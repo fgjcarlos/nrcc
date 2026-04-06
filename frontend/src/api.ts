@@ -15,6 +15,18 @@ export type ApiFailure = {
 
 export type ApiResponse<T> = ApiSuccess<T> | ApiFailure
 
+export class APIRequestError extends Error {
+  code?: string
+  status: number
+
+  constructor(message: string, status: number, code?: string) {
+    super(message)
+    this.name = 'APIRequestError'
+    this.status = status
+    this.code = code
+  }
+}
+
 export type User = {
   id: string
   username: string
@@ -70,6 +82,16 @@ export type ConfigValidationResult = {
   diff: ConfigDiffEntry[]
 }
 
+export type ManagedEnvVar = {
+  name: string
+  value: string
+}
+
+export type ManagedEnvState = {
+  variables: ManagedEnvVar[]
+  restartRequired: boolean
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const method = (init?.method ?? 'GET').toUpperCase()
   const headers = new Headers(init?.headers ?? {})
@@ -85,10 +107,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
   })
 
-  const payload = (await response.json()) as ApiResponse<T>
-  if (!response.ok || !payload.success) {
-    const message = payload.success ? 'Request failed' : payload.error.message
-    throw new Error(message)
+  let payload: ApiResponse<T> | null = null
+  try {
+    payload = (await response.json()) as ApiResponse<T>
+  } catch {
+    payload = null
+  }
+
+  if (!response.ok || !payload || !payload.success) {
+    const message = payload && !payload.success ? payload.error.message : `Request failed with status ${response.status}`
+    const code = payload && !payload.success ? payload.error.code : undefined
+    throw new APIRequestError(message, response.status, code)
   }
 
   syncCSRFToken(path, payload.data)
@@ -151,5 +180,11 @@ export const api = {
     request<ConfigValidationResult>('/api/config/apply', {
       method: 'POST',
       body: JSON.stringify(config),
+    }),
+  environment: () => request<ManagedEnvState>('/api/environment'),
+  applyEnvironment: (variables: ManagedEnvVar[]) =>
+    request<ManagedEnvState>('/api/environment/apply', {
+      method: 'POST',
+      body: JSON.stringify({ variables }),
     }),
 }

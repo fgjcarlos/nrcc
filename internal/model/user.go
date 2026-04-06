@@ -24,6 +24,7 @@ type UserPublic struct {
 }
 
 type SessionClaims struct {
+	SID      string   `json:"sid"`
 	Sub      string   `json:"sub"`
 	Username string   `json:"username"`
 	Role     UserRole `json:"role"`

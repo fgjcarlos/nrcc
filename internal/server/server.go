@@ -18,11 +18,12 @@ import (
 )
 
 type Config struct {
-	Port     string
-	Frontend fs.FS
-	Runtime  *service.ProcessManager
-	Auth     *service.AuthService
-	Config   service.ConfigService
+	Port       string
+	Frontend   fs.FS
+	Runtime    *service.ProcessManager
+	Auth       *service.AuthService
+	Config     service.ConfigService
+	ManagedEnv service.ManagedEnvService
 }
 
 type Server struct {
@@ -36,7 +37,7 @@ type authResponse struct {
 
 func New(cfg Config) *Server {
 	router := chi.NewRouter()
-	registerAPIRoutes(router, cfg.Runtime, cfg.Auth, cfg.Config)
+	registerAPIRoutes(router, cfg.Runtime, cfg.Auth, cfg.Config, cfg.ManagedEnv)
 	registerSPARoutes(router, cfg.Frontend)
 
 	return &Server{
@@ -56,7 +57,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return s.httpServer.Shutdown(ctx)
 }
 
-func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager, authService *service.AuthService, configService service.ConfigService) {
+func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager, authService *service.AuthService, configService service.ConfigService, managedEnvService service.ManagedEnvService) {
 	router.Get("/api/health", func(w http.ResponseWriter, r *http.Request) {
 		respondOK(w, map[string]any{
 			"status": "ok",
@@ -153,6 +154,13 @@ func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager
 			})
 
 			r.With(requireAuth(authService), requireCSRF(authService)).Post("/logout", func(w http.ResponseWriter, r *http.Request) {
+				cookie, err := r.Cookie(service.SessionCookieName)
+				if err == nil && cookie.Value != "" {
+					if revokeErr := authService.RevokeToken(cookie.Value); revokeErr != nil {
+						respondError(w, http.StatusUnauthorized, "AUTH_INVALID", "invalid session")
+						return
+					}
+				}
 				if claims, ok := middleware.AuthClaimsFromContext(r.Context()); ok {
 					authService.LogAudit("auth.logout", claims.Username, "logout succeeded")
 				}
@@ -248,6 +256,43 @@ func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager
 			}
 
 			respondOK(w, result)
+		})
+
+		r.Get("/api/environment", func(w http.ResponseWriter, r *http.Request) {
+			state, err := managedEnvService.Load()
+			if err != nil {
+				respondError(w, http.StatusInternalServerError, "ENV_LOAD_FAILED", err.Error())
+				return
+			}
+			respondOK(w, state)
+		})
+
+		r.Post("/api/environment/apply", func(w http.ResponseWriter, r *http.Request) {
+			var payload struct {
+				Variables []model.ManagedEnvVar `json:"variables"`
+			}
+			if err := decodeJSON(r, &payload); err != nil {
+				respondError(w, http.StatusBadRequest, "INVALID_REQUEST", err.Error())
+				return
+			}
+
+			state, err := managedEnvService.Apply(payload.Variables)
+			if err != nil {
+				respondError(w, http.StatusInternalServerError, "ENV_APPLY_FAILED", err.Error())
+				return
+			}
+			if errors := managedEnvService.Validate(payload.Variables); len(errors) > 0 {
+				respondError(w, http.StatusBadRequest, "ENV_INVALID", strings.Join(errors, "; "))
+				return
+			}
+
+			if authService != nil {
+				if claims, ok := middleware.AuthClaimsFromContext(r.Context()); ok {
+					authService.LogAudit("environment.apply", claims.Username, "managed environment updated")
+				}
+			}
+
+			respondOK(w, state)
 		})
 	})
 }

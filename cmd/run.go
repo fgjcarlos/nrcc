@@ -57,6 +57,7 @@ func start(frontend fs.FS) error {
 	defer authService.Close()
 
 	configService := service.NewConfigService(dataDir)
+	managedEnvService := service.NewManagedEnvService(dataDir)
 
 	port := envOrDefault("NRCC_PORT", "3000")
 	runtimePort, err := strconv.Atoi(envOrDefault("NRCC_NODE_RED_PORT", "1880"))
@@ -73,11 +74,12 @@ func start(frontend fs.FS) error {
 	}
 
 	app := server.New(AppConfig{
-		Port:     port,
-		Frontend: frontend,
-		Runtime:  processManager,
-		Auth:     authService,
-		Config:   configService,
+		Port:       port,
+		Frontend:   frontend,
+		Runtime:    processManager,
+		Auth:       authService,
+		Config:     configService,
+		ManagedEnv: managedEnvService,
 	})
 
 	fmt.Printf("nrcc listening on http://127.0.0.1:%s\n", port)

@@ -12,6 +12,7 @@ import (
 	"nrcc/internal/model"
 	"nrcc/internal/security"
 
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 	_ "modernc.org/sqlite"
 )
@@ -131,7 +132,32 @@ func (s *AuthService) Login(username, password, clientAddr string) (*model.UserP
 }
 
 func (s *AuthService) VerifyToken(token string) (*model.SessionClaims, error) {
-	return s.session.Verify(token)
+	claims, err := s.session.Verify(token)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(claims.SID) == "" {
+		return nil, fmt.Errorf("invalid session")
+	}
+
+	if err := s.deleteExpiredSessions(); err != nil {
+		return nil, err
+	}
+
+	var count int
+	err = s.db.QueryRow(`
+		SELECT COUNT(*)
+		FROM sessions
+		WHERE id = ? AND user_id = ? AND expires_at = ?
+	`, claims.SID, claims.Sub, time.Unix(claims.Exp, 0).UTC().Format(time.RFC3339)).Scan(&count)
+	if err != nil {
+		return nil, fmt.Errorf("verify session: %w", err)
+	}
+	if count == 0 {
+		return nil, fmt.Errorf("invalid session")
+	}
+
+	return claims, nil
 }
 
 func (s *AuthService) HasUsers() (bool, error) {
@@ -157,6 +183,21 @@ func (s *AuthService) VerifyCSRF(sessionToken, token string) bool {
 
 func (s *AuthService) LogAudit(eventType, username, detail string) {
 	s.logAudit(eventType, username, detail)
+}
+
+func (s *AuthService) RevokeToken(token string) error {
+	claims, err := s.session.Verify(token)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(claims.SID) == "" {
+		return fmt.Errorf("invalid session")
+	}
+
+	if _, err := s.db.Exec(`DELETE FROM sessions WHERE id = ?`, claims.SID); err != nil {
+		return fmt.Errorf("revoke session: %w", err)
+	}
+	return nil
 }
 
 func (s *AuthService) Close() error {
@@ -210,12 +251,18 @@ func (s *AuthService) insertUser(user model.UserRecord) error {
 }
 
 func (s *AuthService) issueToken(user model.UserRecord) (string, error) {
-	return s.session.Issue(model.SessionClaims{
+	expiresAt := time.Now().Add(s.cookieTTL).UTC()
+	claims := model.SessionClaims{
+		SID:      "ses_" + uuid.NewString(),
 		Sub:      user.ID,
 		Username: user.Username,
 		Role:     user.Role,
-		Exp:      time.Now().Add(s.cookieTTL).Unix(),
-	})
+		Exp:      expiresAt.Unix(),
+	}
+	if err := s.insertSession(claims.SID, user.ID, expiresAt); err != nil {
+		return "", err
+	}
+	return s.session.Issue(claims)
 }
 
 func publicUser(user model.UserRecord) model.UserPublic {
@@ -252,6 +299,13 @@ func initAuthSchema(db *sql.DB) error {
 		event_type TEXT NOT NULL,
 		username TEXT,
 		detail TEXT,
+		created_at TEXT NOT NULL
+	);
+
+	CREATE TABLE IF NOT EXISTS sessions (
+		id TEXT PRIMARY KEY,
+		user_id TEXT NOT NULL,
+		expires_at TEXT NOT NULL,
 		created_at TEXT NOT NULL
 	);
 	`
@@ -353,4 +407,24 @@ func nullableString(value string) any {
 		return nil
 	}
 	return value
+}
+
+func (s *AuthService) insertSession(sessionID, userID string, expiresAt time.Time) error {
+	if _, err := s.db.Exec(`
+		INSERT INTO sessions (id, user_id, expires_at, created_at)
+		VALUES (?, ?, ?, ?)
+	`, sessionID, userID, expiresAt.UTC().Format(time.RFC3339), time.Now().UTC().Format(time.RFC3339)); err != nil {
+		return fmt.Errorf("insert session: %w", err)
+	}
+	return nil
+}
+
+func (s *AuthService) deleteExpiredSessions() error {
+	if _, err := s.db.Exec(`
+		DELETE FROM sessions
+		WHERE expires_at <= ?
+	`, time.Now().UTC().Format(time.RFC3339)); err != nil {
+		return fmt.Errorf("delete expired sessions: %w", err)
+	}
+	return nil
 }
