@@ -60,6 +60,7 @@ func start(frontend fs.FS) error {
 	managedEnvService := service.NewManagedEnvService(dataDir)
 	backupService := service.NewBackupService(dataDir)
 	libraryService := service.NewLibraryService(dataDir)
+	updateService := service.NewUpdateService(dataDir, backupService)
 	operationLock := service.NewOperationLock()
 
 	port := envOrDefault("NRCC_PORT", "3000")
@@ -85,6 +86,7 @@ func start(frontend fs.FS) error {
 		ManagedEnv: managedEnvService,
 		Backups:    backupService,
 		Libraries:  libraryService,
+		Updates:    updateService,
 		Operations: operationLock,
 	})
 

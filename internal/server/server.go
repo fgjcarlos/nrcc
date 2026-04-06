@@ -26,6 +26,7 @@ type Config struct {
 	ManagedEnv service.ManagedEnvService
 	Backups    service.BackupService
 	Libraries  service.LibraryService
+	Updates    service.UpdateService
 	Operations *service.OperationLock
 }
 
@@ -40,7 +41,7 @@ type authResponse struct {
 
 func New(cfg Config) *Server {
 	router := chi.NewRouter()
-	registerAPIRoutes(router, cfg.Runtime, cfg.Auth, cfg.Config, cfg.ManagedEnv, cfg.Backups, cfg.Libraries, cfg.Operations)
+	registerAPIRoutes(router, cfg.Runtime, cfg.Auth, cfg.Config, cfg.ManagedEnv, cfg.Backups, cfg.Libraries, cfg.Updates, cfg.Operations)
 	registerSPARoutes(router, cfg.Frontend)
 
 	return &Server{
@@ -60,7 +61,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return s.httpServer.Shutdown(ctx)
 }
 
-func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager, authService *service.AuthService, configService service.ConfigService, managedEnvService service.ManagedEnvService, backupService service.BackupService, libraryService service.LibraryService, operationLock *service.OperationLock) {
+func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager, authService *service.AuthService, configService service.ConfigService, managedEnvService service.ManagedEnvService, backupService service.BackupService, libraryService service.LibraryService, updateService service.UpdateService, operationLock *service.OperationLock) {
 	if operationLock == nil {
 		operationLock = service.NewOperationLock()
 	}
@@ -424,6 +425,38 @@ func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager
 			if authService != nil {
 				if claims, ok := middleware.AuthClaimsFromContext(r.Context()); ok {
 					authService.LogAudit("library.uninstall", claims.Username, "npm library removed")
+				}
+			}
+
+			respondOK(w, result)
+		})
+
+		r.Get("/api/updates/status", func(w http.ResponseWriter, r *http.Request) {
+			status, err := updateService.Status()
+			if err != nil {
+				respondError(w, http.StatusInternalServerError, "UPDATE_STATUS_FAILED", err.Error())
+				return
+			}
+			respondOK(w, status)
+		})
+
+		r.Post("/api/updates/apply", func(w http.ResponseWriter, r *http.Request) {
+			release, err := operationLock.Acquire("updating", "node-red")
+			if err != nil {
+				respondError(w, http.StatusConflict, "OPERATION_LOCKED", err.Error())
+				return
+			}
+			defer release()
+
+			result, err := updateService.Apply(runtimeManager)
+			if err != nil {
+				respondError(w, http.StatusInternalServerError, "UPDATE_APPLY_FAILED", err.Error())
+				return
+			}
+
+			if authService != nil {
+				if claims, ok := middleware.AuthClaimsFromContext(r.Context()); ok {
+					authService.LogAudit("update.apply", claims.Username, "node-red update applied")
 				}
 			}
 

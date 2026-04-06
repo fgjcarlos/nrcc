@@ -29,6 +29,7 @@ func TestAuthFlowAndProtectedRoutes(t *testing.T) {
 		service.NewManagedEnvService(testDataDir),
 		service.NewBackupService(testDataDir),
 		service.NewLibraryService(testDataDir),
+		service.NewUpdateService(testDataDir, service.NewBackupService(testDataDir)),
 		service.NewOperationLock(),
 	)
 
@@ -149,6 +150,7 @@ func TestLoginCookieSecureOnForwardedHTTPS(t *testing.T) {
 		service.NewManagedEnvService(testDataDir),
 		service.NewBackupService(testDataDir),
 		service.NewLibraryService(testDataDir),
+		service.NewUpdateService(testDataDir, service.NewBackupService(testDataDir)),
 		service.NewOperationLock(),
 	)
 
@@ -192,6 +194,7 @@ func TestOperationStatusAndRestoreConflict(t *testing.T) {
 		service.NewManagedEnvService(testDataDir),
 		service.NewBackupService(testDataDir),
 		service.NewLibraryService(testDataDir),
+		service.NewUpdateService(testDataDir, service.NewBackupService(testDataDir)),
 		lock,
 	)
 

@@ -496,6 +496,11 @@ input {
   color: #56645e;
 }
 
+.update-card {
+  display: grid;
+  gap: 16px;
+}
+
 .config-form label {
   display: grid;
   gap: 8px;

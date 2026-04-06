@@ -129,6 +129,20 @@ export type OperationStatus = {
   startedAt?: string
 }
 
+export type UpdateStatus = {
+  installedVersion: string
+  availableVersion: string
+  updateAvailable: boolean
+}
+
+export type UpdateApplyResult = {
+  fromVersion: string
+  toVersion: string
+  preventiveBackupId: string
+  rolledBack: boolean
+  message: string
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const method = (init?.method ?? 'GET').toUpperCase()
   const headers = new Headers(init?.headers ?? {})
@@ -243,4 +257,9 @@ export const api = {
       method: 'DELETE',
     }),
   operationsStatus: () => request<OperationStatus>('/api/operations/status'),
+  updateStatus: () => request<UpdateStatus>('/api/updates/status'),
+  applyUpdate: () =>
+    request<UpdateApplyResult>('/api/updates/apply', {
+      method: 'POST',
+    }),
 }

@@ -14,11 +14,12 @@ import {
   type RuntimeStatus,
   type SupportedConfig,
   type SystemInfo,
+  type UpdateStatus,
   type User,
 } from './api'
 
 type AuthMode = 'login' | 'register'
-type PageKey = 'overview' | 'logs' | 'config' | 'environment' | 'backups' | 'libraries'
+type PageKey = 'overview' | 'logs' | 'config' | 'environment' | 'backups' | 'libraries' | 'updates'
 type ToastTone = 'success' | 'error' | 'info'
 
 type Toast = {
@@ -191,6 +192,13 @@ export function App() {
     queryFn: api.operationsStatus,
     enabled: meQuery.isSuccess,
     refetchInterval: 2000,
+  })
+
+  const updatesQuery = useQuery({
+    queryKey: ['updates-status'],
+    queryFn: api.updateStatus,
+    enabled: meQuery.isSuccess,
+    refetchInterval: 15000,
   })
 
   const restartMutation = useMutation({
@@ -378,6 +386,27 @@ export function App() {
                       />
                     }
                   />
+                  <Route
+                    path="updates"
+                    element={
+                      <UpdatesPage
+                        updateStatus={updatesQuery.data}
+                        loading={updatesQuery.isLoading}
+                        error={updatesQuery.error}
+                        operationStatus={operationsQuery.data}
+                        onChanged={async (message, tone) => {
+                          await queryClient.invalidateQueries({ queryKey: ['updates-status'] })
+                          await queryClient.invalidateQueries({ queryKey: ['operations-status'] })
+                          await queryClient.invalidateQueries({ queryKey: ['runtime-status'] })
+                          pushToast({
+                            tone,
+                            title: tone === 'success' ? 'Update completed' : 'Update failed',
+                            detail: message,
+                          })
+                        }}
+                      />
+                    }
+                  />
                   <Route path="*" element={<Navigate to="/app/overview" replace />} />
                 </Routes>
               </DashboardShell>
@@ -502,6 +531,7 @@ function DashboardShell({
     { to: '/app/environment', label: 'Environment', page: 'environment' },
     { to: '/app/backups', label: 'Backups', page: 'backups' },
     { to: '/app/libraries', label: 'Libraries', page: 'libraries' },
+    { to: '/app/updates', label: 'Updates', page: 'updates' },
   ]
 
   return (
@@ -1036,6 +1066,119 @@ function LibrariesPage({
                 </button>
               </article>
             ))}
+          </div>
+        ) : null}
+      </article>
+    </>
+  )
+}
+
+function UpdatesPage({
+  updateStatus,
+  loading,
+  error,
+  operationStatus,
+  onChanged,
+}: {
+  updateStatus?: UpdateStatus
+  loading: boolean
+  error: unknown
+  operationStatus?: OperationStatus
+  onChanged: (message: string, tone: ToastTone) => Promise<void>
+}) {
+  const [confirmUpdate, setConfirmUpdate] = useState(false)
+
+  const applyMutation = useMutation({
+    mutationFn: api.applyUpdate,
+    onSuccess: async (result) => {
+      setConfirmUpdate(false)
+      await onChanged(result.message, result.rolledBack ? 'error' : 'success')
+    },
+    onError: async (mutationError) => {
+      setConfirmUpdate(false)
+      await onChanged(formatErrorMessage(mutationError, 'The update could not be applied.'), 'error')
+    },
+  })
+
+  const busy = operationStatus?.busy ?? false
+
+  return (
+    <>
+      <header className="topbar">
+        <div>
+          <p className="eyebrow">Runtime</p>
+          <h2>Updates</h2>
+        </div>
+      </header>
+
+      {error ? (
+        <section className="inline-notice error">
+          <strong>Update status unavailable</strong>
+          <p>{formatErrorMessage(error, 'Node-RED update information could not be loaded.')}</p>
+        </section>
+      ) : null}
+
+      {busy ? (
+        <section className="inline-notice warn">
+          <strong>System busy</strong>
+          <p>
+            {operationStatus?.type ? `${operationStatus.type} in progress` : 'Another operation is in progress'}
+            {operationStatus?.detail ? `: ${operationStatus.detail}` : '.'}
+          </p>
+        </section>
+      ) : null}
+
+      <article className="panel">
+        <div className="panel-header">
+          <h3>Node-RED update</h3>
+        </div>
+        {loading ? <p className="muted">Loading update status...</p> : null}
+        {updateStatus ? (
+          <div className="update-card">
+            <dl className="details-list">
+              <Detail label="Installed version" value={updateStatus.installedVersion || 'Unknown'} />
+              <Detail label="Available version" value={updateStatus.availableVersion || 'Unknown'} />
+              <Detail label="Update available" value={updateStatus.updateAvailable ? 'Yes' : 'No'} />
+            </dl>
+
+            {confirmUpdate ? (
+              <section className="inline-notice warn">
+                <strong>Confirm update</strong>
+                <p>A preventive backup will be created before updating Node-RED. Rollback will run automatically if health checks fail.</p>
+              </section>
+            ) : null}
+
+            <div className="topbar-actions">
+              {confirmUpdate ? (
+                <>
+                  <button
+                    className="ghost-button"
+                    type="button"
+                    onClick={() => setConfirmUpdate(false)}
+                    disabled={applyMutation.isPending}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="primary-button"
+                    type="button"
+                    onClick={() => applyMutation.mutate()}
+                    disabled={busy || applyMutation.isPending}
+                  >
+                    {applyMutation.isPending ? 'Updating...' : 'Confirm update'}
+                  </button>
+                </>
+              ) : (
+                <button
+                  className="primary-button"
+                  type="button"
+                  onClick={() => setConfirmUpdate(true)}
+                  disabled={busy || !updateStatus.updateAvailable}
+                >
+                  {updateStatus.updateAvailable ? 'Update Node-RED' : 'Up to date'}
+                </button>
+              )}
+            </div>
           </div>
         ) : null}
       </article>
