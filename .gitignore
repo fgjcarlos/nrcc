@@ -15,6 +15,7 @@ dist/
 # Frontend dependencies and local artifacts
 frontend/node_modules/
 frontend/.vite/
+frontend/*.tsbuildinfo
 
 # Environment and editor files
 .env
