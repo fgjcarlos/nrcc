@@ -1,0 +1,31 @@
+package model
+
+type UserRole string
+
+const (
+	RoleAdmin    UserRole = "admin"
+	RoleOperator UserRole = "operator"
+	RoleViewer   UserRole = "viewer"
+)
+
+type UserRecord struct {
+	ID           string   `json:"id"`
+	Username     string   `json:"username"`
+	PasswordHash string   `json:"passwordHash"`
+	Role         UserRole `json:"role"`
+	CreatedAt    string   `json:"createdAt"`
+}
+
+type UserPublic struct {
+	ID        string   `json:"id"`
+	Username  string   `json:"username"`
+	Role      UserRole `json:"role"`
+	CreatedAt string   `json:"createdAt"`
+}
+
+type SessionClaims struct {
+	Sub      string   `json:"sub"`
+	Username string   `json:"username"`
+	Role     UserRole `json:"role"`
+	Exp      int64    `json:"exp"`
+}
