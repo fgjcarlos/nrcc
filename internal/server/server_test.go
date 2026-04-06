@@ -20,7 +20,8 @@ func TestAuthFlowAndProtectedRoutes(t *testing.T) {
 
 	authService, configService := newTestServices(t)
 	router := chi.NewRouter()
-	registerAPIRoutes(router, nil, authService, configService, service.NewManagedEnvService(t.TempDir()))
+	testDataDir := t.TempDir()
+	registerAPIRoutes(router, nil, authService, configService, service.NewManagedEnvService(testDataDir), service.NewBackupService(testDataDir))
 
 	registerBody := map[string]string{
 		"username": "alice",
@@ -130,7 +131,8 @@ func TestLoginCookieSecureOnForwardedHTTPS(t *testing.T) {
 	}
 
 	router := chi.NewRouter()
-	registerAPIRoutes(router, nil, authService, configService, service.NewManagedEnvService(t.TempDir()))
+	testDataDir := t.TempDir()
+	registerAPIRoutes(router, nil, authService, configService, service.NewManagedEnvService(testDataDir), service.NewBackupService(testDataDir))
 
 	loginReq := newJSONRequest(t, http.MethodPost, "/api/auth/login", map[string]string{
 		"username": "alice",

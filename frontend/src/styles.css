@@ -417,6 +417,37 @@ input {
   white-space: nowrap;
 }
 
+.backup-list {
+  display: grid;
+  gap: 14px;
+}
+
+.backup-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(28, 42, 34, 0.04);
+}
+
+.backup-card-copy strong,
+.backup-card-copy p {
+  margin: 0;
+}
+
+.backup-card-copy p {
+  margin-top: 4px;
+  color: #56645e;
+}
+
+.backup-card-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .config-form label {
   display: grid;
   gap: 8px;
@@ -593,6 +624,11 @@ input {
 
   .env-row {
     grid-template-columns: 1fr;
+  }
+
+  .backup-card {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .toast-stack {

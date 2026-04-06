@@ -24,6 +24,7 @@ type Config struct {
 	Auth       *service.AuthService
 	Config     service.ConfigService
 	ManagedEnv service.ManagedEnvService
+	Backups    service.BackupService
 }
 
 type Server struct {
@@ -37,7 +38,7 @@ type authResponse struct {
 
 func New(cfg Config) *Server {
 	router := chi.NewRouter()
-	registerAPIRoutes(router, cfg.Runtime, cfg.Auth, cfg.Config, cfg.ManagedEnv)
+	registerAPIRoutes(router, cfg.Runtime, cfg.Auth, cfg.Config, cfg.ManagedEnv, cfg.Backups)
 	registerSPARoutes(router, cfg.Frontend)
 
 	return &Server{
@@ -57,7 +58,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return s.httpServer.Shutdown(ctx)
 }
 
-func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager, authService *service.AuthService, configService service.ConfigService, managedEnvService service.ManagedEnvService) {
+func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager, authService *service.AuthService, configService service.ConfigService, managedEnvService service.ManagedEnvService, backupService service.BackupService) {
 	router.Get("/api/health", func(w http.ResponseWriter, r *http.Request) {
 		respondOK(w, map[string]any{
 			"status": "ok",
@@ -293,6 +294,56 @@ func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager
 			}
 
 			respondOK(w, state)
+		})
+
+		r.Get("/api/backups", func(w http.ResponseWriter, r *http.Request) {
+			backups, err := backupService.List()
+			if err != nil {
+				respondError(w, http.StatusInternalServerError, "BACKUPS_LIST_FAILED", err.Error())
+				return
+			}
+			respondOK(w, backups)
+		})
+
+		r.Post("/api/backups/create", func(w http.ResponseWriter, r *http.Request) {
+			backup, err := backupService.Create("manual")
+			if err != nil {
+				respondError(w, http.StatusInternalServerError, "BACKUP_CREATE_FAILED", err.Error())
+				return
+			}
+
+			if authService != nil {
+				if claims, ok := middleware.AuthClaimsFromContext(r.Context()); ok {
+					authService.LogAudit("backup.create", claims.Username, "manual backup created")
+				}
+			}
+
+			respondOK(w, backup)
+		})
+
+		r.Post("/api/backups/{id}/restore", func(w http.ResponseWriter, r *http.Request) {
+			backupID := strings.TrimSpace(chi.URLParam(r, "id"))
+			if backupID == "" {
+				respondError(w, http.StatusBadRequest, "INVALID_REQUEST", "backup id is required")
+				return
+			}
+
+			preventive, err := backupService.Restore(backupID, runtimeManager)
+			if err != nil {
+				respondError(w, http.StatusInternalServerError, "BACKUP_RESTORE_FAILED", err.Error())
+				return
+			}
+
+			if authService != nil {
+				if claims, ok := middleware.AuthClaimsFromContext(r.Context()); ok {
+					authService.LogAudit("backup.restore", claims.Username, "backup restored with preventive backup")
+				}
+			}
+
+			respondOK(w, map[string]any{
+				"restoredBackupId":   backupID,
+				"preventiveBackupId": preventive.ID,
+			})
 		})
 	})
 }

@@ -92,6 +92,19 @@ export type ManagedEnvState = {
   restartRequired: boolean
 }
 
+export type BackupSummary = {
+  id: string
+  reason: string
+  createdAt: string
+  archiveName: string
+  archiveBytes: number
+  archiveSha256: string
+}
+
+export type BackupList = {
+  items: BackupSummary[]
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const method = (init?.method ?? 'GET').toUpperCase()
   const headers = new Headers(init?.headers ?? {})
@@ -186,5 +199,14 @@ export const api = {
     request<ManagedEnvState>('/api/environment/apply', {
       method: 'POST',
       body: JSON.stringify({ variables }),
+    }),
+  backups: () => request<BackupList>('/api/backups'),
+  createBackup: () =>
+    request<BackupSummary>('/api/backups/create', {
+      method: 'POST',
+    }),
+  restoreBackup: (id: string) =>
+    request<{ restoredBackupId: string; preventiveBackupId: string }>(`/api/backups/${id}/restore`, {
+      method: 'POST',
     }),
 }

@@ -5,6 +5,7 @@ import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'reac
 import {
   APIRequestError,
   api,
+  type BackupList,
   type ConfigValidationResult,
   type ManagedEnvState,
   type ManagedEnvVar,
@@ -15,7 +16,7 @@ import {
 } from './api'
 
 type AuthMode = 'login' | 'register'
-type PageKey = 'overview' | 'logs' | 'config' | 'environment'
+type PageKey = 'overview' | 'logs' | 'config' | 'environment' | 'backups'
 type ToastTone = 'success' | 'error' | 'info'
 
 type Toast = {
@@ -171,6 +172,12 @@ export function App() {
     enabled: meQuery.isSuccess,
   })
 
+  const backupsQuery = useQuery({
+    queryKey: ['backups'],
+    queryFn: api.backups,
+    enabled: meQuery.isSuccess,
+  })
+
   const restartMutation = useMutation({
     mutationFn: api.runtimeRestart,
     onSuccess: async () => {
@@ -318,6 +325,24 @@ export function App() {
                       />
                     }
                   />
+                  <Route
+                    path="backups"
+                    element={
+                      <BackupsPage
+                        backups={backupsQuery.data}
+                        loading={backupsQuery.isLoading}
+                        error={backupsQuery.error}
+                        onChanged={async (message, tone) => {
+                          await queryClient.invalidateQueries({ queryKey: ['backups'] })
+                          pushToast({
+                            tone,
+                            title: tone === 'success' ? 'Backups updated' : 'Backup action failed',
+                            detail: message,
+                          })
+                        }}
+                      />
+                    }
+                  />
                   <Route path="*" element={<Navigate to="/app/overview" replace />} />
                 </Routes>
               </DashboardShell>
@@ -440,6 +465,7 @@ function DashboardShell({
     { to: '/app/logs', label: 'Logs', page: 'logs' },
     { to: '/app/config', label: 'Config', page: 'config' },
     { to: '/app/environment', label: 'Environment', page: 'environment' },
+    { to: '/app/backups', label: 'Backups', page: 'backups' },
   ]
 
   return (
@@ -728,6 +754,131 @@ function EnvironmentPage({
       ) : null}
 
       <EnvironmentPanel state={state} loading={loading} onSaved={onSaved} onError={onError} />
+    </>
+  )
+}
+
+function BackupsPage({
+  backups,
+  loading,
+  error,
+  onChanged,
+}: {
+  backups?: BackupList
+  loading: boolean
+  error: unknown
+  onChanged: (message: string, tone: ToastTone) => Promise<void>
+}) {
+  const [restoreTarget, setRestoreTarget] = useState<string | null>(null)
+
+  const createMutation = useMutation({
+    mutationFn: api.createBackup,
+    onSuccess: async () => {
+      await onChanged('A manual backup was created successfully.', 'success')
+    },
+    onError: async (mutationError) => {
+      await onChanged(formatErrorMessage(mutationError, 'The backup could not be created.'), 'error')
+    },
+  })
+
+  const restoreMutation = useMutation({
+    mutationFn: api.restoreBackup,
+    onSuccess: async (result) => {
+      setRestoreTarget(null)
+      await onChanged(
+        `Backup restored. Preventive backup created as ${result.preventiveBackupId}.`,
+        'success',
+      )
+    },
+    onError: async (mutationError) => {
+      setRestoreTarget(null)
+      await onChanged(formatErrorMessage(mutationError, 'The backup could not be restored.'), 'error')
+    },
+  })
+
+  return (
+    <>
+      <header className="topbar">
+        <div>
+          <p className="eyebrow">Runtime</p>
+          <h2>Backups</h2>
+        </div>
+        <div className="topbar-actions">
+          <button
+            className="primary-button"
+            type="button"
+            onClick={() => createMutation.mutate()}
+            disabled={createMutation.isPending}
+          >
+            {createMutation.isPending ? 'Creating...' : 'Create backup'}
+          </button>
+        </div>
+      </header>
+
+      {error ? (
+        <section className="inline-notice error">
+          <strong>Backups unavailable</strong>
+          <p>{formatErrorMessage(error, 'Backup history could not be loaded.')}</p>
+        </section>
+      ) : null}
+
+      <article className="panel">
+        <div className="panel-header">
+          <h3>Backup history</h3>
+        </div>
+        {loading ? <p className="muted">Loading backups...</p> : null}
+        {!loading && (!backups || backups.items.length === 0) ? <p className="muted">No backups created yet.</p> : null}
+        {backups?.items.length ? (
+          <div className="backup-list">
+            {backups.items.map((backup) => {
+              const confirming = restoreTarget === backup.id
+              return (
+                <article className="backup-card" key={backup.id}>
+                  <div className="backup-card-copy">
+                    <strong>{backup.id}</strong>
+                    <p>{backup.reason}</p>
+                    <p>{backup.archiveName}</p>
+                    <p>
+                      {formatBytes(backup.archiveBytes)} • {backup.createdAt}
+                    </p>
+                  </div>
+                  <div className="backup-card-actions">
+                    {confirming ? (
+                      <>
+                        <button
+                          className="ghost-button"
+                          type="button"
+                          onClick={() => setRestoreTarget(null)}
+                          disabled={restoreMutation.isPending}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          className="primary-button"
+                          type="button"
+                          onClick={() => restoreMutation.mutate(backup.id)}
+                          disabled={restoreMutation.isPending}
+                        >
+                          {restoreMutation.isPending ? 'Restoring...' : 'Confirm restore'}
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        className="ghost-button"
+                        type="button"
+                        onClick={() => setRestoreTarget(backup.id)}
+                        disabled={restoreMutation.isPending}
+                      >
+                        Restore
+                      </button>
+                    )}
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        ) : null}
+      </article>
     </>
   )
 }
@@ -1149,4 +1300,14 @@ function formatUptime(seconds: number) {
   const minutes = Math.floor((seconds % 3600) / 60)
   const secs = Math.floor(seconds % 60)
   return `${hours}h ${minutes}m ${secs}s`
+}
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024) {
+    return `${bytes} B`
+  }
+  if (bytes < 1024*1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
