@@ -2,27 +2,74 @@
 
 Local-first control center for Node-RED.
 
+## Overview
+
+NRCC combines:
+
+- a Go backend
+- an embedded React + Vite frontend
+- local runtime management for Node-RED
+- SQLite-backed authentication
+- supported configuration editing
+- runtime status, health, and logs
+
 ## Current Status
 
-This repository currently contains the phase 0 scaffold:
+The project is past the initial scaffold and currently includes:
 
-- Go backend skeleton
-- embedded frontend wiring
-- React + Vite frontend shell
-- starter API routes
+- project bootstrap and build wiring
 - phase 1 CLI environment checks and setup flow
 - phase 2 local runtime manager for Node-RED
-- phase 3 pivot in progress toward SQLite-backed auth
+- phase 3 auth migration toward SQLite-backed state
+- authenticated dashboard for runtime visibility and control
+
+The MVP is still in progress. Core runtime and auth foundations are in place, but backup and restore, environment variable management, npm package management, and some CLI behavior are still pending.
+
+## Repository Layout
+
+```text
+cmd/         CLI entrypoints
+internal/    backend services, models, middleware, platform code
+frontend/    React + Vite app
+npm/         local npm package metadata
+```
 
 ## Commands
+
+### Development
 
 ```bash
 make build
 make run
 make frontend-build
+```
+
+### CLI
+
+```bash
 go run . doctor
 go run . setup
+go run . start
+go run . version
 ```
+
+## Implemented So Far
+
+- local environment checks and setup flow
+- local Node-RED process manager
+- runtime status, logs, and restart API
+- SQLite-backed initial user bootstrap and login
+- cookie sessions with CSRF protection
+- supported config load, validate, and apply flow
+- embedded frontend served by the Go binary
+
+## MVP Gaps
+
+- `stop` command is not implemented yet
+- backup and restore flows are not implemented yet
+- environment variable management is not implemented yet
+- npm library install and remove flows are not implemented yet
+- the full Linux MVP path is not complete yet
 
 ## Notes
 
