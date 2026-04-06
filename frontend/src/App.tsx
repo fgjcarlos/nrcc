@@ -7,8 +7,10 @@ import {
   api,
   type BackupList,
   type ConfigValidationResult,
+  type LibraryList,
   type ManagedEnvState,
   type ManagedEnvVar,
+  type OperationStatus,
   type RuntimeStatus,
   type SupportedConfig,
   type SystemInfo,
@@ -16,7 +18,7 @@ import {
 } from './api'
 
 type AuthMode = 'login' | 'register'
-type PageKey = 'overview' | 'logs' | 'config' | 'environment' | 'backups'
+type PageKey = 'overview' | 'logs' | 'config' | 'environment' | 'backups' | 'libraries'
 type ToastTone = 'success' | 'error' | 'info'
 
 type Toast = {
@@ -176,6 +178,19 @@ export function App() {
     queryKey: ['backups'],
     queryFn: api.backups,
     enabled: meQuery.isSuccess,
+  })
+
+  const librariesQuery = useQuery({
+    queryKey: ['libraries'],
+    queryFn: api.libraries,
+    enabled: meQuery.isSuccess,
+  })
+
+  const operationsQuery = useQuery({
+    queryKey: ['operations-status'],
+    queryFn: api.operationsStatus,
+    enabled: meQuery.isSuccess,
+    refetchInterval: 2000,
   })
 
   const restartMutation = useMutation({
@@ -343,6 +358,26 @@ export function App() {
                       />
                     }
                   />
+                  <Route
+                    path="libraries"
+                    element={
+                      <LibrariesPage
+                        libraries={librariesQuery.data}
+                        loading={librariesQuery.isLoading}
+                        error={librariesQuery.error}
+                        operationStatus={operationsQuery.data}
+                        onChanged={async (message, tone) => {
+                          await queryClient.invalidateQueries({ queryKey: ['libraries'] })
+                          await queryClient.invalidateQueries({ queryKey: ['operations-status'] })
+                          pushToast({
+                            tone,
+                            title: tone === 'success' ? 'Libraries updated' : 'Library action failed',
+                            detail: message,
+                          })
+                        }}
+                      />
+                    }
+                  />
                   <Route path="*" element={<Navigate to="/app/overview" replace />} />
                 </Routes>
               </DashboardShell>
@@ -466,6 +501,7 @@ function DashboardShell({
     { to: '/app/config', label: 'Config', page: 'config' },
     { to: '/app/environment', label: 'Environment', page: 'environment' },
     { to: '/app/backups', label: 'Backups', page: 'backups' },
+    { to: '/app/libraries', label: 'Libraries', page: 'libraries' },
   ]
 
   return (
@@ -876,6 +912,130 @@ function BackupsPage({
                 </article>
               )
             })}
+          </div>
+        ) : null}
+      </article>
+    </>
+  )
+}
+
+function LibrariesPage({
+  libraries,
+  loading,
+  error,
+  operationStatus,
+  onChanged,
+}: {
+  libraries?: LibraryList
+  loading: boolean
+  error: unknown
+  operationStatus?: OperationStatus
+  onChanged: (message: string, tone: ToastTone) => Promise<void>
+}) {
+  const [packageName, setPackageName] = useState('')
+
+  const installMutation = useMutation({
+    mutationFn: api.installLibrary,
+    onSuccess: async (result) => {
+      setPackageName('')
+      await onChanged(result.message, 'success')
+    },
+    onError: async (mutationError) => {
+      await onChanged(formatErrorMessage(mutationError, 'The package could not be installed.'), 'error')
+    },
+  })
+
+  const uninstallMutation = useMutation({
+    mutationFn: api.uninstallLibrary,
+    onSuccess: async (result) => {
+      await onChanged(result.message, 'success')
+    },
+    onError: async (mutationError) => {
+      await onChanged(formatErrorMessage(mutationError, 'The package could not be removed.'), 'error')
+    },
+  })
+
+  const busy = operationStatus?.busy ?? false
+
+  return (
+    <>
+      <header className="topbar">
+        <div>
+          <p className="eyebrow">Runtime</p>
+          <h2>Libraries</h2>
+        </div>
+      </header>
+
+      {error ? (
+        <section className="inline-notice error">
+          <strong>Libraries unavailable</strong>
+          <p>{formatErrorMessage(error, 'Installed packages could not be loaded.')}</p>
+        </section>
+      ) : null}
+
+      {busy ? (
+        <section className="inline-notice warn">
+          <strong>System busy</strong>
+          <p>
+            {operationStatus?.type ? `${operationStatus.type} in progress` : 'Another operation is in progress'}
+            {operationStatus?.detail ? `: ${operationStatus.detail}` : '.'}
+          </p>
+        </section>
+      ) : null}
+
+      <article className="panel">
+        <div className="panel-header">
+          <h3>Install package</h3>
+        </div>
+        <form
+          className="library-form"
+          onSubmit={(event) => {
+            event.preventDefault()
+            installMutation.mutate(packageName)
+          }}
+        >
+          <label>
+            <span>Package name</span>
+            <input
+              value={packageName}
+              onChange={(event) => setPackageName(event.target.value)}
+              placeholder="@scope/package"
+            />
+          </label>
+          <button
+            className="primary-button"
+            type="submit"
+            disabled={busy || installMutation.isPending || packageName.trim() === ''}
+          >
+            {installMutation.isPending ? 'Installing...' : 'Install package'}
+          </button>
+        </form>
+      </article>
+
+      <article className="panel">
+        <div className="panel-header">
+          <h3>Installed packages</h3>
+        </div>
+        {loading ? <p className="muted">Loading installed packages...</p> : null}
+        {!loading && (!libraries || libraries.items.length === 0) ? <p className="muted">No additional packages installed.</p> : null}
+        {libraries?.items.length ? (
+          <div className="library-list">
+            {libraries.items.map((item) => (
+              <article className="library-card" key={item.name}>
+                <div className="library-card-copy">
+                  <strong>{item.name}</strong>
+                  <p>{item.version || 'Unknown version'}</p>
+                </div>
+                <button
+                  className="ghost-button"
+                  type="button"
+                  onClick={() => uninstallMutation.mutate(item.name)}
+                  disabled={busy || uninstallMutation.isPending}
+                >
+                  {uninstallMutation.isPending ? 'Working...' : 'Remove'}
+                </button>
+              </article>
+            ))}
           </div>
         ) : null}
       </article>

@@ -105,6 +105,30 @@ export type BackupList = {
   items: BackupSummary[]
 }
 
+export type LibraryPackage = {
+  name: string
+  version: string
+  direct: boolean
+}
+
+export type LibraryList = {
+  items: LibraryPackage[]
+}
+
+export type LibraryOperationResult = {
+  package: LibraryPackage
+  message: string
+  output?: string
+  operation: string
+}
+
+export type OperationStatus = {
+  busy: boolean
+  type?: string
+  detail?: string
+  startedAt?: string
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const method = (init?.method ?? 'GET').toUpperCase()
   const headers = new Headers(init?.headers ?? {})
@@ -209,4 +233,14 @@ export const api = {
     request<{ restoredBackupId: string; preventiveBackupId: string }>(`/api/backups/${id}/restore`, {
       method: 'POST',
     }),
+  libraries: () => request<LibraryList>('/api/libraries'),
+  installLibrary: (name: string) =>
+    request<LibraryOperationResult>(`/api/libraries/${encodeURIComponent(name)}`, {
+      method: 'POST',
+    }),
+  uninstallLibrary: (name: string) =>
+    request<LibraryOperationResult>(`/api/libraries/${encodeURIComponent(name)}`, {
+      method: 'DELETE',
+    }),
+  operationsStatus: () => request<OperationStatus>('/api/operations/status'),
 }

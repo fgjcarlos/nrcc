@@ -21,7 +21,16 @@ func TestAuthFlowAndProtectedRoutes(t *testing.T) {
 	authService, configService := newTestServices(t)
 	router := chi.NewRouter()
 	testDataDir := t.TempDir()
-	registerAPIRoutes(router, nil, authService, configService, service.NewManagedEnvService(testDataDir), service.NewBackupService(testDataDir))
+	registerAPIRoutes(
+		router,
+		nil,
+		authService,
+		configService,
+		service.NewManagedEnvService(testDataDir),
+		service.NewBackupService(testDataDir),
+		service.NewLibraryService(testDataDir),
+		service.NewOperationLock(),
+	)
 
 	registerBody := map[string]string{
 		"username": "alice",
@@ -132,7 +141,16 @@ func TestLoginCookieSecureOnForwardedHTTPS(t *testing.T) {
 
 	router := chi.NewRouter()
 	testDataDir := t.TempDir()
-	registerAPIRoutes(router, nil, authService, configService, service.NewManagedEnvService(testDataDir), service.NewBackupService(testDataDir))
+	registerAPIRoutes(
+		router,
+		nil,
+		authService,
+		configService,
+		service.NewManagedEnvService(testDataDir),
+		service.NewBackupService(testDataDir),
+		service.NewLibraryService(testDataDir),
+		service.NewOperationLock(),
+	)
 
 	loginReq := newJSONRequest(t, http.MethodPost, "/api/auth/login", map[string]string{
 		"username": "alice",
@@ -150,6 +168,72 @@ func TestLoginCookieSecureOnForwardedHTTPS(t *testing.T) {
 	loginCookie := sessionCookieFromResponse(t, loginRec.Result())
 	if !loginCookie.Secure {
 		t.Fatal("session cookie Secure = false on forwarded https request, want true")
+	}
+}
+
+func TestOperationStatusAndRestoreConflict(t *testing.T) {
+	t.Parallel()
+
+	authService, configService := newTestServices(t)
+	testDataDir := t.TempDir()
+	lock := service.NewOperationLock()
+	release, err := lock.Acquire("installing", "lodash")
+	if err != nil {
+		t.Fatalf("Acquire() error = %v", err)
+	}
+	defer release()
+
+	router := chi.NewRouter()
+	registerAPIRoutes(
+		router,
+		nil,
+		authService,
+		configService,
+		service.NewManagedEnvService(testDataDir),
+		service.NewBackupService(testDataDir),
+		service.NewLibraryService(testDataDir),
+		lock,
+	)
+
+	if _, _, err := authService.RegisterInitial("alice", "password123"); err != nil {
+		t.Fatalf("RegisterInitial() error = %v", err)
+	}
+
+	loginReq := newJSONRequest(t, http.MethodPost, "/api/auth/login", map[string]string{
+		"username": "alice",
+		"password": "password123",
+	})
+	loginRec := httptest.NewRecorder()
+	router.ServeHTTP(loginRec, loginReq)
+	if loginRec.Code != http.StatusOK {
+		t.Fatalf("login status = %d, want %d", loginRec.Code, http.StatusOK)
+	}
+	cookie := sessionCookieFromResponse(t, loginRec.Result())
+
+	var loginResp model.APIResponse[authResponse]
+	decodeResponse(t, loginRec.Body.Bytes(), &loginResp)
+
+	statusReq := httptest.NewRequest(http.MethodGet, "/api/operations/status", nil)
+	statusReq.AddCookie(cookie)
+	statusRec := httptest.NewRecorder()
+	router.ServeHTTP(statusRec, statusReq)
+	if statusRec.Code != http.StatusOK {
+		t.Fatalf("operations status = %d, want %d", statusRec.Code, http.StatusOK)
+	}
+
+	var statusResp model.APIResponse[model.OperationStatus]
+	decodeResponse(t, statusRec.Body.Bytes(), &statusResp)
+	if !statusResp.Success || !statusResp.Data.Busy || statusResp.Data.Type != "installing" {
+		t.Fatalf("operations status payload = %+v", statusResp)
+	}
+
+	restoreReq := newJSONRequest(t, http.MethodPost, "/api/backups/backup-id/restore", nil)
+	restoreReq.AddCookie(cookie)
+	restoreReq.Header.Set("X-CSRF-Token", loginResp.Data.CSRFToken)
+	restoreRec := httptest.NewRecorder()
+	router.ServeHTTP(restoreRec, restoreReq)
+	if restoreRec.Code != http.StatusConflict {
+		t.Fatalf("restore while locked = %d, want %d body=%s", restoreRec.Code, http.StatusConflict, restoreRec.Body.String())
 	}
 }
 

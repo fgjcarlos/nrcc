@@ -25,6 +25,8 @@ type Config struct {
 	Config     service.ConfigService
 	ManagedEnv service.ManagedEnvService
 	Backups    service.BackupService
+	Libraries  service.LibraryService
+	Operations *service.OperationLock
 }
 
 type Server struct {
@@ -38,7 +40,7 @@ type authResponse struct {
 
 func New(cfg Config) *Server {
 	router := chi.NewRouter()
-	registerAPIRoutes(router, cfg.Runtime, cfg.Auth, cfg.Config, cfg.ManagedEnv, cfg.Backups)
+	registerAPIRoutes(router, cfg.Runtime, cfg.Auth, cfg.Config, cfg.ManagedEnv, cfg.Backups, cfg.Libraries, cfg.Operations)
 	registerSPARoutes(router, cfg.Frontend)
 
 	return &Server{
@@ -58,7 +60,11 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return s.httpServer.Shutdown(ctx)
 }
 
-func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager, authService *service.AuthService, configService service.ConfigService, managedEnvService service.ManagedEnvService, backupService service.BackupService) {
+func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager, authService *service.AuthService, configService service.ConfigService, managedEnvService service.ManagedEnvService, backupService service.BackupService, libraryService service.LibraryService, operationLock *service.OperationLock) {
+	if operationLock == nil {
+		operationLock = service.NewOperationLock()
+	}
+
 	router.Get("/api/health", func(w http.ResponseWriter, r *http.Request) {
 		respondOK(w, map[string]any{
 			"status": "ok",
@@ -215,6 +221,10 @@ func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager
 			})
 		})
 
+		r.Get("/api/operations/status", func(w http.ResponseWriter, r *http.Request) {
+			respondOK(w, operationLock.Status())
+		})
+
 		r.Get("/api/config", func(w http.ResponseWriter, r *http.Request) {
 			cfg, err := configService.Load()
 			if err != nil {
@@ -328,6 +338,13 @@ func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager
 				return
 			}
 
+			release, err := operationLock.Acquire("restoring", backupID)
+			if err != nil {
+				respondError(w, http.StatusConflict, "OPERATION_LOCKED", err.Error())
+				return
+			}
+			defer release()
+
 			preventive, err := backupService.Restore(backupID, runtimeManager)
 			if err != nil {
 				respondError(w, http.StatusInternalServerError, "BACKUP_RESTORE_FAILED", err.Error())
@@ -344,6 +361,73 @@ func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager
 				"restoredBackupId":   backupID,
 				"preventiveBackupId": preventive.ID,
 			})
+		})
+
+		r.Get("/api/libraries", func(w http.ResponseWriter, r *http.Request) {
+			libraries, err := libraryService.List()
+			if err != nil {
+				respondError(w, http.StatusInternalServerError, "LIBRARIES_LIST_FAILED", err.Error())
+				return
+			}
+			respondOK(w, libraries)
+		})
+
+		r.Post("/api/libraries/{name}", func(w http.ResponseWriter, r *http.Request) {
+			name := strings.TrimSpace(chi.URLParam(r, "name"))
+			if name == "" {
+				respondError(w, http.StatusBadRequest, "INVALID_REQUEST", "package name is required")
+				return
+			}
+
+			release, err := operationLock.Acquire("installing", name)
+			if err != nil {
+				respondError(w, http.StatusConflict, "OPERATION_LOCKED", err.Error())
+				return
+			}
+			defer release()
+
+			result, err := libraryService.Install(name)
+			if err != nil {
+				respondError(w, http.StatusBadRequest, "LIBRARY_INSTALL_FAILED", err.Error())
+				return
+			}
+
+			if authService != nil {
+				if claims, ok := middleware.AuthClaimsFromContext(r.Context()); ok {
+					authService.LogAudit("library.install", claims.Username, "npm library installed")
+				}
+			}
+
+			respondOK(w, result)
+		})
+
+		r.Delete("/api/libraries/{name}", func(w http.ResponseWriter, r *http.Request) {
+			name := strings.TrimSpace(chi.URLParam(r, "name"))
+			if name == "" {
+				respondError(w, http.StatusBadRequest, "INVALID_REQUEST", "package name is required")
+				return
+			}
+
+			release, err := operationLock.Acquire("installing", name)
+			if err != nil {
+				respondError(w, http.StatusConflict, "OPERATION_LOCKED", err.Error())
+				return
+			}
+			defer release()
+
+			result, err := libraryService.Uninstall(name)
+			if err != nil {
+				respondError(w, http.StatusBadRequest, "LIBRARY_UNINSTALL_FAILED", err.Error())
+				return
+			}
+
+			if authService != nil {
+				if claims, ok := middleware.AuthClaimsFromContext(r.Context()); ok {
+					authService.LogAudit("library.uninstall", claims.Username, "npm library removed")
+				}
+			}
+
+			respondOK(w, result)
 		})
 	})
 }
