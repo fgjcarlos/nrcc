@@ -231,8 +231,9 @@ func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager
 			respondOK(w, operationLock.Status())
 		})
 
+		// F.1: GET /api/config — Load full config
 		r.Get("/api/config", func(w http.ResponseWriter, r *http.Request) {
-			cfg, err := configService.Load()
+			cfg, err := configService.LoadFullConfig()
 			if err != nil {
 				respondError(w, http.StatusInternalServerError, "CONFIG_LOAD_FAILED", err.Error())
 				return
@@ -240,39 +241,222 @@ func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager
 			respondOK(w, cfg)
 		})
 
+		// F.2: POST /api/config/validate — Validate full config
 		r.Post("/api/config/validate", func(w http.ResponseWriter, r *http.Request) {
-			var payload model.AppConfig
+			var payload model.FullAppConfig
 			if err := decodeJSON(r, &payload); err != nil {
 				respondError(w, http.StatusBadRequest, "INVALID_REQUEST", err.Error())
 				return
 			}
-			respondOK(w, configService.Validate(payload))
+			respondOK(w, configService.ValidateConfig(payload))
 		})
 
+		// F.3: POST /api/config/apply — Apply full config
 		r.Post("/api/config/apply", func(w http.ResponseWriter, r *http.Request) {
-			var payload model.AppConfig
+			var payload model.FullAppConfig
 			if err := decodeJSON(r, &payload); err != nil {
 				respondError(w, http.StatusBadRequest, "INVALID_REQUEST", err.Error())
 				return
 			}
 
-			result, err := configService.Apply(payload)
+			username := "unknown"
+			if authService != nil {
+				if claims, ok := middleware.AuthClaimsFromContext(r.Context()); ok {
+					username = claims.Username
+				}
+			}
+
+			result, err := configService.ApplyConfig(payload, username)
 			if err != nil {
 				respondError(w, http.StatusInternalServerError, "CONFIG_APPLY_FAILED", err.Error())
 				return
 			}
 			if !result.Valid {
-				respondError(w, http.StatusBadRequest, "CONFIG_INVALID", strings.Join(result.Errors, "; "))
+				var errMessages []string
+				for _, fe := range result.Errors {
+					errMessages = append(errMessages, fe.Message)
+				}
+				respondError(w, http.StatusBadRequest, "CONFIG_INVALID", strings.Join(errMessages, "; "))
 				return
 			}
 
 			if authService != nil {
 				if claims, ok := middleware.AuthClaimsFromContext(r.Context()); ok {
-					authService.LogAudit("config.apply", claims.Username, "supported config applied")
+					authService.LogAudit("config.apply", claims.Username, "full config applied")
 				}
 			}
 
 			respondOK(w, result)
+		})
+
+		// F.4: GET /api/config/schema — Get config JSON schema
+		r.Get("/api/config/schema", func(w http.ResponseWriter, r *http.Request) {
+			respondOK(w, configService.GetConfigSchema())
+		})
+
+		// F.5: GET /api/config/preview — Preview current config as settings.js
+		r.Get("/api/config/preview", func(w http.ResponseWriter, r *http.Request) {
+			preview, err := configService.PreviewConfig(nil)
+			if err != nil {
+				respondError(w, http.StatusInternalServerError, "CONFIG_PREVIEW_FAILED", err.Error())
+				return
+			}
+			respondOK(w, map[string]any{
+				"settingsJs": preview,
+			})
+		})
+
+		// F.6: POST /api/config/preview — Preview with provided config
+		r.Post("/api/config/preview", func(w http.ResponseWriter, r *http.Request) {
+			var payload model.FullAppConfig
+			if err := decodeJSON(r, &payload); err != nil {
+				respondError(w, http.StatusBadRequest, "INVALID_REQUEST", err.Error())
+				return
+			}
+
+			preview, err := configService.PreviewConfig(&payload)
+			if err != nil {
+				respondError(w, http.StatusInternalServerError, "CONFIG_PREVIEW_FAILED", err.Error())
+				return
+			}
+			respondOK(w, map[string]any{
+				"settingsJs": preview,
+			})
+		})
+
+		// F.7: POST /api/config/backup — Create config backup/snapshot
+		r.Post("/api/config/backup", func(w http.ResponseWriter, r *http.Request) {
+			var payload struct {
+				Label string `json:"label"`
+			}
+			if err := decodeJSON(r, &payload); err != nil {
+				respondError(w, http.StatusBadRequest, "INVALID_REQUEST", err.Error())
+				return
+			}
+
+			// Get current config and render settings
+			currentCfg, err := configService.LoadFullConfig()
+			if err != nil {
+				respondError(w, http.StatusInternalServerError, "CONFIG_LOAD_FAILED", err.Error())
+				return
+			}
+
+			currentJSON, _ := json.Marshal(currentCfg)
+			settingsJS := service.RenderSettingsJS(currentCfg)
+
+			username := "unknown"
+			if authService != nil {
+				if claims, ok := middleware.AuthClaimsFromContext(r.Context()); ok {
+					username = claims.Username
+				}
+			}
+
+			// Create snapshot
+			snapshot, err := configService.CreateSnapshot(payload.Label, "Manual backup by "+username, string(currentJSON), settingsJS)
+			if err != nil {
+				respondError(w, http.StatusInternalServerError, "BACKUP_CREATE_FAILED", err.Error())
+				return
+			}
+
+			if authService != nil {
+				if claims, ok := middleware.AuthClaimsFromContext(r.Context()); ok {
+					authService.LogAudit("config.backup", claims.Username, "config backup created")
+				}
+			}
+
+			respondOK(w, snapshot)
+		})
+
+		// F.8: GET /api/config/backups — List config snapshots
+		r.Get("/api/config/backups", func(w http.ResponseWriter, r *http.Request) {
+			snapshots, err := configService.ListSnapshots()
+			if err != nil {
+				respondError(w, http.StatusInternalServerError, "BACKUPS_LIST_FAILED", err.Error())
+				return
+			}
+			respondOK(w, snapshots)
+		})
+
+		// F.9: POST /api/config/backups/:id/restore — Restore from snapshot
+		r.Post("/api/config/backups/{id}/restore", func(w http.ResponseWriter, r *http.Request) {
+			snapshotID := strings.TrimSpace(chi.URLParam(r, "id"))
+			if snapshotID == "" {
+				respondError(w, http.StatusBadRequest, "INVALID_REQUEST", "snapshot id is required")
+				return
+			}
+
+			// Get snapshot
+			snapshot, err := configService.GetSnapshot(snapshotID)
+			if err != nil {
+				respondError(w, http.StatusInternalServerError, "SNAPSHOT_LOOKUP_FAILED", err.Error())
+				return
+			}
+			if snapshot == nil {
+				respondError(w, http.StatusNotFound, "SNAPSHOT_NOT_FOUND", "snapshot not found")
+				return
+			}
+
+			// Create preventive snapshot of current config
+			currentCfg, _ := configService.LoadFullConfig()
+			currentJSON, _ := json.Marshal(currentCfg)
+			currentSettingsJS := service.RenderSettingsJS(currentCfg)
+
+			preventiveSnapshot, err := configService.CreateSnapshot(
+				"Pre-restore snapshot",
+				"Created before restoring snapshot "+snapshotID,
+				string(currentJSON),
+				currentSettingsJS,
+			)
+			if err != nil {
+				respondError(w, http.StatusInternalServerError, "PREVENTIVE_SNAPSHOT_FAILED", err.Error())
+				return
+			}
+
+			// Unmarshal the stored config_json back to FullAppConfig
+			var restoredCfg model.FullAppConfig
+			if err := json.Unmarshal([]byte(snapshot.ConfigJSON), &restoredCfg); err != nil {
+				respondError(w, http.StatusInternalServerError, "CONFIG_UNMARSHAL_FAILED", err.Error())
+				return
+			}
+
+			// Save the restored config
+			if err := configService.SaveFullConfig(restoredCfg); err != nil {
+				respondError(w, http.StatusInternalServerError, "CONFIG_SAVE_FAILED", err.Error())
+				return
+			}
+
+			if authService != nil {
+				if claims, ok := middleware.AuthClaimsFromContext(r.Context()); ok {
+					authService.LogAudit("config.restore", claims.Username, "config restored from snapshot "+snapshotID)
+				}
+			}
+
+			respondOK(w, map[string]any{
+				"restoredSnapshotId":   snapshotID,
+				"preventiveSnapshotId": preventiveSnapshot.ID,
+			})
+		})
+
+		// F.10: POST /api/config/import — Import config from settings.js content
+		r.Post("/api/config/import", func(w http.ResponseWriter, r *http.Request) {
+			var payload struct {
+				Content string `json:"content"`
+			}
+			if err := decodeJSON(r, &payload); err != nil {
+				respondError(w, http.StatusBadRequest, "INVALID_REQUEST", err.Error())
+				return
+			}
+
+			importedCfg, unrecognized, err := configService.ImportConfig(payload.Content)
+			if err != nil {
+				respondError(w, http.StatusBadRequest, "CONFIG_IMPORT_FAILED", err.Error())
+				return
+			}
+
+			respondOK(w, map[string]any{
+				"config":       importedCfg,
+				"unrecognized": unrecognized,
+			})
 		})
 
 		r.Get("/api/environment", func(w http.ResponseWriter, r *http.Request) {

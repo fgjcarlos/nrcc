@@ -61,8 +61,11 @@ func start(frontend fs.FS) error {
 	}
 	defer authService.Close()
 
-	// Initialize log schema
+	// Initialize schemas
 	if err := service.InitLogSchema(authService.GetDB()); err != nil {
+		return err
+	}
+	if err := service.InitConfigSnapshotSchema(authService.GetDB()); err != nil {
 		return err
 	}
 

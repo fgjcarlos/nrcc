@@ -684,3 +684,41 @@ func isRestartRequired(diff []model.ConfigDiffEntry) bool {
 	}
 	return false
 }
+
+// ── Snapshot wrapper methods ──────────────────────────────────────────────
+
+// CreateSnapshot wraps SnapshotService.CreateSnapshot
+func (s ConfigService) CreateSnapshot(label, reason, configJSON, settingsJS string) (model.ConfigSnapshot, error) {
+	if s.db == nil {
+		return model.ConfigSnapshot{}, fmt.Errorf("snapshot service requires database connection")
+	}
+	snapService := NewSnapshotService(s.db)
+	return snapService.CreateSnapshot(label, reason, configJSON, settingsJS)
+}
+
+// ListSnapshots wraps SnapshotService.ListSnapshots
+func (s ConfigService) ListSnapshots() (model.ConfigSnapshotList, error) {
+	if s.db == nil {
+		return model.ConfigSnapshotList{}, fmt.Errorf("snapshot service requires database connection")
+	}
+	snapService := NewSnapshotService(s.db)
+	return snapService.ListSnapshots()
+}
+
+// GetSnapshot wraps SnapshotService.GetSnapshot
+func (s ConfigService) GetSnapshot(id string) (*model.ConfigSnapshot, error) {
+	if s.db == nil {
+		return nil, fmt.Errorf("snapshot service requires database connection")
+	}
+	snapService := NewSnapshotService(s.db)
+	return snapService.GetSnapshot(id)
+}
+
+// DeleteSnapshot wraps SnapshotService.DeleteSnapshot
+func (s ConfigService) DeleteSnapshot(id string) error {
+	if s.db == nil {
+		return fmt.Errorf("snapshot service requires database connection")
+	}
+	snapService := NewSnapshotService(s.db)
+	return snapService.DeleteSnapshot(id)
+}
