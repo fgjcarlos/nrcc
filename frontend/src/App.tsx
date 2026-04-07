@@ -356,6 +356,13 @@ export function App() {
                             detail: message,
                           })
                         }}
+                        onToast={(message, type) => {
+                          pushToast({
+                            tone: type,
+                            title: message.split('\n')[0],
+                            detail: message.split('\n').slice(1).join('\n') || undefined,
+                          })
+                        }}
                       />
                     }
                   />

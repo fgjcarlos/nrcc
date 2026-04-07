@@ -6,9 +6,10 @@ import { SettingsPanel } from '../components/settings/SettingsPanel'
 type ConfigPageCallbacks = {
   onSaved?: (restartRequired: boolean) => void
   onError?: (message: string) => void
+  onToast?: (message: string, type: 'success' | 'error' | 'info') => void
 }
 
-export function ConfigPage({ onSaved, onError }: ConfigPageCallbacks = {}) {
+export function ConfigPage({ onSaved, onError, onToast }: ConfigPageCallbacks = {}) {
   const queryClient = useQueryClient()
 
   const configQuery = useQuery({
@@ -50,6 +51,7 @@ export function ConfigPage({ onSaved, onError }: ConfigPageCallbacks = {}) {
         loading={configQuery.isLoading}
         onSaved={handleSaved}
         onError={handleError}
+        onToast={onToast}
       />
     </>
   )

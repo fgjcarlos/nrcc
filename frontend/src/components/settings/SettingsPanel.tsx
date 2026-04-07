@@ -14,30 +14,44 @@ import { RuntimeSection } from './sections/RuntimeSection'
 import { HTTPSSection } from './sections/HTTPSSection'
 import { NodeReconnectSection } from './sections/NodeReconnectSection'
 import { PaletteSection } from './sections/PaletteSection'
+import { LivePreviewPanel } from './LivePreviewPanel'
+import { AdvancedJSONEditor } from './AdvancedJSONEditor'
+import { SnapshotPanel } from './SnapshotPanel'
+import { ImportDialog } from './ImportDialog'
+import { validateFullConfig } from './validation'
 
 type SettingsPanelProps = {
   config?: FullAppConfig
   loading: boolean
   onSaved: (restartRequired: boolean) => Promise<void>
   onError: (message: string) => void
+  onToast?: (message: string, type: 'success' | 'error' | 'info') => void
 }
 
-export function SettingsPanel({ config, loading, onSaved, onError }: SettingsPanelProps) {
+export function SettingsPanel({ config, loading, onSaved, onError, onToast }: SettingsPanelProps) {
   const queryClient = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
   const activeSection = searchParams.get('section') ?? 'server'
 
   // Local edit state
   const [localConfig, setLocalConfig] = useState<FullAppConfig | null>(null)
+  const [originalConfig, setOriginalConfig] = useState<FullAppConfig | null>(null)
   const [dirtySections, setDirtySections] = useState<Set<string>>(new Set())
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [errorSections, setErrorSections] = useState<Set<string>>(new Set())
   const [saving, setSaving] = useState(false)
 
+  // Panel open/close states
+  const [showPreview, setShowPreview] = useState(false)
+  const [showJSONEditor, setShowJSONEditor] = useState(false)
+  const [showSnapshots, setShowSnapshots] = useState(false)
+  const [showImport, setShowImport] = useState(false)
+
   // Initialize from server config
   useEffect(() => {
     if (config && !localConfig) {
       setLocalConfig(config)
+      setOriginalConfig(config)
       setDirtySections(new Set())
       setFieldErrors({})
       setErrorSections(new Set())
@@ -50,11 +64,39 @@ export function SettingsPanel({ config, loading, onSaved, onError }: SettingsPan
     const updated = { ...localConfig, [sectionKey]: value }
     setLocalConfig(updated)
     setDirtySections((prev) => new Set(prev).add(sectionKey))
+    
+    // Clear field error for this section when user modifies it
+    const fieldsToKeep = Object.keys(fieldErrors).filter(
+      (key) => !key.startsWith(sectionKey + '.')
+    )
+    setFieldErrors(Object.fromEntries(
+      Object.entries(fieldErrors).filter(([key]) => fieldsToKeep.includes(key))
+    ))
+  }
+
+  // Client-side validation
+  const validateBeforeSave = (cfg: FullAppConfig): FieldError[] => {
+    return validateFullConfig(cfg)
   }
 
   // Save section
   const saveMutation = useMutation({
     mutationFn: async (configToSave: FullAppConfig) => {
+      // Client-side validation first
+      const clientErrors = validateBeforeSave(configToSave)
+      if (clientErrors.length > 0) {
+        const errorMap: Record<string, string> = {}
+        const errorSects = new Set<string>()
+        for (const err of clientErrors) {
+          errorMap[err.field] = err.message
+          const section = err.field.split('.')[0]
+          errorSects.add(section)
+        }
+        setFieldErrors(errorMap)
+        setErrorSections(errorSects)
+        throw new Error('Validation failed')
+      }
+
       setSaving(true)
       try {
         const result = await api.applyFullConfig(configToSave)
@@ -68,7 +110,13 @@ export function SettingsPanel({ config, loading, onSaved, onError }: SettingsPan
         setDirtySections(new Set())
         setFieldErrors({})
         setErrorSections(new Set())
+        setOriginalConfig(localConfig)
         await queryClient.invalidateQueries({ queryKey: ['config'] })
+        
+        const successMsg = result.restartRequired
+          ? 'Configuration saved successfully. Restart Node-RED to apply changes.'
+          : 'Configuration saved successfully'
+        onToast?.(successMsg, 'success')
         await onSaved(result.restartRequired)
       } else {
         // Show validation errors
@@ -82,11 +130,15 @@ export function SettingsPanel({ config, loading, onSaved, onError }: SettingsPan
         setFieldErrors(errors)
         setErrorSections(errSections)
         onError('Configuration has validation errors. Please review and try again.')
+        onToast?.('Configuration has validation errors', 'error')
       }
     },
     onError: (error) => {
       const message = error instanceof APIRequestError ? error.message : 'Save failed'
-      onError(message)
+      if (message !== 'Validation failed') {
+        onError(message)
+        onToast?.(message, 'error')
+      }
       setSaving(false)
     },
   })
@@ -94,6 +146,27 @@ export function SettingsPanel({ config, loading, onSaved, onError }: SettingsPan
   const handleSave = () => {
     if (!localConfig) return
     saveMutation.mutate(localConfig)
+  }
+
+  const handleJSONApply = (cfg: FullAppConfig) => {
+    setLocalConfig(cfg)
+    setDirtySections(new Set(Object.keys(cfg) as any[]))
+    onToast?.('Configuration loaded from JSON', 'info')
+  }
+
+  const handleSnapshotRestored = () => {
+    // Reload config from server
+    queryClient.invalidateQueries({ queryKey: ['config'] })
+    setDirtySections(new Set())
+    setFieldErrors({})
+    setErrorSections(new Set())
+    onToast?.('Configuration restored from snapshot', 'success')
+  }
+
+  const handleImported = (cfg: FullAppConfig) => {
+    setLocalConfig(cfg)
+    setDirtySections(new Set(Object.keys(cfg) as any[]))
+    onToast?.('Configuration imported from settings.js', 'info')
   }
 
   if (loading || !localConfig) {
@@ -187,14 +260,70 @@ export function SettingsPanel({ config, loading, onSaved, onError }: SettingsPan
       </div>
 
       <div className="settings-actions">
-        <button
-          className="primary-button"
-          onClick={handleSave}
-          disabled={saveMutation.isPending || dirtySections.size === 0}
-        >
-          {saveMutation.isPending ? 'Saving...' : 'Save changes'}
-        </button>
+        <div className="action-group">
+          <button
+            className="primary-button"
+            onClick={handleSave}
+            disabled={saveMutation.isPending || dirtySections.size === 0}
+          >
+            {saveMutation.isPending ? 'Saving...' : 'Save changes'}
+          </button>
+          <button
+            className="secondary-button"
+            onClick={() => setShowPreview(!showPreview)}
+            title="Preview the rendered settings.js"
+          >
+            Preview settings.js
+          </button>
+          <button
+            className="secondary-button"
+            onClick={() => setShowJSONEditor(true)}
+            title="Edit configuration as raw JSON"
+          >
+            Raw JSON
+          </button>
+          <button
+            className="secondary-button"
+            onClick={() => setShowSnapshots(true)}
+            title="Manage configuration snapshots"
+          >
+            Backups
+          </button>
+          <button
+            className="secondary-button"
+            onClick={() => setShowImport(true)}
+            title="Import from a settings.js file"
+          >
+            Import settings.js
+          </button>
+        </div>
       </div>
+
+      <LivePreviewPanel
+        config={localConfig}
+        isOpen={showPreview}
+        onToggle={() => setShowPreview(!showPreview)}
+      />
+
+      {showJSONEditor && (
+        <AdvancedJSONEditor
+          config={localConfig}
+          onApply={handleJSONApply}
+          onClose={() => setShowJSONEditor(false)}
+        />
+      )}
+
+      <SnapshotPanel
+        isOpen={showSnapshots}
+        onClose={() => setShowSnapshots(false)}
+        onRestored={handleSnapshotRestored}
+      />
+
+      <ImportDialog
+        isOpen={showImport}
+        onClose={() => setShowImport(false)}
+        onImported={handleImported}
+      />
 
       {saveMutation.data?.restartRequired && (
         <section className="inline-notice warn">
