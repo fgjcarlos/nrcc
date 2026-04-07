@@ -12,7 +12,7 @@ import (
 func TestConfigServiceLoadDefaultsWhenConfigMissing(t *testing.T) {
 	t.Parallel()
 
-	service := NewConfigService(t.TempDir())
+	service := NewConfigService(t.TempDir(), nil)
 
 	got, err := service.Load()
 	if err != nil {
@@ -29,7 +29,7 @@ func TestConfigServiceValidateNormalizesAndDiffs(t *testing.T) {
 	t.Parallel()
 
 	dataDir := t.TempDir()
-	service := NewConfigService(dataDir)
+	service := NewConfigService(dataDir, nil)
 
 	if err := platform.WriteJSONAtomic(filepath.Join(dataDir, "config.json"), DefaultAppConfig()); err != nil {
 		t.Fatalf("WriteJSONAtomic() error = %v", err)
@@ -52,7 +52,7 @@ func TestConfigServiceValidateNormalizesAndDiffs(t *testing.T) {
 	if len(result.Diff) != 5 {
 		t.Fatalf("Validate() diff len = %d, want 5", len(result.Diff))
 	}
-	if result.Diff[0].Field != "httpAdminRoot" || result.Diff[0].To != "/admin" {
+	if result.Diff[0].Field != "httpAdminRoot" || result.Diff[0].NewValue != "/admin" {
 		t.Fatalf("Validate() first diff = %+v, want normalized httpAdminRoot", result.Diff[0])
 	}
 }
@@ -61,7 +61,7 @@ func TestConfigServiceApplyWritesConfigAndSettings(t *testing.T) {
 	t.Parallel()
 
 	dataDir := t.TempDir()
-	service := NewConfigService(dataDir)
+	service := NewConfigService(dataDir, nil)
 
 	candidate := model.AppConfig{
 		HTTPAdminRoot:      "/ops",
@@ -106,7 +106,7 @@ func TestConfigServiceApplyInvalidDoesNotOverwriteExistingState(t *testing.T) {
 	t.Parallel()
 
 	dataDir := t.TempDir()
-	service := NewConfigService(dataDir)
+	service := NewConfigService(dataDir, nil)
 
 	original := model.AppConfig{
 		HTTPAdminRoot:      "/ops",

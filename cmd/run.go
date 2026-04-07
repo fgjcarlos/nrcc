@@ -74,7 +74,7 @@ func start(frontend fs.FS) error {
 
 	jobsService := service.NewJobsService(authService.GetDB())
 
-	configService := service.NewConfigService(dataDir)
+	configService := service.NewConfigService(dataDir, authService.GetDB())
 	managedEnvService := service.NewManagedEnvService(dataDir)
 	backupService := service.NewBackupService(dataDir)
 	libraryService := service.NewLibraryService(dataDir)

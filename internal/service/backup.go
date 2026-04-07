@@ -30,7 +30,7 @@ type BackupService struct {
 func NewBackupService(dataDir string) BackupService {
 	return BackupService{
 		dataDir:       dataDir,
-		configService: NewConfigService(dataDir),
+		configService: NewConfigService(dataDir, nil),
 	}
 }
 

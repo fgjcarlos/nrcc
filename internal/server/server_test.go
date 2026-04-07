@@ -254,7 +254,7 @@ func newTestServices(t *testing.T) (*service.AuthService, service.ConfigService)
 		}
 	})
 
-	return authService, service.NewConfigService(dataDir)
+	return authService, service.NewConfigService(dataDir, nil)
 }
 
 func newJSONRequest(t *testing.T, method, path string, body any) *http.Request {

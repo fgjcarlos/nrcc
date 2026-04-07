@@ -19,7 +19,7 @@ func TestBackupServiceCreateListAndRestore(t *testing.T) {
 		t.Fatalf("EnsureDir(manifests) error = %v", err)
 	}
 
-	configService := NewConfigService(dataDir)
+	configService := NewConfigService(dataDir, nil)
 	if _, err := configService.Apply(model.AppConfig{
 		HTTPAdminRoot:      "/ops",
 		FlowFile:           "flows.json",

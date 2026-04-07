@@ -2,6 +2,7 @@ package service
 
 import (
 	"bytes"
+	"database/sql"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -13,10 +14,11 @@ import (
 
 type ConfigService struct {
 	dataDir string
+	db      *sql.DB
 }
 
-func NewConfigService(dataDir string) ConfigService {
-	return ConfigService{dataDir: dataDir}
+func NewConfigService(dataDir string, db *sql.DB) ConfigService {
+	return ConfigService{dataDir: dataDir, db: db}
 }
 
 func DefaultAppConfig() model.AppConfig {
@@ -130,19 +132,19 @@ func diffConfig(from, to model.AppConfig) []model.ConfigDiffEntry {
 	var diff []model.ConfigDiffEntry
 
 	if from.HTTPAdminRoot != to.HTTPAdminRoot {
-		diff = append(diff, model.ConfigDiffEntry{Field: "httpAdminRoot", From: from.HTTPAdminRoot, To: to.HTTPAdminRoot})
+		diff = append(diff, model.ConfigDiffEntry{Field: "httpAdminRoot", OldValue: from.HTTPAdminRoot, NewValue: to.HTTPAdminRoot})
 	}
 	if from.FlowFile != to.FlowFile {
-		diff = append(diff, model.ConfigDiffEntry{Field: "flowFile", From: from.FlowFile, To: to.FlowFile})
+		diff = append(diff, model.ConfigDiffEntry{Field: "flowFile", OldValue: from.FlowFile, NewValue: to.FlowFile})
 	}
 	if from.DiagnosticsEnabled != to.DiagnosticsEnabled {
-		diff = append(diff, model.ConfigDiffEntry{Field: "diagnosticsEnabled", From: boolString(from.DiagnosticsEnabled), To: boolString(to.DiagnosticsEnabled)})
+		diff = append(diff, model.ConfigDiffEntry{Field: "diagnosticsEnabled", OldValue: boolString(from.DiagnosticsEnabled), NewValue: boolString(to.DiagnosticsEnabled)})
 	}
 	if from.ProjectsEnabled != to.ProjectsEnabled {
-		diff = append(diff, model.ConfigDiffEntry{Field: "projectsEnabled", From: boolString(from.ProjectsEnabled), To: boolString(to.ProjectsEnabled)})
+		diff = append(diff, model.ConfigDiffEntry{Field: "projectsEnabled", OldValue: boolString(from.ProjectsEnabled), NewValue: boolString(to.ProjectsEnabled)})
 	}
 	if from.CredentialSecret != to.CredentialSecret {
-		diff = append(diff, model.ConfigDiffEntry{Field: "credentialSecret", From: secretState(from.CredentialSecret), To: secretState(to.CredentialSecret)})
+		diff = append(diff, model.ConfigDiffEntry{Field: "credentialSecret", OldValue: secretState(from.CredentialSecret), NewValue: secretState(to.CredentialSecret)})
 	}
 
 	return diff
