@@ -23,6 +23,7 @@ import {
   type UpdateStatus,
   type User,
 } from './api'
+import { ConfigPage } from './pages/ConfigPage'
 
 type AuthMode = 'login' | 'register'
 type PageKey = 'overview' | 'logs' | 'config' | 'environment' | 'backups' | 'libraries' | 'updates' | 'diagnostics'
@@ -167,12 +168,6 @@ export function App() {
     queryFn: api.systemInfo,
     enabled: meQuery.isSuccess,
     refetchInterval: 15000,
-  })
-
-  const configQuery = useQuery({
-    queryKey: ['config'],
-    queryFn: api.config,
-    enabled: meQuery.isSuccess,
   })
 
   const environmentQuery = useQuery({
@@ -345,11 +340,7 @@ export function App() {
                     path="config"
                     element={
                       <ConfigPage
-                        config={configQuery.data}
-                        configLoading={configQuery.isLoading}
-                        configError={configQuery.error}
-                        onSaved={async (restartRequired) => {
-                          await queryClient.invalidateQueries({ queryKey: ['config'] })
+                        onSaved={(restartRequired) => {
                           pushToast({
                             tone: 'success',
                             title: 'Configuration saved',
@@ -825,40 +816,6 @@ function LogsPage({
           ))}
         </div>
       </article>
-    </>
-  )
-}
-
-function ConfigPage({
-  config,
-  configLoading,
-  configError,
-  onSaved,
-  onError,
-}: {
-  config?: SupportedConfig
-  configLoading: boolean
-  configError: unknown
-  onSaved: (restartRequired: boolean) => Promise<void>
-  onError: (message: string) => void
-}) {
-  return (
-    <>
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">Runtime</p>
-          <h2>Config</h2>
-        </div>
-      </header>
-
-      {configError ? (
-        <section className="inline-notice error">
-          <strong>Configuration unavailable</strong>
-          <p>{formatErrorMessage(configError, 'Supported configuration could not be loaded.')}</p>
-        </section>
-      ) : null}
-
-      <ConfigPanel config={config} loading={configLoading} onSaved={onSaved} onError={onError} />
     </>
   )
 }
@@ -1516,171 +1473,6 @@ function UpdatesPage({
      </>
    )
  }
-
- function ConfigPanel({
-  config,
-  loading,
-  onSaved,
-  onError,
-}: {
-  config?: SupportedConfig
-  loading: boolean
-  onSaved: (restartRequired: boolean) => Promise<void>
-  onError: (message: string) => void
-}) {
-  const [form, setForm] = useState<SupportedConfig | null>(null)
-  const [message, setMessage] = useState('')
-  const [validation, setValidation] = useState<ConfigValidationResult | null>(null)
-
-  useEffect(() => {
-    if (config) {
-      setForm(config)
-      setValidation(null)
-      setMessage('')
-    }
-  }, [config])
-
-  const validateMutation = useMutation({
-    mutationFn: (payload: SupportedConfig) => api.validateConfig(payload),
-    onSuccess: (result) => {
-      setValidation(result)
-      setMessage(
-        result.valid
-          ? 'Configuration is valid. A restart will be required.'
-          : 'Configuration has validation errors.',
-      )
-    },
-    onError: (error) => {
-      const message = formatErrorMessage(error, 'Validation failed')
-      setMessage(message)
-      onError(message)
-    },
-  })
-
-  const applyMutation = useMutation({
-    mutationFn: (payload: SupportedConfig) => api.applyConfig(payload),
-    onSuccess: async (result) => {
-      setValidation(result)
-      setMessage(result.restartRequired ? 'Configuration saved. Restart Node-RED to apply it.' : 'Configuration saved.')
-      await onSaved(result.restartRequired)
-    },
-    onError: (error) => {
-      const message = formatErrorMessage(error, 'Save failed')
-      setMessage(message)
-      onError(message)
-    },
-  })
-
-  if (loading || !form) {
-    return (
-      <article className="panel">
-        <div className="panel-header">
-          <h3>Supported configuration</h3>
-        </div>
-        <p className="muted">Loading configuration...</p>
-      </article>
-    )
-  }
-
-  function update<K extends keyof SupportedConfig>(key: K, value: SupportedConfig[K]) {
-    setForm((current) => (current ? { ...current, [key]: value } : current))
-  }
-
-  return (
-    <article className="panel">
-      <div className="panel-header">
-        <h3>Supported configuration</h3>
-      </div>
-
-      <form
-        className="config-form"
-        onSubmit={(event) => {
-          event.preventDefault()
-          applyMutation.mutate(form)
-        }}
-      >
-        <label>
-          <span>httpAdminRoot</span>
-          <input value={form.httpAdminRoot} onChange={(event) => update('httpAdminRoot', event.target.value)} />
-        </label>
-
-        <label>
-          <span>flowFile</span>
-          <input value={form.flowFile} onChange={(event) => update('flowFile', event.target.value)} />
-        </label>
-
-        <label>
-          <span>credentialSecret</span>
-          <input
-            type="password"
-            value={form.credentialSecret}
-            onChange={(event) => update('credentialSecret', event.target.value)}
-            placeholder="Leave empty to keep credentialSecret disabled"
-          />
-        </label>
-
-        <label className="checkbox-row">
-          <input
-            type="checkbox"
-            checked={form.diagnosticsEnabled}
-            onChange={(event) => update('diagnosticsEnabled', event.target.checked)}
-          />
-          <span>Enable diagnostics UI</span>
-        </label>
-
-        <label className="checkbox-row">
-          <input
-            type="checkbox"
-            checked={form.projectsEnabled}
-            onChange={(event) => update('projectsEnabled', event.target.checked)}
-          />
-          <span>Enable Node-RED projects</span>
-        </label>
-
-        <div className="config-actions">
-          <button
-            className="ghost-button"
-            type="button"
-            onClick={() => validateMutation.mutate(form)}
-            disabled={validateMutation.isPending || applyMutation.isPending}
-          >
-            {validateMutation.isPending ? 'Validating...' : 'Validate'}
-          </button>
-          <button className="primary-button" type="submit" disabled={applyMutation.isPending || validateMutation.isPending}>
-            {applyMutation.isPending ? 'Saving...' : 'Save config'}
-          </button>
-        </div>
-      </form>
-
-      {message ? <p className="config-message">{message}</p> : null}
-
-      {validation ? (
-        <div className="config-validation">
-          {validation.errors.length > 0 ? (
-            <ul className="validation-list error-list">
-              {validation.errors.map((error) => (
-                <li key={error}>{error}</li>
-              ))}
-            </ul>
-          ) : null}
-
-          {validation.diff.length > 0 ? (
-            <div>
-              <p className="validation-heading">Diff preview</p>
-              <ul className="validation-list">
-                {validation.diff.map((entry) => (
-                  <li key={`${entry.field}-${entry.from}-${entry.to}`}>
-                    <strong>{entry.field}</strong>: {entry.from || 'empty'} {'->'} {entry.to || 'empty'}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-    </article>
-  )
-}
 
 function ToastViewport({
   toasts,

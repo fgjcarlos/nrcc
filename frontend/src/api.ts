@@ -1,3 +1,10 @@
+import {
+  FullAppConfig,
+  ExtendedConfigValidationResult,
+  ConfigSnapshot,
+  ConfigSnapshotList,
+} from './types/config'
+
 export type ApiSuccess<T> = {
   success: true
   data: T
@@ -336,8 +343,42 @@ export const api = {
      const query = searchParams.toString()
      return request<JobsResponse>(`/api/diagnostics/jobs${query ? '?' + query : ''}`)
    },
-   diagnosticsExport: () =>
-     request<ExportResponse>('/api/diagnostics/export', {
-       method: 'POST',
-     }),
+    diagnosticsExport: () =>
+      request<ExportResponse>('/api/diagnostics/export', {
+        method: 'POST',
+      }),
+
+    // Full config API (Phase 11)
+    fullConfig: () => request<FullAppConfig>('/api/config'),
+    validateFullConfig: (cfg: FullAppConfig) =>
+      request<ExtendedConfigValidationResult>('/api/config/validate', {
+        method: 'POST',
+        body: JSON.stringify(cfg),
+      }),
+    applyFullConfig: (cfg: FullAppConfig) =>
+      request<ExtendedConfigValidationResult>('/api/config/apply', {
+        method: 'POST',
+        body: JSON.stringify(cfg),
+      }),
+    previewFullConfig: (cfg?: FullAppConfig) =>
+      request<string>(cfg ? '/api/config/preview' : '/api/config/preview', {
+        method: cfg ? 'POST' : 'GET',
+        body: cfg ? JSON.stringify(cfg) : undefined,
+      }),
+    createConfigSnapshot: (label?: string) =>
+      request<ConfigSnapshot>('/api/config/backup', {
+        method: 'POST',
+        body: JSON.stringify({ label: label ?? '' }),
+      }),
+    listConfigSnapshots: () => request<ConfigSnapshotList>('/api/config/backups'),
+    restoreConfigSnapshot: (id: string) =>
+      request<{ restoredSnapshotId: string; preventiveSnapshotId: string }>(
+        `/api/config/backups/${id}/restore`,
+        { method: 'POST' }
+      ),
+    importSettingsJS: (content: string) =>
+      request<{ config: FullAppConfig; warnings: string[] }>('/api/config/import', {
+        method: 'POST',
+        body: JSON.stringify({ content }),
+      }),
 }
