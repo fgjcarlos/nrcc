@@ -21,15 +21,16 @@ func TestAuthFlowAndProtectedRoutes(t *testing.T) {
 	authService, configService := newTestServices(t)
 	router := chi.NewRouter()
 	testDataDir := t.TempDir()
+	backupSvc := service.NewBackupService(testDataDir)
 	registerAPIRoutes(
 		router,
 		nil,
 		authService,
 		configService,
 		service.NewManagedEnvService(testDataDir),
-		service.NewBackupService(testDataDir),
+		backupSvc,
 		service.NewLibraryService(testDataDir),
-		service.NewUpdateService(testDataDir, service.NewBackupService(testDataDir)),
+		service.NewUpdateService(testDataDir, &backupSvc),
 		service.NewOperationLock(),
 	)
 
@@ -142,15 +143,16 @@ func TestLoginCookieSecureOnForwardedHTTPS(t *testing.T) {
 
 	router := chi.NewRouter()
 	testDataDir := t.TempDir()
+	backupSvc := service.NewBackupService(testDataDir)
 	registerAPIRoutes(
 		router,
 		nil,
 		authService,
 		configService,
 		service.NewManagedEnvService(testDataDir),
-		service.NewBackupService(testDataDir),
+		backupSvc,
 		service.NewLibraryService(testDataDir),
-		service.NewUpdateService(testDataDir, service.NewBackupService(testDataDir)),
+		service.NewUpdateService(testDataDir, &backupSvc),
 		service.NewOperationLock(),
 	)
 
@@ -185,6 +187,7 @@ func TestOperationStatusAndRestoreConflict(t *testing.T) {
 	}
 	defer release()
 
+	backupSvc := service.NewBackupService(testDataDir)
 	router := chi.NewRouter()
 	registerAPIRoutes(
 		router,
@@ -192,9 +195,9 @@ func TestOperationStatusAndRestoreConflict(t *testing.T) {
 		authService,
 		configService,
 		service.NewManagedEnvService(testDataDir),
-		service.NewBackupService(testDataDir),
+		backupSvc,
 		service.NewLibraryService(testDataDir),
-		service.NewUpdateService(testDataDir, service.NewBackupService(testDataDir)),
+		service.NewUpdateService(testDataDir, &backupSvc),
 		lock,
 	)
 
