@@ -92,16 +92,28 @@ func (js *JobsService) Get(limit, offset int, jobType, status string) ([]model.J
 	var jobs []model.JobRecord
 	for rows.Next() {
 		var job model.JobRecord
+		var startedAtStr string
 		var finishedAtStr sql.NullString
+		var errorStr sql.NullString
 
-		err := rows.Scan(&job.ID, &job.Type, &job.Status, &job.StartedAt, &finishedAtStr, &job.TriggeredBy, &job.Summary, &job.Error)
+		err := rows.Scan(&job.ID, &job.Type, &job.Status, &startedAtStr, &finishedAtStr, &job.TriggeredBy, &job.Summary, &errorStr)
 		if err != nil {
 			return nil, fmt.Errorf("scan job row: %w", err)
+		}
+
+		// Parse StartedAt
+		if startedAtStr != "" {
+			t, _ := time.Parse(time.RFC3339, startedAtStr)
+			job.StartedAt = t
 		}
 
 		if finishedAtStr.Valid {
 			t, _ := time.Parse(time.RFC3339, finishedAtStr.String)
 			job.FinishedAt = &t
+		}
+
+		if errorStr.Valid {
+			job.Error = errorStr.String
 		}
 
 		jobs = append(jobs, job)
@@ -122,10 +134,12 @@ func (js *JobsService) GetByID(jobID string) (*model.JobRecord, error) {
 		WHERE id = ?
 	`
 	var job model.JobRecord
+	var startedAtStr string
 	var finishedAtStr sql.NullString
+	var errorStr sql.NullString
 
 	err := js.db.QueryRow(query, jobID).Scan(
-		&job.ID, &job.Type, &job.Status, &job.StartedAt, &finishedAtStr, &job.TriggeredBy, &job.Summary, &job.Error,
+		&job.ID, &job.Type, &job.Status, &startedAtStr, &finishedAtStr, &job.TriggeredBy, &job.Summary, &errorStr,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -134,9 +148,19 @@ func (js *JobsService) GetByID(jobID string) (*model.JobRecord, error) {
 		return nil, fmt.Errorf("query job: %w", err)
 	}
 
+	// Parse StartedAt
+	if startedAtStr != "" {
+		t, _ := time.Parse(time.RFC3339, startedAtStr)
+		job.StartedAt = t
+	}
+
 	if finishedAtStr.Valid {
 		t, _ := time.Parse(time.RFC3339, finishedAtStr.String)
 		job.FinishedAt = &t
+	}
+
+	if errorStr.Valid {
+		job.Error = errorStr.String
 	}
 
 	return &job, nil

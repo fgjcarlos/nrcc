@@ -7,7 +7,13 @@ import {
   api,
   type BackupList,
   type ConfigValidationResult,
+  type DoctorReport,
+  type ExportResponse,
+  type JobRecord,
+  type JobStatus,
   type LibraryList,
+  type LogEntry,
+  type LogLevel,
   type ManagedEnvState,
   type ManagedEnvVar,
   type OperationStatus,
@@ -19,7 +25,7 @@ import {
 } from './api'
 
 type AuthMode = 'login' | 'register'
-type PageKey = 'overview' | 'logs' | 'config' | 'environment' | 'backups' | 'libraries' | 'updates'
+type PageKey = 'overview' | 'logs' | 'config' | 'environment' | 'backups' | 'libraries' | 'updates' | 'diagnostics'
 type ToastTone = 'success' | 'error' | 'info'
 
 type Toast = {
@@ -194,32 +200,71 @@ export function App() {
     refetchInterval: 2000,
   })
 
-  const updatesQuery = useQuery({
-    queryKey: ['updates-status'],
-    queryFn: api.updateStatus,
-    enabled: meQuery.isSuccess,
-    refetchInterval: 15000,
-  })
+   const updatesQuery = useQuery({
+     queryKey: ['updates-status'],
+     queryFn: api.updateStatus,
+     enabled: meQuery.isSuccess,
+     refetchInterval: 15000,
+   })
 
-  const restartMutation = useMutation({
-    mutationFn: api.runtimeRestart,
-    onSuccess: async () => {
-      pushToast({
-        tone: 'success',
-        title: 'Restart requested',
-        detail: 'Node-RED is restarting and status will refresh automatically.',
-      })
-      await queryClient.invalidateQueries({ queryKey: ['runtime-status'] })
-      await queryClient.invalidateQueries({ queryKey: ['runtime-logs'] })
-    },
-    onError: (error) => {
-      pushToast({
-        tone: 'error',
-        title: 'Restart failed',
-        detail: formatErrorMessage(error, 'Node-RED could not be restarted'),
-      })
-    },
-  })
+   const diagnosticsReportQuery = useQuery({
+     queryKey: ['diagnostics-report'],
+     queryFn: api.diagnosticsReport,
+     enabled: meQuery.isSuccess,
+     refetchInterval: 30000,
+   })
+
+   const diagnosticsLogsQuery = useQuery({
+     queryKey: ['diagnostics-logs'],
+     queryFn: () => api.diagnosticsLogs({ limit: 100 }),
+     enabled: meQuery.isSuccess,
+     refetchInterval: 10000,
+   })
+
+   const diagnosticsJobsQuery = useQuery({
+     queryKey: ['diagnostics-jobs'],
+     queryFn: () => api.diagnosticsJobs({ limit: 50 }),
+     enabled: meQuery.isSuccess,
+     refetchInterval: 10000,
+   })
+
+   const restartMutation = useMutation({
+     mutationFn: api.runtimeRestart,
+     onSuccess: async () => {
+       pushToast({
+         tone: 'success',
+         title: 'Restart requested',
+         detail: 'Node-RED is restarting and status will refresh automatically.',
+       })
+       await queryClient.invalidateQueries({ queryKey: ['runtime-status'] })
+       await queryClient.invalidateQueries({ queryKey: ['runtime-logs'] })
+     },
+     onError: (error) => {
+       pushToast({
+         tone: 'error',
+         title: 'Restart failed',
+         detail: formatErrorMessage(error, 'Node-RED could not be restarted'),
+       })
+     },
+   })
+
+   const exportMutation = useMutation({
+     mutationFn: api.diagnosticsExport,
+     onSuccess: (result) => {
+       pushToast({
+         tone: 'success',
+         title: 'Support bundle exported',
+         detail: `Bundle saved as ${result.path} (${formatBytes(result.size)})`,
+       })
+     },
+     onError: (error) => {
+       pushToast({
+         tone: 'error',
+         title: 'Export failed',
+         detail: formatErrorMessage(error, 'The support bundle could not be exported.'),
+       })
+     },
+   })
 
   if (authStatusQuery.isLoading || meQuery.isLoading) {
     return (
@@ -387,27 +432,54 @@ export function App() {
                     }
                   />
                   <Route
-                    path="updates"
-                    element={
-                      <UpdatesPage
-                        updateStatus={updatesQuery.data}
-                        loading={updatesQuery.isLoading}
-                        error={updatesQuery.error}
-                        operationStatus={operationsQuery.data}
-                        onChanged={async (message, tone) => {
-                          await queryClient.invalidateQueries({ queryKey: ['updates-status'] })
-                          await queryClient.invalidateQueries({ queryKey: ['operations-status'] })
-                          await queryClient.invalidateQueries({ queryKey: ['runtime-status'] })
-                          pushToast({
-                            tone,
-                            title: tone === 'success' ? 'Update completed' : 'Update failed',
-                            detail: message,
-                          })
-                        }}
-                      />
-                    }
-                  />
-                  <Route path="*" element={<Navigate to="/app/overview" replace />} />
+                     path="updates"
+                     element={
+                       <UpdatesPage
+                         updateStatus={updatesQuery.data}
+                         loading={updatesQuery.isLoading}
+                         error={updatesQuery.error}
+                         operationStatus={operationsQuery.data}
+                         onChanged={async (message, tone) => {
+                           await queryClient.invalidateQueries({ queryKey: ['updates-status'] })
+                           await queryClient.invalidateQueries({ queryKey: ['operations-status'] })
+                           await queryClient.invalidateQueries({ queryKey: ['runtime-status'] })
+                           pushToast({
+                             tone,
+                             title: tone === 'success' ? 'Update completed' : 'Update failed',
+                             detail: message,
+                           })
+                         }}
+                       />
+                     }
+                   />
+                   <Route
+                     path="diagnostics"
+                     element={
+                       <DiagnosticsPage
+                         report={diagnosticsReportQuery.data}
+                         reportLoading={diagnosticsReportQuery.isLoading}
+                         reportError={diagnosticsReportQuery.error}
+                         logs={diagnosticsLogsQuery.data?.logs ?? []}
+                         logsLoading={diagnosticsLogsQuery.isLoading}
+                         logsError={diagnosticsLogsQuery.error}
+                         jobs={diagnosticsJobsQuery.data?.jobs ?? []}
+                         jobsLoading={diagnosticsJobsQuery.isLoading}
+                         jobsError={diagnosticsJobsQuery.error}
+                         exporting={exportMutation.isPending}
+                         onRefreshReport={async () => {
+                           await queryClient.invalidateQueries({ queryKey: ['diagnostics-report'] })
+                         }}
+                         onRefreshLogs={async () => {
+                           await queryClient.invalidateQueries({ queryKey: ['diagnostics-logs'] })
+                         }}
+                         onRefreshJobs={async () => {
+                           await queryClient.invalidateQueries({ queryKey: ['diagnostics-jobs'] })
+                         }}
+                         onExport={() => exportMutation.mutate()}
+                       />
+                     }
+                   />
+                   <Route path="*" element={<Navigate to="/app/overview" replace />} />
                 </Routes>
               </DashboardShell>
             ) : (
@@ -527,6 +599,7 @@ function DashboardShell({
   const items: Array<{ to: string; label: string; page: PageKey }> = [
     { to: '/app/overview', label: 'Overview', page: 'overview' },
     { to: '/app/logs', label: 'Logs', page: 'logs' },
+    { to: '/app/diagnostics', label: 'Diagnostics', page: 'diagnostics' },
     { to: '/app/config', label: 'Config', page: 'config' },
     { to: '/app/environment', label: 'Environment', page: 'environment' },
     { to: '/app/backups', label: 'Backups', page: 'backups' },
@@ -1180,13 +1253,271 @@ function UpdatesPage({
               )}
             </div>
           </div>
-        ) : null}
-      </article>
-    </>
-  )
-}
+         ) : null}
+       </article>
+     </>
+   )
+ }
 
-function ConfigPanel({
+ function DiagnosticsPage({
+   report,
+   reportLoading,
+   reportError,
+   logs,
+   logsLoading,
+   logsError,
+   jobs,
+   jobsLoading,
+   jobsError,
+   exporting,
+   onRefreshReport,
+   onRefreshLogs,
+   onRefreshJobs,
+   onExport,
+ }: {
+   report?: DoctorReport
+   reportLoading: boolean
+   reportError: unknown
+   logs: LogEntry[]
+   logsLoading: boolean
+   logsError: unknown
+   jobs: JobRecord[]
+   jobsLoading: boolean
+   jobsError: unknown
+   exporting: boolean
+   onRefreshReport: () => Promise<void>
+   onRefreshLogs: () => Promise<void>
+   onRefreshJobs: () => Promise<void>
+   onExport: () => void
+ }) {
+   const [activeTab, setActiveTab] = useState<'doctor' | 'logs' | 'jobs'>('doctor')
+
+   return (
+     <>
+       <header className="topbar">
+         <div>
+           <p className="eyebrow">Support</p>
+           <h2>Diagnostics</h2>
+         </div>
+         <div className="topbar-actions">
+           <button
+             className="primary-button"
+             type="button"
+             onClick={onExport}
+             disabled={exporting}
+           >
+             {exporting ? 'Exporting...' : 'Export Support Bundle'}
+           </button>
+         </div>
+       </header>
+
+       <article className="panel diagnostics-panel">
+         <div className="panel-header diagnostics-tabs">
+           <button
+             className={activeTab === 'doctor' ? 'tab-button active' : 'tab-button'}
+             type="button"
+             onClick={() => setActiveTab('doctor')}
+           >
+             Doctor
+           </button>
+           <button
+             className={activeTab === 'logs' ? 'tab-button active' : 'tab-button'}
+             type="button"
+             onClick={() => setActiveTab('logs')}
+           >
+             Logs
+           </button>
+           <button
+             className={activeTab === 'jobs' ? 'tab-button active' : 'tab-button'}
+             type="button"
+             onClick={() => setActiveTab('jobs')}
+           >
+             Jobs
+           </button>
+         </div>
+
+         {activeTab === 'doctor' && (
+           <>
+             {reportError ? (
+               <section className="inline-notice error">
+                 <strong>Doctor report unavailable</strong>
+                 <p>{formatErrorMessage(reportError, 'The doctor report could not be loaded.')}</p>
+               </section>
+             ) : null}
+             <div className="tab-content">
+               <div className="diagnostics-header">
+                 <div className="diagnostics-status">
+                   {reportLoading ? (
+                     <p className="muted">Loading doctor report...</p>
+                   ) : report ? (
+                     <>
+                       <div className={`status-badge ${getStatusBadgeClass(report.overall_status)}`}>
+                         {report.overall_status.toUpperCase()}
+                       </div>
+                       <p className="muted">Generated at {new Date(report.generated_at).toLocaleString()}</p>
+                     </>
+                   ) : null}
+                 </div>
+                 <button
+                   className="ghost-button"
+                   type="button"
+                   onClick={onRefreshReport}
+                   disabled={reportLoading}
+                 >
+                   Refresh
+                 </button>
+               </div>
+
+               {report && (
+                 <div className="checks-list">
+                   {report.checks.map((check) => (
+                     <div key={check.name} className={`check-item ${check.status}`}>
+                       <div className="check-status">
+                         <span className="check-icon">
+                           {check.status === 'pass' && '✅'}
+                           {check.status === 'warn' && '⚠️'}
+                           {check.status === 'fail' && '❌'}
+                           {check.status === 'unknown' && '❓'}
+                         </span>
+                         <strong>{formatCheckName(check.name)}</strong>
+                       </div>
+                       <p>{check.message}</p>
+                       {check.details && (
+                         <details className="check-details">
+                           <summary>Details</summary>
+                           <pre>{JSON.stringify(check.details, null, 2)}</pre>
+                         </details>
+                       )}
+                     </div>
+                   ))}
+                 </div>
+               )}
+             </div>
+           </>
+         )}
+
+         {activeTab === 'logs' && (
+           <>
+             {logsError ? (
+               <section className="inline-notice error">
+                 <strong>Logs unavailable</strong>
+                 <p>{formatErrorMessage(logsError, 'The logs could not be loaded.')}</p>
+               </section>
+             ) : null}
+             <div className="tab-content">
+               <div className="diagnostics-header">
+                 <p className="muted">{logs.length} logs</p>
+                 <button
+                   className="ghost-button"
+                   type="button"
+                   onClick={onRefreshLogs}
+                   disabled={logsLoading}
+                 >
+                   Refresh
+                 </button>
+               </div>
+
+               <div className="logs-list">
+                 {logsLoading ? (
+                   <p className="muted">Loading logs...</p>
+                 ) : logs.length === 0 ? (
+                   <p className="muted">No logs captured yet.</p>
+                 ) : (
+                   logs.map((log, idx) => (
+                     <div key={log.id || idx} className={`log-item level-${log.level}`}>
+                       <div className="log-meta">
+                         <span className="log-timestamp">
+                           {new Date(log.timestamp).toLocaleTimeString()}
+                         </span>
+                         <span className={`log-badge level-${log.level}`}>
+                           {log.level.toUpperCase()}
+                         </span>
+                         <span className="log-source">{log.source}</span>
+                       </div>
+                       <div className="log-message">{log.message}</div>
+                     </div>
+                   ))
+                 )}
+               </div>
+             </div>
+           </>
+         )}
+
+         {activeTab === 'jobs' && (
+           <>
+             {jobsError ? (
+               <section className="inline-notice error">
+                 <strong>Jobs unavailable</strong>
+                 <p>{formatErrorMessage(jobsError, 'The jobs history could not be loaded.')}</p>
+               </section>
+             ) : null}
+             <div className="tab-content">
+               <div className="diagnostics-header">
+                 <p className="muted">{jobs.length} jobs</p>
+                 <button
+                   className="ghost-button"
+                   type="button"
+                   onClick={onRefreshJobs}
+                   disabled={jobsLoading}
+                 >
+                   Refresh
+                 </button>
+               </div>
+
+               <div className="jobs-list">
+                 {jobsLoading ? (
+                   <p className="muted">Loading jobs...</p>
+                 ) : jobs.length === 0 ? (
+                   <p className="muted">No jobs recorded yet.</p>
+                 ) : (
+                   <table className="jobs-table">
+                     <thead>
+                       <tr>
+                         <th>Type</th>
+                         <th>Status</th>
+                         <th>Started</th>
+                         <th>Duration</th>
+                         <th>Summary</th>
+                       </tr>
+                     </thead>
+                     <tbody>
+                       {jobs.map((job) => (
+                         <tr key={job.id} className={`status-${job.status}`}>
+                           <td className="job-type">{job.type}</td>
+                           <td>
+                             <span className={`job-badge status-${job.status}`}>
+                               {job.status.toUpperCase()}
+                             </span>
+                           </td>
+                           <td>{new Date(job.started_at).toLocaleString()}</td>
+                           <td>
+                             {job.finished_at
+                               ? formatDuration(
+                                   new Date(job.finished_at).getTime() -
+                                     new Date(job.started_at).getTime(),
+                                 )
+                               : '—'}
+                           </td>
+                           <td>
+                             <span className="job-summary">
+                               {job.summary || job.error || '—'}
+                             </span>
+                           </td>
+                         </tr>
+                       ))}
+                     </tbody>
+                   </table>
+                 )}
+               </div>
+             </div>
+           </>
+         )}
+       </article>
+     </>
+   )
+ }
+
+ function ConfigPanel({
   config,
   loading,
   onSaved,
@@ -1613,4 +1944,38 @@ function formatBytes(bytes: number) {
     return `${(bytes / 1024).toFixed(1)} KB`
   }
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function formatCheckName(name: string) {
+  return name
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+}
+
+function getStatusBadgeClass(status: string) {
+  switch (status) {
+    case 'pass':
+      return 'status-pass'
+    case 'warn':
+      return 'status-warn'
+    case 'fail':
+      return 'status-fail'
+    default:
+      return 'status-unknown'
+  }
+}
+
+function formatDuration(milliseconds: number) {
+  const seconds = Math.floor(milliseconds / 1000)
+  const minutes = Math.floor(seconds / 60)
+  const hours = Math.floor(minutes / 60)
+
+  if (hours > 0) {
+    return `${hours}h ${minutes % 60}m`
+  }
+  if (minutes > 0) {
+    return `${minutes}m ${seconds % 60}s`
+  }
+  return `${seconds}s`
 }

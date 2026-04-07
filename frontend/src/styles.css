@@ -695,3 +695,345 @@ input {
     width: auto;
   }
 }
+
+/* Diagnostics Page Styles */
+
+.diagnostics-panel {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto 1fr;
+}
+
+.diagnostics-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid rgba(28, 42, 34, 0.08);
+  padding-bottom: 0 !important;
+}
+
+.tab-button {
+  padding: 16px 20px;
+  margin: 0;
+  border: none;
+  background: transparent;
+  color: #56645e;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: all 200ms ease;
+}
+
+.tab-button:hover {
+  color: #1c2a22;
+}
+
+.tab-button.active {
+  color: #1c2a22;
+  border-bottom-color: #ad4a10;
+}
+
+.tab-content {
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.diagnostics-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  gap: 16px;
+}
+
+.diagnostics-status {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.status-badge {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.92rem;
+  letter-spacing: 0.05em;
+}
+
+.status-badge.status-pass {
+  background: rgba(46, 142, 111, 0.15);
+  color: #1a6b3f;
+}
+
+.status-badge.status-warn {
+  background: rgba(247, 156, 65, 0.2);
+  color: #ad4a10;
+}
+
+.status-badge.status-fail {
+  background: rgba(220, 38, 38, 0.15);
+  color: #991b1b;
+}
+
+.status-badge.status-unknown {
+  background: rgba(156, 163, 175, 0.15);
+  color: #374151;
+}
+
+/* Doctor Checks List */
+
+.checks-list {
+  display: grid;
+  gap: 12px;
+}
+
+.check-item {
+  padding: 16px;
+  border-radius: 12px;
+  border-left: 4px solid;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.check-item.pass {
+  border-left-color: #1a6b3f;
+  background: rgba(46, 142, 111, 0.08);
+}
+
+.check-item.warn {
+  border-left-color: #ad4a10;
+  background: rgba(247, 156, 65, 0.12);
+}
+
+.check-item.fail {
+  border-left-color: #991b1b;
+  background: rgba(220, 38, 38, 0.12);
+}
+
+.check-item.unknown {
+  border-left-color: #9ca3af;
+  background: rgba(156, 163, 175, 0.08);
+}
+
+.check-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.check-icon {
+  font-size: 1.2em;
+  min-width: 24px;
+}
+
+.check-item strong {
+  margin: 0;
+}
+
+.check-item p {
+  margin: 0;
+  color: #56645e;
+  font-size: 0.92rem;
+}
+
+.check-details {
+  margin-top: 12px;
+  cursor: pointer;
+}
+
+.check-details summary {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #56645e;
+  cursor: pointer;
+  padding: 8px 0;
+}
+
+.check-details summary:hover {
+  color: #1c2a22;
+}
+
+.check-details pre {
+  background: rgba(28, 42, 34, 0.04);
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  overflow-x: auto;
+  margin: 8px 0 0;
+}
+
+/* Logs List */
+
+.logs-list {
+  display: grid;
+  gap: 0;
+  border: 1px solid rgba(28, 42, 34, 0.08);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.log-item {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(28, 42, 34, 0.06);
+  background: rgba(255, 255, 255, 0.5);
+  font-family: "IBM Plex Mono", "Courier New", monospace;
+  font-size: 0.82rem;
+}
+
+.log-item:last-child {
+  border-bottom: none;
+}
+
+.log-item.level-debug {
+  border-left: 4px solid #9ca3af;
+}
+
+.log-item.level-info {
+  border-left: 4px solid #3b82f6;
+}
+
+.log-item.level-warn {
+  border-left: 4px solid #f59e0b;
+}
+
+.log-item.level-error {
+  border-left: 4px solid #ef4444;
+}
+
+.log-meta {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.log-timestamp {
+  color: #9ca3af;
+  font-size: 0.75rem;
+  min-width: fit-content;
+}
+
+.log-badge {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.log-badge.level-debug {
+  background: rgba(156, 163, 175, 0.2);
+  color: #374151;
+}
+
+.log-badge.level-info {
+  background: rgba(59, 130, 246, 0.2);
+  color: #1e40af;
+}
+
+.log-badge.level-warn {
+  background: rgba(245, 158, 11, 0.2);
+  color: #92400e;
+}
+
+.log-badge.level-error {
+  background: rgba(239, 68, 68, 0.2);
+  color: #7f1d1d;
+}
+
+.log-source {
+  color: #56645e;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.log-message {
+  color: #1c2a22;
+  word-break: break-word;
+}
+
+/* Jobs Table */
+
+.jobs-list {
+  border: 1px solid rgba(28, 42, 34, 0.08);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.jobs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.jobs-table thead {
+  background: rgba(28, 42, 34, 0.02);
+  border-bottom: 1px solid rgba(28, 42, 34, 0.08);
+}
+
+.jobs-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: #56645e;
+  font-size: 0.82rem;
+  letter-spacing: 0.05em;
+}
+
+.jobs-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(28, 42, 34, 0.06);
+}
+
+.jobs-table tr:last-child td {
+  border-bottom: none;
+}
+
+.jobs-table tbody tr {
+  background: rgba(255, 255, 255, 0.5);
+  transition: background 150ms ease;
+}
+
+.jobs-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.job-type {
+  font-weight: 600;
+  color: #1c2a22;
+}
+
+.job-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-align: center;
+  min-width: 80px;
+}
+
+.job-badge.status-pending {
+  background: rgba(156, 163, 175, 0.2);
+  color: #374151;
+}
+
+.job-badge.status-running {
+  background: rgba(59, 130, 246, 0.2);
+  color: #1e40af;
+}
+
+.job-badge.status-completed {
+  background: rgba(46, 142, 111, 0.15);
+  color: #1a6b3f;
+}
+
+.job-badge.status-failed {
+  background: rgba(239, 68, 68, 0.2);
+  color: #7f1d1d;
+}
+
+.job-summary {
+  color: #56645e;
+  font-size: 0.85rem;
+}

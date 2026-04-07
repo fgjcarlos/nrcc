@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"nrcc/internal/security"
 	"nrcc/internal/server"
 	"nrcc/internal/service"
 )
@@ -28,7 +29,11 @@ func Run(args []string, frontend fs.FS) error {
 	case "stop":
 		return stop()
 	case "doctor":
-		return doctor()
+		return runDoctor(args[1:])
+	case "logs":
+		return runLogs(args[1:])
+	case "support":
+		return runSupport(args[1:])
 	case "version":
 		return version()
 	case "help", "--help", "-h":
@@ -73,8 +78,13 @@ func start(frontend fs.FS) error {
 	managedEnvService := service.NewManagedEnvService(dataDir)
 	backupService := service.NewBackupService(dataDir)
 	libraryService := service.NewLibraryService(dataDir)
-	updateService := service.NewUpdateService(dataDir, backupService)
+	updateService := service.NewUpdateService(dataDir, &backupService)
 	operationLock := service.NewOperationLock()
+
+	// Create security, doctor, and support bundle services
+	sanitizer := security.NewSanitizer()
+	doctorService := service.NewDoctorService(dataDir)
+	supportBundleService := service.NewSupportBundleService(dataDir, logService, doctorService, sanitizer)
 
 	port := envOrDefault("NRCC_PORT", "3000")
 	runtimePort, err := strconv.Atoi(envOrDefault("NRCC_NODE_RED_PORT", "1880"))
@@ -86,6 +96,19 @@ func start(frontend fs.FS) error {
 		DataDir: dataDir,
 		Port:    runtimePort,
 	})
+
+	// Wire up LogService and JobsService to all services
+	processManager.SetLogService(logService)
+	operationLock.SetLogService(logService)
+	backupService.SetLogService(logService)
+	backupService.SetJobsService(jobsService)
+	updateService.SetLogService(logService)
+	updateService.SetJobsService(jobsService)
+
+	// Wire up services to DoctorService
+	doctorService.SetProcessManager(processManager)
+	doctorService.SetLogService(logService)
+
 	if err := processManager.Start(); err != nil {
 		return err
 	}
@@ -103,6 +126,8 @@ func start(frontend fs.FS) error {
 		Operations: operationLock,
 		Logs:       logService,
 		Jobs:       jobsService,
+		Doctor:     doctorService,
+		Support:    supportBundleService,
 	})
 
 	fmt.Printf("nrcc listening on http://127.0.0.1:%s\n", port)
@@ -185,6 +210,8 @@ func printHelp() {
 	fmt.Println("  start     Start the local control center")
 	fmt.Println("  stop      Stop the local control center")
 	fmt.Println("  doctor    Check local prerequisites")
+	fmt.Println("  logs      View system logs")
+	fmt.Println("  support   Generate support bundle for diagnostics")
 	fmt.Println("  version   Print version information")
 }
 

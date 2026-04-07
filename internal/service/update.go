@@ -22,12 +22,14 @@ type backupCoordinator interface {
 }
 
 type UpdateService struct {
-	dataDir string
-	runner  commandRunner
-	backups backupCoordinator
+	dataDir     string
+	runner      commandRunner
+	backups     backupCoordinator
+	logService  *LogService
+	jobsService *JobsService
 }
 
-func NewUpdateService(dataDir string, backups BackupService) UpdateService {
+func NewUpdateService(dataDir string, backups *BackupService) UpdateService {
 	runner := platform.NewRunner()
 	runner.Timeout = 2 * time.Minute
 	return UpdateService{
@@ -37,7 +39,17 @@ func NewUpdateService(dataDir string, backups BackupService) UpdateService {
 	}
 }
 
-func (s UpdateService) Status() (model.UpdateStatus, error) {
+// SetLogService injects the LogService for structured logging (nil-safe)
+func (s *UpdateService) SetLogService(ls *LogService) {
+	s.logService = ls
+}
+
+// SetJobsService injects the JobsService for job tracking (nil-safe)
+func (s *UpdateService) SetJobsService(js *JobsService) {
+	s.jobsService = js
+}
+
+func (s *UpdateService) Status() (model.UpdateStatus, error) {
 	installed, err := s.installedVersion()
 	if err != nil {
 		return model.UpdateStatus{}, err
@@ -53,7 +65,7 @@ func (s UpdateService) Status() (model.UpdateStatus, error) {
 	}, nil
 }
 
-func (s UpdateService) Apply(runtime runtimeController) (model.UpdateApplyResult, error) {
+func (s *UpdateService) Apply(runtime runtimeController) (model.UpdateApplyResult, error) {
 	status, err := s.Status()
 	if err != nil {
 		return model.UpdateApplyResult{}, err
@@ -64,6 +76,21 @@ func (s UpdateService) Apply(runtime runtimeController) (model.UpdateApplyResult
 			ToVersion:   status.AvailableVersion,
 			Message:     "Node-RED is already up to date.",
 		}, nil
+	}
+
+	// Start job tracking if available
+	var jobCtx *JobContext
+	if s.jobsService != nil {
+		var jobErr error
+		jobCtx, jobErr = NewJobContext(s.jobsService, s.logService, model.JobTypeUpdateApply, "system", fmt.Sprintf("Updating Node-RED from %s to %s", status.InstalledVersion, status.AvailableVersion))
+		if jobErr != nil {
+			return model.UpdateApplyResult{}, fmt.Errorf("start update job: %w", jobErr)
+		}
+		defer func() {
+			if jobCtx != nil && err != nil {
+				_ = jobCtx.Fail(err.Error())
+			}
+		}()
 	}
 
 	preventive, err := s.backups.Create("pre_update")
@@ -126,6 +153,28 @@ func (s UpdateService) Apply(runtime runtimeController) (model.UpdateApplyResult
 		}
 	}
 
+	// Emit log event
+	if s.logService != nil {
+		entry := model.LogEntry{
+			Level:     model.LogLevelInfo,
+			Source:    model.SourceUpdate,
+			Event:     model.EventUpdateApply,
+			Message:   fmt.Sprintf("Node-RED updated from %s to %s", status.InstalledVersion, status.AvailableVersion),
+			Timestamp: time.Now().UTC(),
+			Metadata: map[string]any{
+				"fromVersion": status.InstalledVersion,
+				"toVersion":   status.AvailableVersion,
+				"backupId":    preventive.ID,
+			},
+		}
+		_ = s.logService.Write(entry)
+	}
+
+	// Complete job
+	if jobCtx != nil {
+		_ = jobCtx.Complete(fmt.Sprintf("Node-RED updated to %s", status.AvailableVersion))
+	}
+
 	return model.UpdateApplyResult{
 		FromVersion:        status.InstalledVersion,
 		ToVersion:          status.AvailableVersion,
@@ -135,7 +184,7 @@ func (s UpdateService) Apply(runtime runtimeController) (model.UpdateApplyResult
 	}, nil
 }
 
-func (s UpdateService) installedVersion() (string, error) {
+func (s *UpdateService) installedVersion() (string, error) {
 	output, err := s.runner.Run(s.dataDir, "npm", "ls", "node-red", "--depth=0", "--json")
 	if err != nil {
 		return "", fmt.Errorf("read installed node-red version: %w", err)
@@ -156,7 +205,7 @@ func (s UpdateService) installedVersion() (string, error) {
 	return "", nil
 }
 
-func (s UpdateService) availableVersion() (string, error) {
+func (s *UpdateService) availableVersion() (string, error) {
 	output, err := s.runner.Run(s.dataDir, "npm", "view", "node-red", "version")
 	if err != nil {
 		return "", fmt.Errorf("read available node-red version: %w", err)
@@ -164,7 +213,7 @@ func (s UpdateService) availableVersion() (string, error) {
 	return strings.TrimSpace(output), nil
 }
 
-func (s UpdateService) rollback(backupID string, runtime runtimeController) error {
+func (s *UpdateService) rollback(backupID string, runtime runtimeController) error {
 	processManager, _ := runtime.(*ProcessManager)
 	if _, err := s.backups.Restore(backupID, processManager); err != nil {
 		return fmt.Errorf("restore preventive backup: %w", err)

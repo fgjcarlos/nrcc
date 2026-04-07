@@ -30,6 +30,8 @@ type Config struct {
 	Operations *service.OperationLock
 	Logs       *service.LogService
 	Jobs       *service.JobsService
+	Doctor     *service.DoctorService
+	Support    *service.SupportBundleService
 }
 
 type Server struct {
@@ -44,6 +46,7 @@ type authResponse struct {
 func New(cfg Config) *Server {
 	router := chi.NewRouter()
 	registerAPIRoutes(router, cfg.Runtime, cfg.Auth, cfg.Config, cfg.ManagedEnv, cfg.Backups, cfg.Libraries, cfg.Updates, cfg.Operations)
+	registerDiagnosticsRoutes(router, cfg)
 	registerSPARoutes(router, cfg.Frontend)
 
 	return &Server{

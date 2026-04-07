@@ -27,6 +27,7 @@ type ProcessConfig struct {
 type ProcessManager struct {
 	cfg        ProcessConfig
 	httpClient *http.Client
+	logService *LogService
 
 	mu         sync.RWMutex
 	cmd        *exec.Cmd
@@ -46,6 +47,11 @@ func NewProcessManager(cfg ProcessConfig) *ProcessManager {
 		},
 		logs: newRingBuffer(500),
 	}
+}
+
+// SetLogService injects the LogService for structured logging (nil-safe)
+func (pm *ProcessManager) SetLogService(ls *LogService) {
+	pm.logService = ls
 }
 
 func (pm *ProcessManager) Start() error {
@@ -96,6 +102,18 @@ func (pm *ProcessManager) Start() error {
 	pm.lastExit = ""
 	pm.binaryPath = scriptPath
 	pm.logs.Add("runtime started")
+
+	// Emit lifecycle event
+	if pm.logService != nil {
+		entry := model.LogEntry{
+			Level:     model.LogLevelInfo,
+			Source:    model.SourceRuntime,
+			Event:     model.EventRuntimeLifecycle,
+			Message:   "Node-RED process started",
+			Timestamp: time.Now().UTC(),
+		}
+		_ = pm.logService.Write(entry)
+	}
 
 	go pm.captureOutput(stdout, "stdout")
 	go pm.captureOutput(stderr, "stderr")
@@ -221,7 +239,33 @@ func (pm *ProcessManager) buildEnv() []string {
 func (pm *ProcessManager) captureOutput(reader io.Reader, stream string) {
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
-		pm.logs.Add(fmt.Sprintf("%s: %s", stream, scanner.Text()))
+		line := scanner.Text()
+		pm.logs.Add(fmt.Sprintf("%s: %s", stream, line))
+
+		// Emit log entry
+		if pm.logService != nil {
+			level := model.LogLevelInfo
+			if stream == "stderr" {
+				// Check for error/warn keywords in stderr
+				if strings.Contains(strings.ToLower(line), "error") {
+					level = model.LogLevelError
+				} else if strings.Contains(strings.ToLower(line), "warn") {
+					level = model.LogLevelWarn
+				}
+			}
+			source := "runtime.stdout"
+			if stream == "stderr" {
+				source = "runtime.stderr"
+			}
+			entry := model.LogEntry{
+				Level:     level,
+				Source:    source,
+				Event:     model.EventRuntimeStdout,
+				Message:   line,
+				Timestamp: time.Now().UTC(),
+			}
+			_ = pm.logService.Write(entry)
+		}
 	}
 	if err := scanner.Err(); err != nil {
 		pm.logs.Add(fmt.Sprintf("%s scan error: %v", stream, err))
@@ -238,11 +282,35 @@ func (pm *ProcessManager) waitForExit(cmd *exec.Cmd) {
 	if err != nil {
 		pm.lastError = err.Error()
 		pm.logs.Add(fmt.Sprintf("runtime exited with error: %v", err))
+
+		// Emit lifecycle event with error
+		if pm.logService != nil {
+			entry := model.LogEntry{
+				Level:     model.LogLevelError,
+				Source:    model.SourceRuntime,
+				Event:     model.EventRuntimeLifecycle,
+				Message:   fmt.Sprintf("Node-RED process stopped with error: %s", err.Error()),
+				Timestamp: time.Now().UTC(),
+			}
+			_ = pm.logService.Write(entry)
+		}
 		return
 	}
 
 	pm.lastError = ""
 	pm.logs.Add("runtime exited cleanly")
+
+	// Emit lifecycle event
+	if pm.logService != nil {
+		entry := model.LogEntry{
+			Level:     model.LogLevelInfo,
+			Source:    model.SourceRuntime,
+			Event:     model.EventRuntimeLifecycle,
+			Message:   "Node-RED process stopped",
+			Timestamp: time.Now().UTC(),
+		}
+		_ = pm.logService.Write(entry)
+	}
 }
 
 func (pm *ProcessManager) isHealthy() bool {

@@ -23,6 +23,8 @@ const backupSchemaVersion = 1
 type BackupService struct {
 	dataDir       string
 	configService ConfigService
+	logService    *LogService
+	jobsService   *JobsService
 }
 
 func NewBackupService(dataDir string) BackupService {
@@ -32,7 +34,17 @@ func NewBackupService(dataDir string) BackupService {
 	}
 }
 
-func (s BackupService) List() (model.BackupList, error) {
+// SetLogService injects the LogService for structured logging (nil-safe)
+func (s *BackupService) SetLogService(ls *LogService) {
+	s.logService = ls
+}
+
+// SetJobsService injects the JobsService for job tracking (nil-safe)
+func (s *BackupService) SetJobsService(js *JobsService) {
+	s.jobsService = js
+}
+
+func (s *BackupService) List() (model.BackupList, error) {
 	manifestDir := filepath.Join(s.dataDir, "manifests")
 	if !platform.Exists(manifestDir) {
 		return model.BackupList{Items: []model.BackupSummary{}}, nil
@@ -71,10 +83,27 @@ func (s BackupService) List() (model.BackupList, error) {
 	return model.BackupList{Items: items}, nil
 }
 
-func (s BackupService) Create(reason string) (model.BackupSummary, error) {
+func (s *BackupService) Create(reason string) (model.BackupSummary, error) {
 	reason = strings.TrimSpace(reason)
 	if reason == "" {
 		reason = "manual"
+	}
+
+	// Start job tracking if available
+	var jobCtx *JobContext
+	if s.jobsService != nil {
+		var err error
+		jobCtx, err = NewJobContext(s.jobsService, s.logService, model.JobTypeBackup, "system", "Creating backup: "+reason)
+		if err != nil {
+			return model.BackupSummary{}, fmt.Errorf("start backup job: %w", err)
+		}
+		defer func() {
+			if jobCtx != nil {
+				if err != nil {
+					_ = jobCtx.Fail(err.Error())
+				}
+			}
+		}()
 	}
 
 	files, err := s.collectBackupFiles()
@@ -111,6 +140,28 @@ func (s BackupService) Create(reason string) (model.BackupSummary, error) {
 		return model.BackupSummary{}, fmt.Errorf("write backup manifest: %w", err)
 	}
 
+	// Emit log event
+	if s.logService != nil {
+		entry := model.LogEntry{
+			Level:     model.LogLevelInfo,
+			Source:    model.SourceBackup,
+			Event:     model.EventBackupCreate,
+			Message:   fmt.Sprintf("Backup created: %s (%s)", id, reason),
+			Timestamp: time.Now().UTC(),
+			Metadata: map[string]any{
+				"backupId":    id,
+				"reason":      reason,
+				"archiveSize": archiveBytes,
+			},
+		}
+		_ = s.logService.Write(entry)
+	}
+
+	// Complete job
+	if jobCtx != nil {
+		_ = jobCtx.Complete(fmt.Sprintf("Backup created: %s", id))
+	}
+
 	return model.BackupSummary{
 		ID:            manifest.ID,
 		Reason:        manifest.Reason,
@@ -121,13 +172,28 @@ func (s BackupService) Create(reason string) (model.BackupSummary, error) {
 	}, nil
 }
 
-func (s BackupService) Restore(id string, runtimeManager *ProcessManager) (model.BackupSummary, error) {
+func (s *BackupService) Restore(id string, runtimeManager *ProcessManager) (model.BackupSummary, error) {
 	manifest, err := s.loadManifest(id)
 	if err != nil {
 		return model.BackupSummary{}, err
 	}
 	if manifest.SchemaVersion != backupSchemaVersion {
 		return model.BackupSummary{}, fmt.Errorf("unsupported backup schema version: %d", manifest.SchemaVersion)
+	}
+
+	// Start job tracking if available
+	var jobCtx *JobContext
+	if s.jobsService != nil {
+		var jobErr error
+		jobCtx, jobErr = NewJobContext(s.jobsService, s.logService, model.JobTypeRestore, "system", "Restoring backup: "+id)
+		if jobErr != nil {
+			return model.BackupSummary{}, fmt.Errorf("start restore job: %w", jobErr)
+		}
+		defer func() {
+			if jobCtx != nil && err != nil {
+				_ = jobCtx.Fail(err.Error())
+			}
+		}()
 	}
 
 	archivePath := filepath.Join(s.dataDir, "backups", manifest.ArchiveName)
@@ -161,10 +227,31 @@ func (s BackupService) Restore(id string, runtimeManager *ProcessManager) (model
 		}
 	}
 
+	// Emit log event
+	if s.logService != nil {
+		entry := model.LogEntry{
+			Level:     model.LogLevelInfo,
+			Source:    model.SourceBackup,
+			Event:     model.EventBackupRestore,
+			Message:   fmt.Sprintf("Backup restored: %s", id),
+			Timestamp: time.Now().UTC(),
+			Metadata: map[string]any{
+				"backupId":  id,
+				"fileCount": len(manifest.Files),
+			},
+		}
+		_ = s.logService.Write(entry)
+	}
+
+	// Complete job
+	if jobCtx != nil {
+		_ = jobCtx.Complete(fmt.Sprintf("Backup restored: %s", id))
+	}
+
 	return preventiveBackup, nil
 }
 
-func (s BackupService) loadManifest(id string) (model.BackupManifest, error) {
+func (s *BackupService) loadManifest(id string) (model.BackupManifest, error) {
 	var manifest model.BackupManifest
 	if err := platform.ReadJSON(filepath.Join(s.dataDir, "manifests", id+".json"), &manifest); err != nil {
 		return model.BackupManifest{}, fmt.Errorf("read backup manifest: %w", err)
@@ -172,7 +259,7 @@ func (s BackupService) loadManifest(id string) (model.BackupManifest, error) {
 	return manifest, nil
 }
 
-func (s BackupService) collectBackupFiles() ([]string, error) {
+func (s *BackupService) collectBackupFiles() ([]string, error) {
 	config, err := s.configService.Load()
 	if err != nil {
 		return nil, err
@@ -207,7 +294,7 @@ func (s BackupService) collectBackupFiles() ([]string, error) {
 	return filtered, nil
 }
 
-func (s BackupService) writeArchive(archivePath string, files []string) (int64, []model.BackupFile, error) {
+func (s *BackupService) writeArchive(archivePath string, files []string) (int64, []model.BackupFile, error) {
 	if err := platform.EnsureDir(filepath.Dir(archivePath)); err != nil {
 		return 0, nil, err
 	}
@@ -251,7 +338,7 @@ func (s BackupService) writeArchive(archivePath string, files []string) (int64, 
 	return int64(buffer.Len()), details, nil
 }
 
-func (s BackupService) restoreArchive(manifest model.BackupManifest, archivePath string) error {
+func (s *BackupService) restoreArchive(manifest model.BackupManifest, archivePath string) error {
 	reader, err := zip.OpenReader(archivePath)
 	if err != nil {
 		return fmt.Errorf("open backup archive: %w", err)

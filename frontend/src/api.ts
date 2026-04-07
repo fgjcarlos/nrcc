@@ -143,6 +143,61 @@ export type UpdateApplyResult = {
   message: string
 }
 
+export type DoctorCheckStatus = 'pass' | 'warn' | 'fail' | 'unknown'
+
+export type DoctorCheck = {
+  name: string
+  status: DoctorCheckStatus
+  message: string
+  details?: Record<string, unknown>
+}
+
+export type DoctorReport = {
+  generated_at: string
+  overall_status: DoctorCheckStatus
+  checks: DoctorCheck[]
+}
+
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
+
+export type LogEntry = {
+  id?: string
+  timestamp: string
+  level: LogLevel
+  source: string
+  event?: string
+  message: string
+  metadata?: Record<string, unknown>
+}
+
+export type LogsResponse = {
+  logs: LogEntry[]
+  total: number
+}
+
+export type JobStatus = 'pending' | 'running' | 'completed' | 'failed'
+
+export type JobRecord = {
+  id: string
+  type: string
+  status: JobStatus
+  started_at: string
+  finished_at?: string
+  triggered_by?: string
+  summary?: string
+  error?: string
+}
+
+export type JobsResponse = {
+  jobs: JobRecord[]
+  total: number
+}
+
+export type ExportResponse = {
+  path: string
+  size: number
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const method = (init?.method ?? 'GET').toUpperCase()
   const headers = new Headers(init?.headers ?? {})
@@ -256,10 +311,33 @@ export const api = {
     request<LibraryOperationResult>(`/api/libraries/${encodeURIComponent(name)}`, {
       method: 'DELETE',
     }),
-  operationsStatus: () => request<OperationStatus>('/api/operations/status'),
-  updateStatus: () => request<UpdateStatus>('/api/updates/status'),
-  applyUpdate: () =>
-    request<UpdateApplyResult>('/api/updates/apply', {
-      method: 'POST',
-    }),
+   operationsStatus: () => request<OperationStatus>('/api/operations/status'),
+   updateStatus: () => request<UpdateStatus>('/api/updates/status'),
+   applyUpdate: () =>
+     request<UpdateApplyResult>('/api/updates/apply', {
+       method: 'POST',
+     }),
+   diagnosticsReport: () => request<DoctorReport>('/api/diagnostics/report'),
+   diagnosticsLogs: (params?: { level?: LogLevel; source?: string; limit?: number; offset?: number }) => {
+     const searchParams = new URLSearchParams()
+     if (params?.level) searchParams.set('level', params.level)
+     if (params?.source) searchParams.set('source', params.source)
+     if (params?.limit) searchParams.set('limit', params.limit.toString())
+     if (params?.offset) searchParams.set('offset', params.offset.toString())
+     const query = searchParams.toString()
+     return request<LogsResponse>(`/api/diagnostics/logs${query ? '?' + query : ''}`)
+   },
+   diagnosticsJobs: (params?: { type?: string; status?: JobStatus; limit?: number; offset?: number }) => {
+     const searchParams = new URLSearchParams()
+     if (params?.type) searchParams.set('type', params.type)
+     if (params?.status) searchParams.set('status', params.status)
+     if (params?.limit) searchParams.set('limit', params.limit.toString())
+     if (params?.offset) searchParams.set('offset', params.offset.toString())
+     const query = searchParams.toString()
+     return request<JobsResponse>(`/api/diagnostics/jobs${query ? '?' + query : ''}`)
+   },
+   diagnosticsExport: () =>
+     request<ExportResponse>('/api/diagnostics/export', {
+       method: 'POST',
+     }),
 }

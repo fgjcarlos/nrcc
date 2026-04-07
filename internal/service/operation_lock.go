@@ -9,15 +9,21 @@ import (
 )
 
 type OperationLock struct {
-	mu      sync.Mutex
-	active  bool
-	opType  string
-	detail  string
-	started time.Time
+	mu         sync.Mutex
+	active     bool
+	opType     string
+	detail     string
+	started    time.Time
+	logService *LogService
 }
 
 func NewOperationLock() *OperationLock {
 	return &OperationLock{}
+}
+
+// SetLogService injects the LogService for structured logging (nil-safe)
+func (l *OperationLock) SetLogService(ls *LogService) {
+	l.logService = ls
 }
 
 func (l *OperationLock) Acquire(opType, detail string) (func(), error) {
@@ -33,9 +39,34 @@ func (l *OperationLock) Acquire(opType, detail string) (func(), error) {
 	l.detail = detail
 	l.started = time.Now().UTC()
 
+	// Emit lock acquired event
+	if l.logService != nil {
+		entry := model.LogEntry{
+			Level:     model.LogLevelInfo,
+			Source:    model.SourceOperation,
+			Event:     model.EventOperationLocked,
+			Message:   fmt.Sprintf("Operation locked: %s", opType),
+			Timestamp: time.Now().UTC(),
+		}
+		_ = l.logService.Write(entry)
+	}
+
 	return func() {
 		l.mu.Lock()
 		defer l.mu.Unlock()
+
+		// Emit lock released event
+		if l.logService != nil {
+			entry := model.LogEntry{
+				Level:     model.LogLevelInfo,
+				Source:    model.SourceOperation,
+				Event:     model.EventOperationReleased,
+				Message:   fmt.Sprintf("Operation released: %s", l.opType),
+				Timestamp: time.Now().UTC(),
+			}
+			_ = l.logService.Write(entry)
+		}
+
 		l.active = false
 		l.opType = ""
 		l.detail = ""

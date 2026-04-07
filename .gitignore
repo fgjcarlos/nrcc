@@ -22,3 +22,11 @@ frontend/*.tsbuildinfo
 .env.*
 .idea/
 .vscode/
+
+# Skills ia
+.agents/
+.claude/
+.codebuddy/
+.continue/
+.junie/
+.kiro/
