@@ -56,6 +56,19 @@ func start(frontend fs.FS) error {
 	}
 	defer authService.Close()
 
+	// Initialize log schema
+	if err := service.InitLogSchema(authService.GetDB()); err != nil {
+		return err
+	}
+
+	logService, err := service.NewLogService(dataDir, authService.GetDB())
+	if err != nil {
+		return err
+	}
+	defer logService.Close()
+
+	jobsService := service.NewJobsService(authService.GetDB())
+
 	configService := service.NewConfigService(dataDir)
 	managedEnvService := service.NewManagedEnvService(dataDir)
 	backupService := service.NewBackupService(dataDir)
@@ -88,6 +101,8 @@ func start(frontend fs.FS) error {
 		Libraries:  libraryService,
 		Updates:    updateService,
 		Operations: operationLock,
+		Logs:       logService,
+		Jobs:       jobsService,
 	})
 
 	fmt.Printf("nrcc listening on http://127.0.0.1:%s\n", port)

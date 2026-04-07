@@ -28,6 +28,8 @@ type Config struct {
 	Libraries  service.LibraryService
 	Updates    service.UpdateService
 	Operations *service.OperationLock
+	Logs       *service.LogService
+	Jobs       *service.JobsService
 }
 
 type Server struct {

@@ -55,6 +55,10 @@ func NewAuthService(dataDir string) (*AuthService, error) {
 	}, nil
 }
 
+func (s *AuthService) GetDB() *sql.DB {
+	return s.db
+}
+
 func (s *AuthService) RegisterInitial(username, password string) (*model.UserPublic, string, error) {
 	username = strings.TrimSpace(username)
 	if err := validateCredentials(username, password); err != nil {
