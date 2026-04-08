@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { api } from '../api'
-import { FullAppConfig } from '../types/config'
-import { SettingsPanel } from '../components/settings/SettingsPanel'
+import { api } from '../../api'
+import { FullAppConfig } from '../../types/config'
+import { SettingsPanel } from './SettingsPanel'
 
 type ConfigPageCallbacks = {
   onSaved?: (restartRequired: boolean) => void
