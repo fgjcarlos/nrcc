@@ -47,9 +47,9 @@ export function LogsTab({
                   <span className="log-timestamp">
                     {new Date(log.timestamp).toLocaleTimeString()}
                   </span>
-                  <span className={`log-badge level-${log.level}`}>
-                    {log.level.toUpperCase()}
-                  </span>
+                   <span className={`log-badge level-${log.level}`}>
+                     {(log.level ?? '').toUpperCase()}
+                   </span>
                   <span className="log-source">{log.source}</span>
                 </div>
                 <div className="log-message">{log.message}</div>

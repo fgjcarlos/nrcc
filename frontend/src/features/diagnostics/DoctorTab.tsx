@@ -28,11 +28,11 @@ export function DoctorTab({
           <div className="diagnostics-status">
             {loading ? (
               <p className="muted">Loading doctor report...</p>
-            ) : report ? (
-              <>
-                <div className={`status-badge ${getStatusBadgeClass(report.overall_status)}`}>
-                  {report.overall_status.toUpperCase()}
-                </div>
+             ) : report ? (
+               <>
+                 <div className={`status-badge ${getStatusBadgeClass(report.overall_status)}`}>
+                   {(report.overall_status ?? '').toUpperCase()}
+                 </div>
                 <p className="muted">Generated at {new Date(report.generated_at).toLocaleString()}</p>
               </>
             ) : null}

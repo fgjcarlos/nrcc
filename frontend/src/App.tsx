@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { api } from './api'
 import { buildGlobalStatus } from './common/utils/status'
+import { ThemeProvider } from './common/components'
 import { useAuth } from './features/auth/useAuth'
 import { AuthScreen } from './features/auth/AuthScreen'
 import { LoadingScreen } from './features/auth/LoadingScreen'
@@ -19,7 +20,7 @@ import { UpdatesPage } from './features/updates/UpdatesPage'
 import { DiagnosticsPage } from './features/diagnostics/DiagnosticsPage'
 import { ConfigPage } from './features/config/ConfigPage'
 
-export function App() {
+function AppContent() {
   const navigate = useNavigate()
   const location = useLocation()
   const queryClient = useQueryClient()
@@ -408,5 +409,13 @@ export function App() {
       </Routes>
       <ToastViewport toasts={toasts} onDismiss={dismissToast} />
     </>
+  )
+}
+
+export function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   )
 }

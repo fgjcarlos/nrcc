@@ -27,8 +27,8 @@ export function formatBytes(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-export function formatCheckName(name: string) {
-  return name
+export function formatCheckName(name: string | undefined) {
+  return (name ?? '')
     .split('_')
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ')

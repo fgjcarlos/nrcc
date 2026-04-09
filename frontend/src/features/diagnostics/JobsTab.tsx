@@ -55,11 +55,11 @@ export function JobsTab({
                 {jobs.map((job) => (
                   <tr key={job.id} className={`status-${job.status}`}>
                     <td className="job-type">{job.type}</td>
-                    <td>
-                      <span className={`job-badge status-${job.status}`}>
-                        {job.status.toUpperCase()}
-                      </span>
-                    </td>
+                     <td>
+                       <span className={`job-badge status-${job.status}`}>
+                         {(job.status ?? '').toUpperCase()}
+                       </span>
+                     </td>
                     <td>{new Date(job.started_at).toLocaleString()}</td>
                     <td>
                       {job.finished_at
