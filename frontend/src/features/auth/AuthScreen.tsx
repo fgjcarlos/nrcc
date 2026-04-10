@@ -26,55 +26,69 @@ export function AuthScreen({
     mode === 'register' ? 'Create the first administrator' : 'Sign in to the local control center'
 
   return (
-    <main className="auth-shell">
-      <section className="auth-panel">
-        <p className="eyebrow">Node-RED Control Center</p>
-        <h1>{title}</h1>
-        <p className="auth-copy">
-          {mode === 'register'
-            ? 'This machine has not been initialized yet. Create the first local administrator account.'
-            : 'Use your local administrator account to access runtime controls and diagnostics.'}
-        </p>
+    <main className="flex flex-col items-center justify-center min-h-screen bg-base-100 px-6">
+      <div className="card bg-base-200 shadow-xl w-full max-w-md p-8">
+        <div className="card-body">
+          <p className="text-xs font-semibold text-base-content opacity-60 uppercase tracking-wide">Node-RED Control Center</p>
+          <h1 className="text-3xl font-bold text-base-content">{title}</h1>
+          <p className="text-base-content opacity-70 mt-4">
+            {mode === 'register'
+              ? 'This machine has not been initialized yet. Create the first local administrator account.'
+              : 'Use your local administrator account to access runtime controls and diagnostics.'}
+          </p>
 
-        <form className="auth-form" onSubmit={handleSubmit}>
-          <label>
-            <span>Username</span>
-            <input value={username} onChange={(event) => setUsername(event.target.value)} required />
-          </label>
-          <label>
-            <span>Password</span>
-            <input
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-            />
-          </label>
+          <form className="form-control space-y-4 mt-6" onSubmit={handleSubmit}>
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text font-semibold">Username</span>
+              </label>
+              <input
+                type="text"
+                className="input input-bordered input-primary"
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+                required
+              />
+            </div>
 
-          {message ? <p className="auth-error">{message}</p> : null}
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text font-semibold">Password</span>
+              </label>
+              <input
+                type="password"
+                className="input input-bordered input-primary"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                required
+              />
+            </div>
 
-          <button className="primary-button" type="submit" disabled={busy}>
-            {busy ? 'Working...' : mode === 'register' ? 'Create account' : 'Sign in'}
-          </button>
-        </form>
+            {message ? <div className="alert alert-error text-sm">{message}</div> : null}
 
-        <div className="auth-toggle">
-          <button
-            className={mode === 'login' ? 'ghost-button active' : 'ghost-button'}
-            type="button"
-            onClick={() => onModeChange('login')}
-          >
-            Login
-          </button>
-          <button
-            className={mode === 'register' ? 'ghost-button active' : 'ghost-button'}
-            type="button"
-            onClick={() => onModeChange('register')}
-          >
-            Bootstrap
-          </button>
+            <button className="btn btn-primary w-full mt-6" type="submit" disabled={busy}>
+              {busy ? 'Working…' : mode === 'register' ? 'Create account' : 'Sign in'}
+            </button>
+          </form>
+
+          <div className="flex gap-2 mt-6 justify-center">
+            <button
+              className={`btn btn-sm ${mode === 'login' ? 'btn-primary' : 'btn-ghost'}`}
+              type="button"
+              onClick={() => onModeChange('login')}
+            >
+              Login
+            </button>
+            <button
+              className={`btn btn-sm ${mode === 'register' ? 'btn-primary' : 'btn-ghost'}`}
+              type="button"
+              onClick={() => onModeChange('register')}
+            >
+              Bootstrap
+            </button>
+          </div>
         </div>
-      </section>
+      </div>
     </main>
   )
 }

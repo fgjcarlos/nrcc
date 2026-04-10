@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import type { User } from '../../api'
 import type { PageKey, GlobalStatus } from '../../common/types'
+import { ThemeToggle } from '../../common/components'
 
 export function DashboardShell({
   user,
@@ -27,50 +28,84 @@ export function DashboardShell({
   ]
 
   return (
-    <main className="app-shell">
-      <aside className="sidebar">
-        <div className="sidebar-top">
-          <div>
-            <p className="eyebrow">NRCC</p>
-            <h1>Control Center</h1>
-            <p className="sidebar-copy">
-              Local-first operations for Node-RED with Go runtime control and cookie-backed sessions.
-            </p>
+    <div className="drawer lg:drawer-open">
+      <input id="sidebar-drawer" type="checkbox" className="drawer-toggle" />
+      <div className="drawer-content flex flex-col">
+        {/* Sticky Navbar Header */}
+        <header className="navbar bg-base-200 sticky top-0 z-10 shadow-md">
+          <div className="flex-1">
+            <label htmlFor="sidebar-drawer" className="btn btn-ghost btn-circle lg:hidden">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </label>
+            <span className="text-lg font-semibold">Node-RED Control Center</span>
+          </div>
+          <div className="navbar-end gap-2">
+            <ThemeToggle />
+            <button className="btn btn-ghost btn-sm" onClick={onLogout} disabled={logoutBusy}>
+              {logoutBusy ? 'Signing out…' : 'Sign out'}
+            </button>
+          </div>
+        </header>
+
+        {/* Main Content Area */}
+        <main className="flex-1 p-6 bg-base-100">
+          {children}
+        </main>
+      </div>
+
+      {/* Sidebar (Drawer Side) */}
+      <div className="drawer-side">
+        <label htmlFor="sidebar-drawer" className="drawer-overlay" />
+        <aside className="bg-base-200 w-72 min-h-full flex flex-col justify-between p-6">
+          {/* Sidebar Top */}
+          <div className="flex flex-col gap-6">
+            <div>
+              <p className="text-xs font-semibold text-base-content opacity-60 uppercase tracking-wide">NRCC</p>
+              <h1 className="text-2xl font-bold text-base-content">Control Center</h1>
+              <p className="text-sm text-base-content opacity-70 mt-2">
+                Local-first operations for Node-RED with Go runtime control and cookie-backed sessions.
+              </p>
+            </div>
+
+            {/* Status Banner */}
+            <div className={`alert ${
+              globalStatus.tone === 'ok' ? 'alert-success' : 
+              globalStatus.tone === 'warn' ? 'alert-warning' : 
+              'alert-info'
+            }`}>
+              <div>
+                <p className="text-xs font-semibold opacity-75">System status</p>
+                <p className="font-bold text-base">{globalStatus.title}</p>
+                <p className="text-sm opacity-75">{globalStatus.detail}</p>
+              </div>
+            </div>
+
+            {/* Navigation Menu */}
+            <nav className="menu bg-base-300 rounded-lg p-2" aria-label="Primary">
+              {items.map((item) => (
+                <li key={item.page}>
+                  <NavLink
+                    to={item.to}
+                    className={({ isActive }) => (isActive ? 'active' : '')}
+                  >
+                    {item.label}
+                  </NavLink>
+                </li>
+              ))}
+            </nav>
           </div>
 
-          <section className={`status-banner ${globalStatus.tone}`}>
-            <div className="status-banner-copy">
-              <p className="status-banner-label">System status</p>
-              <strong>{globalStatus.title}</strong>
-              <p>{globalStatus.detail}</p>
+          {/* Profile Card (Sidebar Bottom) */}
+          <div className="card bg-base-300 shadow-md p-4">
+            <div className="card-body p-0">
+              <p className="font-bold text-base-content">{user.username}</p>
+              <p className="text-sm text-base-content opacity-70">{user.role}</p>
             </div>
-          </section>
-
-          <nav className="sidebar-nav" aria-label="Primary">
-            {items.map((item) => (
-              <NavLink
-                key={item.page}
-                to={item.to}
-                className={({ isActive }) =>
-                  isActive ? 'nav-link active' : 'nav-link'
-                }
-              >
-                {item.label}
-              </NavLink>
-            ))}
-          </nav>
-        </div>
-
-        <div className="profile-card">
-          <p className="profile-name">{user.username}</p>
-          <p className="profile-role">{user.role}</p>
-          <button className="ghost-button wide" type="button" onClick={onLogout} disabled={logoutBusy}>
-            {logoutBusy ? 'Signing out...' : 'Sign out'}
-          </button>
-        </div>
-      </aside>
-
-      <section className="content">{children}</section>
-    </main>
+          </div>
+        </aside>
+      </div>
+    </div>
   )
 }

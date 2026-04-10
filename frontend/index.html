@@ -1,12 +1,13 @@
 <!doctype html>
-<html lang="en" data-theme="nrcc_dark">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>NRCC</title>
     <script>
       (function() {
-        var t = localStorage.getItem('theme') || 'nrcc_dark';
+        // Set theme from localStorage or default to 'dark' (dark-first approach)
+        var t = localStorage.getItem('theme') || 'dark';
         document.documentElement.setAttribute('data-theme', t);
       })();
     </script>

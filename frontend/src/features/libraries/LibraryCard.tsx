@@ -12,13 +12,13 @@ export function LibraryCard({
   onUninstall: () => void
 }) {
   return (
-    <article className="library-card" key={item.name}>
-      <div className="library-card-copy">
-        <strong>{item.name}</strong>
-        <p>{item.version || 'Unknown version'}</p>
+    <article className="card bg-base-200 shadow p-6 flex flex-row items-center justify-between" key={item.name}>
+      <div className="flex-1">
+        <strong className="text-base text-base-content">{item.name}</strong>
+        <p className="text-sm text-base-content opacity-75 mt-1">{item.version || 'Unknown version'}</p>
       </div>
       <button
-        className="ghost-button"
+        className="btn btn-ghost btn-sm ml-4"
         type="button"
         onClick={onUninstall}
         disabled={busy || isPending}

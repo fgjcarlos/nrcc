@@ -14,6 +14,20 @@ export function DoctorTab({
   error: unknown
   onRefresh: () => Promise<void>
 }) {
+  const getStatusBadgeDaisyUI = (status: string) => {
+    switch (status) {
+      case 'pass':
+        return 'badge-success'
+      case 'fail':
+        return 'badge-error'
+      case 'warn':
+        return 'badge-warning'
+      case 'unknown':
+      default:
+        return 'badge-ghost'
+    }
+  }
+
   return (
     <>
       {error ? (
@@ -23,22 +37,22 @@ export function DoctorTab({
           detail={formatErrorMessage(error, 'The doctor report could not be loaded.')}
         />
       ) : null}
-      <div className="tab-content">
-        <div className="diagnostics-header">
-          <div className="diagnostics-status">
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
             {loading ? (
-              <p className="muted">Loading doctor report...</p>
-             ) : report ? (
-               <>
-                 <div className={`status-badge ${getStatusBadgeClass(report.overall_status)}`}>
-                   {(report.overall_status ?? '').toUpperCase()}
-                 </div>
-                <p className="muted">Generated at {new Date(report.generated_at).toLocaleString()}</p>
+              <p className="text-sm text-base-content opacity-60">Loading doctor report...</p>
+            ) : report ? (
+              <>
+                <div className={`badge ${getStatusBadgeDaisyUI(report.overall_status)} badge-lg`}>
+                  {(report.overall_status ?? '').toUpperCase()}
+                </div>
+                <p className="text-sm text-base-content opacity-60">Generated at {new Date(report.generated_at).toLocaleString()}</p>
               </>
             ) : null}
           </div>
           <button
-            className="ghost-button"
+            className="btn btn-ghost btn-sm"
             type="button"
             onClick={onRefresh}
             disabled={loading}
@@ -48,23 +62,28 @@ export function DoctorTab({
         </div>
 
         {report && (
-          <div className="checks-list">
+          <div className="space-y-3">
             {report.checks.map((check) => (
-              <div key={check.name} className={`check-item ${check.status}`}>
-                <div className="check-status">
-                  <span className="check-icon">
+              <div key={check.name} className="border-l-4 border-base-300 p-4 bg-base-300 rounded">
+                <div className="flex items-start gap-3 mb-2">
+                  <span className="text-lg flex-shrink-0">
                     {check.status === 'pass' && '✅'}
                     {check.status === 'warn' && '⚠️'}
                     {check.status === 'fail' && '❌'}
                     {check.status === 'unknown' && '❓'}
                   </span>
-                  <strong>{formatCheckName(check.name)}</strong>
+                  <div className="flex-1">
+                    <strong className="text-base-content block">{formatCheckName(check.name)}</strong>
+                    <span className={`badge badge-sm ${getStatusBadgeDaisyUI(check.status)} mt-1`}>
+                      {check.status.toUpperCase()}
+                    </span>
+                  </div>
                 </div>
-                <p>{check.message}</p>
+                <p className="text-sm text-base-content opacity-85 mb-2">{check.message}</p>
                 {check.details && (
-                  <details className="check-details">
-                    <summary>Details</summary>
-                    <pre>{JSON.stringify(check.details, null, 2)}</pre>
+                  <details className="text-xs">
+                    <summary className="cursor-pointer font-semibold opacity-75 hover:opacity-100">Details</summary>
+                    <pre className="mt-2 p-2 bg-base-200 rounded overflow-auto max-h-40 text-xs opacity-75">{JSON.stringify(check.details, null, 2)}</pre>
                   </details>
                 )}
               </div>

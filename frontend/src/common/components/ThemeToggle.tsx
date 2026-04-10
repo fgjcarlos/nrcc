@@ -9,12 +9,12 @@ export function ThemeToggle() {
   const { theme, setTheme } = useThemeStore()
 
   const handleToggle = () => {
-    const newTheme = theme === 'nrcc_dark' ? 'nrcc_light' : 'nrcc_dark'
+    const newTheme = theme === 'dark' ? 'light' : 'dark'
     setTheme(newTheme)
   }
 
   const label =
-    theme === 'nrcc_dark'
+    theme === 'dark'
       ? 'Switch to light mode'
       : 'Switch to dark mode'
 
@@ -25,7 +25,7 @@ export function ThemeToggle() {
       aria-label={label}
       title={label}
     >
-      {theme === 'nrcc_dark' ? (
+      {theme === 'dark' ? (
         // Sun icon (when in dark mode)
         <svg
           xmlns="http://www.w3.org/2000/svg"

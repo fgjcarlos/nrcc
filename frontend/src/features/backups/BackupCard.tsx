@@ -17,20 +17,21 @@ export function BackupCard({
   onConfirm: () => void
 }) {
   return (
-    <article className="backup-card" key={backup.id}>
-      <div className="backup-card-copy">
-        <strong>{backup.id}</strong>
-        <p>{backup.reason}</p>
-        <p>{backup.archiveName}</p>
-        <p>
-          {formatBytes(backup.archiveBytes)} • {backup.createdAt}
+    <article className="card bg-base-200 shadow p-6" key={backup.id}>
+      <div className="mb-4">
+        <strong className="text-base text-base-content">{backup.id}</strong>
+        <p className="text-sm text-base-content opacity-75 mt-2">{backup.reason}</p>
+        <p className="text-sm text-base-content opacity-75 mt-1">{backup.archiveName}</p>
+        <p className="text-xs text-base-content opacity-60 mt-2">
+          <span className="badge badge-ghost">{formatBytes(backup.archiveBytes)}</span>
+          <span className="ml-2 opacity-75">{backup.createdAt}</span>
         </p>
       </div>
-      <div className="backup-card-actions">
+      <div className="flex gap-2 justify-end">
         {confirming ? (
           <>
             <button
-              className="ghost-button"
+              className="btn btn-ghost btn-sm"
               type="button"
               onClick={onCancel}
               disabled={isPending}
@@ -38,7 +39,7 @@ export function BackupCard({
               Cancel
             </button>
             <button
-              className="primary-button"
+              className="btn btn-primary btn-sm"
               type="button"
               onClick={onConfirm}
               disabled={isPending}
@@ -48,7 +49,7 @@ export function BackupCard({
           </>
         ) : (
           <button
-            className="ghost-button"
+            className="btn btn-ghost btn-sm"
             type="button"
             onClick={onRestore}
             disabled={isPending}

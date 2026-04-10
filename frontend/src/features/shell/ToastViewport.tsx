@@ -28,16 +28,33 @@ export function ToastViewport({
     return null
   }
 
+  const getToneClass = (tone: string) => {
+    switch (tone) {
+      case 'error':
+        return 'alert-error'
+      case 'success':
+        return 'alert-success'
+      case 'info':
+      default:
+        return 'alert-info'
+    }
+  }
+
   return (
-    <div className="toast-stack" aria-live="polite" aria-atomic="true">
+    <div className="toast toast-top toast-right" aria-live="polite" aria-atomic="true">
       {toasts.map((toast) => (
-        <article key={toast.id} className={`toast ${toast.tone}`}>
-          <div>
-            <strong>{toast.title}</strong>
-            {toast.detail ? <p>{toast.detail}</p> : null}
+        <article key={toast.id} className={`alert ${getToneClass(toast.tone)} shadow-lg`}>
+          <div className="flex-1">
+            <strong className="text-sm">{toast.title}</strong>
+            {toast.detail ? <p className="text-xs opacity-90 mt-1">{toast.detail}</p> : null}
           </div>
-          <button type="button" className="toast-dismiss" onClick={() => onDismiss(toast.id)}>
-            Close
+          <button
+            type="button"
+            className="btn btn-ghost btn-xs"
+            onClick={() => onDismiss(toast.id)}
+            aria-label="Close notification"
+          >
+            ✕
           </button>
         </article>
       ))}

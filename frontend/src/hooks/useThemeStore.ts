@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type Theme = 'nrcc_dark' | 'nrcc_light'
+export type Theme = 'dark' | 'light'
 
 interface ThemeStore {
   theme: Theme
@@ -10,14 +10,15 @@ interface ThemeStore {
 /**
  * Zustand store for theme management.
  * Persists to localStorage to maintain user preference across sessions.
+ * Uses DaisyUI standard theme names: 'dark' and 'light'.
  */
 export const useThemeStore = create<ThemeStore>((set) => {
   // Synchronously read from localStorage on store creation
   const storedTheme = localStorage.getItem('theme')
   const initialTheme: Theme =
-    storedTheme === 'nrcc_dark' || storedTheme === 'nrcc_light'
+    storedTheme === 'dark' || storedTheme === 'light'
       ? (storedTheme as Theme)
-      : 'nrcc_dark' // Default to dark-first
+      : 'dark' // Default to dark-first approach
 
   return {
     theme: initialTheme,
