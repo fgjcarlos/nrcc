@@ -1,47 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   color-scheme: light;
   font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+
+  /* Elevation System — Dual Shadow */
+  --elevation-1: 0 1px 3px 0 rgba(0,0,0,0.04), 0 1px 2px -1px rgba(0,0,0,0.04);
+  --elevation-2: 0 3px 8px 0 rgba(0,0,0,0.05), 0 6px 16px 0 rgba(0,0,0,0.03);
+  --elevation-3: 0 8px 24px 0 rgba(0,0,0,0.08), 0 16px 32px 0 rgba(0,0,0,0.05);
+
+  /* Neutral Border */
+  --border-neutral-light: rgba(0,0,0,0.06);
+  --border-neutral-dark: rgba(255,255,255,0.08);
+  --border-neutral: var(--border-neutral-light);
+
+  /* Indented Sub-section Left Border — Visible in light mode */
+  --border-indent: rgba(0, 0, 0, 0.12);
 }
 
-/* NRCC Dark Theme — Override DaisyUI default dark theme CSS variables */
+/* NRCC Dark Theme — Override DaisyUI v5.5 CSS variables (oklch format) */
 [data-theme="dark"] {
-  --p: 195 84 29;       /* primary: #c3561d */
-  --pc: 255 255 255;    /* primary-content: #ffffff */
-  --s: 46 142 111;      /* secondary: #2e8e6f */
-  --sc: 255 255 255;    /* secondary-content: #ffffff */
-  --a: 46 142 111;      /* accent: #2e8e6f */
-  --ac: 255 255 255;    /* accent-content: #ffffff */
-  --n: 33 48 40;        /* neutral: #213028 */
-  --nc: 221 231 221;    /* neutral-content: #dde7dd */
-  --b1: 28 42 34;       /* base-100: #1c2a22 */
-  --b2: 33 48 40;       /* base-200: #213028 */
-  --b3: 15 24 19;       /* base-300: #0f1813 */
-  --bc: 221 231 221;    /* base-content: #dde7dd */
-  --in: 59 130 246;     /* info: #3b82f6 */
-  --su: 46 142 111;     /* success: #2e8e6f */
-  --wa: 214 126 35;     /* warning: #d67e23 */
-  --er: 180 35 24;      /* error: #b42318 */
+  /* DaisyUI v5 uses oklch color space for primary/secondary/colors */
+  --color-primary: oklch(42% 0.15 29);       /* primary: #c3561d */
+  --color-primary-content: oklch(100% 0 0);  /* primary-content: #ffffff */
+  --color-secondary: oklch(56% 0.16 143);    /* secondary: #2BA891 (more saturated) */
+  --color-secondary-content: oklch(100% 0 0);/* secondary-content: #ffffff */
+  --color-accent: oklch(56% 0.16 143);       /* accent: #2BA891 */
+  --color-accent-content: oklch(100% 0 0);   /* accent-content: #ffffff */
+  --color-neutral: oklch(18% 0.04 180);      /* neutral: #213028 */
+  --color-neutral-content: oklch(93% 0.01 127);/* neutral-content: #dde7dd */
+  --color-base-100: oklch(16% 0.05 174);     /* base-100: #1c2a22 */
+  --color-base-200: oklch(18% 0.04 180);     /* base-200: #213028 */
+  --color-base-300: oklch(9% 0.06 165);      /* base-300: #0f1813 */
+  --color-base-content: oklch(93% 0.01 127); /* base-content: #dde7dd */
+  --color-info: oklch(55% 0.22 260);         /* info: #3b82f6 */
+  --color-success: oklch(52% 0.19 143);      /* success: #2e8e6f */
+  --color-warning: oklch(59% 0.20 55);       /* warning: #d67e23 */
+  --color-error: oklch(52% 0.24 15);         /* error: #b42318 */
   color-scheme: dark;
+
+  /* Elevation System — Dark Mode (40% less opacity) */
+  --elevation-1: 0 1px 3px 0 rgba(0,0,0,0.02), 0 1px 2px -1px rgba(0,0,0,0.02);
+  --elevation-2: 0 3px 8px 0 rgba(0,0,0,0.03), 0 6px 16px 0 rgba(0,0,0,0.018);
+  --elevation-3: 0 8px 24px 0 rgba(0,0,0,0.05), 0 16px 32px 0 rgba(0,0,0,0.03);
+
+  /* Neutral Border */
+  --border-neutral: var(--border-neutral-dark);
+  --border-indent: rgba(255, 255, 255, 0.14);
 }
 
-/* NRCC Light Theme — Override DaisyUI default light theme CSS variables */
+/* NRCC Light Theme — Override DaisyUI v5.5 CSS variables (oklch format) */
 [data-theme="light"] {
-  --p: 195 84 29;       /* primary: #c3561d */
-  --pc: 255 255 255;    /* primary-content: #ffffff */
-  --s: 46 142 111;      /* secondary: #2e8e6f */
-  --sc: 255 255 255;    /* secondary-content: #ffffff */
-  --a: 46 142 111;      /* accent: #2e8e6f */
-  --ac: 255 255 255;    /* accent-content: #ffffff */
-  --n: 232 240 234;     /* neutral: #e8f0ea */
-  --nc: 28 42 34;       /* neutral-content: #1c2a22 */
-  --b1: 245 239 228;    /* base-100: #f5efe4 */
-  --b2: 232 240 234;    /* base-200: #e8f0ea */
-  --b3: 249 247 243;    /* base-300: #f9f7f3 */
-  --bc: 28 42 34;       /* base-content: #1c2a22 */
-  --in: 30 64 175;      /* info: #1e40af */
-  --su: 26 107 63;      /* success: #1a6b3f */
-  --wa: 146 64 14;      /* warning: #92400e */
-  --er: 153 27 27;      /* error: #991b1b */
+  /* DaisyUI v5 uses oklch color space */
+  --color-primary: oklch(42% 0.15 29);       /* primary: #c3561d */
+  --color-primary-content: oklch(100% 0 0);  /* primary-content: #ffffff */
+  --color-secondary: oklch(56% 0.16 143);    /* secondary: #2BA891 (more saturated +10%) */
+  --color-secondary-content: oklch(100% 0 0);/* secondary-content: #ffffff */
+  --color-accent: oklch(56% 0.16 143);       /* accent: #2BA891 */
+  --color-accent-content: oklch(100% 0 0);   /* accent-content: #ffffff */
+  --color-neutral: oklch(91% 0.01 127);      /* neutral: #e8f0ea */
+  --color-neutral-content: oklch(16% 0.05 174);/* neutral-content: #1c2a22 */
+  --color-base-100: oklch(96% 0.02 168);     /* base-100: #F4EEE4 (cooled) */
+  --color-base-200: oklch(92% 0.02 159);     /* base-200: #E5EDE8 (cooled) */
+  --color-base-300: oklch(98% 0.01 172);     /* base-300: #f9f7f3 */
+  --color-base-content: oklch(16% 0.05 174); /* base-content: #1c2a22 */
+  --color-info: oklch(48% 0.23 255);         /* info: #1e40af */
+  --color-success: oklch(47% 0.16 143);      /* success: #1a6b3f */
+  --color-warning: oklch(54% 0.20 54);       /* warning: #92400e */
+  --color-error: oklch(51% 0.23 15);         /* error: #991b1b */
   color-scheme: light;
 }
 
@@ -76,6 +104,140 @@ body {
 .log-line {
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* ===== @layer utilities: Elevation System & Component Overrides (DaisyUI v5 compatibility) ===== */
+/* Note: DaisyUI v5 places component styles in @layer utilities, so we must override at the same layer */
+
+@layer utilities {
+  /* Universal Card Border */
+  .card {
+    border: 1px solid var(--border-neutral);
+    transition: box-shadow 150ms ease;
+  }
+
+  .card:hover {
+    box-shadow: var(--elevation-3);
+  }
+
+  /* Button Elevation */
+  .btn-primary {
+    box-shadow: var(--elevation-1);
+    transition: box-shadow 150ms ease;
+  }
+
+  .btn-primary:hover,
+  .btn-primary:focus-visible {
+    box-shadow: var(--elevation-2);
+  }
+
+  .btn-error {
+    box-shadow: var(--elevation-1);
+    transition: box-shadow 150ms ease;
+  }
+
+  .btn-error:hover,
+  .btn-error:focus-visible {
+    box-shadow: var(--elevation-2);
+  }
+
+  /* Input Focus Ring — Using DaisyUI v5 --color-primary oklch */
+  .input:focus,
+  .input:focus-within,
+  .select:focus,
+  .select:focus-within {
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-primary) 25%, transparent);
+  }
+
+  /* DaisyUI Alert Overrides — Reduced Fill with DaisyUI v5 color variables */
+  .alert-success {
+    background-color: color-mix(in oklch, var(--color-success) 8%, transparent);
+    border-left: 4px solid var(--color-success);
+  }
+
+  .alert-warning {
+    background-color: color-mix(in oklch, var(--color-warning) 8%, transparent);
+    border-left: 4px solid var(--color-warning);
+  }
+
+  .alert-error {
+    background-color: color-mix(in oklch, var(--color-error) 8%, transparent);
+    border-left: 4px solid var(--color-error);
+  }
+
+  .alert-info {
+    background-color: color-mix(in oklch, var(--color-info) 8%, transparent);
+    border-left: 4px solid var(--color-info);
+  }
+
+  /* StatCard System with DaisyUI v5 color references */
+  .stat-card {
+    border: 1px solid var(--border-neutral);
+    transition: box-shadow 150ms ease;
+    position: relative;
+  }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    border-radius: 8px 8px 0 0;
+    opacity: 0.4;
+  }
+
+  .stat-card--ok::before {
+    background-color: var(--color-success);
+  }
+
+  .stat-card--warn::before {
+    background-color: var(--color-warning);
+  }
+
+  .stat-card--neutral::before {
+    background-color: var(--color-neutral);
+  }
+
+  .stat-card:hover {
+    box-shadow: var(--elevation-3);
+  }
+
+  .stat-card h3 {
+    font-weight: 700;
+  }
+
+  /* Card Titles & Typography */
+  .card-title,
+  h2,
+  h3 {
+    font-weight: 600;
+  }
+
+  /* Labels Tracking */
+  .stat-card-label {
+    letter-spacing: -0.01em;
+  }
+
+  /* FormField Error Message — icon + text in error state */
+  .form-field-error-msg {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;        /* gap-1 */
+    margin-top: 0.25rem; /* mt-1 */
+    font-size: 0.875rem; /* text-sm */
+    color: var(--color-error);
+  }
+
+  /* FormField Hint — helper text (muted) */
+  .form-field-hint {
+    margin-top: 0.25rem;
+    font-size: 0.875rem;
+    color: color-mix(in oklch, var(--color-base-content) 60%, transparent);
+  }
+
 }
 
 

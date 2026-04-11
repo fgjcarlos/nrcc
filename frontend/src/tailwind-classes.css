@@ -9,6 +9,8 @@
 .menu.menu-compact
 .alert.alert-success.alert-warning.alert-info.alert-error
 .input.input-bordered.input-primary.input-error
+.select.select-error
+.form-field-error-msg.form-field-hint
 .label.label-text
 .form-control
 .badge.badge-primary.badge-success.badge-warning.badge-error
@@ -43,6 +45,9 @@
 .h-screen.w-screen.gap-2.gap-4.gap-6.px-2.px-4.px-6.py-2.py-4.py-6
 .lg\:drawer-open.lg\:hidden.lg\:block
 .shadow-md.rounded-lg
+.shadow-elevation-1.shadow-elevation-2.shadow-elevation-3
+.stat-card.stat-card--ok.stat-card--warn.stat-card--neutral
+.stat-card-label
 {
   @apply hidden !important;
 }

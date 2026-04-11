@@ -1,5 +1,6 @@
 import { FormEvent, useState } from 'react'
 import type { AuthMode } from '../../common/types'
+import { FormField } from '../../components/forms'
 
 export function AuthScreen({
   mode,
@@ -38,31 +39,23 @@ export function AuthScreen({
           </p>
 
           <form className="form-control space-y-4 mt-6" onSubmit={handleSubmit}>
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text font-semibold">Username</span>
-              </label>
-              <input
-                type="text"
-                className="input input-bordered input-primary"
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
-                required
-              />
-            </div>
+            <FormField
+              id="username"
+              label="Username"
+              type="text"
+              value={username}
+              onChange={setUsername}
+              required
+            />
 
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text font-semibold">Password</span>
-              </label>
-              <input
-                type="password"
-                className="input input-bordered input-primary"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                required
-              />
-            </div>
+            <FormField
+              id="password"
+              label="Password"
+              type="password"
+              value={password}
+              onChange={setPassword}
+              required
+            />
 
             {message ? <div className="alert alert-error text-sm">{message}</div> : null}
 
