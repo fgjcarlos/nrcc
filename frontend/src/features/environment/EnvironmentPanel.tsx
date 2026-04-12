@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { api, type ManagedEnvState, type ManagedEnvVar } from '../../api'
 import { formatErrorMessage } from '../../common/utils/format'
+import { InlineNotice } from '../../common/components/InlineNotice'
 
 export function EnvironmentPanel({
   state,
@@ -39,11 +40,11 @@ export function EnvironmentPanel({
 
   if (loading || !state) {
     return (
-      <article className="panel">
-        <div className="panel-header">
-          <h3>Managed runtime variables</h3>
+      <article className="card bg-base-200 shadow-elevation-2 rounded-lg">
+        <div className="card-body">
+          <h3 className="card-title text-lg font-semibold text-base-content">Managed runtime variables</h3>
+          <p className="text-base-content/60 text-sm">Loading managed environment...</p>
         </div>
-        <p className="muted">Loading managed environment...</p>
       </article>
     )
   }
@@ -68,58 +69,72 @@ export function EnvironmentPanel({
   }
 
   return (
-    <article className="panel">
-      <div className="panel-header">
-        <h3>Managed runtime variables</h3>
+    <article className="card bg-base-200 shadow-elevation-2 rounded-lg">
+      <div className="card-body">
+        <h3 className="card-title text-lg font-semibold text-base-content">Managed runtime variables</h3>
+        <p className="text-base-content/60 text-sm mb-6">
+          These variables are injected into the Node-RED runtime from `.env.managed`. Names prefixed with `NRCC_` and `PORT` are reserved.
+        </p>
+
+        <form
+          className="space-y-6"
+          onSubmit={(event) => {
+            event.preventDefault()
+            applyMutation.mutate(variables)
+          }}
+        >
+          <div className="space-y-4">
+            {variables.map((variable, index) => (
+              <div key={`${index}-${variable.name}`} className="flex flex-col sm:flex-row gap-4 items-end">
+                <div className="form-control flex-1">
+                  <label className="label">
+                    <span className="label-text font-medium">Name</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input input-bordered bg-base-100"
+                    value={variable.name}
+                    onChange={(event) => update(index, { name: event.target.value })}
+                    placeholder="API_TOKEN"
+                  />
+                </div>
+                <div className="form-control flex-1">
+                  <label className="label">
+                    <span className="label-text font-medium">Value</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input input-bordered bg-base-100"
+                    value={variable.value}
+                    onChange={(event) => update(index, { value: event.target.value })}
+                    placeholder="secret-value"
+                  />
+                </div>
+                <button className="btn btn-ghost btn-sm" type="button" onClick={() => removeRow(index)}>
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex gap-3">
+            <button className="btn btn-ghost btn-sm" type="button" onClick={addRow} disabled={applyMutation.isPending}>
+              + Add variable
+            </button>
+            <button className="btn btn-primary btn-sm" type="submit" disabled={applyMutation.isPending}>
+              {applyMutation.isPending ? 'Saving...' : 'Save environment'}
+            </button>
+          </div>
+        </form>
+
+        {message ? (
+          <InlineNotice
+            tone={message.includes('failed') ? 'error' : 'warn'}
+            title={message.includes('failed') ? 'Save failed' : 'Saved'}
+            detail={message}
+          />
+        ) : null}
       </div>
-      <p className="muted">
-        These variables are injected into the Node-RED runtime from `.env.managed`. Names prefixed with `NRCC_` and `PORT` are reserved.
-      </p>
-
-      <form
-        className="env-form"
-        onSubmit={(event) => {
-          event.preventDefault()
-          applyMutation.mutate(variables)
-        }}
-      >
-        <div className="env-rows">
-          {variables.map((variable, index) => (
-            <div className="env-row" key={`${index}-${variable.name}`}>
-              <label>
-                <span>Name</span>
-                <input
-                  value={variable.name}
-                  onChange={(event) => update(index, { name: event.target.value })}
-                  placeholder="API_TOKEN"
-                />
-              </label>
-              <label>
-                <span>Value</span>
-                <input
-                  value={variable.value}
-                  onChange={(event) => update(index, { value: event.target.value })}
-                  placeholder="secret-value"
-                />
-              </label>
-              <button className="ghost-button env-remove" type="button" onClick={() => removeRow(index)}>
-                Remove
-              </button>
-            </div>
-          ))}
-        </div>
-
-        <div className="config-actions">
-          <button className="ghost-button" type="button" onClick={addRow} disabled={applyMutation.isPending}>
-            Add variable
-          </button>
-          <button className="primary-button" type="submit" disabled={applyMutation.isPending}>
-            {applyMutation.isPending ? 'Saving...' : 'Save environment'}
-          </button>
-        </div>
-      </form>
-
-      {message ? <p className="config-message">{message}</p> : null}
     </article>
   )
 }

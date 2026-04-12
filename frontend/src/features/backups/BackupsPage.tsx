@@ -46,14 +46,14 @@ export function BackupsPage({
 
   return (
     <>
-      <header className="topbar">
+      <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 mb-8">
         <div>
-          <p className="eyebrow">Runtime</p>
-          <h2>Backups</h2>
+          <p className="text-sm font-semibold text-base-content/70 uppercase tracking-wide">Runtime</p>
+          <h2 className="text-3xl font-bold text-base-content mt-1">Backups</h2>
         </div>
-        <div className="topbar-actions">
+        <div className="flex gap-2">
           <button
-            className="primary-button"
+            className="btn btn-primary"
             type="button"
             onClick={() => createMutation.mutate()}
             disabled={createMutation.isPending}
@@ -71,30 +71,30 @@ export function BackupsPage({
         />
       ) : null}
 
-      <article className="panel">
-        <div className="panel-header">
-          <h3>Backup history</h3>
+      <article className="card bg-base-200 shadow">
+        <div className="card-body">
+          <h3 className="card-title text-2xl">Backup history</h3>
+          {loading ? <p className="text-sm text-base-content/60">Loading backups...</p> : null}
+          {!loading && (!backups || backups.items.length === 0) ? <p className="text-sm text-base-content/60">No backups created yet.</p> : null}
+          {backups?.items.length ? (
+            <div className="space-y-4">
+              {backups.items.map((backup) => {
+                const confirming = restoreTarget === backup.id
+                return (
+                  <BackupCard
+                    key={backup.id}
+                    backup={backup}
+                    confirming={confirming}
+                    isPending={restoreMutation.isPending}
+                    onRestore={() => setRestoreTarget(backup.id)}
+                    onCancel={() => setRestoreTarget(null)}
+                    onConfirm={() => restoreMutation.mutate(backup.id)}
+                  />
+                )
+              })}
+            </div>
+          ) : null}
         </div>
-        {loading ? <p className="muted">Loading backups...</p> : null}
-        {!loading && (!backups || backups.items.length === 0) ? <p className="muted">No backups created yet.</p> : null}
-        {backups?.items.length ? (
-          <div className="backup-list">
-            {backups.items.map((backup) => {
-              const confirming = restoreTarget === backup.id
-              return (
-                <BackupCard
-                  key={backup.id}
-                  backup={backup}
-                  confirming={confirming}
-                  isPending={restoreMutation.isPending}
-                  onRestore={() => setRestoreTarget(backup.id)}
-                  onCancel={() => setRestoreTarget(null)}
-                  onConfirm={() => restoreMutation.mutate(backup.id)}
-                />
-              )
-            })}
-          </div>
-        ) : null}
       </article>
     </>
   )

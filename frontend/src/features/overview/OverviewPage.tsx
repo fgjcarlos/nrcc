@@ -35,12 +35,12 @@ export function OverviewPage({
 
   return (
     <>
-      <header className="topbar">
+      <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 mb-8">
         <div>
-          <p className="eyebrow">Runtime</p>
-          <h2>Dashboard</h2>
+          <p className="text-sm font-semibold text-base-content/70 uppercase tracking-wide">Runtime</p>
+          <h2 className="text-3xl font-bold text-base-content mt-1">Dashboard</h2>
         </div>
-        <div className="topbar-actions">
+        <div className="flex gap-2">
           <RestartButton
             confirmRestart={confirmRestart}
             restarting={restarting}
@@ -70,7 +70,7 @@ export function OverviewPage({
         />
       ) : null}
 
-      <section className="stats-grid">
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <StatCard
           label="Runtime state"
           value={runtimeLoading ? 'Loading...' : runtime?.running ? 'Running' : 'Stopped'}
@@ -89,7 +89,7 @@ export function OverviewPage({
         <StatCard label="Global status" value={globalStatus.title} accent={globalStatus.tone} />
       </section>
 
-      <section className="panel-grid">
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <RuntimeDetailsPanel runtime={runtime} runtimeLoading={runtimeLoading} />
         <SystemInfoPanel systemInfo={systemInfo} systemLoading={systemLoading} />
       </section>

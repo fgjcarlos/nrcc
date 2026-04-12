@@ -40,14 +40,14 @@ export function DiagnosticsPage({
 
   return (
     <>
-      <header className="topbar">
+      <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 mb-8">
         <div>
-          <p className="eyebrow">Support</p>
-          <h2>Diagnostics</h2>
+          <p className="text-sm font-semibold text-base-content/70 uppercase tracking-wide">Support</p>
+          <h2 className="text-3xl font-bold text-base-content mt-1">Diagnostics</h2>
         </div>
-        <div className="topbar-actions">
+        <div className="flex gap-2">
           <button
-            className="primary-button"
+            className="btn btn-primary"
             type="button"
             onClick={onExport}
             disabled={exporting}
@@ -57,57 +57,59 @@ export function DiagnosticsPage({
         </div>
       </header>
 
-      <article className="panel diagnostics-panel">
-        <div className="panel-header diagnostics-tabs">
-          <button
-            className={activeTab === 'doctor' ? 'tab-button active' : 'tab-button'}
-            type="button"
-            onClick={() => setActiveTab('doctor')}
-          >
-            Doctor
-          </button>
-          <button
-            className={activeTab === 'logs' ? 'tab-button active' : 'tab-button'}
-            type="button"
-            onClick={() => setActiveTab('logs')}
-          >
-            Logs
-          </button>
-          <button
-            className={activeTab === 'jobs' ? 'tab-button active' : 'tab-button'}
-            type="button"
-            onClick={() => setActiveTab('jobs')}
-          >
-            Jobs
-          </button>
+      <article className="card bg-base-200 shadow-elevation-2 rounded-lg">
+        <div className="card-body">
+          <div className="tabs tabs-bordered mb-6">
+            <button
+              className={`tab ${activeTab === 'doctor' ? 'tab-active' : ''}`}
+              type="button"
+              onClick={() => setActiveTab('doctor')}
+            >
+              Doctor
+            </button>
+            <button
+              className={`tab ${activeTab === 'logs' ? 'tab-active' : ''}`}
+              type="button"
+              onClick={() => setActiveTab('logs')}
+            >
+              Logs
+            </button>
+            <button
+              className={`tab ${activeTab === 'jobs' ? 'tab-active' : ''}`}
+              type="button"
+              onClick={() => setActiveTab('jobs')}
+            >
+              Jobs
+            </button>
+          </div>
+
+          {activeTab === 'doctor' && (
+            <DoctorTab
+              report={report}
+              loading={reportLoading}
+              error={reportError}
+              onRefresh={onRefreshReport}
+            />
+          )}
+
+          {activeTab === 'logs' && (
+            <LogsTab
+              logs={logs}
+              loading={logsLoading}
+              error={logsError}
+              onRefresh={onRefreshLogs}
+            />
+          )}
+
+          {activeTab === 'jobs' && (
+            <JobsTab
+              jobs={jobs}
+              loading={jobsLoading}
+              error={jobsError}
+              onRefresh={onRefreshJobs}
+            />
+          )}
         </div>
-
-        {activeTab === 'doctor' && (
-          <DoctorTab
-            report={report}
-            loading={reportLoading}
-            error={reportError}
-            onRefresh={onRefreshReport}
-          />
-        )}
-
-        {activeTab === 'logs' && (
-          <LogsTab
-            logs={logs}
-            loading={logsLoading}
-            error={logsError}
-            onRefresh={onRefreshLogs}
-          />
-        )}
-
-        {activeTab === 'jobs' && (
-          <JobsTab
-            jobs={jobs}
-            loading={jobsLoading}
-            error={jobsError}
-            onRefresh={onRefreshJobs}
-          />
-        )}
       </article>
     </>
   )

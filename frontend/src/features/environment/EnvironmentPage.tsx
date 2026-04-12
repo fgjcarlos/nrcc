@@ -18,10 +18,10 @@ export function EnvironmentPage({
 }) {
   return (
     <>
-      <header className="topbar">
+      <header className="flex flex-col sm:flex-row sm:items-center gap-6 mb-8">
         <div>
-          <p className="eyebrow">Runtime</p>
-          <h2>Environment</h2>
+          <p className="text-sm font-semibold text-base-content/70 uppercase tracking-wide">Runtime</p>
+          <h2 className="text-3xl font-bold text-base-content mt-1">Environment</h2>
         </div>
       </header>
 

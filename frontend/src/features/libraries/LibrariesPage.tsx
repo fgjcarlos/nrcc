@@ -47,10 +47,10 @@ export function LibrariesPage({
 
   return (
     <>
-      <header className="topbar">
+      <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 mb-8">
         <div>
-          <p className="eyebrow">Runtime</p>
-          <h2>Libraries</h2>
+          <p className="text-sm font-semibold text-base-content/70 uppercase tracking-wide">Runtime</p>
+          <h2 className="text-3xl font-bold text-base-content mt-1">Libraries</h2>
         </div>
       </header>
 
@@ -81,25 +81,25 @@ export function LibrariesPage({
         onSubmit={() => installMutation.mutate(packageName)}
       />
 
-      <article className="panel">
-        <div className="panel-header">
-          <h3>Installed packages</h3>
+      <article className="card bg-base-200 shadow">
+        <div className="card-body">
+          <h3 className="card-title text-2xl">Installed packages</h3>
+          {loading ? <p className="text-sm text-base-content/60">Loading installed packages...</p> : null}
+          {!loading && (!libraries || libraries.items.length === 0) ? <p className="text-sm text-base-content/60">No additional packages installed.</p> : null}
+          {libraries?.items.length ? (
+            <div className="space-y-4">
+              {libraries.items.map((item) => (
+                <LibraryCard
+                  key={item.name}
+                  item={item}
+                  isPending={uninstallMutation.isPending}
+                  busy={busy}
+                  onUninstall={() => uninstallMutation.mutate(item.name)}
+                />
+              ))}
+            </div>
+          ) : null}
         </div>
-        {loading ? <p className="muted">Loading installed packages...</p> : null}
-        {!loading && (!libraries || libraries.items.length === 0) ? <p className="muted">No additional packages installed.</p> : null}
-        {libraries?.items.length ? (
-          <div className="library-list">
-            {libraries.items.map((item) => (
-              <LibraryCard
-                key={item.name}
-                item={item}
-                isPending={uninstallMutation.isPending}
-                busy={busy}
-                onUninstall={() => uninstallMutation.mutate(item.name)}
-              />
-            ))}
-          </div>
-        ) : null}
       </article>
     </>
   )

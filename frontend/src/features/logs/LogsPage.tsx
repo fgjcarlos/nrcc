@@ -13,10 +13,10 @@ export function LogsPage({
 }) {
   return (
     <>
-      <header className="topbar">
+      <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 mb-8">
         <div>
-          <p className="eyebrow">Runtime</p>
-          <h2>Logs</h2>
+          <p className="text-sm font-semibold text-base-content/70 uppercase tracking-wide">Runtime</p>
+          <h2 className="text-3xl font-bold text-base-content mt-1">Logs</h2>
         </div>
       </header>
 
@@ -28,18 +28,18 @@ export function LogsPage({
         />
       ) : null}
 
-      <article className="panel logs-panel">
-        <div className="panel-header">
-          <h3>Runtime logs</h3>
-        </div>
-        <div className="log-output">
-          {loading ? <p className="muted">Loading logs...</p> : null}
-          {!loading && logs.length === 0 ? <p className="muted">No logs captured yet.</p> : null}
-          {logs.map((line, index) => (
-            <div className="log-line" key={`${index}-${line}`}>
-              {line}
-            </div>
-          ))}
+      <article className="card bg-base-200 shadow">
+        <div className="card-body">
+          <h3 className="card-title text-2xl">Runtime logs</h3>
+          <div className="log-output">
+            {loading ? <p className="text-sm text-base-content/60">Loading logs...</p> : null}
+            {!loading && logs.length === 0 ? <p className="text-sm text-base-content/60">No logs captured yet.</p> : null}
+            {logs.map((line, index) => (
+              <div className="log-line" key={`${index}-${line}`}>
+                {line}
+              </div>
+            ))}
+          </div>
         </div>
       </article>
     </>

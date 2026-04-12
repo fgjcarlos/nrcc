@@ -1,3 +1,46 @@
+function getNoticeIcon(tone: 'error' | 'warn' | 'info') {
+  const textColorClass = {
+    error: 'text-error',
+    warn: 'text-warning',
+    info: 'text-info',
+  }[tone]
+
+  switch (tone) {
+    case 'error':
+      return (
+        <svg
+          className={`${textColorClass} flex-shrink-0 w-5 h-5`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      )
+    case 'warn':
+      return (
+        <svg
+          className={`${textColorClass} flex-shrink-0 w-5 h-5`}
+          fill="currentColor"
+          viewBox="0 0 20 20"
+        >
+          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+        </svg>
+      )
+    case 'info':
+    default:
+      return (
+        <svg
+          className={`${textColorClass} flex-shrink-0 w-5 h-5`}
+          fill="currentColor"
+          viewBox="0 0 20 20"
+        >
+          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+        </svg>
+      )
+  }
+}
+
 export function InlineNotice({
   tone,
   title,
@@ -7,38 +50,24 @@ export function InlineNotice({
   title: string
   detail?: string
 }) {
-  const getToneClass = () => {
+  const getBorderColor = () => {
     switch (tone) {
       case 'error':
-        return 'alert-error'
+        return 'border-l-error'
       case 'warn':
-        return 'alert-warning'
+        return 'border-l-warning'
       case 'info':
       default:
-        return 'alert-info'
-    }
-  }
-
-  const getIconEmoji = () => {
-    switch (tone) {
-      case 'error':
-        return '❌'
-      case 'warn':
-        return '⚠️'
-      case 'info':
-      default:
-        return 'ℹ️'
+        return 'border-l-info'
     }
   }
 
   return (
-    <section className={`alert ${getToneClass()} shadow-md`}>
-      <div className="flex items-start gap-3 w-full">
-        <span className="text-lg flex-shrink-0">{getIconEmoji()}</span>
-        <div className="flex-1">
-          <strong className="text-sm">{title}</strong>
-          {detail ? <p className="text-xs opacity-90 mt-1">{detail}</p> : null}
-        </div>
+    <section className={`flex gap-3 p-4 rounded-lg bg-base-200 border border-[color:var(--border-neutral)] ${getBorderColor()} border-l-4 shadow-elevation-1`}>
+      {getNoticeIcon(tone)}
+      <div className="flex-1">
+        <strong className="text-sm text-base-content">{title}</strong>
+        {detail ? <p className="text-xs text-base-content opacity-90 mt-1">{detail}</p> : null}
       </div>
     </section>
   )

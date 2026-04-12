@@ -19,10 +19,10 @@ export function UpdatesPage({
 }) {
   return (
     <>
-      <header className="topbar">
+      <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 mb-8">
         <div>
-          <p className="eyebrow">Runtime</p>
-          <h2>Updates</h2>
+          <p className="text-sm font-semibold text-base-content/70 uppercase tracking-wide">Runtime</p>
+          <h2 className="text-3xl font-bold text-base-content mt-1">Updates</h2>
         </div>
       </header>
 
@@ -45,18 +45,18 @@ export function UpdatesPage({
         />
       ) : null}
 
-      <article className="panel">
-        <div className="panel-header">
-          <h3>Node-RED update</h3>
+      <article className="card bg-base-200 shadow">
+        <div className="card-body">
+          <h3 className="card-title text-2xl">Node-RED update</h3>
+          {loading ? <p className="text-sm text-base-content/60">Loading update status...</p> : null}
+          {updateStatus ? (
+            <UpdateCard
+              updateStatus={updateStatus}
+              operationStatus={operationStatus}
+              onChanged={onChanged}
+            />
+          ) : null}
         </div>
-        {loading ? <p className="muted">Loading update status...</p> : null}
-        {updateStatus ? (
-          <UpdateCard
-            updateStatus={updateStatus}
-            operationStatus={operationStatus}
-            onChanged={onChanged}
-          />
-        ) : null}
       </article>
     </>
   )

@@ -32,8 +32,8 @@ export function UpdateCard({
   const busy = operationStatus?.busy ?? false
 
   return (
-    <div className="update-card">
-      <dl className="details-list">
+    <div className="space-y-6">
+      <dl className="space-y-3">
         <Detail label="Installed version" value={updateStatus.installedVersion || 'Unknown'} />
         <Detail label="Available version" value={updateStatus.availableVersion || 'Unknown'} />
         <Detail label="Update available" value={updateStatus.updateAvailable ? 'Yes' : 'No'} />
@@ -47,11 +47,11 @@ export function UpdateCard({
         />
       ) : null}
 
-      <div className="topbar-actions">
+      <div className="flex gap-3 justify-end">
         {confirmUpdate ? (
           <>
             <button
-              className="ghost-button"
+              className="btn btn-ghost"
               type="button"
               onClick={() => setConfirmUpdate(false)}
               disabled={applyMutation.isPending}
@@ -59,7 +59,7 @@ export function UpdateCard({
               Cancel
             </button>
             <button
-              className="primary-button"
+              className="btn btn-primary"
               type="button"
               onClick={() => applyMutation.mutate()}
               disabled={busy || applyMutation.isPending}
@@ -69,7 +69,7 @@ export function UpdateCard({
           </>
         ) : (
           <button
-            className="primary-button"
+            className="btn btn-primary"
             type="button"
             onClick={() => setConfirmUpdate(true)}
             disabled={busy || !updateStatus.updateAvailable}

@@ -10,18 +10,18 @@ export function StatCard({
   const getAccentClass = () => {
     switch (accent) {
       case 'warn':
-        return 'border-warning'
+        return 'stat-card--warn'
       case 'neutral':
-        return 'border-neutral'
+        return 'stat-card--neutral'
       case 'ok':
       default:
-        return 'border-success'
+        return 'stat-card--ok'
     }
   }
 
   return (
-    <article className={`card bg-base-200 border-l-4 ${getAccentClass()} p-6 shadow`}>
-      <p className="text-sm text-base-content opacity-75 uppercase tracking-wider">{label}</p>
+    <article className={`card stat-card bg-base-200 p-6 shadow-elevation-2 rounded-lg ${getAccentClass()}`}>
+      <p className="text-sm text-base-content opacity-75 uppercase tracking-wider stat-card-label">{label}</p>
       <h3 className="text-3xl font-bold text-base-content mt-2">{value}</h3>
     </article>
   )
