@@ -4,23 +4,32 @@ import { ChangeEvent, ReactNode } from 'react'
  * FormField component — reusable form field wrapper with unified styling,
  * label, hint, and error state support.
  *
- * This component is the single source of truth for form input styling across
- * the application (auth + config sections). It encapsulates:
- * - Consistent input styling via DaisyUI input-bordered base classes
- * - Unified error state (input-error modifier + icon + message)
- * - Optional hint text in a muted style
- * - Accessibility: label linked to input via htmlFor
+ * This component is the SINGLE SOURCE OF TRUTH for form input styling across
+ * the entire application (AuthScreen + all 10 config section pages).
+ * It encapsulates:
+ * - Consistent input styling: DaisyUI `input input-bordered bg-base-100`
+ * - Unified error state: conditional `input-error` modifier + icon + text message
+ * - Optional hint text (muted, theme-aware)
+ * - Full accessibility: label htmlFor binding, aria-describedby on error
  *
- * Design Decision: Why one FormField for all use-cases?
- * - The audit found only one divergence: AuthScreen used input-primary (a theme modifier).
- * - All other inputs in config sections use input-bordered (the standard).
- * - A single FormField with a `type` prop covers text, password, email, number inputs.
- * - This is simpler than maintaining separate AuthInput + ConfigInput + base class duplication.
+ * DESIGN DECISION: Why a single FormField for all use-cases?
+ * - Pre-refactor audit found ONE divergence: AuthScreen used `input-primary` modifier
+ * - All config-section inputs used `input-bordered` (the standard)
+ * - Removing `input-primary` + creating unified FormField eliminates the divergence
+ * - Single component with `type` prop covers: text, password, email, number
+ * - Simpler than maintaining separate AuthInput + ConfigInput with base duplication
  *
- * Why input-error modifier (not inline styles)?
- * - DaisyUI's input-error modifier already exists and respects --color-error (themed).
- * - Inline styles bypass the theme cascade and break dark mode.
- * - The modifier is the cleanest, theme-aware approach.
+ * DESIGN DECISION: Why `input-error` modifier (not inline styles)?
+ * - DaisyUI's `input-error` modifier is built-in and respects --color-error CSS variable
+ * - --color-error is defined per theme ([data-theme="light/dark"]) for proper contrast
+ * - Inline `style={{ borderColor: 'red' }}` would bypass theme cascade → breaks dark mode
+ * - Using DaisyUI modifier is the cleanest, most maintainable, theme-aware approach
+ *
+ * IMPLEMENTATION NOTES:
+ * - ErrorIcon uses fill="currentColor" for automatic theme-aware coloring
+ * - form-field-error-msg and form-field-hint classes defined in styles.css @layer utilities
+ * - Component props marked as required/optional to match usage patterns
+ * - ref prop NOT supported (use htmlFor on labels instead of ref)
  */
 
 export interface FormFieldProps {
