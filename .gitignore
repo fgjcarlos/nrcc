@@ -5,6 +5,7 @@ bin/
 dist/
 *.exe
 *.out
+nrcc
 
 # Local runtime data
 .nrcc/
