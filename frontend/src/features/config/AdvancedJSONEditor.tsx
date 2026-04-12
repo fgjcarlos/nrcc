@@ -55,46 +55,48 @@ export function AdvancedJSONEditor({ config, onApply, onClose }: AdvancedJSONEdi
   }
 
   return (
-    <div className="advanced-json-editor modal-overlay">
-      <div className="modal-content">
-        <div className="modal-header">
-          <h2>Raw JSON Editor</h2>
-          <button className="close-button" onClick={onClose} aria-label="Close editor">
-            ✕
-          </button>
-        </div>
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="card bg-base-200 shadow-lg w-full max-w-2xl max-h-96 overflow-auto">
+        <div className="card-body">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="card-title text-xl">Raw JSON Editor</h2>
+            <button className="btn btn-ghost btn-sm btn-circle" onClick={onClose} aria-label="Close editor">
+              ✕
+            </button>
+          </div>
 
-        <div className="modal-body">
-          <label className="form-field">
-            <span>Configuration JSON</span>
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text font-medium">Configuration JSON</span>
+            </label>
             <textarea
               value={jsonText}
               onChange={(e) => {
                 setJsonText(e.target.value)
                 setJsonError('')
               }}
-              className="json-textarea"
-              rows={20}
+              className="textarea textarea-bordered bg-base-100 font-mono text-sm"
+              rows={15}
             />
-          </label>
+          </div>
 
           {jsonError && (
-            <p className="field-error">
+            <p className="alert alert-error text-sm">
               <strong>Error:</strong> {jsonError}
             </p>
           )}
-        </div>
 
-        <div className="modal-footer">
-          <button className="secondary-button" onClick={handleBackToForm}>
-            Apply & Back to Form
-          </button>
-          <button className="primary-button" onClick={handleApply}>
-            Apply JSON
-          </button>
-          <button className="secondary-button" onClick={onClose}>
-            Cancel
-          </button>
+          <div className="flex gap-3 justify-end mt-6">
+            <button className="btn btn-ghost" onClick={handleBackToForm}>
+              Apply & Back to Form
+            </button>
+            <button className="btn btn-primary" onClick={handleApply}>
+              Apply JSON
+            </button>
+            <button className="btn btn-ghost" onClick={onClose}>
+              Cancel
+            </button>
+          </div>
         </div>
       </div>
     </div>

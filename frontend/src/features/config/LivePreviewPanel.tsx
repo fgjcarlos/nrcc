@@ -53,27 +53,29 @@ export function LivePreviewPanel({ config, isOpen, onToggle }: LivePreviewPanelP
   }
 
   return (
-    <div className="live-preview-panel">
-      <div className="panel-header">
-        <h3>Preview settings.js</h3>
-        <button className="close-button" onClick={onToggle} aria-label="Close preview">
-          ✕
-        </button>
+    <div className="card bg-base-200 shadow fixed inset-4 z-40 overflow-auto md:inset-auto md:w-1/2 md:right-4 md:bottom-4">
+      <div className="card-body">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="card-title text-lg">Preview settings.js</h3>
+          <button className="btn btn-ghost btn-sm btn-circle" onClick={onToggle} aria-label="Close preview">
+            ✕
+          </button>
+        </div>
+
+        {loading && <p className="text-sm text-base-content/60">Loading preview...</p>}
+
+        {error && (
+          <p className="alert alert-error">
+            <strong>Error:</strong> {error}
+          </p>
+        )}
+
+        {!loading && !error && preview && (
+          <pre className="bg-base-300 p-4 rounded overflow-x-auto text-xs">
+            <code>{preview}</code>
+          </pre>
+        )}
       </div>
-
-      {loading && <p className="muted">Loading preview...</p>}
-
-      {error && (
-        <p className="field-error">
-          <strong>Error:</strong> {error}
-        </p>
-      )}
-
-      {!loading && !error && preview && (
-        <pre className="code-block">
-          <code>{preview}</code>
-        </pre>
-      )}
     </div>
   )
 }

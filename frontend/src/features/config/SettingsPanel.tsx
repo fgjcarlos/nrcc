@@ -171,14 +171,14 @@ export function SettingsPanel({ config, loading, onSaved, onError, onToast }: Se
 
   if (loading || !localConfig) {
     return (
-      <section className="settings-panel">
-        <p className="muted">Loading configuration...</p>
+      <section className="space-y-6">
+        <p className="text-sm text-base-content/60">Loading configuration...</p>
       </section>
     )
   }
 
   return (
-    <section className="settings-panel">
+    <section className="space-y-6">
       <TabBar
         activeSection={activeSection}
         onChange={(section) => setSearchParams({ section })}
@@ -186,7 +186,7 @@ export function SettingsPanel({ config, loading, onSaved, onError, onToast }: Se
         errorTabs={errorSections}
       />
 
-      <div className="settings-content">
+      <div className="space-y-6">
         {activeSection === 'server' && (
           <ServerSection
             value={localConfig.server}
@@ -259,44 +259,42 @@ export function SettingsPanel({ config, loading, onSaved, onError, onToast }: Se
         )}
       </div>
 
-      <div className="settings-actions">
-        <div className="action-group">
-          <button
-            className="primary-button"
-            onClick={handleSave}
-            disabled={saveMutation.isPending || dirtySections.size === 0}
-          >
-            {saveMutation.isPending ? 'Saving...' : 'Save changes'}
-          </button>
-          <button
-            className="secondary-button"
-            onClick={() => setShowPreview(!showPreview)}
-            title="Preview the rendered settings.js"
-          >
-            Preview settings.js
-          </button>
-          <button
-            className="secondary-button"
-            onClick={() => setShowJSONEditor(true)}
-            title="Edit configuration as raw JSON"
-          >
-            Raw JSON
-          </button>
-          <button
-            className="secondary-button"
-            onClick={() => setShowSnapshots(true)}
-            title="Manage configuration snapshots"
-          >
-            Backups
-          </button>
-          <button
-            className="secondary-button"
-            onClick={() => setShowImport(true)}
-            title="Import from a settings.js file"
-          >
-            Import settings.js
-          </button>
-        </div>
+      <div className="flex flex-wrap gap-3">
+        <button
+          className="btn btn-primary"
+          onClick={handleSave}
+          disabled={saveMutation.isPending || dirtySections.size === 0}
+        >
+          {saveMutation.isPending ? 'Saving...' : 'Save changes'}
+        </button>
+        <button
+          className="btn btn-ghost"
+          onClick={() => setShowPreview(!showPreview)}
+          title="Preview the rendered settings.js"
+        >
+          Preview settings.js
+        </button>
+        <button
+          className="btn btn-ghost"
+          onClick={() => setShowJSONEditor(true)}
+          title="Edit configuration as raw JSON"
+        >
+          Raw JSON
+        </button>
+        <button
+          className="btn btn-ghost"
+          onClick={() => setShowSnapshots(true)}
+          title="Manage configuration snapshots"
+        >
+          Backups
+        </button>
+        <button
+          className="btn btn-ghost"
+          onClick={() => setShowImport(true)}
+          title="Import from a settings.js file"
+        >
+          Import settings.js
+        </button>
       </div>
 
       <LivePreviewPanel
@@ -326,7 +324,7 @@ export function SettingsPanel({ config, loading, onSaved, onError, onToast }: Se
       />
 
       {saveMutation.data?.restartRequired && (
-        <section className="inline-notice warn">
+        <section className="alert alert-warning">
           <strong>Restart required</strong>
           <p>Changes have been saved. Restart Node-RED to apply them.</p>
         </section>

@@ -28,15 +28,15 @@ export function ConfigPage({ onSaved, onError, onToast }: ConfigPageCallbacks = 
 
   return (
     <>
-      <header className="topbar">
+      <header className="flex flex-col sm:flex-row sm:items-center gap-6 mb-8">
         <div>
-          <p className="eyebrow">Runtime</p>
-          <h2>Configuration</h2>
+          <p className="text-sm font-semibold text-base-content/70 uppercase tracking-wide">Runtime</p>
+          <h2 className="text-3xl font-bold text-base-content mt-1">Configuration</h2>
         </div>
       </header>
 
       {configQuery.error ? (
-        <section className="inline-notice error">
+        <section className="alert alert-error mb-6">
           <strong>Configuration unavailable</strong>
           <p>
             {configQuery.error instanceof Error

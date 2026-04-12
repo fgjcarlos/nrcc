@@ -20,27 +20,36 @@ const SECTIONS = [
 
 export function TabBar({ activeSection, onChange, dirtyTabs, errorTabs }: TabBarProps) {
   return (
-    <div className="config-tabs">
-      <div className="tabs-scroll">
-        {SECTIONS.map((section) => {
-          const isDirty = dirtyTabs.has(section.id)
-          const hasError = errorTabs.has(section.id)
-          const isActive = activeSection === section.id
+    <div className="flex border-b border-base-300 overflow-x-auto gap-2 mb-6">
+      {SECTIONS.map((section) => {
+        const isDirty = dirtyTabs.has(section.id)
+        const hasError = errorTabs.has(section.id)
+        const isActive = activeSection === section.id
 
-          return (
-            <button
-              key={section.id}
-              className={`tab ${isActive ? 'active' : ''} ${hasError ? 'error' : ''} ${isDirty ? 'dirty' : ''}`}
-              onClick={() => onChange(section.id)}
-              type="button"
-            >
+        return (
+          <button
+            key={section.id}
+            className={`
+              px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors
+              border-b-2
+              ${isActive 
+                ? 'border-primary text-primary' 
+                : 'border-transparent text-base-content/60 hover:text-base-content'
+              }
+              ${hasError ? 'text-error' : ''}
+            `}
+            onClick={() => onChange(section.id)}
+            type="button"
+            title={hasError ? 'Validation errors' : isDirty ? 'Unsaved changes' : undefined}
+          >
+            <span className="flex items-center gap-2">
               {section.label}
-              {isDirty && <span className="indicator dirty" title="Unsaved changes">●</span>}
-              {hasError && <span className="indicator error" title="Validation errors">●</span>}
-            </button>
-          )
-        })}
-      </div>
+              {isDirty && <span className="badge badge-warning badge-sm" title="Unsaved changes">●</span>}
+              {hasError && <span className="badge badge-error badge-sm" title="Validation errors">●</span>}
+            </span>
+          </button>
+        )
+      })}
     </div>
   )
 }

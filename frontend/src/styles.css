@@ -20,12 +20,17 @@
   --border-indent: rgba(0, 0, 0, 0.12);
 }
 
-/* NRCC Dark Theme — Override DaisyUI v5.5 CSS variables (oklch format) */
+/* NRCC Dark Theme — Override DaisyUI v5.5 CSS variables (oklch format)
+ * NOTE: primary/secondary use IDENTICAL values across light/dark modes.
+ *       This is INTENTIONAL — Node-RED brand identity uses fixed colors (#c3561d orange, #2BA891 teal).
+ *       Error color is adapted per theme for contrast (darker in dark mode).
+ *       See design.md Decision 4 and audit.md Problem 1.2 for rationale.
+ */
 [data-theme="dark"] {
   /* DaisyUI v5 uses oklch color space for primary/secondary/colors */
-  --color-primary: oklch(42% 0.15 29);       /* primary: #c3561d */
+  --color-primary: oklch(42% 0.15 29);       /* primary: #c3561d (INTENTIONALLY SAME as light) */
   --color-primary-content: oklch(100% 0 0);  /* primary-content: #ffffff */
-  --color-secondary: oklch(56% 0.16 143);    /* secondary: #2BA891 (more saturated) */
+  --color-secondary: oklch(56% 0.16 143);    /* secondary: #2BA891 (INTENTIONALLY SAME as light) */
   --color-secondary-content: oklch(100% 0 0);/* secondary-content: #ffffff */
   --color-accent: oklch(56% 0.16 143);       /* accent: #2BA891 */
   --color-accent-content: oklch(100% 0 0);   /* accent-content: #ffffff */
@@ -51,18 +56,22 @@
   --border-indent: rgba(255, 255, 255, 0.14);
 }
 
-/* NRCC Light Theme — Override DaisyUI v5.5 CSS variables (oklch format) */
+/* NRCC Light Theme — Override DaisyUI v5.5 CSS variables (oklch format)
+ * NOTE: primary/secondary use IDENTICAL values as dark mode (intentional brand design).
+ *       base-100 uses "cooled" chroma (0.02) to reduce greenish tint vs. base-200.
+ *       See audit.md Problem 1.3 for temperature adjustment rationale.
+ */
 [data-theme="light"] {
   /* DaisyUI v5 uses oklch color space */
-  --color-primary: oklch(42% 0.15 29);       /* primary: #c3561d */
+  --color-primary: oklch(42% 0.15 29);       /* primary: #c3561d (INTENTIONALLY SAME as dark) */
   --color-primary-content: oklch(100% 0 0);  /* primary-content: #ffffff */
-  --color-secondary: oklch(56% 0.16 143);    /* secondary: #2BA891 (more saturated +10%) */
+  --color-secondary: oklch(56% 0.16 143);    /* secondary: #2BA891 (INTENTIONALLY SAME as dark; +10% saturation) */
   --color-secondary-content: oklch(100% 0 0);/* secondary-content: #ffffff */
   --color-accent: oklch(56% 0.16 143);       /* accent: #2BA891 */
   --color-accent-content: oklch(100% 0 0);   /* accent-content: #ffffff */
   --color-neutral: oklch(91% 0.01 127);      /* neutral: #e8f0ea */
   --color-neutral-content: oklch(16% 0.05 174);/* neutral-content: #1c2a22 */
-  --color-base-100: oklch(96% 0.02 168);     /* base-100: #F4EEE4 (cooled) */
+  --color-base-100: oklch(96% 0.01 168);     /* base-100: #F4EEE4 (cooled softened) */
   --color-base-200: oklch(92% 0.02 159);     /* base-200: #E5EDE8 (cooled) */
   --color-base-300: oklch(98% 0.01 172);     /* base-300: #f9f7f3 */
   --color-base-content: oklch(16% 0.05 174); /* base-content: #1c2a22 */

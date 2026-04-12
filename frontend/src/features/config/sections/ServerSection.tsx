@@ -1,4 +1,5 @@
 import { ServerConfig } from '../../../types/config'
+import { FormField } from '../../../components/forms'
 
 type SectionProps<T> = {
   value: T
@@ -12,77 +13,75 @@ export function ServerSection({ value, onChange, errors }: SectionProps<ServerCo
   }
 
   return (
-    <article className="settings-section">
-      <h3>Server</h3>
+    <article className="space-y-6">
+      <h3 className="text-xl font-semibold text-base-content">Server</h3>
 
-      <label className="form-field">
-        <span>UI Port</span>
-        <input
-          type="number"
-          value={value.uiPort}
-          onChange={(e) => updateField('uiPort', parseInt(e.target.value) || 1880)}
-          min={1}
-          max={65535}
-        />
-        {errors['server.uiPort'] && <p className="field-error">{errors['server.uiPort']}</p>}
-      </label>
+      <FormField
+        id="server-ui-port"
+        label="UI Port"
+        type="number"
+        value={value.uiPort}
+        onChange={(v) => updateField('uiPort', parseInt(v) || 1880)}
+        error={errors['server.uiPort']}
+        min={1}
+        max={65535}
+      />
 
-      <label className="form-field">
-        <span>UI Host</span>
-        <input
-          type="text"
-          value={value.uiHost}
-          onChange={(e) => updateField('uiHost', e.target.value)}
-          placeholder="0.0.0.0"
-        />
-        {errors['server.uiHost'] && <p className="field-error">{errors['server.uiHost']}</p>}
-      </label>
+      <FormField
+        id="server-ui-host"
+        label="UI Host"
+        type="text"
+        value={value.uiHost}
+        onChange={(v) => updateField('uiHost', v)}
+        placeholder="0.0.0.0"
+        error={errors['server.uiHost']}
+      />
 
-      <label className="form-field">
-        <span>HTTP Admin Root</span>
-        <input
-          type="text"
-          value={value.httpAdminRoot}
-          onChange={(e) => updateField('httpAdminRoot', e.target.value)}
-          placeholder="/"
-        />
-        {errors['server.httpAdminRoot'] && <p className="field-error">{errors['server.httpAdminRoot']}</p>}
-      </label>
+      <FormField
+        id="server-http-admin-root"
+        label="HTTP Admin Root"
+        type="text"
+        value={value.httpAdminRoot}
+        onChange={(v) => updateField('httpAdminRoot', v)}
+        placeholder="/"
+        error={errors['server.httpAdminRoot']}
+      />
 
-      <label className="form-field">
-        <span>HTTP Node Root</span>
-        <input
-          type="text"
-          value={value.httpNodeRoot}
-          onChange={(e) => updateField('httpNodeRoot', e.target.value)}
-          placeholder="/"
-        />
-        <p className="field-hint">Set to 'false' to disable</p>
-        {errors['server.httpNodeRoot'] && <p className="field-error">{errors['server.httpNodeRoot']}</p>}
-      </label>
+      <FormField
+        id="server-http-node-root"
+        label="HTTP Node Root"
+        type="text"
+        value={value.httpNodeRoot}
+        onChange={(v) => updateField('httpNodeRoot', v)}
+        placeholder="/"
+        hint="Set to 'false' to disable"
+        error={errors['server.httpNodeRoot']}
+      />
 
-      <label className="form-field">
-        <span>HTTP Static</span>
-        <input
-          type="text"
-          value={value.httpStatic}
-          onChange={(e) => updateField('httpStatic', e.target.value)}
-          placeholder="/path/to/static"
-        />
-        {errors['server.httpStatic'] && <p className="field-error">{errors['server.httpStatic']}</p>}
-      </label>
+      <FormField
+        id="server-http-static"
+        label="HTTP Static"
+        type="text"
+        value={value.httpStatic}
+        onChange={(v) => updateField('httpStatic', v)}
+        placeholder="/path/to/static"
+        error={errors['server.httpStatic']}
+      />
 
-      <label className="form-field form-toggle">
-        <input
-          type="checkbox"
-          checked={value.disableEditor}
-          onChange={(e) => updateField('disableEditor', e.target.checked)}
-        />
-        <span>Disable Editor</span>
+      <div className="form-control">
+        <label className="label cursor-pointer gap-3">
+          <input
+            type="checkbox"
+            className="checkbox checkbox-sm"
+            checked={value.disableEditor}
+            onChange={(e) => updateField('disableEditor', e.target.checked)}
+          />
+          <span className="label-text font-medium">Disable Editor</span>
+        </label>
         {value.disableEditor && (
-          <p className="field-warning">⚠️ Disables the Node-RED editor UI</p>
+          <p className="text-warning text-sm mt-2">⚠️ Disables the Node-RED editor UI</p>
         )}
-      </label>
+      </div>
     </article>
   )
 }

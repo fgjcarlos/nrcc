@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { EditorThemeConfig } from '../../../types/config'
+import { FormField } from '../../../components/forms'
 
 type SectionProps<T> = {
   value: T
@@ -18,53 +19,63 @@ export function EditorThemeSection({ value, onChange, errors }: SectionProps<Edi
   }
 
   return (
-    <article className="settings-section">
-      <h3>Editor Theme</h3>
+    <article className="space-y-6">
+      <h3 className="text-xl font-semibold text-base-content">Editor Theme</h3>
 
-      <label className="form-field">
-        <span>Theme</span>
-        <input
-          type="text"
-          value={value.theme}
-          onChange={(e) => updateField('theme', e.target.value)}
-          placeholder="Theme name"
-        />
-      </label>
+      <FormField
+        id="editor-theme-theme"
+        label="Theme"
+        type="text"
+        value={value.theme}
+        onChange={(v) => updateField('theme', v)}
+        placeholder="Theme name"
+      />
 
-      <label className="form-toggle">
-        <input
-          type="checkbox"
-          checked={value.tours}
-          onChange={(e) => updateField('tours', e.target.checked)}
-        />
-        <span>Enable Tours</span>
-      </label>
-
-      <label className="form-toggle">
-        <input
-          type="checkbox"
-          checked={value.userMenu}
-          onChange={(e) => updateField('userMenu', e.target.checked)}
-        />
-        <span>Enable User Menu</span>
-      </label>
-
-      <label className="form-toggle">
-        <input
-          type="checkbox"
-          checked={value.projects.enabled}
-          onChange={(e) =>
-            updateField('projects', { ...value.projects, enabled: e.target.checked })
-          }
-        />
-        <span>Enable Projects</span>
-      </label>
-
-      {/* Code Editor */}
-      <div className="collapsible-section">
-        <label className="form-toggle">
+      <div className="form-control">
+        <label className="label cursor-pointer gap-3">
           <input
             type="checkbox"
+            className="checkbox checkbox-sm"
+            checked={value.tours}
+            onChange={(e) => updateField('tours', e.target.checked)}
+          />
+          <span className="label-text font-medium">Enable Tours</span>
+        </label>
+      </div>
+
+      <div className="form-control">
+        <label className="label cursor-pointer gap-3">
+          <input
+            type="checkbox"
+            className="checkbox checkbox-sm"
+            checked={value.userMenu}
+            onChange={(e) => updateField('userMenu', e.target.checked)}
+          />
+          <span className="label-text font-medium">Enable User Menu</span>
+        </label>
+      </div>
+
+      <div className="form-control">
+        <label className="label cursor-pointer gap-3">
+          <input
+            type="checkbox"
+            className="checkbox checkbox-sm"
+            checked={value.projects.enabled}
+            onChange={(e) =>
+              updateField('projects', { ...value.projects, enabled: e.target.checked })
+            }
+          />
+          <span className="label-text font-medium">Enable Projects</span>
+        </label>
+      </div>
+
+      {/* Code Editor */}
+      <div className="divider"></div>
+      <div className="form-control">
+        <label className="label cursor-pointer gap-3">
+          <input
+            type="checkbox"
+            className="checkbox checkbox-sm"
             checked={showCodeEditor}
             onChange={(e) => {
               setShowCodeEditor(e.target.checked)
@@ -75,53 +86,57 @@ export function EditorThemeSection({ value, onChange, errors }: SectionProps<Edi
               }
             }}
           />
-          <span>Code Editor Settings</span>
+          <span className="label-text font-medium">Code Editor Settings</span>
         </label>
-
-        {showCodeEditor && value.codeEditor && (
-          <div className="collapsible-content">
-            <label className="form-field">
-              <span>Library</span>
-              <div className="radio-group">
-                <label>
-                  <input
-                    type="radio"
-                    value="ace"
-                    checked={value.codeEditor.lib === 'ace'}
-                    onChange={(e) =>
-                      updateField('codeEditor', {
-                        ...value.codeEditor!,
-                        lib: e.target.value as 'ace' | 'monaco',
-                      })
-                    }
-                  />
-                  ACE
-                </label>
-                <label>
-                  <input
-                    type="radio"
-                    value="monaco"
-                    checked={value.codeEditor.lib === 'monaco'}
-                    onChange={(e) =>
-                      updateField('codeEditor', {
-                        ...value.codeEditor!,
-                        lib: e.target.value as 'ace' | 'monaco',
-                      })
-                    }
-                  />
-                  Monaco
-                </label>
-              </div>
-            </label>
-          </div>
-        )}
       </div>
 
+      {showCodeEditor && value.codeEditor && (
+        <div className="pl-4 border-l-2 border-[color:var(--border-indent)] space-y-4">
+          <label className="label">
+            <span className="label-text font-medium">Library</span>
+          </label>
+          <div className="space-y-2">
+            <label className="label cursor-pointer gap-2">
+              <input
+                type="radio"
+                value="ace"
+                className="radio radio-sm"
+                checked={value.codeEditor.lib === 'ace'}
+                onChange={(e) =>
+                  updateField('codeEditor', {
+                    ...value.codeEditor!,
+                    lib: e.target.value as 'ace' | 'monaco',
+                  })
+                }
+              />
+              <span className="label-text text-sm">ACE</span>
+            </label>
+            <label className="label cursor-pointer gap-2">
+              <input
+                type="radio"
+                value="monaco"
+                className="radio radio-sm"
+                checked={value.codeEditor.lib === 'monaco'}
+                onChange={(e) =>
+                  updateField('codeEditor', {
+                    ...value.codeEditor!,
+                    lib: e.target.value as 'ace' | 'monaco',
+                  })
+                }
+              />
+              <span className="label-text text-sm">Monaco</span>
+            </label>
+          </div>
+        </div>
+      )}
+
       {/* Page Settings */}
-      <div className="collapsible-section">
-        <label className="form-toggle">
+      <div className="divider"></div>
+      <div className="form-control">
+        <label className="label cursor-pointer gap-3">
           <input
             type="checkbox"
+            className="checkbox checkbox-sm"
             checked={showPage}
             onChange={(e) => {
               setShowPage(e.target.checked)
@@ -132,53 +147,56 @@ export function EditorThemeSection({ value, onChange, errors }: SectionProps<Edi
               }
             }}
           />
-          <span>Page Settings</span>
+          <span className="label-text font-medium">Page Settings</span>
         </label>
-
-        {showPage && value.page && (
-          <div className="collapsible-content">
-            <label className="form-field">
-              <span>Page Title</span>
-              <input
-                type="text"
-                value={value.page.title}
-                onChange={(e) =>
-                  updateField('page', { ...value.page!, title: e.target.value })
-                }
-              />
-            </label>
-
-            <label className="form-field">
-              <span>Favicon URL</span>
-              <input
-                type="text"
-                value={value.page.favicon}
-                onChange={(e) =>
-                  updateField('page', { ...value.page!, favicon: e.target.value })
-                }
-              />
-            </label>
-
-            <label className="form-field">
-              <span>Custom CSS</span>
-              <textarea
-                value={value.page.css}
-                onChange={(e) =>
-                  updateField('page', { ...value.page!, css: e.target.value })
-                }
-                rows={4}
-                placeholder="CSS content"
-              />
-            </label>
-          </div>
-        )}
       </div>
 
+      {showPage && value.page && (
+        <div className="pl-4 border-l-2 border-[color:var(--border-indent)] space-y-4">
+           <FormField
+             id="editor-page-title"
+             label="Page Title"
+             type="text"
+             value={value.page.title}
+             onChange={(v) =>
+               updateField('page', { ...value.page!, title: v })
+             }
+           />
+
+           <FormField
+             id="editor-page-favicon"
+             label="Favicon URL"
+             type="text"
+             value={value.page.favicon}
+             onChange={(v) =>
+               updateField('page', { ...value.page!, favicon: v })
+             }
+           />
+
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text font-medium">Custom CSS</span>
+            </label>
+            <textarea
+              className="textarea textarea-bordered bg-base-100"
+              value={value.page.css}
+              onChange={(e) =>
+                updateField('page', { ...value.page!, css: e.target.value })
+              }
+              rows={4}
+              placeholder="CSS content"
+            />
+          </div>
+        </div>
+      )}
+
       {/* Header Settings */}
-      <div className="collapsible-section">
-        <label className="form-toggle">
+      <div className="divider"></div>
+      <div className="form-control">
+        <label className="label cursor-pointer gap-3">
           <input
             type="checkbox"
+            className="checkbox checkbox-sm"
             checked={showHeader}
             onChange={(e) => {
               setShowHeader(e.target.checked)
@@ -189,52 +207,51 @@ export function EditorThemeSection({ value, onChange, errors }: SectionProps<Edi
               }
             }}
           />
-          <span>Header Settings</span>
+          <span className="label-text font-medium">Header Settings</span>
         </label>
-
-        {showHeader && value.header && (
-          <div className="collapsible-content">
-            <label className="form-field">
-              <span>Header Title</span>
-              <input
-                type="text"
-                value={value.header.title}
-                onChange={(e) =>
-                  updateField('header', { ...value.header!, title: e.target.value })
-                }
-              />
-            </label>
-
-            <label className="form-field">
-              <span>Header Image</span>
-              <input
-                type="text"
-                value={value.header.image}
-                onChange={(e) =>
-                  updateField('header', { ...value.header!, image: e.target.value })
-                }
-              />
-            </label>
-
-            <label className="form-field">
-              <span>Header URL</span>
-              <input
-                type="text"
-                value={value.header.url}
-                onChange={(e) =>
-                  updateField('header', { ...value.header!, url: e.target.value })
-                }
-              />
-            </label>
-          </div>
-        )}
       </div>
 
+      {showHeader && value.header && (
+        <div className="pl-4 border-l-2 border-[color:var(--border-indent)] space-y-4">
+           <FormField
+             id="editor-header-title"
+             label="Header Title"
+             type="text"
+             value={value.header.title}
+             onChange={(v) =>
+               updateField('header', { ...value.header!, title: v })
+             }
+           />
+
+           <FormField
+             id="editor-header-image"
+             label="Header Image"
+             type="text"
+             value={value.header.image}
+             onChange={(v) =>
+               updateField('header', { ...value.header!, image: v })
+             }
+           />
+
+           <FormField
+             id="editor-header-url"
+             label="Header URL"
+             type="text"
+             value={value.header.url}
+             onChange={(v) =>
+               updateField('header', { ...value.header!, url: v })
+             }
+           />
+        </div>
+      )}
+
       {/* Deploy Button Settings */}
-      <div className="collapsible-section">
-        <label className="form-toggle">
+      <div className="divider"></div>
+      <div className="form-control">
+        <label className="label cursor-pointer gap-3">
           <input
             type="checkbox"
+            className="checkbox checkbox-sm"
             checked={showDeployButton}
             onChange={(e) => {
               setShowDeployButton(e.target.checked)
@@ -245,43 +262,45 @@ export function EditorThemeSection({ value, onChange, errors }: SectionProps<Edi
               }
             }}
           />
-          <span>Deploy Button Settings</span>
+          <span className="label-text font-medium">Deploy Button Settings</span>
         </label>
-
-        {showDeployButton && value.deployButton && (
-          <div className="collapsible-content">
-            <label className="form-field">
-              <span>Type</span>
-              <select
-                value={value.deployButton.type}
-                onChange={(e) =>
-                  updateField('deployButton', {
-                    ...value.deployButton!,
-                    type: e.target.value as 'simple' | 'confirm',
-                  })
-                }
-              >
-                <option value="simple">Simple</option>
-                <option value="confirm">Confirm</option>
-              </select>
-            </label>
-
-            <label className="form-field">
-              <span>Label</span>
-              <input
-                type="text"
-                value={value.deployButton.label}
-                onChange={(e) =>
-                  updateField('deployButton', {
-                    ...value.deployButton!,
-                    label: e.target.value,
-                  })
-                }
-              />
-            </label>
-          </div>
-        )}
       </div>
+
+      {showDeployButton && value.deployButton && (
+        <div className="pl-4 border-l-2 border-[color:var(--border-indent)] space-y-4">
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text font-medium">Type</span>
+            </label>
+            <select
+              className="select select-bordered bg-base-100"
+              value={value.deployButton.type}
+              onChange={(e) =>
+                updateField('deployButton', {
+                  ...value.deployButton!,
+                  type: e.target.value as 'simple' | 'confirm',
+                })
+              }
+            >
+              <option value="simple">Simple</option>
+              <option value="confirm">Confirm</option>
+            </select>
+          </div>
+
+          <FormField
+            id="editor-deploy-button-label"
+            label="Label"
+            type="text"
+            value={value.deployButton.label}
+            onChange={(v) =>
+              updateField('deployButton', {
+                ...value.deployButton!,
+                label: v,
+              })
+            }
+          />
+        </div>
+      )}
     </article>
   )
 }

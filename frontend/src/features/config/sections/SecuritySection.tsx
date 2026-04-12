@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { SecurityConfig, AdminAuthUser } from '../../../types/config'
+import { FormField } from '../../../components/forms'
 
 type SectionProps<T> = {
   value: T
@@ -39,72 +40,92 @@ export function SecuritySection({ value, onChange, errors }: SectionProps<Securi
   ]
 
   return (
-    <article className="settings-section">
-      <h3>Security</h3>
+    <article className="space-y-6">
+      <h3 className="text-xl font-semibold text-base-content">Security</h3>
 
-      <label className="form-field">
-        <span>Credential Secret</span>
-        <div className="input-group">
+      <div className="form-control">
+        <label className="label">
+          <span className="label-text font-medium">Credential Secret</span>
+        </label>
+        <div className="flex gap-2">
           <input
             type={showSecret ? 'text' : 'password'}
+            className={`input input-bordered bg-base-100 flex-1${errors['security.credentialSecret'] ? ' input-error' : ''}`}
             value={value.credentialSecret}
             onChange={(e) => updateField('credentialSecret', e.target.value)}
             placeholder="Leave empty for default"
+            aria-describedby={errors['security.credentialSecret'] ? 'security-credentialSecret-error' : undefined}
           />
           <button
             type="button"
             onClick={() => setShowSecret(!showSecret)}
-            className="ghost-button small"
+            className="btn btn-ghost btn-sm"
           >
             {showSecret ? 'Hide' : 'Show'}
           </button>
           <button
             type="button"
             onClick={() => updateField('credentialSecret', generateRandomSecret())}
-            className="ghost-button small"
+            className="btn btn-ghost btn-sm"
           >
             Generate
           </button>
         </div>
         {errors['security.credentialSecret'] && (
-          <p className="field-error">{errors['security.credentialSecret']}</p>
+          <span id="security-credentialSecret-error" className="form-field-error-msg">
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+            </svg>
+            {errors['security.credentialSecret']}
+          </span>
         )}
-      </label>
+      </div>
 
-      <label className="form-field">
-        <span>Session Expiry Time</span>
-        <div className="input-group">
+      <div className="form-control">
+        <label className="label">
+          <span className="label-text font-medium">Session Expiry Time</span>
+        </label>
+        <div className="flex gap-2 items-center">
           <input
             type="number"
+            className={`input input-bordered bg-base-100 flex-1${errors['security.sessionExpiryTime'] ? ' input-error' : ''}`}
             value={value.sessionExpiryTime}
             onChange={(e) => updateField('sessionExpiryTime', parseInt(e.target.value) || 86400)}
             min={300}
             max={2592000}
+            aria-describedby={errors['security.sessionExpiryTime'] ? 'security-sessionExpiryTime-error' : undefined}
           />
-          <span className="unit">seconds</span>
+          <span className="text-base-content/60 text-sm min-w-max">seconds</span>
         </div>
-        <div className="preset-buttons">
+        <div className="flex flex-wrap gap-2 mt-3">
           {presets.map((p) => (
             <button
               key={p.value}
               type="button"
               onClick={() => updateField('sessionExpiryTime', p.value)}
-              className={`preset-button ${value.sessionExpiryTime === p.value ? 'active' : ''}`}
+              className={`btn btn-sm ${value.sessionExpiryTime === p.value ? 'btn-primary' : 'btn-ghost'}`}
             >
               {p.label}
             </button>
           ))}
         </div>
         {errors['security.sessionExpiryTime'] && (
-          <p className="field-error">{errors['security.sessionExpiryTime']}</p>
+          <span id="security-sessionExpiryTime-error" className="form-field-error-msg">
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+            </svg>
+            {errors['security.sessionExpiryTime']}
+          </span>
         )}
-      </label>
+      </div>
 
       {/* Admin Authentication */}
-      <div className="collapsible-section">
-        <label className="form-toggle">
+      <div className="divider"></div>
+      <div className="form-control">
+        <label className="label cursor-pointer gap-3">
           <input
             type="checkbox"
+            className="checkbox checkbox-sm"
             checked={showAdminAuth}
             onChange={(e) => {
               setShowAdminAuth(e.target.checked)
@@ -118,101 +139,107 @@ export function SecuritySection({ value, onChange, errors }: SectionProps<Securi
               }
             }}
           />
-          <span>Admin Authentication</span>
+          <span className="label-text font-medium">Admin Authentication</span>
         </label>
-
-        {showAdminAuth && value.adminAuth && (
-          <div className="collapsible-content">
-            <label className="form-field">
-              <span>Type</span>
-              <select
-                value={value.adminAuth.type}
-                onChange={(e) =>
-                  updateField('adminAuth', {
-                    ...value.adminAuth!,
-                    type: e.target.value as 'credentials' | 'strategy',
-                  })
-                }
-              >
-                <option value="credentials">Credentials</option>
-                <option value="strategy">Strategy</option>
-              </select>
-            </label>
-
-            {value.adminAuth.type === 'credentials' && (
-              <div>
-                <label className="form-field">
-                  <span>Users</span>
-                </label>
-                {value.adminAuth.users.map((user, idx) => (
-                  <div key={idx} className="admin-user-row">
-                    <input
-                      type="text"
-                      placeholder="Username"
-                      value={user.username}
-                      onChange={(e) => {
-                        const users = [...value.adminAuth!.users]
-                        users[idx] = { ...user, username: e.target.value }
-                        updateField('adminAuth', { ...value.adminAuth!, users })
-                      }}
-                    />
-                    <input
-                      type="password"
-                      placeholder="Password"
-                      value={user.password}
-                      onChange={(e) => {
-                        const users = [...value.adminAuth!.users]
-                        users[idx] = { ...user, password: e.target.value }
-                        updateField('adminAuth', { ...value.adminAuth!, users })
-                      }}
-                    />
-                    <select
-                      value={user.permissions}
-                      onChange={(e) => {
-                        const users = [...value.adminAuth!.users]
-                        users[idx] = { ...user, permissions: e.target.value as '*' | 'read' }
-                        updateField('adminAuth', { ...value.adminAuth!, users })
-                      }}
-                    >
-                      <option value="*">Admin (*)</option>
-                      <option value="read">Read-only</option>
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const users = value.adminAuth!.users.filter((_, i) => i !== idx)
-                        updateField('adminAuth', { ...value.adminAuth!, users })
-                      }}
-                      className="ghost-button"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => {
-                    const users = [
-                      ...value.adminAuth!.users,
-                      { username: '', password: '', permissions: '*' as const },
-                    ]
-                    updateField('adminAuth', { ...value.adminAuth!, users })
-                  }}
-                  className="ghost-button"
-                >
-                  Add User
-                </button>
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
+       {showAdminAuth && value.adminAuth && (
+         <div className="pl-4 border-l-2 border-[color:var(--border-indent)] space-y-4">
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text font-medium">Type</span>
+            </label>
+            <select
+              className="select select-bordered bg-base-100"
+              value={value.adminAuth.type}
+              onChange={(e) =>
+                updateField('adminAuth', {
+                  ...value.adminAuth!,
+                  type: e.target.value as 'credentials' | 'strategy',
+                })
+              }
+            >
+              <option value="credentials">Credentials</option>
+              <option value="strategy">Strategy</option>
+            </select>
+          </div>
+
+          {value.adminAuth.type === 'credentials' && (
+            <div className="space-y-3">
+              <p className="label-text font-medium">Users</p>
+              {value.adminAuth.users.map((user, idx) => (
+                <div key={idx} className="flex gap-2 items-end">
+                  <input
+                    type="text"
+                    placeholder="Username"
+                    className="input input-bordered bg-base-100 flex-1"
+                    value={user.username}
+                    onChange={(e) => {
+                      const users = [...value.adminAuth!.users]
+                      users[idx] = { ...user, username: e.target.value }
+                      updateField('adminAuth', { ...value.adminAuth!, users })
+                    }}
+                  />
+                  <input
+                    type="password"
+                    placeholder="Password"
+                    className="input input-bordered bg-base-100 flex-1"
+                    value={user.password}
+                    onChange={(e) => {
+                      const users = [...value.adminAuth!.users]
+                      users[idx] = { ...user, password: e.target.value }
+                      updateField('adminAuth', { ...value.adminAuth!, users })
+                    }}
+                  />
+                  <select
+                    className="select select-bordered bg-base-100"
+                    value={user.permissions}
+                    onChange={(e) => {
+                      const users = [...value.adminAuth!.users]
+                      users[idx] = { ...user, permissions: e.target.value as '*' | 'read' }
+                      updateField('adminAuth', { ...value.adminAuth!, users })
+                    }}
+                  >
+                    <option value="*">Admin (*)</option>
+                    <option value="read">Read-only</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const users = value.adminAuth!.users.filter((_, i) => i !== idx)
+                      updateField('adminAuth', { ...value.adminAuth!, users })
+                    }}
+                    className="btn btn-ghost btn-sm"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  const users = [
+                    ...value.adminAuth!.users,
+                    { username: '', password: '', permissions: '*' as const },
+                  ]
+                  updateField('adminAuth', { ...value.adminAuth!, users })
+                }}
+                className="btn btn-ghost btn-sm"
+              >
+                + Add User
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* HTTP Node Auth */}
-      <div className="collapsible-section">
-        <label className="form-toggle">
+      <div className="divider"></div>
+      <div className="form-control">
+        <label className="label cursor-pointer gap-3">
           <input
             type="checkbox"
+            className="checkbox checkbox-sm"
             checked={showHttpNodeAuth}
             onChange={(e) => {
               setShowHttpNodeAuth(e.target.checked)
@@ -223,47 +250,41 @@ export function SecuritySection({ value, onChange, errors }: SectionProps<Securi
               }
             }}
           />
-          <span>HTTP Node Auth</span>
+          <span className="label-text font-medium">HTTP Node Auth</span>
         </label>
-
-        {showHttpNodeAuth && value.httpNodeAuth && (
-          <div className="collapsible-content">
-            <label className="form-field">
-              <span>Username</span>
-              <input
-                type="text"
-                value={value.httpNodeAuth.user}
-                onChange={(e) =>
-                  updateField('httpNodeAuth', {
-                    ...value.httpNodeAuth!,
-                    user: e.target.value,
-                  })
-                }
-              />
-              {errors['security.httpNodeAuth.user'] && (
-                <p className="field-error">{errors['security.httpNodeAuth.user']}</p>
-              )}
-            </label>
-
-            <label className="form-field">
-              <span>Password (MD5 hash)</span>
-              <input
-                type="password"
-                value={value.httpNodeAuth.pass}
-                onChange={(e) =>
-                  updateField('httpNodeAuth', {
-                    ...value.httpNodeAuth!,
-                    pass: e.target.value,
-                  })
-                }
-              />
-              {errors['security.httpNodeAuth.pass'] && (
-                <p className="field-error">{errors['security.httpNodeAuth.pass']}</p>
-              )}
-            </label>
-          </div>
-        )}
       </div>
+
+       {showHttpNodeAuth && value.httpNodeAuth && (
+         <div className="pl-4 border-l-2 border-[color:var(--border-indent)] space-y-4">
+          <FormField
+            id="security-http-node-auth-user"
+            label="Username"
+            type="text"
+            value={value.httpNodeAuth.user}
+            onChange={(v) =>
+              updateField('httpNodeAuth', {
+                ...value.httpNodeAuth!,
+                user: v,
+              })
+            }
+            error={errors['security.httpNodeAuth.user']}
+          />
+
+          <FormField
+            id="security-http-node-auth-pass"
+            label="Password (MD5 hash)"
+            type="password"
+            value={value.httpNodeAuth.pass}
+            onChange={(v) =>
+              updateField('httpNodeAuth', {
+                ...value.httpNodeAuth!,
+                pass: v,
+              })
+            }
+            error={errors['security.httpNodeAuth.pass']}
+          />
+         </div>
+       )}
     </article>
   )
 }

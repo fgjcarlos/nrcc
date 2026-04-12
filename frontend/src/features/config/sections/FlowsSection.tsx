@@ -1,4 +1,5 @@
 import { FlowsConfig } from '../../../types/config'
+import { FormField } from '../../../components/forms'
 
 type SectionProps<T> = {
   value: T
@@ -12,53 +13,53 @@ export function FlowsSection({ value, onChange, errors }: SectionProps<FlowsConf
   }
 
   return (
-    <article className="settings-section">
-      <h3>Flows</h3>
+    <article className="space-y-6">
+      <h3 className="text-xl font-semibold text-base-content">Flows</h3>
 
-      <label className="form-field">
-        <span>Flow File</span>
-        <input
-          type="text"
-          value={value.flowFile}
-          onChange={(e) => updateField('flowFile', e.target.value)}
-          placeholder="flows.json"
-        />
-        <p className="field-hint">Filename only, no path separators</p>
-        {errors['flows.flowFile'] && <p className="field-error">{errors['flows.flowFile']}</p>}
-      </label>
+      <FormField
+        id="flows-flow-file"
+        label="Flow File"
+        type="text"
+        value={value.flowFile}
+        onChange={(v) => updateField('flowFile', v)}
+        placeholder="flows.json"
+        hint="Filename only, no path separators"
+        error={errors['flows.flowFile']}
+      />
 
-      <label className="form-toggle">
-        <input
-          type="checkbox"
-          checked={value.flowFilePretty}
-          onChange={(e) => updateField('flowFilePretty', e.target.checked)}
-        />
-        <span>Pretty-print flows.json</span>
-      </label>
+      <div className="form-control">
+        <label className="label cursor-pointer gap-3">
+          <input
+            type="checkbox"
+            className="checkbox checkbox-sm"
+            checked={value.flowFilePretty}
+            onChange={(e) => updateField('flowFilePretty', e.target.checked)}
+          />
+          <span className="label-text font-medium">Pretty-print flows.json</span>
+        </label>
+      </div>
 
-      <label className="form-field">
-        <span>User Directory</span>
-        <input
-          type="text"
-          value={value.userDir}
-          onChange={(e) => updateField('userDir', e.target.value)}
-          placeholder="/absolute/path/to/user/dir"
-        />
-        <p className="field-hint">Absolute path</p>
-        {errors['flows.userDir'] && <p className="field-error">{errors['flows.userDir']}</p>}
-      </label>
+      <FormField
+        id="flows-user-dir"
+        label="User Directory"
+        type="text"
+        value={value.userDir}
+        onChange={(v) => updateField('userDir', v)}
+        placeholder="/absolute/path/to/user/dir"
+        hint="Absolute path"
+        error={errors['flows.userDir']}
+      />
 
-      <label className="form-field">
-        <span>Nodes Directory</span>
-        <input
-          type="text"
-          value={value.nodesDir}
-          onChange={(e) => updateField('nodesDir', e.target.value)}
-          placeholder="/absolute/path/to/nodes"
-        />
-        <p className="field-hint">Absolute path</p>
-        {errors['flows.nodesDir'] && <p className="field-error">{errors['flows.nodesDir']}</p>}
-      </label>
+      <FormField
+        id="flows-nodes-dir"
+        label="Nodes Directory"
+        type="text"
+        value={value.nodesDir}
+        onChange={(v) => updateField('nodesDir', v)}
+        placeholder="/absolute/path/to/nodes"
+        hint="Absolute path"
+        error={errors['flows.nodesDir']}
+      />
     </article>
   )
 }

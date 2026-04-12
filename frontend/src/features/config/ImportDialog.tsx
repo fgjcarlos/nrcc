@@ -63,16 +63,16 @@ export function ImportDialog({ isOpen, onClose, onImported }: ImportDialogProps)
   }
 
   return (
-    <div className="import-dialog modal-overlay">
-      <div className="modal-content">
-        <div className="modal-header">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="card bg-base-200 shadow-lg w-full max-w-2xl max-h-96 overflow-auto">
+        <div className="flex items-center justify-between mb-4">
           <h2>Import from settings.js</h2>
-          <button className="close-button" onClick={onClose} aria-label="Close import">
+          <button className="btn btn-ghost btn-sm btn-circle" onClick={onClose} aria-label="Close import">
             ✕
           </button>
         </div>
 
-        <div className="modal-body">
+        <div className="space-y-4">
           {/* Tab bar */}
           <div className="tab-bar">
             <button
@@ -130,7 +130,7 @@ export function ImportDialog({ isOpen, onClose, onImported }: ImportDialogProps)
           )}
 
           {error && (
-            <p className="field-error">
+            <p className="alert alert-error text-sm">
               <strong>Error:</strong> {error}
             </p>
           )}
@@ -155,7 +155,7 @@ export function ImportDialog({ isOpen, onClose, onImported }: ImportDialogProps)
           {/* Import button */}
           {!parsedConfig && (
             <button
-              className="primary-button full-width"
+              className="btn btn-primary w-full"
               onClick={handleImport}
               disabled={loading || !content.trim()}
             >
@@ -165,12 +165,12 @@ export function ImportDialog({ isOpen, onClose, onImported }: ImportDialogProps)
         </div>
 
         {parsedConfig && (
-          <div className="modal-footer">
-            <button className="secondary-button" onClick={onClose}>
+          <div className="flex gap-3 justify-end mt-6">
+            <button className="btn btn-ghost" onClick={onClose}>
               Cancel
             </button>
             <button
-              className="primary-button"
+              className="btn btn-primary"
               onClick={handleApply}
             >
               Apply to Forms
@@ -179,8 +179,8 @@ export function ImportDialog({ isOpen, onClose, onImported }: ImportDialogProps)
         )}
 
         {!parsedConfig && (
-          <div className="modal-footer">
-            <button className="secondary-button" onClick={onClose}>
+          <div className="flex gap-3 justify-end mt-6">
+            <button className="btn btn-ghost" onClick={onClose}>
               Close
             </button>
           </div>

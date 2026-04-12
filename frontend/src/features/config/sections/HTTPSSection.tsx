@@ -1,4 +1,5 @@
 import { HTTPSConfig } from '../../../types/config'
+import { FormField } from '../../../components/forms'
 
 type SectionProps<T> = {
   value: T
@@ -12,66 +13,63 @@ export function HTTPSSection({ value, onChange, errors }: SectionProps<HTTPSConf
   }
 
   return (
-    <article className="settings-section">
-      <h3>HTTPS</h3>
+    <article className="space-y-6">
+      <h3 className="text-xl font-semibold text-base-content">HTTPS</h3>
 
       {value.enabled && (
-        <section className="inline-notice warn">
+        <section className="alert alert-warning">
           <strong>HTTPS Enabled</strong>
-          <p>
-            After enabling HTTPS, you must restart Node-RED and update your browser URL to
-            https://
+          <p className="text-sm">
+            After enabling HTTPS, you must restart Node-RED and update your browser URL to https://
           </p>
         </section>
       )}
 
-      <label className="form-toggle">
-        <input
-          type="checkbox"
-          checked={value.enabled}
-          onChange={(e) => updateField('enabled', e.target.checked)}
-        />
-        <span>Enable HTTPS</span>
-      </label>
+      <div className="form-control">
+        <label className="label cursor-pointer gap-3">
+          <input
+            type="checkbox"
+            className="checkbox checkbox-sm"
+            checked={value.enabled}
+            onChange={(e) => updateField('enabled', e.target.checked)}
+          />
+          <span className="label-text font-medium">Enable HTTPS</span>
+        </label>
+      </div>
 
-      {value.enabled && (
-        <>
-          <label className="form-field">
-            <span>Key File Path</span>
-            <input
-              type="text"
-              value={value.keyFile}
-              onChange={(e) => updateField('keyFile', e.target.value)}
-              placeholder="/path/to/key.pem"
-            />
-            {errors['https.keyFile'] && <p className="field-error">{errors['https.keyFile']}</p>}
-          </label>
+       {value.enabled && (
+         <div className="space-y-6 pl-4 border-l-2 border-[color:var(--border-indent)]">
+          <FormField
+            id="https-key-file"
+            label="Key File Path"
+            type="text"
+            value={value.keyFile}
+            onChange={(v) => updateField('keyFile', v)}
+            placeholder="/path/to/key.pem"
+            error={errors['https.keyFile']}
+          />
 
-          <label className="form-field">
-            <span>Certificate File Path</span>
-            <input
-              type="text"
-              value={value.certFile}
-              onChange={(e) => updateField('certFile', e.target.value)}
-              placeholder="/path/to/cert.pem"
-            />
-            {errors['https.certFile'] && (
-              <p className="field-error">{errors['https.certFile']}</p>
-            )}
-          </label>
+          <FormField
+            id="https-cert-file"
+            label="Certificate File Path"
+            type="text"
+            value={value.certFile}
+            onChange={(v) => updateField('certFile', v)}
+            placeholder="/path/to/cert.pem"
+            error={errors['https.certFile']}
+          />
 
-          <label className="form-field">
-            <span>CA File Path (optional)</span>
-            <input
-              type="text"
-              value={value.caFile}
-              onChange={(e) => updateField('caFile', e.target.value)}
-              placeholder="/path/to/ca.pem"
-            />
-            {errors['https.caFile'] && <p className="field-error">{errors['https.caFile']}</p>}
-          </label>
-        </>
-      )}
+          <FormField
+            id="https-ca-file"
+            label="CA File Path (optional)"
+            type="text"
+            value={value.caFile}
+            onChange={(v) => updateField('caFile', v)}
+            placeholder="/path/to/ca.pem"
+            error={errors['https.caFile']}
+          />
+         </div>
+       )}
     </article>
   )
 }
