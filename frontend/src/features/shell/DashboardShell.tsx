@@ -32,7 +32,7 @@ export function DashboardShell({
       <input id="sidebar-drawer" type="checkbox" className="drawer-toggle" />
       <div className="drawer-content flex flex-col">
         {/* Sticky Navbar Header */}
-        <header className="navbar bg-base-200 sticky top-0 z-10 shadow-elevation-2 rounded-lg">
+        <header className="navbar bg-base-200 sticky top-0 z-10">
           <div className="flex-1">
             <label htmlFor="sidebar-drawer" className="btn btn-ghost btn-circle lg:hidden">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -70,11 +70,11 @@ export function DashboardShell({
             </div>
 
             {/* Status Banner */}
-            <div className={`flex gap-3 p-4 rounded-lg bg-base-200 border border-[color:var(--border-neutral)] ${
-              globalStatus.tone === 'ok' ? 'border-l-success' : 
-              globalStatus.tone === 'warn' ? 'border-l-warning' : 
-              'border-l-info'
-            } border-l-4 shadow-elevation-1`}>
+            <div className={`flex gap-3 p-4 rounded-lg bg-base-200 border border-[color:var(--oc-border-warm)] ${
+              globalStatus.tone === 'ok' ? 'border-l-[color:var(--oc-success)]' : 
+              globalStatus.tone === 'warn' ? 'border-l-[color:var(--oc-warning)]' : 
+              'border-l-[color:var(--oc-info)]'
+             } border-l-4`}>
               <div>
                 <p className="text-xs font-semibold opacity-75">System status</p>
                 <p className="font-bold text-base">{globalStatus.title}</p>
@@ -98,7 +98,7 @@ export function DashboardShell({
           </div>
 
           {/* Profile Card (Sidebar Bottom) */}
-          <div className="card bg-base-300 shadow-elevation-2 p-4 rounded-lg">
+          <div className="card bg-base-300 p-4">
             <div className="card-body p-0">
               <p className="font-bold text-base-content">{user.username}</p>
               <p className="text-sm text-base-content opacity-70">{user.role}</p>

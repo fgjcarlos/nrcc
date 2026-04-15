@@ -10,7 +10,7 @@ export function RuntimeDetailsPanel({
   runtimeLoading: boolean
 }) {
   return (
-    <article className="card bg-base-200 shadow-elevation-2 rounded-lg">
+    <article className="card bg-base-200">
       <div className="card-body">
         <h3 className="card-title text-lg font-semibold text-base-content">Runtime details</h3>
         <dl className="space-y-3">

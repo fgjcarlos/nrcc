@@ -8,13 +8,15 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['"IBM Plex Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-        mono: ['"IBM Plex Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+        sans: ['"Berkeley Mono"', '"IBM Plex Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', '"Liberation Mono"', '"Courier New"', 'monospace'],
+        mono: ['"Berkeley Mono"', '"IBM Plex Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', '"Liberation Mono"', '"Courier New"', 'monospace'],
       },
-      boxShadow: {
-        'elevation-1': 'var(--elevation-1)',
-        'elevation-2': 'var(--elevation-2)',
-        'elevation-3': 'var(--elevation-3)',
+      borderRadius: {
+        DEFAULT: '4px',
+        none: '0',
+        sm: '2px',
+        input: '6px',
+        full: '9999px',
       },
     },
   },

@@ -57,7 +57,7 @@ export function DiagnosticsPage({
         </div>
       </header>
 
-      <article className="card bg-base-200 shadow-elevation-2 rounded-lg">
+      <article className="card bg-base-200">
         <div className="card-body">
           <div className="tabs tabs-bordered mb-6">
             <button

@@ -28,7 +28,7 @@ export function LogsPage({
         />
       ) : null}
 
-      <article className="card bg-base-200 shadow">
+      <article className="card bg-base-200">
         <div className="card-body">
           <h3 className="card-title text-2xl">Runtime logs</h3>
           <div className="log-output">

@@ -43,7 +43,7 @@ export function ToastViewport({
   return (
     <div className="toast toast-top toast-right" aria-live="polite" aria-atomic="true">
       {toasts.map((toast) => (
-        <article key={toast.id} className={`alert ${getToneClass(toast.tone)} shadow-lg`}>
+        <article key={toast.id} className={`alert ${getToneClass(toast.tone)}`}>
           <div className="flex-1">
             <strong className="text-sm">{toast.title}</strong>
             {toast.detail ? <p className="text-xs opacity-90 mt-1">{toast.detail}</p> : null}

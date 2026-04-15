@@ -12,7 +12,7 @@ export function LibraryCard({
   onUninstall: () => void
 }) {
   return (
-    <article className="card bg-base-200 shadow-elevation-2 p-6 rounded-lg flex flex-row items-center justify-between" key={item.name}>
+    <article className="card bg-base-200 p-6 flex flex-row items-center justify-between" key={item.name}>
       <div className="flex-1">
         <strong className="text-base text-base-content">{item.name}</strong>
         <p className="text-sm text-base-content opacity-75 mt-1">{item.version || 'Unknown version'}</p>

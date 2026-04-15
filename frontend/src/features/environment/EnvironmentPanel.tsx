@@ -3,6 +3,7 @@ import { useMutation } from '@tanstack/react-query'
 import { api, type ManagedEnvState, type ManagedEnvVar } from '../../api'
 import { formatErrorMessage } from '../../common/utils/format'
 import { InlineNotice } from '../../common/components/InlineNotice'
+import { FormField } from '../../components/forms'
 
 export function EnvironmentPanel({
   state,
@@ -40,7 +41,7 @@ export function EnvironmentPanel({
 
   if (loading || !state) {
     return (
-      <article className="card bg-base-200 shadow-elevation-2 rounded-lg">
+      <article className="card bg-base-200">
         <div className="card-body">
           <h3 className="card-title text-lg font-semibold text-base-content">Managed runtime variables</h3>
           <p className="text-base-content/60 text-sm">Loading managed environment...</p>
@@ -69,7 +70,7 @@ export function EnvironmentPanel({
   }
 
   return (
-    <article className="card bg-base-200 shadow-elevation-2 rounded-lg">
+    <article className="card bg-base-200">
       <div className="card-body">
         <h3 className="card-title text-lg font-semibold text-base-content">Managed runtime variables</h3>
         <p className="text-base-content/60 text-sm mb-6">
@@ -83,39 +84,31 @@ export function EnvironmentPanel({
             applyMutation.mutate(variables)
           }}
         >
-          <div className="space-y-4">
-            {variables.map((variable, index) => (
-              <div key={`${index}-${variable.name}`} className="flex flex-col sm:flex-row gap-4 items-end">
-                <div className="form-control flex-1">
-                  <label className="label">
-                    <span className="label-text font-medium">Name</span>
-                  </label>
-                  <input
-                    type="text"
-                    className="input input-bordered bg-base-100"
-                    value={variable.name}
-                    onChange={(event) => update(index, { name: event.target.value })}
-                    placeholder="API_TOKEN"
-                  />
-                </div>
-                <div className="form-control flex-1">
-                  <label className="label">
-                    <span className="label-text font-medium">Value</span>
-                  </label>
-                  <input
-                    type="text"
-                    className="input input-bordered bg-base-100"
-                    value={variable.value}
-                    onChange={(event) => update(index, { value: event.target.value })}
-                    placeholder="secret-value"
-                  />
-                </div>
-                <button className="btn btn-ghost btn-sm" type="button" onClick={() => removeRow(index)}>
-                  Remove
-                </button>
-              </div>
-            ))}
-          </div>
+           <div className="space-y-4">
+             {variables.map((variable, index) => (
+               <div key={`${index}-${variable.name}`} className="space-y-2 p-4 border border-base-300 rounded-lg">
+                 <FormField
+                   id={`env-var-${index}-name`}
+                   label="Name"
+                   type="text"
+                   placeholder="API_TOKEN"
+                   value={variable.name}
+                   onChange={(val) => update(index, { name: val })}
+                 />
+                 <FormField
+                   id={`env-var-${index}-value`}
+                   label="Value"
+                   type="text"
+                   placeholder="secret-value"
+                   value={variable.value}
+                   onChange={(val) => update(index, { value: val })}
+                 />
+                 <button className="btn btn-ghost btn-sm" type="button" onClick={() => removeRow(index)}>
+                   Remove
+                 </button>
+               </div>
+             ))}
+           </div>
 
           <div className="flex gap-3">
             <button className="btn btn-ghost btn-sm" type="button" onClick={addRow} disabled={applyMutation.isPending}>

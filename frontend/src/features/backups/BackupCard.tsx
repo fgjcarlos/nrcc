@@ -17,7 +17,7 @@ export function BackupCard({
   onConfirm: () => void
 }) {
   return (
-    <article className="card bg-base-200 shadow-elevation-2 p-6 rounded-lg" key={backup.id}>
+    <article className="card bg-base-200 p-6" key={backup.id}>
       <div className="mb-4">
         <strong className="text-base text-base-content">{backup.id}</strong>
         <p className="text-sm text-base-content opacity-75 mt-2">{backup.reason}</p>

@@ -71,7 +71,7 @@ export function BackupsPage({
         />
       ) : null}
 
-      <article className="card bg-base-200 shadow">
+      <article className="card bg-base-200">
         <div className="card-body">
           <h3 className="card-title text-2xl">Backup history</h3>
           {loading ? <p className="text-sm text-base-content/60">Loading backups...</p> : null}

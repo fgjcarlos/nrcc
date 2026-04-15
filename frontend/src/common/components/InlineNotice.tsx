@@ -53,17 +53,17 @@ export function InlineNotice({
   const getBorderColor = () => {
     switch (tone) {
       case 'error':
-        return 'border-l-error'
+        return 'border-l-[color:var(--oc-danger)]'
       case 'warn':
-        return 'border-l-warning'
+        return 'border-l-[color:var(--oc-warning)]'
       case 'info':
       default:
-        return 'border-l-info'
+        return 'border-l-[color:var(--oc-info)]'
     }
   }
 
   return (
-    <section className={`flex gap-3 p-4 rounded-lg bg-base-200 border border-[color:var(--border-neutral)] ${getBorderColor()} border-l-4 shadow-elevation-1`}>
+    <section className={`flex gap-3 p-4 rounded-lg bg-base-200 border border-[color:var(--oc-border-warm)] ${getBorderColor()} border-l-4`}>
       {getNoticeIcon(tone)}
       <div className="flex-1">
         <strong className="text-sm text-base-content">{title}</strong>

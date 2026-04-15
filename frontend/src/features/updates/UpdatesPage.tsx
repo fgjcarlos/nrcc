@@ -45,7 +45,7 @@ export function UpdatesPage({
         />
       ) : null}
 
-      <article className="card bg-base-200 shadow">
+      <article className="card bg-base-200">
         <div className="card-body">
           <h3 className="card-title text-2xl">Node-RED update</h3>
           {loading ? <p className="text-sm text-base-content/60">Loading update status...</p> : null}

@@ -1,4 +1,5 @@
 import { PaletteConfig } from '../../../types/config'
+import { FormField } from '../../../components/forms'
 
 type SectionProps<T> = {
   value: T
@@ -45,44 +46,47 @@ export function PaletteSection({ value, onChange, errors }: SectionProps<Palette
         <span className="label-text font-medium">Categories (ordered)</span>
       </label>
 
-      <div className="space-y-3">
-        {value.categories.map((cat, idx) => (
-          <div key={idx} className="flex gap-2 items-center">
-            <input
-              type="text"
-              className="input input-bordered bg-base-100 flex-1"
-              value={cat}
-              onChange={(e) => updateCategory(idx, e.target.value)}
-              placeholder="Category name"
-            />
-            <button
-              type="button"
-              onClick={() => moveCategory(idx, 'up')}
-              disabled={idx === 0}
-              className="btn btn-ghost btn-sm"
-              title="Move up"
-            >
-              ↑
-            </button>
-            <button
-              type="button"
-              onClick={() => moveCategory(idx, 'down')}
-              disabled={idx === value.categories.length - 1}
-              className="btn btn-ghost btn-sm"
-              title="Move down"
-            >
-              ↓
-            </button>
-            <button
-              type="button"
-              onClick={() => removeCategory(idx)}
-              className="btn btn-ghost btn-sm"
-            >
-              Remove
-            </button>
-          </div>
-        ))}
-      </div>
+       <div className="space-y-3">
+         {value.categories.map((cat, idx) => (
+           <div key={idx} className="space-y-2">
+             <FormField
+               id={`palette-category-${idx}`}
+               label={`Category ${idx + 1}`}
+               type="text"
+               placeholder="Category name"
+               value={cat}
+               onChange={(val) => updateCategory(idx, val)}
+             />
+             <div className="flex gap-2">
+               <button
+                 type="button"
+                 onClick={() => moveCategory(idx, 'up')}
+                 disabled={idx === 0}
+                 className="btn btn-ghost btn-sm"
+                 title="Move up"
+               >
+                 ↑
+               </button>
+               <button
+                 type="button"
+                 onClick={() => moveCategory(idx, 'down')}
+                 disabled={idx === value.categories.length - 1}
+                 className="btn btn-ghost btn-sm"
+                 title="Move down"
+               >
+                 ↓
+               </button>
+               <button
+                 type="button"
+                 onClick={() => removeCategory(idx)}
+                 className="btn btn-ghost btn-sm"
+               >
+                 Remove
+               </button>
+             </div>
+           </div>
+         ))}
+       </div>
 
       <button
         type="button"

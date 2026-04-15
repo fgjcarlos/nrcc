@@ -49,6 +49,8 @@ export interface FormFieldProps {
   error?: string
   /** Helper text rendered below the input (muted style) */
   hint?: string
+  /** Unit suffix to display after input (e.g., "ms", "px", "seconds") */
+  unit?: string
   /** Disabled state */
   disabled?: boolean
   /** HTML required attribute */
@@ -94,6 +96,7 @@ export function FormField(props: FormFieldProps): JSX.Element {
     placeholder,
     error,
     hint,
+    unit,
     disabled = false,
     required = false,
     min,
@@ -109,7 +112,7 @@ export function FormField(props: FormFieldProps): JSX.Element {
   const inputClasses = [
     'input',
     'input-bordered',
-    'bg-base-100',
+    unit ? 'pr-12' : '',
     error ? 'input-error' : '',
     className,
   ]
@@ -125,19 +128,26 @@ export function FormField(props: FormFieldProps): JSX.Element {
         </span>
       </label>
 
-      <input
-        id={id}
-        type={type}
-        className={inputClasses}
-        value={value}
-        onChange={handleChange}
-        placeholder={placeholder}
-        disabled={disabled}
-        required={required}
-        min={min}
-        max={max}
-        aria-describedby={error ? `${id}-error` : undefined}
-      />
+      <div className="relative">
+        <input
+          id={id}
+          type={type}
+          className={inputClasses}
+          value={value}
+          onChange={handleChange}
+          placeholder={placeholder}
+          disabled={disabled}
+          required={required}
+          min={min}
+          max={max}
+          aria-describedby={error ? `${id}-error` : undefined}
+        />
+        {unit && (
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-base-content/60 text-sm pointer-events-none">
+            {unit}
+          </span>
+        )}
+      </div>
 
       {error && (
         <span id={`${id}-error`} className="form-field-error-msg">

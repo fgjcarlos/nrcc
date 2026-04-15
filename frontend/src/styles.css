@@ -1,86 +1,115 @@
+/* ===== BERKELEY MONO FONT FACE DEFINITIONS ===== */
+
+@font-face {
+  font-family: "Berkeley Mono";
+  font-weight: 400;
+  src: url('/fonts/BerkeleyMono-Regular.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: "Berkeley Mono";
+  font-weight: 500;
+  src: url('/fonts/BerkeleyMono-Medium.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: "Berkeley Mono";
+  font-weight: 700;
+  src: url('/fonts/BerkeleyMono-Bold.woff2') format('woff2');
+}
+
+/* ===== TAILWIND DIRECTIVES ===== */
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ===== OPENCODE AESTHETIC DESIGN TOKENS ===== */
+
 :root {
-  color-scheme: light;
-  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  /* --- Raw Palette Tokens (theme-invariant) --- */
+  --oc-dark:            #201d1d;
+  --oc-dark-surface:    #302c2c;
+  --oc-light:           #fdfcfc;
+  --oc-light-surface:   #f1eeee;
 
-  /* Elevation System — Dual Shadow */
-  --elevation-1: 0 1px 3px 0 rgba(0,0,0,0.04), 0 1px 2px -1px rgba(0,0,0,0.04);
-  --elevation-2: 0 3px 8px 0 rgba(0,0,0,0.05), 0 6px 16px 0 rgba(0,0,0,0.03);
-  --elevation-3: 0 8px 24px 0 rgba(0,0,0,0.08), 0 16px 32px 0 rgba(0,0,0,0.05);
+  /* --- Active Theme Mappings (dark-first defaults) --- */
+  --oc-bg:              var(--oc-dark);
+  --oc-surface:         var(--oc-dark-surface);
+  --oc-input-bg:        var(--oc-dark-surface);
+  --oc-text-primary:    var(--oc-light);
+  --oc-text-secondary:  #9a9898;
+   --oc-text-muted:      #858585;
 
-  /* Neutral Border */
-  --border-neutral-light: rgba(0,0,0,0.06);
-  --border-neutral-dark: rgba(255,255,255,0.08);
-  --border-neutral: var(--border-neutral-light);
+   /* --- Border Tokens (theme-invariant) --- */
+   --oc-gray:            #9a9898;
+   --oc-border-gray:     #646262;
+   --oc-border-warm:     rgba(15, 0, 0, 0.12);
+   --oc-border-tab:      #9a9898;
+   --oc-border-outline:  #646262;
+   --oc-muted:           #858585;
+  --oc-secondary-text:  #424245;
 
-  /* Indented Sub-section Left Border — Visible in light mode */
-  --border-indent: rgba(0, 0, 0, 0.12);
+  /* --- Semantic Color Tokens (theme-invariant, Apple HIG) --- */
+  --oc-accent:          #007aff;
+  --oc-accent-hover:    #0056b3;
+  --oc-accent-active:   #004085;
+  --oc-danger:          #ff3b30;
+  --oc-danger-hover:    #d70015;
+  --oc-danger-active:   #a50011;
+  --oc-success:         #30d158;
+  --oc-warning:         #ff9f0a;
+  --oc-warning-hover:   #cc7f08;
+  --oc-warning-active:  #995f06;
 }
 
-/* NRCC Dark Theme — Override DaisyUI v5.5 CSS variables (oklch format)
- * NOTE: primary/secondary use IDENTICAL values across light/dark modes.
- *       This is INTENTIONAL — Node-RED brand identity uses fixed colors (#c3561d orange, #2BA891 teal).
- *       Error color is adapted per theme for contrast (darker in dark mode).
- *       See design.md Decision 4 and audit.md Problem 1.2 for rationale.
- */
+/* ===== DARK THEME (DEFAULT) ===== */
+
 [data-theme="dark"] {
-  /* DaisyUI v5 uses oklch color space for primary/secondary/colors */
-  --color-primary: oklch(42% 0.15 29);       /* primary: #c3561d (INTENTIONALLY SAME as light) */
-  --color-primary-content: oklch(100% 0 0);  /* primary-content: #ffffff */
-  --color-secondary: oklch(56% 0.16 143);    /* secondary: #2BA891 (INTENTIONALLY SAME as light) */
-  --color-secondary-content: oklch(100% 0 0);/* secondary-content: #ffffff */
-  --color-accent: oklch(56% 0.16 143);       /* accent: #2BA891 */
-  --color-accent-content: oklch(100% 0 0);   /* accent-content: #ffffff */
-  --color-neutral: oklch(18% 0.04 180);      /* neutral: #213028 */
-  --color-neutral-content: oklch(93% 0.01 127);/* neutral-content: #dde7dd */
-  --color-base-100: oklch(16% 0.05 174);     /* base-100: #1c2a22 */
-  --color-base-200: oklch(18% 0.04 180);     /* base-200: #213028 */
-  --color-base-300: oklch(9% 0.06 165);      /* base-300: #0f1813 */
-  --color-base-content: oklch(93% 0.01 127); /* base-content: #dde7dd */
-  --color-info: oklch(55% 0.22 260);         /* info: #3b82f6 */
-  --color-success: oklch(52% 0.19 143);      /* success: #2e8e6f */
-  --color-warning: oklch(59% 0.20 55);       /* warning: #d67e23 */
-  --color-error: oklch(52% 0.24 15);         /* error: #b42318 */
+  /* Active theme token bindings */
+  --oc-bg:              var(--oc-dark);
+  --oc-surface:         var(--oc-dark-surface);
+  --oc-input-bg:        var(--oc-dark-surface);
+  --oc-text-primary:    var(--oc-light);
   color-scheme: dark;
 
-  /* Elevation System — Dark Mode (40% less opacity) */
-  --elevation-1: 0 1px 3px 0 rgba(0,0,0,0.02), 0 1px 2px -1px rgba(0,0,0,0.02);
-  --elevation-2: 0 3px 8px 0 rgba(0,0,0,0.03), 0 6px 16px 0 rgba(0,0,0,0.018);
-  --elevation-3: 0 8px 24px 0 rgba(0,0,0,0.05), 0 16px 32px 0 rgba(0,0,0,0.03);
-
-  /* Neutral Border */
-  --border-neutral: var(--border-neutral-dark);
-  --border-indent: rgba(255, 255, 255, 0.14);
+  /* DaisyUI v5.5 Variable Remapping */
+  --color-base-100:     var(--oc-dark);
+  --color-base-200:     var(--oc-dark-surface);
+  --color-base-300:     oklch(9% 0.03 30);
+  --color-base-content: var(--oc-light);
+  --color-primary:      var(--oc-accent);
+  --color-primary-content: var(--oc-light);
+  --color-error:        var(--oc-danger);
+  --color-warning:      var(--oc-warning);
+  --color-success:      var(--oc-success);
+  --color-info:         var(--oc-accent);
 }
 
-/* NRCC Light Theme — Override DaisyUI v5.5 CSS variables (oklch format)
- * NOTE: primary/secondary use IDENTICAL values as dark mode (intentional brand design).
- *       base-100 uses "cooled" chroma (0.02) to reduce greenish tint vs. base-200.
- *       See audit.md Problem 1.3 for temperature adjustment rationale.
- */
+/* ===== LIGHT THEME ===== */
+
 [data-theme="light"] {
-  /* DaisyUI v5 uses oklch color space */
-  --color-primary: oklch(42% 0.15 29);       /* primary: #c3561d (INTENTIONALLY SAME as dark) */
-  --color-primary-content: oklch(100% 0 0);  /* primary-content: #ffffff */
-  --color-secondary: oklch(56% 0.16 143);    /* secondary: #2BA891 (INTENTIONALLY SAME as dark; +10% saturation) */
-  --color-secondary-content: oklch(100% 0 0);/* secondary-content: #ffffff */
-  --color-accent: oklch(56% 0.16 143);       /* accent: #2BA891 */
-  --color-accent-content: oklch(100% 0 0);   /* accent-content: #ffffff */
-  --color-neutral: oklch(91% 0.01 127);      /* neutral: #e8f0ea */
-  --color-neutral-content: oklch(16% 0.05 174);/* neutral-content: #1c2a22 */
-  --color-base-100: oklch(96% 0.01 168);     /* base-100: #F4EEE4 (cooled softened) */
-  --color-base-200: oklch(92% 0.02 159);     /* base-200: #E5EDE8 (cooled) */
-  --color-base-300: oklch(98% 0.01 172);     /* base-300: #f9f7f3 */
-  --color-base-content: oklch(16% 0.05 174); /* base-content: #1c2a22 */
-  --color-info: oklch(48% 0.23 255);         /* info: #1e40af */
-  --color-success: oklch(47% 0.16 143);      /* success: #1a6b3f */
-  --color-warning: oklch(54% 0.20 54);       /* warning: #92400e */
-  --color-error: oklch(51% 0.23 15);         /* error: #991b1b */
+  /* Active theme token bindings */
+  --oc-bg:              var(--oc-light-surface);
+  --oc-surface:         #f8f7f7;
+  --oc-input-bg:        #f8f7f7;
+  --oc-text-primary:    var(--oc-dark);
   color-scheme: light;
+
+  /* DaisyUI v5.5 Variable Remapping */
+  --color-base-100:     var(--oc-light-surface);
+  --color-base-200:     #f8f7f7;
+  --color-base-300:     var(--oc-light);
+  --color-base-content: var(--oc-dark);
+  --color-primary:      var(--oc-accent);
+  --color-primary-content: var(--oc-light);
+  --color-error:        var(--oc-danger);
+  --color-warning:      var(--oc-warning);
+  --color-success:      var(--oc-success);
+  --color-info:         var(--oc-accent);
 }
+
+/* ===== GLOBAL STYLES ===== */
 
 * {
   box-sizing: border-box;
@@ -96,157 +125,387 @@ body {
   min-height: 100vh;
 }
 
-/* Terminal log output — intentionally always dark, regardless of theme */
-.log-output {
-  display: grid;
-  gap: 8px;
-  max-height: 360px;
-  overflow: auto;
-  padding: 14px;
-  border-radius: 16px;
-  background: #18211d;
-  color: #dde7dd;
-  font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
-  font-size: 0.84rem;
-}
-
-.log-line {
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-/* ===== @layer utilities: Elevation System & Component Overrides (DaisyUI v5 compatibility) ===== */
-/* Note: DaisyUI v5 places component styles in @layer utilities, so we must override at the same layer */
+/* ===== COMPONENT STYLE OVERRIDES (@layer utilities) ===== */
 
 @layer utilities {
-  /* Universal Card Border */
-  .card {
-    border: 1px solid var(--border-neutral);
-    transition: box-shadow 150ms ease;
+  /* === BUTTONS === */
+  .btn {
+    font-family: "Berkeley Mono", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 1rem;
+    font-weight: 500;
+    line-height: 2.00;
+    border-radius: 4px;
+    padding: 4px 20px;
+    transition: background-color 150ms ease, border-color 150ms ease;
+    box-shadow: none !important;
   }
 
-  .card:hover {
-    box-shadow: var(--elevation-3);
-  }
-
-  /* Button Elevation */
   .btn-primary {
-    box-shadow: var(--elevation-1);
-    transition: box-shadow 150ms ease;
+    background-color: var(--oc-dark);
+    color: var(--oc-light);
+    border: 1px solid var(--oc-border-outline);
   }
 
-  .btn-primary:hover,
+  .btn-primary:hover {
+    background-color: var(--oc-dark-surface);
+  }
+
+  .btn-primary:active {
+    background-color: #252222;
+  }
+
   .btn-primary:focus-visible {
-    box-shadow: var(--elevation-2);
+    outline: 2px solid var(--oc-accent);
+    outline-offset: 2px;
+    box-shadow: none;
   }
 
   .btn-error {
-    box-shadow: var(--elevation-1);
-    transition: box-shadow 150ms ease;
+    background-color: var(--oc-danger);
+    color: var(--oc-light);
+    border: none;
   }
 
-  .btn-error:hover,
+  .btn-error:hover {
+    background-color: var(--oc-danger-hover);
+  }
+
+  .btn-error:active {
+    background-color: var(--oc-danger-active);
+  }
+
   .btn-error:focus-visible {
-    box-shadow: var(--elevation-2);
+    outline: 2px solid var(--oc-accent);
+    outline-offset: 2px;
+    box-shadow: none;
   }
 
-  /* Input Focus Ring — Using DaisyUI v5 --color-primary oklch */
+  .btn-ghost {
+    background-color: transparent;
+    color: var(--oc-text-primary);
+    border: none;
+  }
+
+  .btn-ghost:hover {
+    background-color: var(--oc-surface);
+  }
+
+  .btn:disabled,
+  .btn[disabled] {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  /* === INPUTS === */
+  .input,
+  .input-bordered {
+    background-color: var(--oc-input-bg);
+    color: var(--oc-text-primary);
+    border: 1px solid var(--oc-border-warm);
+    border-radius: 6px;
+    padding: 20px;
+    font-family: "Berkeley Mono", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 1rem;
+    font-weight: 400;
+    box-shadow: none;
+  }
+
+  .input::placeholder {
+    color: var(--oc-muted);
+  }
+
   .input:focus,
-  .input:focus-within,
-  .select:focus,
-  .select:focus-within {
-    outline: none;
-    box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-primary) 25%, transparent);
+  .input:focus-within {
+    outline: 2px solid var(--oc-accent);
+    outline-offset: 2px;
+    border-color: var(--oc-border-outline);
+    box-shadow: none;
   }
 
-  /* DaisyUI Alert Overrides — Reduced Fill with DaisyUI v5 color variables */
-  .alert-success {
-    background-color: color-mix(in oklch, var(--color-success) 8%, transparent);
-    border-left: 4px solid var(--color-success);
+  .input-error {
+    border-color: var(--oc-danger);
   }
 
-  .alert-warning {
-    background-color: color-mix(in oklch, var(--color-warning) 8%, transparent);
-    border-left: 4px solid var(--color-warning);
+  textarea {
+    background-color: var(--oc-input-bg);
+    color: var(--oc-text-primary);
+    border: 1px solid var(--oc-border-warm);
+    border-radius: 6px;
+    padding: 20px;
+    font-family: "Berkeley Mono", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 1rem;
+    font-weight: 400;
+    box-shadow: none;
   }
 
-  .alert-error {
-    background-color: color-mix(in oklch, var(--color-error) 8%, transparent);
-    border-left: 4px solid var(--color-error);
+  textarea::placeholder {
+    color: var(--oc-muted);
   }
 
-  .alert-info {
-    background-color: color-mix(in oklch, var(--color-info) 8%, transparent);
-    border-left: 4px solid var(--color-info);
+  textarea:focus {
+    outline: 2px solid var(--oc-accent);
+    outline-offset: 2px;
+    border-color: var(--oc-border-outline);
+    box-shadow: none;
   }
 
-  /* StatCard System with DaisyUI v5 color references */
+  /* === SELECT === */
+  .select {
+    background-color: var(--oc-input-bg);
+    color: var(--oc-text-primary);
+    border: 1px solid var(--oc-border-warm);
+    border-radius: 6px;
+    padding: 20px;
+    font-family: "Berkeley Mono", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 1rem;
+    box-shadow: none;
+  }
+
+  .select:focus {
+    outline: 2px solid var(--oc-accent);
+    outline-offset: 2px;
+    border-color: var(--oc-border-outline);
+    box-shadow: none;
+  }
+
+  .select-error {
+    border-color: var(--oc-danger);
+  }
+
+  .dropdown-content {
+    background-color: var(--oc-dark);
+    border: 1px solid var(--oc-border-warm);
+    color: var(--oc-light);
+  }
+
+  /* === CHECKBOXES & RADIOS === */
+  input[type="checkbox"],
+  input[type="radio"] {
+    border-color: var(--oc-border-outline);
+  }
+
+  input[type="checkbox"]:checked,
+  input[type="radio"]:checked {
+    background-color: var(--oc-accent);
+    border-color: var(--oc-accent);
+  }
+
+  /* === CARDS === */
+  .card {
+    background-color: var(--oc-surface);
+    border: 1px solid var(--oc-border-warm);
+    border-radius: 4px;
+    box-shadow: none;
+  }
+
+  .card:hover {
+    border-color: var(--oc-border-outline);
+    box-shadow: none;
+  }
+
+  /* === STAT CARDS === */
   .stat-card {
-    border: 1px solid var(--border-neutral);
-    transition: box-shadow 150ms ease;
-    position: relative;
+    background-color: var(--oc-surface);
+    border: 1px solid var(--oc-border-warm);
+    border-radius: 4px;
+    box-shadow: none;
   }
 
   .stat-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-    border-radius: 8px 8px 0 0;
-    opacity: 0.4;
+    display: none;
   }
 
-  .stat-card--ok::before {
-    background-color: var(--color-success);
+  .stat-card--ok {
+    border-left: 3px solid var(--oc-success);
   }
 
-  .stat-card--warn::before {
-    background-color: var(--color-warning);
+  .stat-card--warn {
+    border-left: 3px solid var(--oc-warning);
   }
 
-  .stat-card--neutral::before {
-    background-color: var(--color-neutral);
+  .stat-card--neutral {
+    border-left: 3px solid var(--oc-border-gray);
   }
 
   .stat-card:hover {
-    box-shadow: var(--elevation-3);
+    border-color: var(--oc-border-outline);
+    box-shadow: none;
   }
 
-  .stat-card h3 {
-    font-weight: 700;
+  /* === NAVBAR === */
+  .navbar {
+    background-color: var(--oc-bg);
+    border-bottom: 1px solid var(--oc-border-warm);
+    border-radius: 0;
+    box-shadow: none;
   }
 
-  /* Card Titles & Typography */
-  .card-title,
-  h2,
-  h3 {
-    font-weight: 600;
+  .navbar-start,
+  .navbar-center,
+  .navbar-end {
+    background-color: transparent;
   }
 
-  /* Labels Tracking */
-  .stat-card-label {
-    letter-spacing: -0.01em;
+  /* === MENU / SIDEBAR NAVIGATION === */
+  .menu a {
+    font-family: "Berkeley Mono", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--oc-text-primary);
+    border-radius: 4px;
+    transition: background-color 150ms ease;
   }
 
-  /* FormField Error Message — icon + text in error state */
+  .menu a:hover {
+    background-color: var(--oc-surface);
+  }
+
+  .menu a.active {
+    background-color: var(--oc-surface);
+    border-left: 2px solid var(--oc-accent);
+    color: var(--oc-text-primary);
+  }
+
+  /* === ALERTS === */
+  .alert {
+    border-radius: 4px;
+    box-shadow: none;
+  }
+
+  .alert-success {
+    background-color: color-mix(in srgb, var(--oc-success) 12%, var(--oc-bg));
+    border-left: 4px solid var(--oc-success);
+  }
+
+  .alert-warning {
+    background-color: color-mix(in srgb, var(--oc-warning) 12%, var(--oc-bg));
+    border-left: 4px solid var(--oc-warning);
+  }
+
+  .alert-error {
+    background-color: color-mix(in srgb, var(--oc-danger) 12%, var(--oc-bg));
+    border-left: 4px solid var(--oc-danger);
+  }
+
+  .alert-info {
+    background-color: color-mix(in srgb, var(--oc-accent) 12%, var(--oc-bg));
+    border-left: 4px solid var(--oc-accent);
+  }
+
+  .toast {
+    background-color: var(--oc-surface);
+    border: 1px solid var(--oc-border-warm);
+    border-radius: 4px;
+    box-shadow: none;
+  }
+
+  /* === BADGES === */
+  .badge {
+    background-color: var(--oc-surface);
+    border: 1px solid var(--oc-border-warm);
+    border-radius: 4px;
+    color: var(--oc-text-primary);
+  }
+
+  .badge-success {
+    background-color: color-mix(in srgb, var(--oc-success) 20%, var(--oc-surface));
+    border: 1px solid var(--oc-success);
+  }
+
+  .badge-warning {
+    background-color: color-mix(in srgb, var(--oc-warning) 20%, var(--oc-surface));
+    border: 1px solid var(--oc-warning);
+  }
+
+  .badge-error {
+    background-color: color-mix(in srgb, var(--oc-danger) 20%, var(--oc-surface));
+    border: 1px solid var(--oc-danger);
+  }
+
+  /* === FORM FIELD UTILITIES === */
   .form-field-error-msg {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;        /* gap-1 */
-    margin-top: 0.25rem; /* mt-1 */
-    font-size: 0.875rem; /* text-sm */
-    color: var(--color-error);
-  }
-
-  /* FormField Hint — helper text (muted) */
-  .form-field-hint {
-    margin-top: 0.25rem;
+    color: var(--oc-danger);
     font-size: 0.875rem;
-    color: color-mix(in oklch, var(--color-base-content) 60%, transparent);
   }
 
+  .form-field-hint {
+    color: var(--oc-muted);
+    font-size: 0.875rem;
+  }
+
+  /* === LOG OUTPUT TERMINAL === */
+  .log-output {
+    background: var(--oc-dark);
+    color: var(--oc-light);
+    font-family: "Berkeley Mono", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    border-radius: 4px;
+    padding: 1rem;
+    max-height: 360px;
+    overflow: auto;
+    display: grid;
+    gap: 8px;
+  }
+
+  .log-line {
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  /* === TABS === */
+  .tabs {
+    font-family: "Berkeley Mono", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  }
+
+  .tab {
+    font-size: 1rem;
+    font-weight: 500;
+    line-height: 1.00;
+    color: var(--oc-gray);
+  }
+
+  .tab.tab-active {
+    color: var(--oc-light);
+    border-bottom: 2px solid var(--oc-border-tab);
+  }
+
+  .tab-content {
+    background-color: inherit;
+  }
+
+  /* === DRAWER === */
+  .drawer-side {
+    background-color: var(--oc-bg);
+    border-right: 1px solid var(--oc-border-warm);
+  }
+
+  .drawer-overlay {
+    background-color: rgba(0, 0, 0, 0.5);
+  }
+
+  /* === MODAL === */
+  .modal-box {
+    background-color: var(--oc-surface);
+    border: 1px solid var(--oc-border-outline);
+    border-radius: 4px;
+    box-shadow: none;
+  }
+
+  .modal-backdrop {
+    background-color: rgba(0, 0, 0, 0.5);
+  }
+
+  /* === FORM CONTROL & LABELS === */
+  .form-control {
+    font-family: "Berkeley Mono", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  }
+
+  .label {
+    font-family: "Berkeley Mono", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 1rem;
+    font-weight: 500;
+  }
+
+  .label-text {
+    color: var(--oc-text-primary);
+  }
 }
-
-

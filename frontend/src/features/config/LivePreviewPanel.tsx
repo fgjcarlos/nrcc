@@ -53,7 +53,7 @@ export function LivePreviewPanel({ config, isOpen, onToggle }: LivePreviewPanelP
   }
 
   return (
-    <div className="card bg-base-200 shadow fixed inset-4 z-40 overflow-auto md:inset-auto md:w-1/2 md:right-4 md:bottom-4">
+    <div className="card bg-base-200 fixed inset-4 z-40 overflow-auto md:inset-auto md:w-1/2 md:right-4 md:bottom-4">
       <div className="card-body">
         <div className="flex items-center justify-between mb-4">
           <h3 className="card-title text-lg">Preview settings.js</h3>

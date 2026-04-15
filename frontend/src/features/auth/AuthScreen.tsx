@@ -28,7 +28,7 @@ export function AuthScreen({
 
   return (
     <main className="flex flex-col items-center justify-center min-h-screen bg-base-100 px-6">
-      <div className="card bg-base-200 shadow-xl w-full max-w-md p-8">
+      <div className="card bg-base-200 w-full max-w-md p-8">
         <div className="card-body">
           <p className="text-xs font-semibold text-base-content opacity-60 uppercase tracking-wide">Node-RED Control Center</p>
           <h1 className="text-3xl font-bold text-base-content">{title}</h1>

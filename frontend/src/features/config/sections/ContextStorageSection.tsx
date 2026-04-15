@@ -1,4 +1,5 @@
 import { ContextStorageConfig, ContextStoreEntry } from '../../../types/config'
+import { FormField } from '../../../components/forms'
 
 type SectionProps<T> = {
   value: T
@@ -72,44 +73,50 @@ export function ContextStorageSection({ value, onChange, errors }: SectionProps<
         </label>
 
         <div className="space-y-3">
-          {storeNames.map((name) => {
-            const store = value.stores[name]
-            return (
-              <div key={name} className="flex gap-2 items-end">
-                <input
-                  type="text"
-                  className="input input-bordered bg-base-100 flex-1"
-                  placeholder="Store name"
-                  value={name}
-                  readOnly
-                  disabled
-                />
-                <select
-                  className="select select-bordered bg-base-100"
-                  value={store.module}
-                  onChange={(e) =>
-                    updateStore(name, {
-                      ...store,
-                      module: e.target.value as 'memory' | 'localfilesystem',
-                    })
-                  }
-                >
-                  <option value="memory">Memory</option>
-                  <option value="localfilesystem">Local Filesystem</option>
-                </select>
-                {name !== 'default' && (
-                  <button
-                    type="button"
-                    onClick={() => removeStore(name)}
-                    className="btn btn-ghost btn-sm"
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
-            )
-          })}
-        </div>
+           {storeNames.map((name) => {
+             const store = value.stores[name]
+             return (
+               <div key={name} className="space-y-2">
+                  <FormField
+                    id={`context-store-${name}-name`}
+                    label="Store Name"
+                    type="text"
+                    placeholder="Store name"
+                    value={name}
+                    onChange={() => {}} // Read-only, disabled
+                    disabled
+                  />
+                 <div className="form-control">
+                   <label className="label">
+                     <span className="label-text font-medium">Module</span>
+                   </label>
+                   <select
+                     className="select select-bordered bg-base-100"
+                     value={store.module}
+                     onChange={(e) =>
+                       updateStore(name, {
+                         ...store,
+                         module: e.target.value as 'memory' | 'localfilesystem',
+                       })
+                     }
+                   >
+                     <option value="memory">Memory</option>
+                     <option value="localfilesystem">Local Filesystem</option>
+                   </select>
+                 </div>
+                 {name !== 'default' && (
+                   <button
+                     type="button"
+                     onClick={() => removeStore(name)}
+                     className="btn btn-ghost btn-sm"
+                   >
+                     Remove
+                   </button>
+                 )}
+               </div>
+             )
+           })}
+         </div>
 
         <button
           type="button"
