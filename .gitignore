@@ -17,6 +17,8 @@ nrcc
 frontend/node_modules/
 frontend/.vite/
 frontend/*.tsbuildinfo
+!frontend/dist/
+!frontend/dist/index.html
 
 # Environment and editor files
 .env
