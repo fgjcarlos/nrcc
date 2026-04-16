@@ -53,6 +53,8 @@ go run . start
 go run . version
 ```
 
+`go run . start` runs in the foreground. Stop it with `Ctrl+C` or by sending `SIGTERM` to that process.
+
 ## Implemented So Far
 
 - local environment checks and setup flow
@@ -65,7 +67,6 @@ go run . version
 
 ## MVP Gaps
 
-- `stop` command is not implemented yet
 - backup and restore flows are not implemented yet
 - environment variable management is not implemented yet
 - npm library install and remove flows are not implemented yet
