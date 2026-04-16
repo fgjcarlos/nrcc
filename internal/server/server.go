@@ -43,6 +43,12 @@ type authResponse struct {
 	CSRFToken string            `json:"csrfToken"`
 }
 
+// Session cookies stay on same-site requests only. The API already uses an
+// explicit CSRF token for authenticated state changes, and Strict avoids
+// silently broadening the browser cookie contract across login, register,
+// protected POST, and logout flows.
+const sessionCookieSameSite = http.SameSiteStrictMode
+
 func New(cfg Config) *Server {
 	router := chi.NewRouter()
 	registerAPIRoutes(router, cfg.Runtime, cfg.Auth, cfg.Config, cfg.ManagedEnv, cfg.Backups, cfg.Libraries, cfg.Updates, cfg.Operations)
@@ -689,7 +695,7 @@ func writeSessionCookie(w http.ResponseWriter, r *http.Request, token string, tt
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: sessionCookieSameSite,
 		Secure:   isSecureRequest(r),
 		Expires:  time.Now().Add(ttl),
 		MaxAge:   int(ttl.Seconds()),
@@ -702,7 +708,7 @@ func clearSessionCookie(w http.ResponseWriter, r *http.Request) {
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: sessionCookieSameSite,
 		Secure:   isSecureRequest(r),
 		MaxAge:   -1,
 		Expires:  time.Unix(0, 0),
