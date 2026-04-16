@@ -12,13 +12,18 @@ export function LibraryCard({
   onUninstall: () => void
 }) {
   return (
-    <article className="card bg-base-200 p-6 flex flex-row items-center justify-between" key={item.name}>
-      <div className="flex-1">
-        <strong className="text-base text-base-content">{item.name}</strong>
-        <p className="text-sm text-base-content opacity-75 mt-1">{item.version || 'Unknown version'}</p>
+    <article className="surface-panel flex flex-col gap-4 border border-base-300/60 p-5 md:flex-row md:items-center md:justify-between" key={item.name}>
+      <div className="flex-1 min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <strong className="text-base text-base-content">{item.name}</strong>
+          <span className="rounded-full bg-base-300/60 px-2.5 py-1 text-xs text-base-content/70">
+            {item.version || 'Unknown version'}
+          </span>
+        </div>
+        <p className="text-sm text-base-content/65 mt-2">Installed runtime package managed by the control center.</p>
       </div>
       <button
-        className="btn btn-ghost btn-sm ml-4"
+        className="action-btn-danger md:ml-4"
         type="button"
         onClick={onUninstall}
         disabled={busy || isPending}

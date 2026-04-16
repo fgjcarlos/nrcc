@@ -10,9 +10,10 @@ export function RuntimeDetailsPanel({
   runtimeLoading: boolean
 }) {
   return (
-    <article className="card bg-base-200">
-      <div className="card-body">
-        <h3 className="card-title text-lg font-semibold text-base-content">Runtime details</h3>
+    <article className="surface-card border border-base-300 p-6">
+      <div>
+        <p className="text-xs uppercase tracking-[0.24em] text-base-content/55">Runtime</p>
+        <h3 className="mt-2 text-xl font-semibold text-base-content">Runtime details</h3>
         <dl className="space-y-3">
           <Detail label="PID" value={runtime?.pid ? String(runtime.pid) : 'N/A'} />
           <Detail label="Port" value={runtime?.port ? String(runtime.port) : 'N/A'} />

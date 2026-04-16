@@ -34,25 +34,33 @@ export function OverviewPage({
   const pageError = runtimeError ?? systemError
 
   return (
-    <>
-      <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 mb-8">
-        <div>
-          <p className="text-sm font-semibold text-base-content/70 uppercase tracking-wide">Runtime</p>
-          <h2 className="text-3xl font-bold text-base-content mt-1">Dashboard</h2>
+    <div className="space-y-8">
+      <section className="surface-panel border border-base-300 px-6 py-8 sm:px-8">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-3xl">
+            <p className="text-xs uppercase tracking-[0.32em] text-base-content/55">System overview</p>
+            <h2 className="mt-3 text-4xl font-bold tracking-tight text-base-content sm:text-5xl">Dashboard</h2>
+            <p className="mt-4 text-base text-base-content/70 sm:text-lg">
+              Real-time control for the local Node-RED runtime, system health, and operational state.
+            </p>
+          </div>
+          <div className="flex flex-col items-start gap-3 sm:items-end">
+            <span className="rounded-full bg-base-300/60 px-4 py-2 text-xs font-medium uppercase tracking-[0.18em] text-base-content/70">
+              {globalStatus.title}
+            </span>
+            <RestartButton
+              confirmRestart={confirmRestart}
+              restarting={restarting}
+              onConfirm={() => {
+                setConfirmRestart(false)
+                onRestart()
+              }}
+              onCancel={() => setConfirmRestart(false)}
+              onRequest={() => setConfirmRestart(true)}
+            />
+          </div>
         </div>
-        <div className="flex gap-2">
-          <RestartButton
-            confirmRestart={confirmRestart}
-            restarting={restarting}
-            onConfirm={() => {
-              setConfirmRestart(false)
-              onRestart()
-            }}
-            onCancel={() => setConfirmRestart(false)}
-            onRequest={() => setConfirmRestart(true)}
-          />
-        </div>
-      </header>
+      </section>
 
       {confirmRestart ? (
         <InlineNotice
@@ -93,7 +101,7 @@ export function OverviewPage({
         <RuntimeDetailsPanel runtime={runtime} runtimeLoading={runtimeLoading} />
         <SystemInfoPanel systemInfo={systemInfo} systemLoading={systemLoading} />
       </section>
-    </>
+    </div>
   )
 }
 

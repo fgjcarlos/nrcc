@@ -72,21 +72,22 @@ export function SnapshotPanel({ isOpen, onClose, onRestored }: SnapshotPanelProp
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="card bg-base-200 w-full max-w-2xl max-h-96 overflow-auto">
+    <div className="modal-overlay">
+      <div className="surface-card w-full max-w-2xl max-h-[32rem] overflow-auto border border-base-300/60 p-5">
         <div className="flex items-center justify-between mb-4">
-          <h2>Config Snapshots (Backups)</h2>
-          <button className="btn btn-ghost btn-sm btn-circle" onClick={onClose} aria-label="Close snapshots">
+          <h2 className="text-xl font-semibold text-base-content">Config Snapshots</h2>
+          <button className="action-btn-ghost px-3 py-2" onClick={onClose} aria-label="Close snapshots">
             ✕
           </button>
         </div>
 
         <div className="space-y-4">
           {/* Create snapshot section */}
-          <div className="form-control mb-4">
+          <div className="surface-panel form-control mb-4 border border-base-300/60 p-4">
             <label className="form-field inline">
-              <span>New Snapshot Label (optional)</span>
+              <span className="label-text">New Snapshot Label (optional)</span>
               <input
+                className="input input-bordered mt-2"
                 type="text"
                 value={newLabel}
                 onChange={(e) => setNewLabel(e.target.value)}
@@ -95,7 +96,7 @@ export function SnapshotPanel({ isOpen, onClose, onRestored }: SnapshotPanelProp
               />
             </label>
             <button
-              className="btn btn-primary"
+              className="action-btn-primary mt-3"
               onClick={handleCreate}
               disabled={creating}
             >
@@ -118,48 +119,48 @@ export function SnapshotPanel({ isOpen, onClose, onRestored }: SnapshotPanelProp
 
            {!loading && snapshots.length > 0 && (
              <div className="space-y-3">
-               <table className="table table-zebra w-full">
-                 <thead>
-                   <tr>
-                     <th>Created</th>
-                     <th>Label</th>
-                     <th>Reason</th>
+               <table className="table w-full">
+                  <thead>
+                    <tr className="table-header-subtle">
+                      <th>Created</th>
+                      <th>Label</th>
+                      <th>Reason</th>
                      <th>Action</th>
                    </tr>
                  </thead>
-                <tbody>
-                  {snapshots.map((snapshot) => (
-                    <tr key={snapshot.id}>
-                      <td>{new Date(snapshot.createdAt).toLocaleString()}</td>
-                      <td>{snapshot.label || '—'}</td>
-                      <td>
+                 <tbody>
+                   {snapshots.map((snapshot) => (
+                     <tr key={snapshot.id} className="table-row-hover">
+                       <td>{new Date(snapshot.createdAt).toLocaleString()}</td>
+                       <td>{snapshot.label || '—'}</td>
+                       <td>
                         <span className="badge">{snapshot.reason}</span>
                       </td>
                        <td>
                          {confirmRestoreId === snapshot.id ? (
                            <div className="flex gap-2 items-center">
-                             <p className="text-sm">Restore this snapshot?</p>
-                             <button
-                               className="btn btn-error btn-sm"
-                               onClick={() => handleRestore(snapshot.id)}
+                              <p className="text-sm">Restore this snapshot?</p>
+                              <button
+                                className="action-btn-danger"
+                                onClick={() => handleRestore(snapshot.id)}
+                                disabled={restoring === snapshot.id}
+                              >
+                               {restoring === snapshot.id ? 'Restoring...' : 'Confirm'}
+                              </button>
+                              <button
+                                className="action-btn-ghost"
+                               onClick={() => setConfirmRestoreId(null)}
                                disabled={restoring === snapshot.id}
                              >
-                               {restoring === snapshot.id ? 'Restoring...' : 'Confirm'}
-                             </button>
-                             <button
-                               className="btn btn-ghost btn-sm"
-                              onClick={() => setConfirmRestoreId(null)}
-                              disabled={restoring === snapshot.id}
-                            >
                               Cancel
                             </button>
                           </div>
-                        ) : (
-                          <button
-                            className="btn btn-ghost"
-                            onClick={() => setConfirmRestoreId(snapshot.id)}
-                          >
-                            Restore
+                         ) : (
+                           <button
+                             className="action-btn-secondary"
+                             onClick={() => setConfirmRestoreId(snapshot.id)}
+                           >
+                             Restore
                           </button>
                         )}
                       </td>
@@ -172,7 +173,7 @@ export function SnapshotPanel({ isOpen, onClose, onRestored }: SnapshotPanelProp
         </div>
 
         <div className="flex gap-3 justify-end mt-6">
-          <button className="btn btn-ghost" onClick={onClose}>
+          <button className="action-btn-ghost" onClick={onClose}>
             Close
           </button>
         </div>

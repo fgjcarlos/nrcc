@@ -1,8 +1,8 @@
-import { useEffect, useState, useMemo } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { api, APIRequestError } from '../../api'
-import { FullAppConfig, FieldError, ExtendedConfigValidationResult, defaultFullAppConfig } from '../../types/config'
+import { FullAppConfig, FieldError } from '../../types/config'
 import { TabBar } from './TabBar'
 import { ServerSection } from './sections/ServerSection'
 import { SecuritySection } from './sections/SecuritySection'
@@ -178,7 +178,7 @@ export function SettingsPanel({ config, loading, onSaved, onError, onToast }: Se
   }
 
   return (
-    <section className="space-y-6">
+    <section className="space-y-5 md:space-y-6">
       <TabBar
         activeSection={activeSection}
         onChange={(section) => setSearchParams({ section })}
@@ -259,42 +259,57 @@ export function SettingsPanel({ config, loading, onSaved, onError, onToast }: Se
         )}
       </div>
 
-      <div className="flex flex-wrap gap-3">
-        <button
-          className="btn btn-primary"
-          onClick={handleSave}
-          disabled={saveMutation.isPending || dirtySections.size === 0}
-        >
-          {saveMutation.isPending ? 'Saving...' : 'Save changes'}
-        </button>
-        <button
-          className="btn btn-ghost"
-          onClick={() => setShowPreview(!showPreview)}
-          title="Preview the rendered settings.js"
-        >
-          Preview settings.js
-        </button>
-        <button
-          className="btn btn-ghost"
-          onClick={() => setShowJSONEditor(true)}
-          title="Edit configuration as raw JSON"
-        >
-          Raw JSON
-        </button>
-        <button
-          className="btn btn-ghost"
-          onClick={() => setShowSnapshots(true)}
-          title="Manage configuration snapshots"
-        >
-          Backups
-        </button>
-        <button
-          className="btn btn-ghost"
-          onClick={() => setShowImport(true)}
-          title="Import from a settings.js file"
-        >
-          Import settings.js
-        </button>
+      <div className="surface-panel border border-base-300/60 p-4 md:p-5 space-y-4">
+        <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.22em] text-base-content/50">Workspace</p>
+            <h3 className="mt-1 text-lg font-semibold text-base-content">Apply and inspect changes</h3>
+            <p className="mt-1 max-w-2xl text-sm text-base-content/60">
+              Save section changes, inspect the rendered output, or switch to import and snapshot tools without leaving the page.
+            </p>
+          </div>
+          <p className="text-sm text-base-content/55">
+            {dirtySections.size > 0 ? `${dirtySections.size} section${dirtySections.size === 1 ? '' : 's'} changed` : 'No unsaved changes'}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-3">
+          <button
+            className="action-btn-primary"
+            onClick={handleSave}
+            disabled={saveMutation.isPending || dirtySections.size === 0}
+          >
+            {saveMutation.isPending ? 'Saving...' : 'Save changes'}
+          </button>
+          <button
+            className="action-btn-ghost"
+            onClick={() => setShowPreview(!showPreview)}
+            title="Preview the rendered settings.js"
+          >
+            Preview settings.js
+          </button>
+          <button
+            className="action-btn-ghost"
+            onClick={() => setShowJSONEditor(true)}
+            title="Edit configuration as raw JSON"
+          >
+            Raw JSON
+          </button>
+          <button
+            className="action-btn-ghost"
+            onClick={() => setShowSnapshots(true)}
+            title="Manage configuration snapshots"
+          >
+            Backups
+          </button>
+          <button
+            className="action-btn-ghost"
+            onClick={() => setShowImport(true)}
+            title="Import from a settings.js file"
+          >
+            Import settings.js
+          </button>
+        </div>
       </div>
 
       <LivePreviewPanel

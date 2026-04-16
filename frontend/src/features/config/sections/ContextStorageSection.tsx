@@ -38,13 +38,19 @@ export function ContextStorageSection({ value, onChange, errors }: SectionProps<
   }
 
   return (
-    <article className="space-y-6">
-      <h3 className="text-xl font-semibold text-base-content">Context Storage</h3>
+    <article className="surface-card border border-base-300/60 p-6 md:p-7 space-y-6">
+      <div className="config-section-head">
+        <p className="config-section-kicker">Persistence</p>
+        <h3 className="config-section-title">Context Storage</h3>
+        <p className="config-section-copy">
+          Choose the default context store and manage additional memory or filesystem-backed stores.
+        </p>
+      </div>
 
-       <div className="form-control">
-         <label className="label">
-           <span className="label-text font-medium">Default Store</span>
-         </label>
+       <div className="config-section-card space-y-3">
+          <label className="label">
+            <span className="label-text font-medium">Default Store</span>
+          </label>
          <select
            className={`select select-bordered bg-base-100${errors['contextStorage.default'] ? ' select-error' : ''}`}
            value={value.default}
@@ -63,33 +69,37 @@ export function ContextStorageSection({ value, onChange, errors }: SectionProps<
                <path fillRule="evenodd" d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12z" clipRule="evenodd" />
              </svg>
              <span>{errors['contextStorage.default']}</span>
-           </span>
-         )}
-       </div>
+            </span>
+          )}
+        </div>
 
-      <div>
+      <div className="space-y-4">
         <label className="label">
           <span className="label-text font-medium">Stores</span>
         </label>
 
         <div className="space-y-3">
-           {storeNames.map((name) => {
-             const store = value.stores[name]
-             return (
-               <div key={name} className="space-y-2">
-                  <FormField
-                    id={`context-store-${name}-name`}
-                    label="Store Name"
+            {storeNames.map((name) => {
+              const store = value.stores[name]
+              return (
+                <div key={name} className="config-subsection space-y-4">
+                  <div>
+                    <p className="config-subsection-title">{name}</p>
+                    <p className="config-subsection-copy">Select how this context store persists values between restarts.</p>
+                  </div>
+                   <FormField
+                     id={`context-store-${name}-name`}
+                     label="Store Name"
                     type="text"
                     placeholder="Store name"
                     value={name}
                     onChange={() => {}} // Read-only, disabled
                     disabled
-                  />
-                 <div className="form-control">
-                   <label className="label">
-                     <span className="label-text font-medium">Module</span>
-                   </label>
+                   />
+                  <div className="form-control">
+                    <label className="label">
+                      <span className="label-text font-medium">Module</span>
+                    </label>
                    <select
                      className="select select-bordered bg-base-100"
                      value={store.module}
@@ -104,14 +114,14 @@ export function ContextStorageSection({ value, onChange, errors }: SectionProps<
                      <option value="localfilesystem">Local Filesystem</option>
                    </select>
                  </div>
-                 {name !== 'default' && (
-                   <button
-                     type="button"
-                     onClick={() => removeStore(name)}
-                     className="btn btn-ghost btn-sm"
-                   >
-                     Remove
-                   </button>
+                  {name !== 'default' && (
+                    <button
+                      type="button"
+                      onClick={() => removeStore(name)}
+                      className="action-btn-ghost"
+                    >
+                      Remove
+                    </button>
                  )}
                </div>
              )
@@ -121,7 +131,7 @@ export function ContextStorageSection({ value, onChange, errors }: SectionProps<
         <button
           type="button"
           onClick={addStore}
-          className="btn btn-ghost btn-sm mt-3"
+          className="action-btn-ghost mt-1"
         >
           + Add Store
         </button>

@@ -63,7 +63,7 @@ export function InlineNotice({
   }
 
   return (
-    <section className={`flex gap-3 p-4 rounded-lg bg-base-200 border border-[color:var(--oc-border-warm)] ${getBorderColor()} border-l-4`}>
+    <section className={`surface-card flex gap-3 border p-4 ${getBorderColor()} border-l-4`}>
       {getNoticeIcon(tone)}
       <div className="flex-1">
         <strong className="text-sm text-base-content">{title}</strong>

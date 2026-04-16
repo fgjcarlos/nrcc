@@ -37,10 +37,10 @@ export function LogsTab({
         />
       ) : null}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-base-content opacity-60">{logs.length} logs</p>
           <button
-            className="btn btn-ghost btn-sm"
+            className="action-btn-ghost self-start sm:self-auto"
             type="button"
             onClick={onRefresh}
             disabled={loading}
@@ -49,14 +49,14 @@ export function LogsTab({
           </button>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-3">
           {loading ? (
             <p className="text-sm text-base-content opacity-60">Loading logs...</p>
           ) : logs.length === 0 ? (
             <p className="text-sm text-base-content opacity-60">No logs captured yet.</p>
           ) : (
             logs.map((log, idx) => (
-              <div key={log.id || idx} className="flex items-start gap-3 p-3 bg-base-300 rounded border-l-2 border-base-200">
+              <div key={log.id || idx} className="list-shell flex items-start gap-3 p-4 md:p-5">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
                     <span className="text-xs text-base-content opacity-60">

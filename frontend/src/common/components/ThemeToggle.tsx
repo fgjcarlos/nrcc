@@ -21,7 +21,7 @@ export function ThemeToggle() {
   return (
     <button
       onClick={handleToggle}
-      className="btn btn-ghost btn-circle btn-sm"
+      className="btn btn-ghost btn-square btn-sm rounded-2xl"
       aria-label={label}
       title={label}
     >

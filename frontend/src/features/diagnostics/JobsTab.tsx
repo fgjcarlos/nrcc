@@ -37,10 +37,10 @@ export function JobsTab({
         />
       ) : null}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-base-content opacity-60">{jobs.length} jobs</p>
           <button
-            className="btn btn-ghost btn-sm"
+            className="action-btn-ghost self-start sm:self-auto"
             type="button"
             onClick={onRefresh}
             disabled={loading}
@@ -49,15 +49,15 @@ export function JobsTab({
           </button>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="table-shell overflow-x-auto">
           {loading ? (
-            <p className="text-sm text-base-content opacity-60">Loading jobs...</p>
+            <p className="px-4 py-5 text-sm text-base-content opacity-60">Loading jobs...</p>
           ) : jobs.length === 0 ? (
-            <p className="text-sm text-base-content opacity-60">No jobs recorded yet.</p>
+            <p className="px-4 py-5 text-sm text-base-content opacity-60">No jobs recorded yet.</p>
           ) : (
-            <table className="table table-compact w-full">
+            <table className="table w-full">
               <thead>
-                <tr className="bg-base-300">
+                <tr className="table-header-subtle">
                   <th className="text-base-content">Type</th>
                   <th className="text-base-content">Status</th>
                   <th className="text-base-content">Started</th>
@@ -67,7 +67,7 @@ export function JobsTab({
               </thead>
               <tbody>
                 {jobs.map((job) => (
-                  <tr key={job.id} className="hover:bg-base-300">
+                  <tr key={job.id} className="table-row-hover">
                     <td className="text-sm text-base-content font-semibold">{job.type}</td>
                     <td>
                       <span className={`badge badge-sm ${getStatusBadgeClass(job.status)}`}>

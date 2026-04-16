@@ -20,9 +20,9 @@ export function StatCard({
   }
 
   return (
-    <article className={`card stat-card bg-base-200 p-6 ${getAccentClass()}`}>
-      <p className="text-sm text-base-content opacity-75 uppercase tracking-wider stat-card-label">{label}</p>
-      <h3 className="text-3xl font-bold text-base-content mt-2">{value}</h3>
+    <article className={`stat-card p-6 ${getAccentClass()}`}>
+      <p className="stat-card-label text-xs uppercase tracking-[0.22em] text-base-content/55">{label}</p>
+      <h3 className="mt-3 text-3xl font-bold tracking-tight text-base-content">{value}</h3>
     </article>
   )
 }

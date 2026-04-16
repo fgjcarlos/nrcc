@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { SecurityConfig, AdminAuthUser } from '../../../types/config'
+import { SecurityConfig } from '../../../types/config'
 import { FormField } from '../../../components/forms'
 
 type SectionProps<T> = {
@@ -40,14 +40,20 @@ export function SecuritySection({ value, onChange, errors }: SectionProps<Securi
   ]
 
   return (
-    <article className="space-y-6">
-      <h3 className="text-xl font-semibold text-base-content">Security</h3>
+    <article className="surface-card border border-base-300/60 p-6 md:p-7 space-y-6">
+      <div className="config-section-head">
+        <p className="config-section-kicker">Identity</p>
+        <h3 className="config-section-title">Security</h3>
+        <p className="config-section-copy">
+          Manage credential encryption, session expiry, and the runtime authentication blocks written into `settings.js`.
+        </p>
+      </div>
 
-      <div className="flex flex-col gap-2">
+      <div className="config-section-card space-y-3">
          <div className="form-control">
-           <label className="label">
-             <span className="label-text font-medium">Credential Secret</span>
-           </label>
+            <label className="label">
+              <span className="label-text font-medium">Credential Secret</span>
+            </label>
            <div className="flex gap-2">
              <input
                type={showSecret ? 'text' : 'password'}
@@ -57,20 +63,20 @@ export function SecuritySection({ value, onChange, errors }: SectionProps<Securi
                placeholder="Leave empty for default"
                aria-describedby={errors['security.credentialSecret'] ? 'security-credentialSecret-error' : undefined}
              />
-             <button
-               type="button"
-               onClick={() => setShowSecret(!showSecret)}
-               className="btn btn-ghost btn-sm"
-             >
-               {showSecret ? 'Hide' : 'Show'}
-             </button>
-             <button
-               type="button"
-               onClick={() => updateField('credentialSecret', generateRandomSecret())}
-               className="btn btn-ghost btn-sm"
-             >
-               Generate
-             </button>
+              <button
+                type="button"
+                onClick={() => setShowSecret(!showSecret)}
+                className="action-btn-ghost"
+              >
+                {showSecret ? 'Hide' : 'Show'}
+              </button>
+              <button
+                type="button"
+                onClick={() => updateField('credentialSecret', generateRandomSecret())}
+                className="action-btn-ghost"
+              >
+                Generate
+              </button>
            </div>
          </div>
          {errors['security.credentialSecret'] && (
@@ -82,13 +88,13 @@ export function SecuritySection({ value, onChange, errors }: SectionProps<Securi
              <span>{errors['security.credentialSecret']}</span>
            </span>
          )}
-       </div>
+        </div>
 
-      <div className="flex flex-col gap-2">
+      <div className="config-section-card space-y-3">
          <div className="form-control">
-           <label className="label">
-             <span className="label-text font-medium">Session Expiry Time</span>
-           </label>
+            <label className="label">
+              <span className="label-text font-medium">Session Expiry Time</span>
+            </label>
            <div className="flex gap-2 items-center">
              <input
                type="number"
@@ -102,16 +108,16 @@ export function SecuritySection({ value, onChange, errors }: SectionProps<Securi
              <span className="text-base-content/60 text-sm min-w-max">seconds</span>
            </div>
          </div>
-         <div className="flex flex-wrap gap-2">
-           {presets.map((p) => (
-             <button
-               key={p.value}
-               type="button"
-               onClick={() => updateField('sessionExpiryTime', p.value)}
-               className={`btn btn-sm ${value.sessionExpiryTime === p.value ? 'btn-primary' : 'btn-ghost'}`}
-             >
-               {p.label}
-             </button>
+          <div className="config-chip-row">
+            {presets.map((p) => (
+              <button
+                key={p.value}
+                type="button"
+                onClick={() => updateField('sessionExpiryTime', p.value)}
+                className={`config-chip-btn ${value.sessionExpiryTime === p.value ? 'config-chip-btn-active' : ''}`}
+              >
+                {p.label}
+              </button>
            ))}
          </div>
          {errors['security.sessionExpiryTime'] && (
@@ -127,11 +133,10 @@ export function SecuritySection({ value, onChange, errors }: SectionProps<Securi
 
       {/* Admin Authentication */}
       <div className="divider"></div>
-      <div className="form-control">
-        <label className="label cursor-pointer gap-3">
+      <label className="config-toggle-row cursor-pointer">
           <input
             type="checkbox"
-            className="checkbox checkbox-sm"
+            className="checkbox"
             checked={showAdminAuth}
             onChange={(e) => {
               setShowAdminAuth(e.target.checked)
@@ -145,12 +150,18 @@ export function SecuritySection({ value, onChange, errors }: SectionProps<Securi
               }
             }}
           />
-          <span className="label-text font-medium">Admin Authentication</span>
-        </label>
-      </div>
+          <span className="config-toggle-copy">
+            <span className="config-toggle-title">Admin Authentication</span>
+            <span className="config-toggle-hint">Protect the editor and admin API with user credentials or an external strategy.</span>
+          </span>
+      </label>
 
-       {showAdminAuth && value.adminAuth && (
-         <div className="pl-4 border-l-2 border-[color:var(--border-indent)] space-y-4">
+        {showAdminAuth && value.adminAuth && (
+         <div className="config-subsection space-y-4">
+          <div>
+            <p className="config-subsection-title">Admin authentication block</p>
+            <p className="config-subsection-copy">Users and permissions here map directly to the `adminAuth` section in `settings.js`.</p>
+          </div>
           <div className="form-control">
             <label className="label">
               <span className="label-text font-medium">Type</span>
@@ -172,12 +183,12 @@ export function SecuritySection({ value, onChange, errors }: SectionProps<Securi
 
            {value.adminAuth.type === 'credentials' && (
              <div className="space-y-3">
-               <p className="label-text font-medium">Users</p>
-               {value.adminAuth.users.map((user, idx) => (
-                 <div key={idx} className="space-y-2">
-                   <FormField
-                     id={`admin-auth-user-${idx}-username`}
-                     label="Username"
+                <p className="label-text font-medium">Users</p>
+                {value.adminAuth.users.map((user, idx) => (
+                  <div key={idx} className="config-subsection space-y-3">
+                    <FormField
+                      id={`admin-auth-user-${idx}-username`}
+                      label="Username"
                      type="text"
                      placeholder="Username"
                      value={user.username}
@@ -216,31 +227,31 @@ export function SecuritySection({ value, onChange, errors }: SectionProps<Securi
                        <option value="read">Read-only</option>
                      </select>
                    </div>
-                   <button
-                     type="button"
-                     onClick={() => {
-                       const users = value.adminAuth!.users.filter((_, i) => i !== idx)
-                       updateField('adminAuth', { ...value.adminAuth!, users })
-                     }}
-                     className="btn btn-ghost btn-sm"
-                   >
-                     Remove
-                   </button>
-                 </div>
-               ))}
-               <button
-                 type="button"
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const users = value.adminAuth!.users.filter((_, i) => i !== idx)
+                        updateField('adminAuth', { ...value.adminAuth!, users })
+                      }}
+                      className="action-btn-danger"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
                  onClick={() => {
                    const users = [
                      ...value.adminAuth!.users,
                      { username: '', password: '', permissions: '*' as const },
-                   ]
-                   updateField('adminAuth', { ...value.adminAuth!, users })
-                 }}
-                 className="btn btn-ghost btn-sm"
-               >
-                 + Add User
-               </button>
+                    ]
+                    updateField('adminAuth', { ...value.adminAuth!, users })
+                  }}
+                  className="action-btn-ghost"
+                >
+                  + Add User
+                </button>
              </div>
            )}
         </div>
@@ -248,11 +259,10 @@ export function SecuritySection({ value, onChange, errors }: SectionProps<Securi
 
       {/* HTTP Node Auth */}
       <div className="divider"></div>
-      <div className="form-control">
-        <label className="label cursor-pointer gap-3">
+      <label className="config-toggle-row cursor-pointer">
           <input
             type="checkbox"
-            className="checkbox checkbox-sm"
+            className="checkbox"
             checked={showHttpNodeAuth}
             onChange={(e) => {
               setShowHttpNodeAuth(e.target.checked)
@@ -263,12 +273,18 @@ export function SecuritySection({ value, onChange, errors }: SectionProps<Securi
               }
             }}
           />
-          <span className="label-text font-medium">HTTP Node Auth</span>
-        </label>
-      </div>
+          <span className="config-toggle-copy">
+            <span className="config-toggle-title">HTTP Node Auth</span>
+            <span className="config-toggle-hint">Require credentials for HTTP In nodes and other exposed runtime endpoints.</span>
+          </span>
+      </label>
 
-       {showHttpNodeAuth && value.httpNodeAuth && (
-         <div className="pl-4 border-l-2 border-[color:var(--border-indent)] space-y-4">
+        {showHttpNodeAuth && value.httpNodeAuth && (
+         <div className="config-subsection space-y-4">
+          <div>
+            <p className="config-subsection-title">HTTP node credentials</p>
+            <p className="config-subsection-copy">Passwords are stored as MD5 hashes, matching Node-RED's expected format.</p>
+          </div>
           <FormField
             id="security-http-node-auth-user"
             label="Username"
@@ -294,8 +310,8 @@ export function SecuritySection({ value, onChange, errors }: SectionProps<Securi
                 pass: v,
               })
             }
-            error={errors['security.httpNodeAuth.pass']}
-          />
+             error={errors['security.httpNodeAuth.pass']}
+           />
          </div>
        )}
     </article>

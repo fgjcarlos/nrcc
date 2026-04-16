@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import type { DoctorReport, LogEntry, JobRecord } from '../../api'
-import { InlineNotice } from '../../common/components'
 import { DoctorTab } from './DoctorTab'
 import { LogsTab } from './LogsTab'
 import { JobsTab } from './JobsTab'
@@ -42,12 +41,15 @@ export function DiagnosticsPage({
     <>
       <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 mb-8">
         <div>
-          <p className="text-sm font-semibold text-base-content/70 uppercase tracking-wide">Support</p>
-          <h2 className="text-3xl font-bold text-base-content mt-1">Diagnostics</h2>
+          <p className="text-xs uppercase tracking-[0.28em] text-base-content/50">Support</p>
+          <h2 className="text-3xl font-bold tracking-tight text-base-content mt-1">Diagnostics</h2>
+          <p className="mt-2 max-w-2xl text-sm text-base-content/65">
+            Doctor checks, support logs, and job history in a single operational workspace.
+          </p>
         </div>
         <div className="flex gap-2">
           <button
-            className="btn btn-primary"
+            className="action-btn-primary"
             type="button"
             onClick={onExport}
             disabled={exporting}
@@ -57,25 +59,25 @@ export function DiagnosticsPage({
         </div>
       </header>
 
-      <article className="card bg-base-200">
-        <div className="card-body">
-          <div className="tabs tabs-bordered mb-6">
+      <article className="surface-card border border-base-300/60 p-6 md:p-7">
+        <div>
+          <div className="surface-panel section-tabbar border border-base-300/60 mb-6">
             <button
-              className={`tab ${activeTab === 'doctor' ? 'tab-active' : ''}`}
+              className={`section-tab ${activeTab === 'doctor' ? 'section-tab-active' : ''}`}
               type="button"
               onClick={() => setActiveTab('doctor')}
             >
               Doctor
             </button>
             <button
-              className={`tab ${activeTab === 'logs' ? 'tab-active' : ''}`}
+              className={`section-tab ${activeTab === 'logs' ? 'section-tab-active' : ''}`}
               type="button"
               onClick={() => setActiveTab('logs')}
             >
               Logs
             </button>
             <button
-              className={`tab ${activeTab === 'jobs' ? 'tab-active' : ''}`}
+              className={`section-tab ${activeTab === 'jobs' ? 'section-tab-active' : ''}`}
               type="button"
               onClick={() => setActiveTab('jobs')}
             >

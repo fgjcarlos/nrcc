@@ -28,20 +28,30 @@ export function DashboardShell({
   ]
 
   return (
-    <div className="drawer lg:drawer-open">
+    <div className="drawer lg:drawer-open bg-base-100">
       <input id="sidebar-drawer" type="checkbox" className="drawer-toggle" />
-      <div className="drawer-content flex flex-col">
-        {/* Sticky Navbar Header */}
-        <header className="navbar bg-base-200 sticky top-0 z-10">
-          <div className="flex-1">
-            <label htmlFor="sidebar-drawer" className="btn btn-ghost btn-circle lg:hidden">
+      <div className="drawer-content flex min-h-screen flex-col app-shell">
+        <header className="navbar glass-panel sticky top-0 z-20 border-b px-4 sm:px-6 ghost-divider">
+          <div className="navbar-start gap-3">
+            <label htmlFor="sidebar-drawer" className="btn btn-ghost btn-square lg:hidden">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </label>
-            <span className="text-lg font-semibold">Node-RED Control Center</span>
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/15 text-primary shadow-glow">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M13 3L4 14h7l-1 7 10-13h-7l0-5z" />
+              </svg>
+            </div>
+            <div className="leading-tight">
+              <span className="block text-xs uppercase tracking-[0.28em] text-base-content/60">Command Center</span>
+              <span className="block font-semibold text-base-content">Node-RED Control Center</span>
+            </div>
           </div>
-          <div className="navbar-end gap-2">
+          <div className="navbar-end gap-3">
+            <span className="hidden rounded-full bg-base-300/60 px-3 py-1 text-xs font-medium text-base-content/70 xl:inline">
+              {globalStatus.title}
+            </span>
             <ThemeToggle />
             <button className="btn btn-ghost btn-sm" onClick={onLogout} disabled={logoutBusy}>
               {logoutBusy ? 'Signing out…' : 'Sign out'}
@@ -49,59 +59,55 @@ export function DashboardShell({
           </div>
         </header>
 
-        {/* Main Content Area */}
-        <main className="flex-1 p-6 bg-base-100">
-          {children}
+        <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
+          <div className="mx-auto w-full max-w-7xl">{children}</div>
         </main>
       </div>
 
-      {/* Sidebar (Drawer Side) */}
-      <div className="drawer-side">
+      <div className="drawer-side z-30">
         <label htmlFor="sidebar-drawer" className="drawer-overlay" />
-        <aside className="bg-base-200 w-72 min-h-full flex flex-col justify-between p-6">
-          {/* Sidebar Top */}
-          <div className="flex flex-col gap-6">
-            <div>
-              <p className="text-xs font-semibold text-base-content opacity-60 uppercase tracking-wide">NRCC</p>
-              <h1 className="text-2xl font-bold text-base-content">Control Center</h1>
-              <p className="text-sm text-base-content opacity-70 mt-2">
-                Local-first operations for Node-RED with Go runtime control and cookie-backed sessions.
-              </p>
+        <aside className="glass-panel border-r ghost-divider flex min-h-full w-72 flex-col justify-between">
+          <div className="flex flex-col gap-6 p-6">
+            <div className="border-b pb-6 ghost-divider">
+              <p className="text-xs uppercase tracking-[0.26em] text-base-content/50">Orchestrator</p>
+              <h1 className="mt-2 text-2xl font-bold tracking-tight text-base-content">Node-RED</h1>
+              <p className="text-sm text-base-content/70">Control Center</p>
             </div>
 
-            {/* Status Banner */}
-            <div className={`flex gap-3 p-4 rounded-lg bg-base-200 border border-[color:var(--oc-border-warm)] ${
-              globalStatus.tone === 'ok' ? 'border-l-[color:var(--oc-success)]' : 
-              globalStatus.tone === 'warn' ? 'border-l-[color:var(--oc-warning)]' : 
-              'border-l-[color:var(--oc-info)]'
-             } border-l-4`}>
+            <div
+              className={`surface-panel border p-4 ${
+                globalStatus.tone === 'ok'
+                  ? 'border-success/20'
+                  : globalStatus.tone === 'warn'
+                    ? 'border-warning/20'
+                    : 'border-info/20'
+              }`}
+            >
               <div>
-                <p className="text-xs font-semibold opacity-75">System status</p>
-                <p className="font-bold text-base">{globalStatus.title}</p>
-                <p className="text-sm opacity-75">{globalStatus.detail}</p>
+                <p className="text-xs uppercase tracking-[0.18em] text-base-content/55">System status</p>
+                <p className="mt-2 text-base font-semibold text-base-content">{globalStatus.title}</p>
+                <p className="mt-1 text-sm text-base-content/70">{globalStatus.detail}</p>
               </div>
             </div>
 
-            {/* Navigation Menu */}
-            <nav className="menu bg-base-300 rounded-lg p-2" aria-label="Primary">
-              {items.map((item) => (
-                <li key={item.page}>
-                  <NavLink
-                    to={item.to}
-                    className={({ isActive }) => (isActive ? 'active' : '')}
-                  >
-                    {item.label}
-                  </NavLink>
-                </li>
-              ))}
+            <nav aria-label="Primary">
+              <ul className="menu gap-1 rounded-2xl bg-base-300/40 p-2">
+                {items.map((item) => (
+                  <li key={item.page}>
+                    <NavLink to={item.to} className={({ isActive }) => (isActive ? 'menu-active' : '')}>
+                      {item.label}
+                    </NavLink>
+                  </li>
+                ))}
+              </ul>
             </nav>
           </div>
 
-          {/* Profile Card (Sidebar Bottom) */}
-          <div className="card bg-base-300 p-4">
-            <div className="card-body p-0">
-              <p className="font-bold text-base-content">{user.username}</p>
-              <p className="text-sm text-base-content opacity-70">{user.role}</p>
+          <div className="border-t p-6 ghost-divider">
+            <div className="surface-card border p-4">
+              <p className="text-xs uppercase tracking-[0.18em] text-base-content/55">Active session</p>
+              <p className="mt-3 font-semibold text-base-content">{user.username}</p>
+              <p className="text-sm text-base-content/70">{user.role}</p>
             </div>
           </div>
         </aside>

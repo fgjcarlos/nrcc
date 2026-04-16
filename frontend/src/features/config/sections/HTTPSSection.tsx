@@ -13,8 +13,14 @@ export function HTTPSSection({ value, onChange, errors }: SectionProps<HTTPSConf
   }
 
   return (
-    <article className="space-y-6">
-      <h3 className="text-xl font-semibold text-base-content">HTTPS</h3>
+    <article className="surface-card border border-base-300/60 p-6 md:p-7 space-y-6">
+      <div className="config-section-head">
+        <p className="config-section-kicker">Transport</p>
+        <h3 className="config-section-title">HTTPS</h3>
+        <p className="config-section-copy">
+          Enable TLS for the runtime and point Node-RED to the key, certificate, and optional CA bundle files.
+        </p>
+      </div>
 
       {value.enabled && (
         <section className="alert alert-warning">
@@ -25,20 +31,25 @@ export function HTTPSSection({ value, onChange, errors }: SectionProps<HTTPSConf
         </section>
       )}
 
-      <div className="form-control">
-        <label className="label cursor-pointer gap-3">
+      <label className="config-toggle-row cursor-pointer">
           <input
             type="checkbox"
-            className="checkbox checkbox-sm"
+            className="checkbox"
             checked={value.enabled}
             onChange={(e) => updateField('enabled', e.target.checked)}
           />
-          <span className="label-text font-medium">Enable HTTPS</span>
-        </label>
-      </div>
+          <span className="config-toggle-copy">
+            <span className="config-toggle-title">Enable HTTPS</span>
+            <span className="config-toggle-hint">Serve the editor and HTTP endpoints over TLS after the next restart.</span>
+          </span>
+      </label>
 
-       {value.enabled && (
-         <div className="space-y-6 pl-4 border-l-2 border-[color:var(--border-indent)]">
+        {value.enabled && (
+         <div className="config-subsection space-y-6">
+          <div>
+            <p className="config-subsection-title">Certificate files</p>
+            <p className="config-subsection-copy">Use absolute paths accessible from inside the Node-RED container or runtime host.</p>
+          </div>
           <FormField
             id="https-key-file"
             label="Key File Path"
@@ -69,7 +80,7 @@ export function HTTPSSection({ value, onChange, errors }: SectionProps<HTTPSConf
             error={errors['https.caFile']}
           />
          </div>
-       )}
+        )}
     </article>
   )
 }

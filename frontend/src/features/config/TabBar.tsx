@@ -6,21 +6,21 @@ type TabBarProps = {
 }
 
 const SECTIONS = [
-  { id: 'server', label: 'Server' },
-  { id: 'security', label: 'Security' },
-  { id: 'editorTheme', label: 'Editor Theme' },
-  { id: 'flows', label: 'Flows' },
-  { id: 'contextStorage', label: 'Context Storage' },
-  { id: 'logging', label: 'Logging' },
-  { id: 'runtime', label: 'Runtime' },
-  { id: 'https', label: 'HTTPS' },
-  { id: 'nodeReconnect', label: 'Node Reconnect' },
-  { id: 'palette', label: 'Palette' },
+  { id: 'server', label: 'Server', copy: 'Ports and roots' },
+  { id: 'security', label: 'Security', copy: 'Secrets and auth' },
+  { id: 'editorTheme', label: 'Editor Theme', copy: 'Branding and UI' },
+  { id: 'flows', label: 'Flows', copy: 'Files and storage' },
+  { id: 'contextStorage', label: 'Context Storage', copy: 'Stores and defaults' },
+  { id: 'logging', label: 'Logging', copy: 'Console behavior' },
+  { id: 'runtime', label: 'Runtime', copy: 'Execution limits' },
+  { id: 'https', label: 'HTTPS', copy: 'Certificates' },
+  { id: 'nodeReconnect', label: 'Node Reconnect', copy: 'Reconnect timing' },
+  { id: 'palette', label: 'Palette', copy: 'Category order' },
 ]
 
 export function TabBar({ activeSection, onChange, dirtyTabs, errorTabs }: TabBarProps) {
   return (
-    <div className="flex border-b border-base-300 overflow-x-auto gap-2 mb-6">
+    <div className="surface-panel section-tabbar border border-base-300/60 mb-6">
       {SECTIONS.map((section) => {
         const isDirty = dirtyTabs.has(section.id)
         const hasError = errorTabs.has(section.id)
@@ -29,23 +29,18 @@ export function TabBar({ activeSection, onChange, dirtyTabs, errorTabs }: TabBar
         return (
           <button
             key={section.id}
-            className={`
-              px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors
-              border-b-2
-              ${isActive 
-                ? 'border-primary text-primary' 
-                : 'border-transparent text-base-content/60 hover:text-base-content'
-              }
-              ${hasError ? 'text-error' : ''}
-            `}
+            className={`section-tab ${isActive ? 'section-tab-active' : ''} ${hasError ? 'text-error' : ''}`}
             onClick={() => onChange(section.id)}
             type="button"
             title={hasError ? 'Validation errors' : isDirty ? 'Unsaved changes' : undefined}
           >
-            <span className="flex items-center gap-2">
-              {section.label}
-              {isDirty && <span className="badge badge-warning badge-sm" title="Unsaved changes">●</span>}
-              {hasError && <span className="badge badge-error badge-sm" title="Validation errors">●</span>}
+            <span>
+              <span className="flex items-center gap-2">
+                {section.label}
+                {isDirty && <span className="status-dot status-dot-warning" title="Unsaved changes" />}
+                {hasError && <span className="status-dot status-dot-error" title="Validation errors" />}
+              </span>
+              <span className="section-tab-copy">{section.copy}</span>
             </span>
           </button>
         )

@@ -1,8 +1,6 @@
 import type { DoctorReport } from '../../api'
 import { InlineNotice } from '../../common/components'
 import { formatErrorMessage, formatCheckName } from '../../common/utils/format'
-import { getStatusBadgeClass } from '../../common/utils/status'
-
 export function DoctorTab({
   report,
   loading,
@@ -38,8 +36,8 @@ export function DoctorTab({
         />
       ) : null}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4">
             {loading ? (
               <p className="text-sm text-base-content opacity-60">Loading doctor report...</p>
             ) : report ? (
@@ -52,7 +50,7 @@ export function DoctorTab({
             ) : null}
           </div>
           <button
-            className="btn btn-ghost btn-sm"
+            className="action-btn-ghost self-start sm:self-auto"
             type="button"
             onClick={onRefresh}
             disabled={loading}
@@ -64,7 +62,7 @@ export function DoctorTab({
         {report && (
           <div className="space-y-3">
             {report.checks.map((check) => (
-              <div key={check.name} className="border-l-4 border-base-300 p-4 bg-base-300 rounded">
+              <div key={check.name} className="list-shell p-4 md:p-5">
                 <div className="flex items-start gap-3 mb-2">
                   <span className="text-lg flex-shrink-0">
                     {check.status === 'pass' && '✅'}
@@ -83,7 +81,7 @@ export function DoctorTab({
                 {check.details && (
                   <details className="text-xs">
                     <summary className="cursor-pointer font-semibold opacity-75 hover:opacity-100">Details</summary>
-                    <pre className="mt-2 p-2 bg-base-200 rounded overflow-auto max-h-40 text-xs opacity-75">{JSON.stringify(check.details, null, 2)}</pre>
+                    <pre className="code-block-bg mt-2 overflow-auto max-h-40 text-xs opacity-75">{JSON.stringify(check.details, null, 2)}</pre>
                   </details>
                 )}
               </div>

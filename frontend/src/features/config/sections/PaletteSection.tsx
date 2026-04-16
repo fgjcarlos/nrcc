@@ -39,50 +39,60 @@ export function PaletteSection({ value, onChange, errors }: SectionProps<Palette
   }
 
   return (
-    <article className="space-y-6">
-      <h3 className="text-xl font-semibold text-base-content">Palette</h3>
+    <article className="surface-card border border-base-300/60 p-6 md:p-7 space-y-6">
+      <div className="config-section-head">
+        <p className="config-section-kicker">Editor catalog</p>
+        <h3 className="config-section-title">Palette</h3>
+        <p className="config-section-copy">
+          Reorder palette categories so the editor matches the workflow and terminology you want operators to see first.
+        </p>
+      </div>
 
       <label className="label">
         <span className="label-text font-medium">Categories (ordered)</span>
       </label>
 
-       <div className="space-y-3">
-         {value.categories.map((cat, idx) => (
-           <div key={idx} className="space-y-2">
-             <FormField
-               id={`palette-category-${idx}`}
-               label={`Category ${idx + 1}`}
+        <div className="space-y-3">
+          {value.categories.map((cat, idx) => (
+            <div key={idx} className="config-subsection space-y-4">
+              <div>
+                <p className="config-subsection-title">Category {idx + 1}</p>
+                <p className="config-subsection-copy">Move entries up or down to change the order shown in the editor palette.</p>
+              </div>
+              <FormField
+                id={`palette-category-${idx}`}
+                label={`Category ${idx + 1}`}
                type="text"
                placeholder="Category name"
-               value={cat}
-               onChange={(val) => updateCategory(idx, val)}
-             />
-             <div className="flex gap-2">
-               <button
-                 type="button"
-                 onClick={() => moveCategory(idx, 'up')}
-                 disabled={idx === 0}
-                 className="btn btn-ghost btn-sm"
-                 title="Move up"
-               >
-                 ↑
+                value={cat}
+                onChange={(val) => updateCategory(idx, val)}
+              />
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => moveCategory(idx, 'up')}
+                  disabled={idx === 0}
+                  className="action-btn-ghost"
+                  title="Move up"
+                >
+                  ↑
                </button>
                <button
-                 type="button"
-                 onClick={() => moveCategory(idx, 'down')}
-                 disabled={idx === value.categories.length - 1}
-                 className="btn btn-ghost btn-sm"
-                 title="Move down"
-               >
-                 ↓
+                  type="button"
+                  onClick={() => moveCategory(idx, 'down')}
+                  disabled={idx === value.categories.length - 1}
+                  className="action-btn-ghost"
+                  title="Move down"
+                >
+                  ↓
                </button>
-               <button
-                 type="button"
-                 onClick={() => removeCategory(idx)}
-                 className="btn btn-ghost btn-sm"
-               >
-                 Remove
-               </button>
+                <button
+                  type="button"
+                  onClick={() => removeCategory(idx)}
+                  className="action-btn-danger"
+                >
+                  Remove
+                </button>
              </div>
            </div>
          ))}
@@ -91,7 +101,7 @@ export function PaletteSection({ value, onChange, errors }: SectionProps<Palette
       <button
         type="button"
         onClick={addCategory}
-        className="btn btn-ghost btn-sm"
+        className="action-btn-ghost"
       >
         + Add Category
       </button>

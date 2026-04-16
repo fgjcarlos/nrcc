@@ -9,9 +9,10 @@ export function SystemInfoPanel({
   systemLoading: boolean
 }) {
   return (
-    <article className="card bg-base-200">
-      <div className="card-body">
-        <h3 className="card-title text-lg font-semibold text-base-content">System info</h3>
+    <article className="surface-card border border-base-300 p-6">
+      <div>
+        <p className="text-xs uppercase tracking-[0.24em] text-base-content/55">Host</p>
+        <h3 className="mt-2 text-xl font-semibold text-base-content">System info</h3>
         {systemLoading ? (
           <p className="text-base-content/60 text-sm">Loading system information...</p>
         ) : (

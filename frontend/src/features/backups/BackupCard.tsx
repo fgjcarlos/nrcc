@@ -17,21 +17,25 @@ export function BackupCard({
   onConfirm: () => void
 }) {
   return (
-    <article className="card bg-base-200 p-6" key={backup.id}>
+    <article className="surface-panel border border-base-300/60 p-5" key={backup.id}>
       <div className="mb-4">
-        <strong className="text-base text-base-content">{backup.id}</strong>
-        <p className="text-sm text-base-content opacity-75 mt-2">{backup.reason}</p>
-        <p className="text-sm text-base-content opacity-75 mt-1">{backup.archiveName}</p>
-        <p className="text-xs text-base-content opacity-60 mt-2">
-          <span className="badge badge-ghost">{formatBytes(backup.archiveBytes)}</span>
-          <span className="ml-2 opacity-75">{backup.createdAt}</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <strong className="text-base text-base-content">{backup.id}</strong>
+          <span className="rounded-full bg-base-300/60 px-2.5 py-1 text-xs text-base-content/70">
+            {formatBytes(backup.archiveBytes)}
+          </span>
+        </div>
+        <p className="text-sm text-base-content/75 mt-2">{backup.reason}</p>
+        <p className="text-sm text-base-content/70 mt-1">{backup.archiveName}</p>
+        <p className="text-xs text-base-content/60 mt-2">
+          <span className="opacity-75">{backup.createdAt}</span>
         </p>
       </div>
       <div className="flex gap-2 justify-end">
         {confirming ? (
           <>
             <button
-              className="btn btn-ghost btn-sm"
+              className="action-btn-ghost"
               type="button"
               onClick={onCancel}
               disabled={isPending}
@@ -39,7 +43,7 @@ export function BackupCard({
               Cancel
             </button>
             <button
-              className="btn btn-primary btn-sm"
+              className="action-btn-primary"
               type="button"
               onClick={onConfirm}
               disabled={isPending}
@@ -49,7 +53,7 @@ export function BackupCard({
           </>
         ) : (
           <button
-            className="btn btn-ghost btn-sm"
+            className="action-btn-secondary"
             type="button"
             onClick={onRestore}
             disabled={isPending}

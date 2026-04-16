@@ -41,9 +41,9 @@ export function EnvironmentPanel({
 
   if (loading || !state) {
     return (
-      <article className="card bg-base-200">
-        <div className="card-body">
-          <h3 className="card-title text-lg font-semibold text-base-content">Managed runtime variables</h3>
+      <article className="surface-card border border-base-300/60 p-6 md:p-7">
+        <div>
+          <h3 className="text-lg font-semibold text-base-content">Managed runtime variables</h3>
           <p className="text-base-content/60 text-sm">Loading managed environment...</p>
         </div>
       </article>
@@ -70,9 +70,9 @@ export function EnvironmentPanel({
   }
 
   return (
-    <article className="card bg-base-200">
-      <div className="card-body">
-        <h3 className="card-title text-lg font-semibold text-base-content">Managed runtime variables</h3>
+    <article className="surface-card border border-base-300/60 p-6 md:p-7">
+      <div>
+        <h3 className="text-lg font-semibold text-base-content">Managed runtime variables</h3>
         <p className="text-base-content/60 text-sm mb-6">
           These variables are injected into the Node-RED runtime from `.env.managed`. Names prefixed with `NRCC_` and `PORT` are reserved.
         </p>
@@ -85,36 +85,45 @@ export function EnvironmentPanel({
           }}
         >
            <div className="space-y-4">
-             {variables.map((variable, index) => (
-               <div key={`${index}-${variable.name}`} className="space-y-2 p-4 border border-base-300 rounded-lg">
-                 <FormField
-                   id={`env-var-${index}-name`}
-                   label="Name"
-                   type="text"
-                   placeholder="API_TOKEN"
-                   value={variable.name}
-                   onChange={(val) => update(index, { name: val })}
-                 />
-                 <FormField
-                   id={`env-var-${index}-value`}
-                   label="Value"
-                   type="text"
-                   placeholder="secret-value"
-                   value={variable.value}
-                   onChange={(val) => update(index, { value: val })}
-                 />
-                 <button className="btn btn-ghost btn-sm" type="button" onClick={() => removeRow(index)}>
-                   Remove
-                 </button>
-               </div>
-             ))}
-           </div>
+              {variables.map((variable, index) => (
+                <div key={`${index}-${variable.name}`} className="surface-panel border border-base-300/60 p-4 md:p-5 rounded-2xl space-y-4">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.22em] text-base-content/50">Variable {index + 1}</p>
+                      <p className="mt-1 text-sm text-base-content/60">Values are written to `.env.managed` in order.</p>
+                    </div>
+                    <button className="action-btn-ghost" type="button" onClick={() => removeRow(index)}>
+                    Remove
+                    </button>
+                  </div>
 
-          <div className="flex gap-3">
-            <button className="btn btn-ghost btn-sm" type="button" onClick={addRow} disabled={applyMutation.isPending}>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <FormField
+                      id={`env-var-${index}-name`}
+                      label="Name"
+                      type="text"
+                      placeholder="API_TOKEN"
+                      value={variable.name}
+                      onChange={(val) => update(index, { name: val })}
+                    />
+                    <FormField
+                      id={`env-var-${index}-value`}
+                      label="Value"
+                      type="text"
+                      placeholder="secret-value"
+                      value={variable.value}
+                      onChange={(val) => update(index, { value: val })}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <button className="action-btn-ghost" type="button" onClick={addRow} disabled={applyMutation.isPending}>
               + Add variable
             </button>
-            <button className="btn btn-primary btn-sm" type="submit" disabled={applyMutation.isPending}>
+            <button className="action-btn-primary" type="submit" disabled={applyMutation.isPending}>
               {applyMutation.isPending ? 'Saving...' : 'Save environment'}
             </button>
           </div>

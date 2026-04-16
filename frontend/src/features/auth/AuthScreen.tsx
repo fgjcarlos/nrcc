@@ -27,18 +27,18 @@ export function AuthScreen({
     mode === 'register' ? 'Create the first administrator' : 'Sign in to the local control center'
 
   return (
-    <main className="flex flex-col items-center justify-center min-h-screen bg-base-100 px-6">
-      <div className="card bg-base-200 w-full max-w-md p-8">
-        <div className="card-body">
-          <p className="text-xs font-semibold text-base-content opacity-60 uppercase tracking-wide">Node-RED Control Center</p>
-          <h1 className="text-3xl font-bold text-base-content">{title}</h1>
-          <p className="text-base-content opacity-70 mt-4">
+    <main className="auth-shell flex min-h-screen items-center justify-center px-6 py-12">
+      <div className="surface-card w-full max-w-md border border-base-300 p-8 sm:p-10">
+        <div>
+          <p className="text-xs uppercase tracking-[0.32em] text-base-content/55">Node-RED Control Center</p>
+          <h1 className="mt-4 text-3xl font-bold tracking-tight text-base-content">{title}</h1>
+          <p className="mt-4 text-base-content/70">
             {mode === 'register'
               ? 'This machine has not been initialized yet. Create the first local administrator account.'
               : 'Use your local administrator account to access runtime controls and diagnostics.'}
           </p>
 
-          <form className="form-control space-y-4 mt-6" onSubmit={handleSubmit}>
+          <form className="form-control mt-8 space-y-4" onSubmit={handleSubmit}>
             <FormField
               id="username"
               label="Username"
@@ -59,12 +59,12 @@ export function AuthScreen({
 
             {message ? <div className="alert alert-error text-sm">{message}</div> : null}
 
-            <button className="btn btn-primary w-full mt-6" type="submit" disabled={busy}>
+            <button className="btn btn-primary mt-6 w-full" type="submit" disabled={busy}>
               {busy ? 'Working…' : mode === 'register' ? 'Create account' : 'Sign in'}
             </button>
           </form>
 
-          <div className="flex gap-2 mt-6 justify-center">
+          <div className="mt-6 flex justify-center gap-2">
             <button
               className={`btn btn-sm ${mode === 'login' ? 'btn-primary' : 'btn-ghost'}`}
               type="button"

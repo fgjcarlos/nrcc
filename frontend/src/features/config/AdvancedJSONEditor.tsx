@@ -55,12 +55,12 @@ export function AdvancedJSONEditor({ config, onApply, onClose }: AdvancedJSONEdi
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="card bg-base-200 w-full max-w-2xl max-h-96 overflow-auto">
-        <div className="card-body">
+    <div className="modal-overlay">
+      <div className="surface-card w-full max-w-2xl max-h-[32rem] overflow-auto border border-base-300/60 p-5">
+        <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="card-title text-xl">Raw JSON Editor</h2>
-            <button className="btn btn-ghost btn-sm btn-circle" onClick={onClose} aria-label="Close editor">
+            <h2 className="text-xl font-semibold">Raw JSON Editor</h2>
+            <button className="action-btn-ghost px-3 py-2" onClick={onClose} aria-label="Close editor">
               ✕
             </button>
           </div>
@@ -75,7 +75,7 @@ export function AdvancedJSONEditor({ config, onApply, onClose }: AdvancedJSONEdi
                 setJsonText(e.target.value)
                 setJsonError('')
               }}
-              className="textarea textarea-bordered bg-base-100 font-mono text-sm"
+              className="textarea textarea-bordered font-mono text-sm"
               rows={15}
             />
           </div>
@@ -87,13 +87,13 @@ export function AdvancedJSONEditor({ config, onApply, onClose }: AdvancedJSONEdi
           )}
 
           <div className="flex gap-3 justify-end mt-6">
-            <button className="btn btn-ghost" onClick={handleBackToForm}>
+            <button className="action-btn-ghost" onClick={handleBackToForm}>
               Apply & Back to Form
             </button>
-            <button className="btn btn-primary" onClick={handleApply}>
+            <button className="action-btn-primary" onClick={handleApply}>
               Apply JSON
             </button>
-            <button className="btn btn-ghost" onClick={onClose}>
+            <button className="action-btn-ghost" onClick={onClose}>
               Cancel
             </button>
           </div>

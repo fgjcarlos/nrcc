@@ -1,8 +1,8 @@
 export function Detail({ label, value }: { label: string; value: string }) {
   return (
-    <div className="grid grid-cols-2 gap-4 py-3 border-b border-base-300">
-      <dt className="text-sm font-semibold text-base-content opacity-75">{label}</dt>
-      <dd className="text-sm text-base-content">{value}</dd>
+    <div className="detail-row grid grid-cols-1 gap-2 py-3 sm:grid-cols-[160px_minmax(0,1fr)] sm:gap-4">
+      <dt className="text-xs font-medium uppercase tracking-[0.16em] text-base-content/50">{label}</dt>
+      <dd className="text-sm text-base-content sm:text-right">{value}</dd>
     </div>
   )
 }

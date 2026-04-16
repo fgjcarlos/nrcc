@@ -53,11 +53,11 @@ export function LivePreviewPanel({ config, isOpen, onToggle }: LivePreviewPanelP
   }
 
   return (
-    <div className="card bg-base-200 fixed inset-4 z-40 overflow-auto md:inset-auto md:w-1/2 md:right-4 md:bottom-4">
-      <div className="card-body">
+    <div className="surface-card fixed inset-4 z-40 overflow-auto border border-base-300/60 p-5 md:inset-auto md:right-4 md:bottom-4 md:w-1/2">
+      <div>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="card-title text-lg">Preview settings.js</h3>
-          <button className="btn btn-ghost btn-sm btn-circle" onClick={onToggle} aria-label="Close preview">
+          <h3 className="text-lg font-semibold">Preview settings.js</h3>
+          <button className="action-btn-ghost px-3 py-2" onClick={onToggle} aria-label="Close preview">
             ✕
           </button>
         </div>
@@ -71,7 +71,7 @@ export function LivePreviewPanel({ config, isOpen, onToggle }: LivePreviewPanelP
         )}
 
         {!loading && !error && preview && (
-          <pre className="bg-base-300 p-4 rounded overflow-x-auto text-xs">
+          <pre className="code-block-bg overflow-x-auto text-xs">
             <code>{preview}</code>
           </pre>
         )}

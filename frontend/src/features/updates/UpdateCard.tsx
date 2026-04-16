@@ -33,6 +33,21 @@ export function UpdateCard({
 
   return (
     <div className="space-y-6">
+      <div className="grid gap-3 md:grid-cols-3">
+        <div className="surface-panel border border-base-300/60 p-4">
+          <div className="text-xs uppercase tracking-[0.18em] text-base-content/50">Installed</div>
+          <div className="mt-2 text-lg font-semibold text-base-content">{updateStatus.installedVersion || 'Unknown'}</div>
+        </div>
+        <div className="surface-panel border border-base-300/60 p-4">
+          <div className="text-xs uppercase tracking-[0.18em] text-base-content/50">Available</div>
+          <div className="mt-2 text-lg font-semibold text-base-content">{updateStatus.availableVersion || 'Unknown'}</div>
+        </div>
+        <div className="surface-panel border border-base-300/60 p-4">
+          <div className="text-xs uppercase tracking-[0.18em] text-base-content/50">Status</div>
+          <div className="mt-2 text-lg font-semibold text-base-content">{updateStatus.updateAvailable ? 'Update available' : 'Up to date'}</div>
+        </div>
+      </div>
+
       <dl className="space-y-3">
         <Detail label="Installed version" value={updateStatus.installedVersion || 'Unknown'} />
         <Detail label="Available version" value={updateStatus.availableVersion || 'Unknown'} />
@@ -51,7 +66,7 @@ export function UpdateCard({
         {confirmUpdate ? (
           <>
             <button
-              className="btn btn-ghost"
+              className="action-btn-ghost"
               type="button"
               onClick={() => setConfirmUpdate(false)}
               disabled={applyMutation.isPending}
@@ -59,7 +74,7 @@ export function UpdateCard({
               Cancel
             </button>
             <button
-              className="btn btn-primary"
+              className="action-btn-primary"
               type="button"
               onClick={() => applyMutation.mutate()}
               disabled={busy || applyMutation.isPending}
@@ -69,7 +84,7 @@ export function UpdateCard({
           </>
         ) : (
           <button
-            className="btn btn-primary"
+            className="action-btn-primary"
             type="button"
             onClick={() => setConfirmUpdate(true)}
             disabled={busy || !updateStatus.updateAvailable}

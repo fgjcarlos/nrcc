@@ -20,8 +20,11 @@ export function EnvironmentPage({
     <>
       <header className="flex flex-col sm:flex-row sm:items-center gap-6 mb-8">
         <div>
-          <p className="text-sm font-semibold text-base-content/70 uppercase tracking-wide">Runtime</p>
-          <h2 className="text-3xl font-bold text-base-content mt-1">Environment</h2>
+          <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">Runtime</p>
+          <h2 className="text-3xl font-bold tracking-tight text-base-content mt-1">Environment</h2>
+          <p className="mt-2 max-w-2xl text-sm text-base-content/65">
+            Manage `.env.managed` variables with the same dense, card-based workflow used in `frontend_old`.
+          </p>
         </div>
       </header>
 

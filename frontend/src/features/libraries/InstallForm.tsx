@@ -14,9 +14,13 @@ export function InstallForm({
   onSubmit: () => void
 }) {
   return (
-    <article className="card bg-base-200 mb-6">
-      <div className="card-body">
-        <h3 className="card-title text-2xl">Install package</h3>
+    <article className="surface-card mb-6 border border-base-300/60 p-6 md:p-7">
+      <div className="flex items-start justify-between gap-4 mb-5">
+        <div>
+          <h3 className="text-xl font-semibold text-base-content">Install package</h3>
+          <p className="mt-1 text-sm text-base-content/60">Add npm modules directly into the runtime environment.</p>
+        </div>
+      </div>
         <form
           className="space-y-4"
           onSubmit={(event) => {
@@ -34,14 +38,13 @@ export function InstallForm({
             disabled={busy || isPending}
           />
           <button
-            className="btn btn-primary w-full"
+            className="action-btn-primary w-full"
             type="submit"
             disabled={busy || isPending || packageName.trim() === ''}
           >
             {isPending ? 'Installing...' : 'Install package'}
           </button>
         </form>
-      </div>
     </article>
   )
 }

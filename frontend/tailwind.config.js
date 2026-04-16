@@ -7,31 +7,69 @@ export default {
   darkMode: ['selector', '[data-theme="dark"]'],
   theme: {
     extend: {
+      boxShadow: {
+        glow: '0 20px 40px rgba(0, 0, 0, 0.5)',
+        'glow-light': '0 20px 40px rgba(0, 0, 0, 0.06)',
+      },
       fontFamily: {
-        sans: ['"Berkeley Mono"', '"IBM Plex Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', '"Liberation Mono"', '"Courier New"', 'monospace'],
+        sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'sans-serif'],
         mono: ['"Berkeley Mono"', '"IBM Plex Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', '"Liberation Mono"', '"Courier New"', 'monospace'],
       },
       borderRadius: {
-        DEFAULT: '4px',
+        DEFAULT: '1rem',
         none: '0',
-        sm: '2px',
-        input: '6px',
+        sm: '0.75rem',
+        input: '0.9rem',
         full: '9999px',
       },
     },
   },
-  plugins: [
-    daisyui({
-      // Use DaisyUI's built-in light and dark themes.
-      // The actual NRCC color values are injected via CSS variable overrides in styles.css
-      // for selectors [data-theme="light"] and [data-theme="dark"].
-      // This architecture keeps DaisyUI's CSS generation clean and allows robust color customization.
-      themes: ['light', 'dark'],
-      base: true,
-      styled: true,
-      utils: true,
-      logs: false,
-    }),
-  ],
+  plugins: [daisyui],
+  daisyui: {
+    themes: [
+      {
+        dark: {
+          primary: '#ef4444',
+          'primary-content': '#ffffff',
+          secondary: '#18181b',
+          'secondary-content': '#fafafa',
+          accent: '#a1a1aa',
+          'accent-content': '#fafafa',
+          'base-100': '#09090b',
+          'base-200': '#0a0a0c',
+          'base-300': '#111113',
+          'base-content': '#fafafa',
+          success: '#22c55e',
+          'success-content': '#ffffff',
+          warning: '#f59e0b',
+          'warning-content': '#ffffff',
+          error: '#ef4444',
+          'error-content': '#ffffff',
+          info: '#3b82f6',
+          'info-content': '#ffffff',
+        },
+        light: {
+          primary: '#dc2626',
+          'primary-content': '#ffffff',
+          secondary: '#f4f4f5',
+          'secondary-content': '#09090b',
+          accent: '#52525b',
+          'accent-content': '#fafafa',
+          'base-100': '#fafafa',
+          'base-200': '#f4f4f5',
+          'base-300': '#e4e4e7',
+          'base-content': '#09090b',
+          success: '#16a34a',
+          'success-content': '#ffffff',
+          warning: '#d97706',
+          'warning-content': '#ffffff',
+          error: '#dc2626',
+          'error-content': '#ffffff',
+          info: '#2563eb',
+          'info-content': '#ffffff',
+        },
+      },
+    ],
+    logs: false,
+  },
 }
-

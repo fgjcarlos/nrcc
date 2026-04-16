@@ -49,8 +49,15 @@ export function LibrariesPage({
     <>
       <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 mb-8">
         <div>
-          <p className="text-sm font-semibold text-base-content/70 uppercase tracking-wide">Runtime</p>
-          <h2 className="text-3xl font-bold text-base-content mt-1">Libraries</h2>
+          <p className="text-xs uppercase tracking-[0.28em] text-base-content/50">Extensions</p>
+          <h2 className="text-3xl font-bold tracking-tight text-base-content mt-1">Libraries</h2>
+          <p className="mt-2 max-w-2xl text-sm text-base-content/65">
+            Install and manage runtime packages without leaving the old-style operations console.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2 text-sm text-base-content/70">
+          <span className="rounded-full bg-base-300/60 px-3 py-1">Installed: {libraries?.items.length ?? 0}</span>
+          <span className="rounded-full bg-base-300/60 px-3 py-1">Busy: {busy ? 'Yes' : 'No'}</span>
         </div>
       </header>
 
@@ -81,9 +88,11 @@ export function LibrariesPage({
         onSubmit={() => installMutation.mutate(packageName)}
       />
 
-      <article className="card bg-base-200">
-        <div className="card-body">
-          <h3 className="card-title text-2xl">Installed packages</h3>
+      <article className="surface-card border border-base-300/60 p-6 md:p-7">
+        <div className="mb-5">
+          <h3 className="text-xl font-semibold text-base-content">Installed packages</h3>
+          <p className="mt-1 text-sm text-base-content/60">Packages currently available inside the runtime.</p>
+        </div>
           {loading ? <p className="text-sm text-base-content/60">Loading installed packages...</p> : null}
           {!loading && (!libraries || libraries.items.length === 0) ? <p className="text-sm text-base-content/60">No additional packages installed.</p> : null}
           {libraries?.items.length ? (
@@ -99,7 +108,6 @@ export function LibrariesPage({
               ))}
             </div>
           ) : null}
-        </div>
       </article>
     </>
   )
