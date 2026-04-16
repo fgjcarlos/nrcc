@@ -1,29 +1,83 @@
 # NRCC
 
-Local-first control center for Node-RED.
+Local-first control center for a single Node-RED runtime.
 
 ## Overview
 
-NRCC combines:
+NRCC ships as:
 
-- a Go backend
+- a Go backend and CLI
 - an embedded React + Vite frontend
-- local runtime management for Node-RED
-- SQLite-backed authentication
-- supported configuration editing
-- runtime status, health, and logs
+- a local Node-RED process manager
+- SQLite-backed auth, audit, logs, and job history
+- operator workflows for config, environment, backups, libraries, updates, and diagnostics
 
-## Current Status
+NRCC is intended to run on the operator's machine. It is not a hosted multi-tenant service.
 
-The project is past the initial scaffold and currently includes:
+## What The Product Does Today
 
-- project bootstrap and build wiring
-- phase 1 CLI environment checks and setup flow
-- phase 2 local runtime manager for Node-RED
-- phase 3 auth migration toward SQLite-backed state
-- authenticated dashboard for runtime visibility and control
+The current main branch supports this end-to-end workflow:
 
-The MVP is still in progress. Core runtime and auth foundations are in place, but backup and restore, environment variable management, npm package management, and some CLI behavior are still pending.
+- prepare the local data directory and runtime prerequisites with `nrcc setup`
+- start NRCC and the managed Node-RED runtime with `nrcc start`
+- bootstrap the first local administrator, then sign in through the web UI
+- inspect runtime status, health, logs, and system information
+- restart the managed Node-RED runtime from the UI
+- edit supported Node-RED settings, validate changes, preview generated `settings.js`, import existing `settings.js`, and apply changes
+- create and restore config snapshots inside the config workflow
+- manage `.env.managed` variables from the UI
+- create and restore full runtime backups
+- install and remove npm libraries in the managed runtime
+- check for Node-RED updates and apply them with preventive backup and rollback handling
+- run diagnostics, inspect audit/log/job history, and export support bundles
+
+## Current Release Surface
+
+### Web UI
+
+The authenticated dashboard currently includes these operator pages:
+
+- Overview
+- Logs
+- Diagnostics
+- Config
+- Environment
+- Backups
+- Libraries
+- Updates
+
+### CLI
+
+These commands are part of the usable workflow on the current main branch:
+
+```bash
+go run . setup
+go run . start
+go run . doctor
+go run . logs
+go run . support
+go run . version
+```
+
+`go run . start` runs in the foreground. Stop it with `Ctrl+C` or by sending `SIGTERM` to that process.
+
+Relevant command flags implemented in the code today:
+
+- `doctor --json`
+- `doctor --export`
+- `logs --level <level>`
+- `logs --source <prefix>`
+- `logs --lines <n>`
+- `logs --follow` or `logs -f`
+- `logs --json`
+- `support --open`
+
+## Deferred Or Not Release-Ready
+
+These items should not be described as supported MVP workflows yet:
+
+- the standalone CLI is not a full operator replacement for the web UI; backup, restore, environment, library, update, and config editing flows are currently UI/API driven
+- Linux-first runtime management is implemented, but broader packaging and release hardening are still incomplete
 
 ## Repository Layout
 
@@ -34,9 +88,7 @@ frontend/    React + Vite app
 npm/         local npm package metadata
 ```
 
-## Commands
-
-### Development
+## Development
 
 ```bash
 make build
@@ -44,36 +96,10 @@ make run
 make frontend-build
 ```
 
-### CLI
-
-```bash
-go run . doctor
-go run . setup
-go run . start
-go run . version
-```
-
-`go run . start` runs in the foreground. Stop it with `Ctrl+C` or by sending `SIGTERM` to that process.
-
-## Implemented So Far
-
-- local environment checks and setup flow
-- local Node-RED process manager
-- runtime status, logs, and restart API
-- SQLite-backed initial user bootstrap and login
-- cookie sessions with CSRF protection
-- supported config load, validate, and apply flow
-- embedded frontend served by the Go binary
-
-## MVP Gaps
-
-- backup and restore flows are not implemented yet
-- environment variable management is not implemented yet
-- npm library install and remove flows are not implemented yet
-- the full Linux MVP path is not complete yet
+The repository keeps a placeholder `frontend/dist/index.html` so `go build` and `go run .` work in a fresh checkout. Run `make frontend-build` before manual UI testing so the embedded assets match the current frontend source.
 
 ## Notes
 
-- `frontend/dist/index.html` is a placeholder so the Go binary can compile before the first frontend build.
-- `NRCC_DATA_DIR` can override the default `~/.nrcc/data` location.
-- Auth and internal panel state are being moved to SQLite instead of JSON files.
+- `NRCC_DATA_DIR` overrides the default data directory location.
+- `NRCC_PORT` overrides the NRCC web UI port. `NRCC_NODE_RED_PORT` overrides the managed Node-RED port.
+- Config snapshots and runtime backups are different flows: snapshots capture supported NRCC config state, while backups capture the managed runtime state used for restore and update rollback.
