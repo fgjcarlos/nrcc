@@ -26,8 +26,6 @@ func Run(args []string, frontend fs.FS) error {
 		return setup()
 	case "start":
 		return start(frontend)
-	case "stop":
-		return stop()
 	case "doctor":
 		return runDoctor(args[1:])
 	case "logs":
@@ -175,10 +173,6 @@ func setup() error {
 	return envSvc.Setup(dataDir, os.Stdin, os.Stdout)
 }
 
-func stop() error {
-	return errors.New("stop command is not implemented yet")
-}
-
 func doctor() error {
 	envSvc := service.NewEnvironmentService()
 	dataDir, err := envSvc.DefaultDataDir()
@@ -211,7 +205,6 @@ func printHelp() {
 	fmt.Println("Commands:")
 	fmt.Println("  setup     Prepare the local environment")
 	fmt.Println("  start     Start the local control center")
-	fmt.Println("  stop      Stop the local control center")
 	fmt.Println("  doctor    Check local prerequisites")
 	fmt.Println("  logs      View system logs")
 	fmt.Println("  support   Generate support bundle for diagnostics")
