@@ -13,9 +13,9 @@ export function RestartButton({
 }) {
   if (confirmRestart) {
     return (
-      <div className="flex gap-2">
+      <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
         <button
-          className="btn btn-ghost btn-sm"
+          className="btn btn-ghost w-full sm:w-auto"
           type="button"
           onClick={onCancel}
           disabled={restarting}
@@ -23,7 +23,7 @@ export function RestartButton({
           Cancel
         </button>
         <button
-          className="btn btn-primary btn-sm"
+          className="btn btn-primary w-full sm:w-auto"
           type="button"
           onClick={onConfirm}
           disabled={restarting}
@@ -35,7 +35,7 @@ export function RestartButton({
   }
 
   return (
-    <button className="btn btn-primary btn-sm" type="button" onClick={onRequest} disabled={restarting}>
+    <button className="btn btn-primary w-full sm:w-auto" type="button" onClick={onRequest} disabled={restarting}>
       Restart Node-RED
     </button>
   )

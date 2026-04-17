@@ -16,7 +16,7 @@ export function LogsPage({
       <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 mb-8">
         <div>
           <p className="text-xs uppercase tracking-[0.28em] text-base-content/50">Observability</p>
-          <h2 className="text-3xl font-bold tracking-tight text-base-content mt-1">Logs</h2>
+          <h2 className="page-title text-3xl mt-1">Logs</h2>
           <p className="mt-2 max-w-2xl text-sm text-base-content/65">
             Stream runtime output in the same console style as the old dashboard.
           </p>
@@ -34,7 +34,7 @@ export function LogsPage({
       <article className="surface-card border border-base-300/60 p-6 md:p-7">
         <div className="flex items-center justify-between gap-4 mb-5">
           <div>
-            <h3 className="text-xl font-semibold text-base-content">Runtime logs</h3>
+            <h3 className="section-title">Runtime logs</h3>
             <p className="mt-1 text-sm text-base-content/60">Plain-text output from the active Node-RED runtime.</p>
           </div>
           <span className="rounded-full bg-base-300/60 px-3 py-1 text-xs font-medium text-base-content/70">

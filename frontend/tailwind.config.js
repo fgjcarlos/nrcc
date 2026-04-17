@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 import daisyui from 'daisyui'
+import { spacing, shadows, borderRadius } from './src/tokens.ts'
 
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
@@ -7,20 +8,40 @@ export default {
   darkMode: ['selector', '[data-theme="dark"]'],
   theme: {
     extend: {
-      boxShadow: {
-        glow: '0 20px 40px rgba(0, 0, 0, 0.5)',
-        'glow-light': '0 20px 40px rgba(0, 0, 0, 0.06)',
+      // Spacing scale from design tokens
+      spacing: {
+        'xs': spacing.xs,
+        'sm': spacing.sm,
+        'base': spacing.base,
+        'md': spacing.md,
+        'lg': spacing.lg,
+        'xl': spacing.xl,
       },
+      
+      // Shadow elevation system
+      boxShadow: {
+        'sm': shadows.sm,
+        'md': shadows.md,
+        'lg': shadows.lg,
+        'xl': shadows.xl,
+        '2xl': shadows['2xl'],
+        'glow': shadows.glow,
+        'glow-light': shadows['glow-light'],
+      },
+      
+      // Border radius tokens
+      borderRadius: {
+        'xs': borderRadius.xs,
+        'sm': borderRadius.sm,
+        'md': borderRadius.md,
+        'lg': borderRadius.lg,
+        'xl': borderRadius.xl,
+        'full': borderRadius.full,
+      },
+      
       fontFamily: {
         sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'sans-serif'],
         mono: ['"Berkeley Mono"', '"IBM Plex Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', '"Liberation Mono"', '"Courier New"', 'monospace'],
-      },
-      borderRadius: {
-        DEFAULT: '1rem',
-        none: '0',
-        sm: '0.75rem',
-        input: '0.9rem',
-        full: '9999px',
       },
     },
   },

@@ -9,14 +9,17 @@ export function SystemInfoPanel({
   systemLoading: boolean
 }) {
   return (
-    <article className="surface-card border border-base-300 p-6">
+    <article className="surface-card border section-card section-card--success p-6">
       <div>
-        <p className="text-xs uppercase tracking-[0.24em] text-base-content/55">Host</p>
-        <h3 className="mt-2 text-xl font-semibold text-base-content">System info</h3>
+        <div className="flex items-center gap-2 mb-3">
+          <div className="h-2 w-2 rounded-full bg-success"></div>
+          <p className="text-xs uppercase tracking-[0.24em] text-base-content/55 font-semibold">Host</p>
+        </div>
+        <h3 className="text-xl font-semibold text-base-content">System info</h3>
         {systemLoading ? (
-          <p className="text-base-content/60 text-sm">Loading system information...</p>
+          <p className="text-base-content/60 text-sm mt-4">Loading system information...</p>
         ) : (
-          <dl className="space-y-3">
+          <dl className="space-y-3 mt-4">
             <Detail label="Hostname" value={systemInfo?.hostname || 'N/A'} />
             <Detail label="OS" value={systemInfo ? `${systemInfo.goos}/${systemInfo.goarch}` : 'N/A'} />
             <Detail label="CPUs" value={systemInfo ? String(systemInfo.cpus) : 'N/A'} />
