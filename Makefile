@@ -6,7 +6,7 @@ build:
 	go build -o bin/$(APP_NAME) .
 
 frontend-build:
-	cd frontend && npm install && npm run build
+	cd frontend && npm ci && npm run build
 
 run:
 	go run .
