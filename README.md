@@ -94,9 +94,49 @@ npm/         local npm package metadata
 make build
 make run
 make frontend-build
+make release-package
 ```
 
 The repository keeps a placeholder `frontend/dist/index.html` so `go build` and `go run .` work in a fresh checkout. Run `make frontend-build` before manual UI testing so the embedded assets match the current frontend source.
+
+## Release Packaging
+
+The MVP release artifacts are platform-specific archives containing:
+
+- the `nrcc` Go binary for that target platform
+- the frontend already embedded into the binary at build time
+- the top-level `README.md`
+
+The packaging flow intentionally builds `frontend/dist` as part of release assembly instead of relying on checked-in frontend assets.
+
+Create the full release artifact set locally with:
+
+```bash
+make release-package
+```
+
+Artifacts are written to `dist/release/` with this naming scheme:
+
+- `nrcc_<version>_linux_amd64.tar.gz`
+- `nrcc_<version>_linux_arm64.tar.gz`
+- `nrcc_<version>_darwin_amd64.tar.gz`
+- `nrcc_<version>_darwin_arm64.tar.gz`
+- `nrcc_<version>_windows_amd64.zip`
+- `nrcc_<version>_windows_arm64.zip`
+- `checksums.txt`
+
+Override the version label or target list when needed:
+
+```bash
+VERSION=v0.1.0 make release-package
+TARGETS="linux/amd64 windows/amd64" ./scripts/package-release.sh
+```
+
+A GitHub Actions workflow at `.github/workflows/release-package.yml` runs the same script on tag pushes matching `v*` and on manual dispatches.
+
+## npm Wrapper Status
+
+The `npm/` directory is not part of the current release artifact set. The wrapper remains intentionally out of scope until it does more than print a placeholder message, so releases should be built from the Go packaging flow above.
 
 ## Notes
 
