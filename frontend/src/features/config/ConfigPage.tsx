@@ -31,7 +31,7 @@ export function ConfigPage({ onSaved, onError, onToast }: ConfigPageCallbacks = 
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between mb-6 md:mb-8">
         <div>
           <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">Runtime</p>
-          <h2 className="text-3xl font-bold tracking-tight text-base-content mt-1">Configuration</h2>
+          <h2 className="page-title text-3xl mt-1">Configuration</h2>
           <p className="mt-2 max-w-3xl text-sm text-base-content/65">
             Edit the generated `settings.js` through sectioned forms, previews, snapshots, and import tools.
           </p>

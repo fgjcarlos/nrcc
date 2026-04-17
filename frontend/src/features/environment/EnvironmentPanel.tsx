@@ -92,8 +92,13 @@ export function EnvironmentPanel({
                       <p className="text-xs uppercase tracking-[0.22em] text-base-content/50">Variable {index + 1}</p>
                       <p className="mt-1 text-sm text-base-content/60">Values are written to `.env.managed` in order.</p>
                     </div>
-                    <button className="action-btn-ghost" type="button" onClick={() => removeRow(index)}>
-                    Remove
+                    <button
+                      className="action-btn-ghost"
+                      type="button"
+                      onClick={() => removeRow(index)}
+                      aria-label={`Remove variable ${index + 1}`}
+                    >
+                     Remove
                     </button>
                   </div>
 

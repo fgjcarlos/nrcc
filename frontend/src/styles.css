@@ -28,6 +28,63 @@ body {
   color: var(--fallback-bc, oklch(var(--bc) / 1));
 }
 
+html {
+  scroll-padding-top: 5.5rem;
+}
+
+:where(a, button, input, textarea, select, summary, [role="button"], [role="tab"]):focus-visible {
+  outline: 2px solid rgb(239, 68, 68);
+  outline-offset: 3px;
+}
+
+[data-theme="light"] :where(a, button, input, textarea, select, summary, [role="button"], [role="tab"]):focus-visible {
+  outline-color: rgb(220, 38, 38);
+}
+
+#main-content,
+#auth-main {
+  scroll-margin-top: 5.5rem;
+}
+
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: 1rem;
+  z-index: 60;
+  transform: translateY(-200%);
+  border-radius: 9999px;
+  padding: 0.75rem 1rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: transform 160ms ease;
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
+}
+
+[data-theme="dark"] .skip-link {
+  background-color: rgba(10, 10, 12, 0.96);
+  color: #fafafa;
+}
+
+[data-theme="light"] .skip-link {
+  background-color: rgba(255, 255, 255, 0.96);
+  color: #09090b;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 [data-theme="dark"] {
   color-scheme: dark;
 }
@@ -156,13 +213,18 @@ body {
 }
 
 .btn {
-  min-height: 2.75rem;
+  min-height: 3rem;
   border-radius: 1rem;
   border-width: 1px;
   padding-inline: 1rem;
   font-weight: 600;
   box-shadow: none;
   transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease, transform 180ms ease;
+}
+
+.btn-sm {
+  min-height: 2.75rem;
+  padding-inline: 0.9rem;
 }
 
 .btn:hover {
@@ -211,7 +273,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  min-height: 2.75rem;
+  min-height: 3rem;
   border-radius: 0.9rem;
   border-width: 1px;
   padding: 0.65rem 1rem;
@@ -572,10 +634,10 @@ textarea:focus,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.15rem;
+  min-height: 2.75rem;
   border-radius: 9999px;
   border-width: 1px;
-  padding: 0.45rem 0.9rem;
+  padding: 0.55rem 1rem;
   font-size: 0.82rem;
   font-weight: 600;
   transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease, transform 180ms ease;
@@ -668,28 +730,7 @@ textarea:focus,
   list-style: none;
 }
 
-.menu li > a {
-  min-height: 2.75rem;
-  border-radius: 1rem;
-  font-size: 0.95rem;
-  font-weight: 500;
-  color: inherit;
-  transition: background-color 180ms ease, color 180ms ease;
-}
-
-[data-theme="dark"] .menu li > a:hover {
-  background-color: rgba(113, 113, 122, 0.08);
-}
-
-[data-theme="light"] .menu li > a:hover {
-  background-color: rgba(9, 9, 11, 0.04);
-}
-
-.menu li > a.menu-active,
-.menu li > a.active {
-  background-color: color-mix(in srgb, var(--fallback-p, oklch(var(--p) / 1)) 14%, transparent);
-  color: var(--fallback-bc, oklch(var(--bc) / 1));
-}
+/* Menu styling moved to end of file for unified visual hierarchy */
 
 .alert {
   border-radius: 1rem;
@@ -700,30 +741,7 @@ textarea:focus,
   border-radius: 1rem;
 }
 
-.stat-card {
-  position: relative;
-  overflow: hidden;
-}
-
-.stat-card::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 55%);
-}
-
-.stat-card--ok {
-  border-color: rgba(34, 197, 94, 0.2);
-}
-
-.stat-card--warn {
-  border-color: rgba(245, 158, 11, 0.22);
-}
-
-.stat-card--neutral {
-  border-color: rgba(113, 113, 122, 0.2);
-}
+/* Stat cards styling moved to end of file for unified visual hierarchy */
 
 .detail-row {
   border-bottom: 1px solid rgba(113, 113, 122, 0.14);
@@ -799,19 +817,25 @@ textarea:focus,
   display: flex;
   gap: 0.5rem;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   border-radius: 1.25rem;
   padding: 0.6rem;
+  scrollbar-width: thin;
 }
 
 .section-tab {
   display: inline-flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 0.45rem;
   border-radius: 9999px;
   border: 1px solid transparent;
+  min-height: 3rem;
+  flex-shrink: 0;
   padding: 0.75rem 1rem;
   font-size: 0.9rem;
   font-weight: 500;
+  text-align: left;
   white-space: nowrap;
   transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease;
 }
@@ -834,6 +858,11 @@ textarea:focus,
   color: #09090b;
 }
 
+.section-tab:focus-visible,
+.menu li > a:focus-visible {
+  outline-offset: 2px;
+}
+
 .section-tab-active {
   color: var(--fallback-bc, oklch(var(--bc) / 1));
 }
@@ -845,6 +874,27 @@ textarea:focus,
   font-weight: 500;
   letter-spacing: 0.02em;
   color: color-mix(in srgb, currentColor 62%, transparent);
+}
+
+@media (max-width: 639px) {
+  .section-tabbar {
+    padding: 0.5rem;
+  }
+
+  .section-tab {
+    min-width: max-content;
+  }
+
+  .section-tab-copy {
+    display: none;
+  }
+}
+
+@media (min-width: 640px) {
+  .section-tabbar {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
 }
 
 [data-theme="dark"] .section-tab-active {
@@ -865,4 +915,444 @@ textarea:focus,
 [data-theme="light"] .divider::before,
 [data-theme="light"] .divider::after {
   background-color: rgba(9, 9, 11, 0.08);
+}
+
+/* ========================================================================== */
+/* ISSUE #32: VISUAL HIERARCHY & BRANDED FEEL ENHANCEMENTS */
+/* ========================================================================== */
+
+/* Enhanced Stat Cards with Left Border Accents */
+.stat-card {
+  border-left: 4px solid transparent;
+  transition: all 180ms ease;
+}
+
+.stat-card--ok {
+  border-left-color: #22c55e;
+}
+
+[data-theme="dark"] .stat-card--ok {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, transparent 100%);
+}
+
+[data-theme="light"] .stat-card--ok {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.05) 0%, transparent 100%);
+}
+
+.stat-card--warn {
+  border-left-color: #f59e0b;
+}
+
+[data-theme="dark"] .stat-card--warn {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, transparent 100%);
+}
+
+[data-theme="light"] .stat-card--warn {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, transparent 100%);
+}
+
+.stat-card--error {
+  border-left-color: #ef4444;
+}
+
+[data-theme="dark"] .stat-card--error {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, transparent 100%);
+}
+
+[data-theme="light"] .stat-card--error {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.05) 0%, transparent 100%);
+}
+
+.stat-card--info {
+  border-left-color: #3b82f6;
+}
+
+[data-theme="dark"] .stat-card--info {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, transparent 100%);
+}
+
+[data-theme="light"] .stat-card--info {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, transparent 100%);
+}
+
+/* Section Cards with Colored Left Border Variants */
+.section-card {
+  border-left: 4px solid transparent;
+  transition: all 180ms ease;
+}
+
+.section-card--default {
+  border-left-color: rgba(113, 113, 122, 0.3);
+}
+
+.section-card--info {
+  border-left-color: #3b82f6;
+  border-color: rgba(59, 130, 246, 0.2);
+}
+
+[data-theme="dark"] .section-card--info {
+  background-color: rgba(59, 130, 246, 0.04);
+}
+
+[data-theme="light"] .section-card--info {
+  background-color: rgba(59, 130, 246, 0.03);
+}
+
+.section-card--success {
+  border-left-color: #22c55e;
+  border-color: rgba(34, 197, 94, 0.2);
+}
+
+[data-theme="dark"] .section-card--success {
+  background-color: rgba(34, 197, 94, 0.04);
+}
+
+[data-theme="light"] .section-card--success {
+  background-color: rgba(34, 197, 94, 0.03);
+}
+
+.section-card--warning {
+  border-left-color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.22);
+}
+
+[data-theme="dark"] .section-card--warning {
+  background-color: rgba(245, 158, 11, 0.04);
+}
+
+[data-theme="light"] .section-card--warning {
+  background-color: rgba(245, 158, 11, 0.03);
+}
+
+.section-card--error {
+  border-left-color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+[data-theme="dark"] .section-card--error {
+  background-color: rgba(239, 68, 68, 0.04);
+}
+
+[data-theme="light"] .section-card--error {
+  background-color: rgba(239, 68, 68, 0.03);
+}
+
+/* Enhanced Navigation Active State with Left Border */
+.menu li > a {
+  border-left: 3px solid transparent;
+  transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease;
+}
+
+.menu li > a.menu-active,
+.menu li > a.active {
+  border-left-color: #ef4444;
+  font-weight: 600;
+}
+
+[data-theme="dark"] .menu li > a.menu-active,
+[data-theme="dark"] .menu li > a.active {
+  border-left-color: #ef4444;
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+[data-theme="light"] .menu li > a.menu-active,
+[data-theme="light"] .menu li > a.active {
+  border-left-color: #dc2626;
+  background-color: rgba(220, 38, 38, 0.08);
+}
+
+[data-theme="dark"] .menu li > a:hover {
+  border-left-color: rgba(239, 68, 68, 0.3);
+}
+
+[data-theme="light"] .menu li > a:hover {
+  border-left-color: rgba(220, 38, 38, 0.2);
+}
+
+/* Page Title with Gradient Underline */
+.page-title {
+  position: relative;
+}
+
+/* Section Title with Colored Bottom Accent */
+.section-title {
+  position: relative;
+  padding-bottom: 0.75rem;
+}
+
+.section-title::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 3rem;
+  height: 2px;
+  background: var(--fallback-p, oklch(var(--p) / 1));
+  border-radius: 1px;
+}
+
+[data-theme="dark"] .section-title::after {
+  background: #ef4444;
+}
+
+[data-theme="light"] .section-title::after {
+  background: #dc2626;
+}
+
+/* Status Badges */
+[data-theme="dark"] .badge-success {
+  background-color: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+[data-theme="light"] .badge-success {
+  background-color: rgba(34, 197, 94, 0.1);
+  color: #16a34a;
+}
+
+[data-theme="dark"] .badge-warning {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+[data-theme="light"] .badge-warning {
+  background-color: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+}
+
+[data-theme="dark"] .badge-error {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+[data-theme="light"] .badge-error {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+}
+
+[data-theme="dark"] .badge-info {
+  background-color: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+}
+
+[data-theme="light"] .badge-info {
+  background-color: rgba(59, 130, 246, 0.1);
+  color: #2563eb;
+}
+
+/* Base Menu Styles */
+.menu li > a {
+  min-height: 2.75rem;
+  border-radius: 1rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: inherit;
+}
+
+[data-theme="dark"] .menu li > a:hover {
+  background-color: rgba(113, 113, 122, 0.08);
+}
+
+[data-theme="light"] .menu li > a:hover {
+  background-color: rgba(9, 9, 11, 0.04);
+}
+
+/* Stat Card Overlay Gradient */
+.stat-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 55%);
+}
+
+/* ==================== ANIMATIONS & TRANSITIONS ==================== */
+
+/* Respect prefers-reduced-motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Page and Card Entrance Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Loading spinner animation */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Subtle pulse for skeleton/loading states */
+@keyframes pulse-subtle {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* Shimmer effect for skeleton loading */
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+/* Smooth height transitions for collapsible elements */
+@keyframes expandHeight {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 1000px;
+  }
+}
+
+/* Utility classes for animations */
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+.animate-slide-down {
+  animation: slideDown 0.3s ease-out;
+}
+
+.animate-spin-slow {
+  animation: spin 1s linear infinite;
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s ease-in-out infinite;
+}
+
+/* Interactive Elements - Hover & Active States */
+
+/* Cards and surfaces - elevation on hover */
+.interactive-card,
+.surface-panel,
+.surface-card,
+.stat-card,
+.section-card {
+  transition: all 200ms ease-in-out;
+  will-change: transform, box-shadow;
+}
+
+.interactive-card:hover,
+.surface-panel:hover,
+.surface-card:hover,
+.stat-card:hover,
+.section-card:hover {
+  transform: translateY(-2px) scale(1.005);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="light"] .interactive-card:hover,
+[data-theme="light"] .surface-panel:hover,
+[data-theme="light"] .surface-card:hover,
+[data-theme="light"] .stat-card:hover,
+[data-theme="light"] .section-card:hover {
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
+}
+
+/* Buttons - scale on hover and active */
+.btn {
+  transition: all 200ms ease-in-out;
+  will-change: transform;
+}
+
+.btn:hover:not(:disabled) {
+  transform: scale(1.02);
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* Sidebar navigation items - smooth color transition */
+.menu li > a {
+  transition: all 200ms ease-in-out;
+  will-change: background-color, color;
+}
+
+/* Table rows - hover highlight */
+table tbody tr {
+  transition: background-color 200ms ease-in-out;
+}
+
+table tbody tr:hover {
+  background-color: rgba(113, 113, 122, 0.06);
+}
+
+[data-theme="light"] table tbody tr:hover {
+  background-color: rgba(9, 9, 11, 0.03);
+}
+
+/* Input fields and selects - focus transitions */
+input,
+select,
+textarea {
+  transition: border-color 200ms ease-in-out, background-color 200ms ease-in-out, box-shadow 200ms ease-in-out;
+  will-change: border-color;
+}
+
+/* Smooth transitions for all transform properties */
+.transition-transform {
+  transition: transform 200ms ease-in-out;
+}
+
+.transition-opacity {
+  transition: opacity 200ms ease-in-out;
+}
+
+.transition-all {
+  transition: all 200ms ease-in-out;
 }

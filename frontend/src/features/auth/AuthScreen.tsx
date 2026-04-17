@@ -27,7 +27,7 @@ export function AuthScreen({
     mode === 'register' ? 'Create the first administrator' : 'Sign in to the local control center'
 
   return (
-    <main className="auth-shell flex min-h-screen items-center justify-center px-6 py-12">
+    <main id="auth-main" tabIndex={-1} className="auth-shell flex min-h-screen items-center justify-center px-6 py-12">
       <div className="surface-card w-full max-w-md border border-base-300 p-8 sm:p-10">
         <div>
           <p className="text-xs uppercase tracking-[0.32em] text-base-content/55">Node-RED Control Center</p>

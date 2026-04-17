@@ -186,7 +186,12 @@ export function SettingsPanel({ config, loading, onSaved, onError, onToast }: Se
         errorTabs={errorSections}
       />
 
-      <div className="space-y-6">
+      <div
+        id={`config-panel-${activeSection}`}
+        className="space-y-6"
+        role="tabpanel"
+        aria-labelledby={`config-tab-${activeSection}`}
+      >
         {activeSection === 'server' && (
           <ServerSection
             value={localConfig.server}

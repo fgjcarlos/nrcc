@@ -10,11 +10,14 @@ export function RuntimeDetailsPanel({
   runtimeLoading: boolean
 }) {
   return (
-    <article className="surface-card border border-base-300 p-6">
+    <article className="surface-card border section-card section-card--info p-6">
       <div>
-        <p className="text-xs uppercase tracking-[0.24em] text-base-content/55">Runtime</p>
-        <h3 className="mt-2 text-xl font-semibold text-base-content">Runtime details</h3>
-        <dl className="space-y-3">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="h-2 w-2 rounded-full bg-info"></div>
+          <p className="text-xs uppercase tracking-[0.24em] text-base-content/55 font-semibold">Runtime</p>
+        </div>
+        <h3 className="text-xl font-semibold text-base-content">Runtime details</h3>
+        <dl className="space-y-3 mt-4">
           <Detail label="PID" value={runtime?.pid ? String(runtime.pid) : 'N/A'} />
           <Detail label="Port" value={runtime?.port ? String(runtime.port) : 'N/A'} />
           <Detail label="Started at" value={runtime?.startedAt || 'N/A'} />
