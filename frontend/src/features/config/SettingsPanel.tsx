@@ -19,6 +19,7 @@ import { AdvancedJSONEditor } from './AdvancedJSONEditor'
 import { SnapshotPanel } from './SnapshotPanel'
 import { ImportDialog } from './ImportDialog'
 import { validateFullConfig } from './validation'
+import { LoadingState } from '../../common/components'
 
 type SettingsPanelProps = {
   config?: FullAppConfig
@@ -172,7 +173,7 @@ export function SettingsPanel({ config, loading, onSaved, onError, onToast }: Se
   if (loading || !localConfig) {
     return (
       <section className="space-y-6">
-        <p className="text-sm text-base-content/60">Loading configuration...</p>
+        <LoadingState message="Loading configuration..." />
       </section>
     )
   }

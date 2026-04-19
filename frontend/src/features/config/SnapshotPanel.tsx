@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../api'
 import { ConfigSnapshot } from '../../types/config'
+import { LoadingState, EmptyState } from '../../common/components'
 
 type SnapshotPanelProps = {
   isOpen: boolean
@@ -111,10 +112,13 @@ export function SnapshotPanel({ isOpen, onClose, onRestored }: SnapshotPanelProp
           )}
 
           {/* Snapshots list */}
-          {loading && <p className="text-sm text-base-content/60">Loading snapshots...</p>}
+          {loading && <LoadingState message="Loading snapshots..." />}
 
           {!loading && snapshots.length === 0 && (
-            <p className="text-sm text-base-content/60">No snapshots yet. Create one to get started.</p>
+            <EmptyState
+              title="No snapshots yet"
+              description="Create one to get started."
+            />
           )}
 
            {!loading && snapshots.length > 0 && (

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { api, type ManagedEnvState, type ManagedEnvVar } from '../../api'
 import { formatErrorMessage } from '../../common/utils/format'
-import { InlineNotice } from '../../common/components/InlineNotice'
+import { InlineNotice, LoadingState } from '../../common/components'
 import { FormField } from '../../components/forms'
 
 export function EnvironmentPanel({
@@ -44,7 +44,7 @@ export function EnvironmentPanel({
       <article className="surface-card border border-base-300/60 p-6 md:p-7">
         <div>
           <h3 className="text-lg font-semibold text-base-content">Managed runtime variables</h3>
-          <p className="text-base-content/60 text-sm">Loading managed environment...</p>
+          <LoadingState message="Loading managed environment..." />
         </div>
       </article>
     )

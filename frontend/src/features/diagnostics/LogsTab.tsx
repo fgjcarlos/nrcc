@@ -1,5 +1,5 @@
 import type { LogEntry } from '../../api'
-import { InlineNotice } from '../../common/components'
+import { InlineNotice, LoadingState, EmptyState } from '../../common/components'
 import { formatErrorMessage } from '../../common/utils/format'
 
 export function LogsTab({
@@ -51,9 +51,12 @@ export function LogsTab({
 
         <div className="space-y-3">
           {loading ? (
-            <p className="text-sm text-base-content opacity-60">Loading logs...</p>
+            <LoadingState message="Loading logs..." />
           ) : logs.length === 0 ? (
-            <p className="text-sm text-base-content opacity-60">No logs captured yet.</p>
+            <EmptyState
+              title="No logs captured yet"
+              description="Runtime and diagnostic logs will appear here once available."
+            />
           ) : (
             logs.map((log, idx) => (
               <div key={log.id || idx} className="list-shell flex items-start gap-3 p-4 md:p-5">
