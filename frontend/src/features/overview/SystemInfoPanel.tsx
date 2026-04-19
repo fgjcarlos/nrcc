@@ -19,12 +19,17 @@ export function SystemInfoPanel({
         {systemLoading ? (
           <p className="text-base-content/60 text-sm mt-4">Loading system information...</p>
         ) : (
-          <dl className="space-y-3 mt-4">
-            <Detail label="Hostname" value={systemInfo?.hostname || 'N/A'} />
-            <Detail label="OS" value={systemInfo ? `${systemInfo.goos}/${systemInfo.goarch}` : 'N/A'} />
-            <Detail label="CPUs" value={systemInfo ? String(systemInfo.cpus) : 'N/A'} />
-            <Detail label="Updated" value={systemInfo?.timestamp || 'N/A'} />
-          </dl>
+          <>
+            <dl className="space-y-3 mt-4">
+              <Detail label="Hostname" value={systemInfo?.hostname || 'N/A'} />
+              <Detail label="OS" value={systemInfo ? `${systemInfo.goos}/${systemInfo.goarch}` : 'N/A'} />
+              <Detail label="CPUs" value={systemInfo ? String(systemInfo.cpus) : 'N/A'} />
+              <Detail label="Preferred access" value={systemInfo?.localAccess.url || 'N/A'} />
+              <Detail label="Access mode" value={systemInfo ? `${systemInfo.localAccess.mode}${systemInfo.localAccess.configured ? ' (configured)' : ''}` : 'N/A'} />
+              <Detail label="Updated" value={systemInfo?.timestamp || 'N/A'} />
+            </dl>
+            {systemInfo ? <p className="mt-4 text-sm text-base-content/65">{systemInfo.localAccess.message}</p> : null}
+          </>
         )}
       </div>
     </article>

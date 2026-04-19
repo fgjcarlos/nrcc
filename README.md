@@ -142,4 +142,22 @@ The `npm/` directory is not part of the current release artifact set. The wrappe
 
 - `NRCC_DATA_DIR` overrides the default data directory location.
 - `NRCC_PORT` overrides the NRCC web UI port. `NRCC_NODE_RED_PORT` overrides the managed Node-RED port.
+- `NRCC_LOCAL_HOSTNAME` and `NRCC_LOCAL_TLD` override the stable local URL published through `portless` when it is available.
 - Config snapshots and runtime backups are different flows: snapshots capture supported NRCC config state, while backups capture the managed runtime state used for restore and update rollback.
+
+## Stable Local Access
+
+NRCC can expose a stable local hostname when `portless` is installed.
+
+- default hostname: `https://nrcc.localhost`
+- fallback when `portless` is missing or cannot be configured: `http://127.0.0.1:<NRCC_PORT>`
+- install `portless` with `npm install -g portless`
+
+At startup NRCC now:
+
+- detects whether `portless` is available
+- tries to start the `portless` proxy
+- registers a stable alias for the current NRCC web port
+- surfaces the resulting status in the overview and diagnostics flows
+
+If the alias cannot be configured because of trust, permissions, or host-environment constraints, NRCC keeps running on the direct localhost URL and reports the fallback clearly.

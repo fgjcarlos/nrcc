@@ -66,6 +66,16 @@ export type SystemInfo = {
   cpus: number
   hostname: string
   timestamp: string
+  localAccess: {
+    mode: 'direct' | 'portless'
+    hostname?: string
+    url: string
+    fallbackUrl: string
+    portlessAvailable: boolean
+    configured: boolean
+    operational: boolean
+    message: string
+  }
 }
 
 export type SupportedConfig = {
@@ -150,18 +160,19 @@ export type UpdateApplyResult = {
   message: string
 }
 
-export type DoctorCheckStatus = 'pass' | 'warn' | 'fail' | 'unknown'
+export type DoctorCheckStatus = 'pass' | 'warn' | 'fail'
 
 export type DoctorCheck = {
-  name: string
+  id: string
+  label: string
   status: DoctorCheckStatus
+  severity?: 'critical' | 'warning'
   message: string
-  details?: Record<string, unknown>
 }
 
 export type DoctorReport = {
-  generated_at: string
-  overall_status: DoctorCheckStatus
+  generatedAt: string
+  overallStatus: 'healthy' | 'degraded' | 'critical'
   checks: DoctorCheck[]
 }
 

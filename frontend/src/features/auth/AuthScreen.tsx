@@ -37,6 +37,9 @@ export function AuthScreen({
               ? 'This machine has not been initialized yet. Create the first local administrator account.'
               : 'Use your local administrator account to access runtime controls and diagnostics.'}
           </p>
+          <p className="mt-2 text-sm text-base-content/60">
+            Stable `.localhost` access is optional. If `portless` is installed during setup, NRCC will try to publish a named local URL automatically.
+          </p>
 
           <form className="form-control mt-8 space-y-4" onSubmit={handleSubmit}>
             <FormField

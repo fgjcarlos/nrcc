@@ -94,6 +94,13 @@ export function OverviewPage({
           timestamp: runtime.startedAt,
         }
       : null,
+    systemInfo?.localAccess?.url
+      ? {
+          label: 'Preferred local access',
+          detail: systemInfo.localAccess.url,
+          timestamp: systemInfo.timestamp,
+        }
+      : null,
     runtime?.lastExit
       ? {
           label: 'Last runtime exit',
@@ -257,6 +264,11 @@ export function OverviewPage({
             <p className="mt-2 max-w-3xl text-sm text-base-content/65">
               Keep the managed Node-RED instance front and center with live state, operator controls, and runtime details.
             </p>
+            {systemInfo?.localAccess ? (
+              <p className="mt-3 text-sm text-base-content/65">
+                Preferred local access: <span className="font-medium text-base-content">{systemInfo.localAccess.url}</span>
+              </p>
+            ) : null}
           </div>
           <span
             className={`badge badge-lg ${
