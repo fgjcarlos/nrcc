@@ -99,6 +99,16 @@ describe('App routing', () => {
       cpus: 4,
       hostname: 'nrcc-host',
       timestamp: '2026-01-01T00:00:00Z',
+      localAccess: {
+        mode: 'portless',
+        hostname: 'nrcc.localhost',
+        url: 'https://nrcc.localhost',
+        fallbackUrl: 'http://127.0.0.1:3000',
+        portlessAvailable: true,
+        configured: true,
+        operational: true,
+        message: 'Stable local hostname configured at https://nrcc.localhost',
+      },
     })
     vi.mocked(api.environment).mockResolvedValue({
       variables: [{ name: 'NODE_ENV', value: 'production' }],
@@ -126,9 +136,9 @@ describe('App routing', () => {
       updateAvailable: true,
     })
     vi.mocked(api.diagnosticsReport).mockResolvedValue({
-      generated_at: '2026-01-01T00:00:00Z',
-      overall_status: 'pass',
-      checks: [{ name: 'runtime', status: 'pass', message: 'Runtime healthy' }],
+      generatedAt: '2026-01-01T00:00:00Z',
+      overallStatus: 'healthy',
+      checks: [{ id: 'runtime', label: 'Runtime', severity: 'warning', status: 'pass', message: 'Runtime healthy' }],
     })
     vi.mocked(api.diagnosticsLogs).mockResolvedValue({
       logs: [{ timestamp: '2026-01-01T00:00:00Z', level: 'info', source: 'runtime', message: 'All good' }],

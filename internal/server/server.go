@@ -18,20 +18,21 @@ import (
 )
 
 type Config struct {
-	Port       string
-	Frontend   fs.FS
-	Runtime    *service.ProcessManager
-	Auth       *service.AuthService
-	Config     service.ConfigService
-	ManagedEnv service.ManagedEnvService
-	Backups    service.BackupService
-	Libraries  service.LibraryService
-	Updates    service.UpdateService
-	Operations *service.OperationLock
-	Logs       *service.LogService
-	Jobs       *service.JobsService
-	Doctor     *service.DoctorService
-	Support    *service.SupportBundleService
+	Port        string
+	Frontend    fs.FS
+	Runtime     *service.ProcessManager
+	Auth        *service.AuthService
+	Config      service.ConfigService
+	ManagedEnv  service.ManagedEnvService
+	Backups     service.BackupService
+	Libraries   service.LibraryService
+	Updates     service.UpdateService
+	Operations  *service.OperationLock
+	Logs        *service.LogService
+	Jobs        *service.JobsService
+	Doctor      *service.DoctorService
+	Support     *service.SupportBundleService
+	LocalAccess *service.LocalAccessService
 }
 
 type Server struct {
@@ -51,7 +52,7 @@ const sessionCookieSameSite = http.SameSiteStrictMode
 
 func New(cfg Config) *Server {
 	router := chi.NewRouter()
-	registerAPIRoutes(router, cfg.Runtime, cfg.Auth, cfg.Config, cfg.ManagedEnv, cfg.Backups, cfg.Libraries, cfg.Updates, cfg.Operations)
+	registerAPIRoutes(router, cfg.Runtime, cfg.Auth, cfg.Config, cfg.ManagedEnv, cfg.Backups, cfg.Libraries, cfg.Updates, cfg.Operations, cfg.LocalAccess)
 	registerDiagnosticsRoutes(router, cfg)
 	registerSPARoutes(router, cfg.Frontend)
 
@@ -72,7 +73,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return s.httpServer.Shutdown(ctx)
 }
 
-func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager, authService *service.AuthService, configService service.ConfigService, managedEnvService service.ManagedEnvService, backupService service.BackupService, libraryService service.LibraryService, updateService service.UpdateService, operationLock *service.OperationLock) {
+func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager, authService *service.AuthService, configService service.ConfigService, managedEnvService service.ManagedEnvService, backupService service.BackupService, libraryService service.LibraryService, updateService service.UpdateService, operationLock *service.OperationLock, localAccessService *service.LocalAccessService) {
 	if operationLock == nil {
 		operationLock = service.NewOperationLock()
 	}
@@ -224,12 +225,24 @@ func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager
 
 		r.Get("/api/system/info", func(w http.ResponseWriter, r *http.Request) {
 			hostname, _ := os.Hostname()
-			respondOK(w, map[string]any{
-				"goos":      runtime.GOOS,
-				"goarch":    runtime.GOARCH,
-				"cpus":      runtime.NumCPU(),
-				"hostname":  hostname,
-				"timestamp": time.Now().UTC(),
+			localAccess := model.LocalAccessStatus{
+				Mode:        "direct",
+				URL:         "http://127.0.0.1:3000",
+				FallbackURL: "http://127.0.0.1:3000",
+				Operational: true,
+				Message:     "Direct local access is available.",
+			}
+			if localAccessService != nil {
+				localAccess = localAccessService.Status()
+			}
+
+			respondOK(w, model.SystemInfo{
+				GOOS:        runtime.GOOS,
+				GOARCH:      runtime.GOARCH,
+				CPUs:        runtime.NumCPU(),
+				Hostname:    hostname,
+				Timestamp:   time.Now().UTC().Format(time.RFC3339),
+				LocalAccess: localAccess,
 			})
 		})
 

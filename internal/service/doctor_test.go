@@ -31,9 +31,9 @@ func TestDoctorServiceRunAllChecks(t *testing.T) {
 		t.Fatal("expected GeneratedAt to be set")
 	}
 
-	// Should have 13 checks
-	if len(report.Checks) != 13 {
-		t.Fatalf("expected 13 checks, got %d", len(report.Checks))
+	// Should have 14 checks
+	if len(report.Checks) != 14 {
+		t.Fatalf("expected 14 checks, got %d", len(report.Checks))
 	}
 
 	// Verify all check IDs are present
@@ -47,6 +47,7 @@ func TestDoctorServiceRunAllChecks(t *testing.T) {
 		"flows-file":         false,
 		"process-running":    false,
 		"port-available":     false,
+		"local-access":       false,
 		"log-dir-writable":   false,
 		"db-accessible":      false,
 		"disk-space":         false,
@@ -286,9 +287,9 @@ func TestDoctorServiceMissingDataDir(t *testing.T) {
 	doctor := NewDoctorService(nonExistentDir)
 	report := doctor.Run(context.Background())
 
-	// Should still have all 13 checks (some may fail)
-	if len(report.Checks) != 13 {
-		t.Fatalf("expected 13 checks even with missing data dir, got %d", len(report.Checks))
+	// Should still have all 14 checks (some may fail)
+	if len(report.Checks) != 14 {
+		t.Fatalf("expected 14 checks even with missing data dir, got %d", len(report.Checks))
 	}
 
 	// Overall status should be degraded or critical
@@ -312,8 +313,8 @@ func TestDoctorServiceContextTimeout(t *testing.T) {
 	// Should not panic even with timeout
 	report := doctor.Run(ctx)
 
-	if len(report.Checks) != 13 {
-		t.Fatalf("expected 13 checks, got %d", len(report.Checks))
+	if len(report.Checks) != 14 {
+		t.Fatalf("expected 14 checks, got %d", len(report.Checks))
 	}
 }
 

@@ -88,10 +88,15 @@ func start(frontend fs.FS) error {
 	supportBundleService := service.NewSupportBundleService(dataDir, logService, doctorService, sanitizer)
 
 	port := envOrDefault("NRCC_PORT", "3000")
+	localAccessPort, err := strconv.Atoi(port)
+	if err != nil {
+		return fmt.Errorf("invalid NRCC_PORT: %w", err)
+	}
 	runtimePort, err := strconv.Atoi(envOrDefault("NRCC_NODE_RED_PORT", "1880"))
 	if err != nil {
 		return fmt.Errorf("invalid NRCC_NODE_RED_PORT: %w", err)
 	}
+	localAccessService := service.NewLocalAccessService(localAccessPort)
 
 	processManager := service.NewProcessManager(service.ProcessConfig{
 		DataDir: dataDir,
@@ -109,29 +114,40 @@ func start(frontend fs.FS) error {
 	// Wire up services to DoctorService
 	doctorService.SetProcessManager(processManager)
 	doctorService.SetLogService(logService)
+	doctorService.SetLocalAccessService(localAccessService)
 
 	if err := processManager.Start(); err != nil {
 		return err
 	}
 
 	app := server.New(AppConfig{
-		Port:       port,
-		Frontend:   frontend,
-		Runtime:    processManager,
-		Auth:       authService,
-		Config:     configService,
-		ManagedEnv: managedEnvService,
-		Backups:    backupService,
-		Libraries:  libraryService,
-		Updates:    updateService,
-		Operations: operationLock,
-		Logs:       logService,
-		Jobs:       jobsService,
-		Doctor:     doctorService,
-		Support:    supportBundleService,
+		Port:        port,
+		Frontend:    frontend,
+		Runtime:     processManager,
+		Auth:        authService,
+		Config:      configService,
+		ManagedEnv:  managedEnvService,
+		Backups:     backupService,
+		Libraries:   libraryService,
+		Updates:     updateService,
+		Operations:  operationLock,
+		Logs:        logService,
+		Jobs:        jobsService,
+		Doctor:      doctorService,
+		Support:     supportBundleService,
+		LocalAccess: localAccessService,
 	})
 
+	localAccess := localAccessService.EnsureConfigured()
+
 	fmt.Printf("nrcc listening on http://127.0.0.1:%s\n", port)
+	fmt.Printf("preferred local access: %s\n", localAccess.URL)
+	if localAccess.URL != localAccess.FallbackURL {
+		fmt.Printf("fallback local access: %s\n", localAccess.FallbackURL)
+	}
+	if localAccess.Message != "" {
+		fmt.Printf("local access status: %s\n", localAccess.Message)
+	}
 	fmt.Printf("node-red runtime on http://127.0.0.1:%d\n", runtimePort)
 
 	serverErr := make(chan error, 1)

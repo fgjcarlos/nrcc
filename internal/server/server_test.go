@@ -32,6 +32,7 @@ func TestAuthFlowAndProtectedRoutes(t *testing.T) {
 		service.NewLibraryService(testDataDir),
 		service.NewUpdateService(testDataDir, &backupSvc),
 		service.NewOperationLock(),
+		nil,
 	)
 
 	registerBody := map[string]string{
@@ -154,6 +155,7 @@ func TestLoginCookieSecureOnForwardedHTTPS(t *testing.T) {
 		service.NewLibraryService(testDataDir),
 		service.NewUpdateService(testDataDir, &backupSvc),
 		service.NewOperationLock(),
+		nil,
 	)
 
 	loginReq := newJSONRequest(t, http.MethodPost, "/api/auth/login", map[string]string{
@@ -199,6 +201,7 @@ func TestOperationStatusAndRestoreConflict(t *testing.T) {
 		service.NewLibraryService(testDataDir),
 		service.NewUpdateService(testDataDir, &backupSvc),
 		lock,
+		nil,
 	)
 
 	if _, _, err := authService.RegisterInitial("alice", "password123"); err != nil {

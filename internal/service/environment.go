@@ -100,7 +100,7 @@ func (s EnvironmentService) Diagnose(dataDir string) model.EnvironmentReport {
 		report.Checks = append(report.Checks, model.EnvironmentCheck{
 			Name:    "portless",
 			Status:  model.StatusWarn,
-			Detail:  "portless is not available; the app can still run with a normal localhost URL",
+			Detail:  "portless is not available; install it with `npm install -g portless` to get a stable .localhost URL",
 			Command: "portless --version",
 		})
 	}
@@ -135,6 +135,14 @@ func (s EnvironmentService) Setup(dataDir string, stdin *os.File, stdout *os.Fil
 
 	report := s.Diagnose(dataDir)
 	printReport(stdout, report)
+
+	if report.PortlessPresent {
+		fmt.Fprintln(stdout, "")
+		fmt.Fprintln(stdout, "Stable local access is available. When NRCC starts, it will try to publish https://nrcc.localhost through portless.")
+	} else {
+		fmt.Fprintln(stdout, "")
+		fmt.Fprintln(stdout, "Stable local hostname support is optional. Install portless later with `npm install -g portless` if you want a named .localhost URL.")
+	}
 
 	if !report.NodeInstalled || !report.NPMInstalled {
 		return fmt.Errorf("missing system prerequisites: install Node.js and npm, then run `nrcc setup` again")

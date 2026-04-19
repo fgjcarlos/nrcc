@@ -22,6 +22,7 @@ type DoctorService struct {
 	dataDir        string
 	processManager *ProcessManager
 	logService     *LogService
+	localAccess    *LocalAccessService
 }
 
 // NewDoctorService creates a new DoctorService
@@ -39,6 +40,11 @@ func (d *DoctorService) SetProcessManager(pm *ProcessManager) {
 // SetLogService injects the LogService (nil-safe)
 func (d *DoctorService) SetLogService(ls *LogService) {
 	d.logService = ls
+}
+
+// SetLocalAccessService injects the LocalAccessService (nil-safe)
+func (d *DoctorService) SetLocalAccessService(access *LocalAccessService) {
+	d.localAccess = access
 }
 
 // Run executes all checks and returns a DoctorReport
@@ -59,6 +65,7 @@ func (d *DoctorService) Run(ctx context.Context) model.DoctorReport {
 		d.checkFlowsFile,
 		d.checkProcessRunning,
 		d.checkPortAvailable,
+		d.checkLocalAccess,
 		d.checkLogDirWritable,
 		d.checkDbAccessible,
 		d.checkDiskSpace,
@@ -356,6 +363,38 @@ func (d *DoctorService) checkPortAvailable(ctx context.Context) model.DoctorChec
 		Label:   "Node-RED Port Available",
 		Status:  model.CheckStatusWarn,
 		Message: "Port 1880 is not accessible",
+	}
+}
+
+// Check 10: local-access
+func (d *DoctorService) checkLocalAccess(ctx context.Context) model.DoctorCheck {
+	_ = ctx
+	name := "local-access"
+
+	if d.localAccess == nil {
+		return model.DoctorCheck{
+			ID:      name,
+			Label:   "Stable Local Access",
+			Status:  model.CheckStatusWarn,
+			Message: "Local access integration is not initialized",
+		}
+	}
+
+	status := d.localAccess.Status()
+	if status.Configured && status.Operational {
+		return model.DoctorCheck{
+			ID:      name,
+			Label:   "Stable Local Access",
+			Status:  model.CheckStatusPass,
+			Message: fmt.Sprintf("Stable hostname available at %s", status.URL),
+		}
+	}
+
+	return model.DoctorCheck{
+		ID:      name,
+		Label:   "Stable Local Access",
+		Status:  model.CheckStatusWarn,
+		Message: status.Message,
 	}
 }
 

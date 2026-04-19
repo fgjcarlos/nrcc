@@ -13,6 +13,17 @@ type fakeRunner struct {
 	errors  map[string]error
 }
 
+func (f fakeRunner) LookPath(name string) (string, error) {
+	key := "lookpath " + name
+	if err, ok := f.errors[key]; ok {
+		return "", err
+	}
+	if output, ok := f.outputs[key]; ok {
+		return output, nil
+	}
+	return "/usr/bin/" + name, nil
+}
+
 func (f fakeRunner) Run(_ string, name string, args ...string) (string, error) {
 	key := name + " " + strings.Join(args, " ")
 	if err, ok := f.errors[key]; ok {
@@ -64,9 +75,9 @@ func TestLibraryServiceInstallAndUninstall(t *testing.T) {
 		dataDir: t.TempDir(),
 		runner: fakeRunner{
 			outputs: map[string]string{
-				"npm install lodash":                 "installed",
-				"npm uninstall lodash":               "removed",
-				"npm ls --json --depth=0":            `{"dependencies":{"lodash":{"version":"4.17.21"}}}`,
+				"npm install lodash":      "installed",
+				"npm uninstall lodash":    "removed",
+				"npm ls --json --depth=0": `{"dependencies":{"lodash":{"version":"4.17.21"}}}`,
 			},
 			errors: map[string]error{},
 		},
