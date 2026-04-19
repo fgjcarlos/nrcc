@@ -7,9 +7,12 @@ type APIResponse[T any] struct {
 	Data      T         `json:"data,omitempty"`
 	Error     *APIError `json:"error,omitempty"`
 	Timestamp time.Time `json:"timestamp"`
+	RequestID string    `json:"request_id,omitempty"`
 }
 
 type APIError struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
+	Code      string `json:"code"`
+	Message   string `json:"message"`
+	RequestID string `json:"request_id,omitempty"`
+	Details   any    `json:"details,omitempty"`
 }

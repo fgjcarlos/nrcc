@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"os"
 	"os/signal"
 	"strconv"
@@ -44,6 +45,15 @@ func Run(args []string, frontend fs.FS) error {
 }
 
 func start(frontend fs.FS) error {
+	// Set up structured logging
+	logLevel := slog.LevelInfo
+	if os.Getenv("NRCC_LOG_LEVEL") == "debug" {
+		logLevel = slog.LevelDebug
+	}
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: logLevel,
+	})))
+
 	envSvc := service.NewEnvironmentService()
 	dataDir, err := envSvc.DefaultDataDir()
 	if err != nil {
@@ -142,15 +152,15 @@ func start(frontend fs.FS) error {
 
 	localAccess := localAccessService.EnsureConfigured()
 
-	fmt.Printf("nrcc listening on http://127.0.0.1:%s\n", port)
-	fmt.Printf("preferred local access: %s\n", localAccess.URL)
+	slog.Info("nrcc listening", "addr", "http://127.0.0.1:"+port)
+	slog.Info("preferred local access", "url", localAccess.URL)
 	if localAccess.URL != localAccess.FallbackURL {
-		fmt.Printf("fallback local access: %s\n", localAccess.FallbackURL)
+		slog.Info("fallback local access", "url", localAccess.FallbackURL)
 	}
 	if localAccess.Message != "" {
-		fmt.Printf("local access status: %s\n", localAccess.Message)
+		slog.Info("local access status", "message", localAccess.Message)
 	}
-	fmt.Printf("node-red runtime on http://127.0.0.1:%d\n", runtimePort)
+	slog.Info("node-red runtime", "addr", fmt.Sprintf("http://127.0.0.1:%d", runtimePort))
 
 	serverErr := make(chan error, 1)
 	go func() {
