@@ -1,5 +1,5 @@
 import type { DoctorReport } from '../../api'
-import { InlineNotice } from '../../common/components'
+import { InlineNotice, LoadingState } from '../../common/components'
 import { formatErrorMessage } from '../../common/utils/format'
 export function DoctorTab({
   report,
@@ -51,7 +51,7 @@ export function DoctorTab({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-3 sm:gap-4">
             {loading ? (
-              <p className="text-sm text-base-content opacity-60">Loading doctor report...</p>
+              <LoadingState message="Loading doctor report..." size="sm" />
             ) : report ? (
               <>
                 <div className={`badge ${getOverallStatusBadge(report.overallStatus)} badge-lg`}>

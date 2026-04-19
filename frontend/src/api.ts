@@ -16,7 +16,10 @@ export type ApiFailure = {
   error: {
     code: string
     message: string
+    request_id?: string
+    details?: unknown
   }
+  request_id?: string
   timestamp: string
 }
 
@@ -25,12 +28,16 @@ export type ApiResponse<T> = ApiSuccess<T> | ApiFailure
 export class APIRequestError extends Error {
   code?: string
   status: number
+  requestId?: string
+  details?: unknown
 
-  constructor(message: string, status: number, code?: string) {
+  constructor(message: string, status: number, code?: string, requestId?: string, details?: unknown) {
     super(message)
     this.name = 'APIRequestError'
     this.status = status
     this.code = code
+    this.requestId = requestId
+    this.details = details
   }
 }
 
@@ -256,7 +263,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!response.ok || !payload || !payload.success) {
     const message = payload && !payload.success ? payload.error.message : `Request failed with status ${response.status}`
     const code = payload && !payload.success ? payload.error.code : undefined
-    throw new APIRequestError(message, response.status, code)
+    const requestId = payload && !payload.success ? (payload.error.request_id ?? payload.request_id) : undefined
+    const details = payload && !payload.success ? payload.error.details : undefined
+    throw new APIRequestError(message, response.status, code, requestId, details)
   }
 
   syncCSRFToken(path, payload.data)

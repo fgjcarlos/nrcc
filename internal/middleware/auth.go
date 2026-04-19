@@ -20,13 +20,13 @@ func RequireAuth(authService *service.AuthService) func(http.Handler) http.Handl
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			cookie, err := r.Cookie(service.SessionCookieName)
 			if err != nil || cookie.Value == "" {
-				writeAuthError(w, http.StatusUnauthorized, "AUTH_REQUIRED", "authentication required")
+				writeAuthError(w, r, http.StatusUnauthorized, "AUTH_REQUIRED", "authentication required")
 				return
 			}
 
 			claims, err := authService.VerifyToken(cookie.Value)
 			if err != nil {
-				writeAuthError(w, http.StatusUnauthorized, "AUTH_INVALID", "invalid session")
+				writeAuthError(w, r, http.StatusUnauthorized, "AUTH_INVALID", "invalid session")
 				return
 			}
 
@@ -46,13 +46,13 @@ func RequireCSRF(authService *service.AuthService) func(http.Handler) http.Handl
 
 			cookie, err := r.Cookie(service.SessionCookieName)
 			if err != nil || cookie.Value == "" {
-				writeAuthError(w, http.StatusUnauthorized, "AUTH_REQUIRED", "authentication required")
+				writeAuthError(w, r, http.StatusUnauthorized, "AUTH_REQUIRED", "authentication required")
 				return
 			}
 
 			token := strings.TrimSpace(r.Header.Get("X-CSRF-Token"))
 			if token == "" || !authService.VerifyCSRF(cookie.Value, token) {
-				writeAuthError(w, http.StatusForbidden, "CSRF_INVALID", "invalid csrf token")
+				writeAuthError(w, r, http.StatusForbidden, "CSRF_INVALID", "invalid csrf token")
 				return
 			}
 
@@ -66,15 +66,18 @@ func AuthClaimsFromContext(ctx context.Context) (model.SessionClaims, bool) {
 	return claims, ok
 }
 
-func writeAuthError(w http.ResponseWriter, status int, code, message string) {
+func writeAuthError(w http.ResponseWriter, r *http.Request, status int, code, message string) {
+	reqID := GetRequestID(r.Context())
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(model.APIResponse[any]{
 		Success: false,
 		Error: &model.APIError{
-			Code:    code,
-			Message: message,
+			Code:      code,
+			Message:   message,
+			RequestID: reqID,
 		},
+		RequestID: reqID,
 		Timestamp: time.Now().UTC(),
 	})
 }

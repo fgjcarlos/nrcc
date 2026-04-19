@@ -62,6 +62,10 @@ func New(cfg Config) *Server {
 	apiLimiter := middleware.NewRateLimiter(100, 20)
 	router.Use(apiLimiter.Middleware())
 
+	// Global middleware: request ID and request logging
+	router.Use(middleware.RequestID)
+	router.Use(middleware.RequestLogger)
+
 	registerAPIRoutes(router, cfg.Runtime, cfg.Auth, cfg.Config, cfg.ManagedEnv, cfg.Backups, cfg.Libraries, cfg.Updates, cfg.Operations, cfg.LocalAccess, cfg.Assets)
 	registerDiagnosticsRoutes(router, cfg)
 	registerAssetRoutes(router, cfg.Auth, cfg.Assets)
@@ -707,6 +711,50 @@ func respondError(w http.ResponseWriter, status int, code, message string) {
 			Code:    code,
 			Message: message,
 		},
+		Timestamp: time.Now().UTC(),
+	})
+}
+
+func respondErrorWithRequest(w http.ResponseWriter, r *http.Request, status int, code, message string) {
+	reqID := middleware.GetRequestID(r.Context())
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(model.APIResponse[any]{
+		Success: false,
+		Error: &model.APIError{
+			Code:      code,
+			Message:   message,
+			RequestID: reqID,
+		},
+		RequestID: reqID,
+		Timestamp: time.Now().UTC(),
+	})
+}
+
+func respondErrorWithDetails(w http.ResponseWriter, r *http.Request, status int, code, message string, details any) {
+	reqID := middleware.GetRequestID(r.Context())
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(model.APIResponse[any]{
+		Success: false,
+		Error: &model.APIError{
+			Code:      code,
+			Message:   message,
+			RequestID: reqID,
+			Details:   details,
+		},
+		RequestID: reqID,
+		Timestamp: time.Now().UTC(),
+	})
+}
+
+func respondOKWithRequest(w http.ResponseWriter, r *http.Request, data any) {
+	reqID := middleware.GetRequestID(r.Context())
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(model.APIResponse[any]{
+		Success:   true,
+		Data:      data,
+		RequestID: reqID,
 		Timestamp: time.Now().UTC(),
 	})
 }

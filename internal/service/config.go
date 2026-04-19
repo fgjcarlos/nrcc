@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -313,7 +313,7 @@ func (s ConfigService) ApplyConfig(cfg model.FullAppConfig, username string) (mo
 	}
 
 	// Step 4: Log the apply event
-	log.Printf("[CONFIG] Config applied by user: %s", username)
+	slog.Info("config applied", "user", username)
 
 	// Step 5: Return result
 	return result, nil
