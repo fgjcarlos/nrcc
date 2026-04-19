@@ -11,7 +11,7 @@ func TestAuthServiceBootstrapStoresHashAndAudit(t *testing.T) {
 
 	service := newTestAuthService(t)
 
-	user, token, err := service.RegisterInitial("alice", "password123")
+	user, token, err := service.RegisterInitial("alice", "Alice2025!sec")
 	if err != nil {
 		t.Fatalf("RegisterInitial() error = %v", err)
 	}
@@ -26,7 +26,7 @@ func TestAuthServiceBootstrapStoresHashAndAudit(t *testing.T) {
 	if record == nil {
 		t.Fatal("findUserByUsername() = nil")
 	}
-	if record.PasswordHash == "password123" {
+	if record.PasswordHash == "Alice2025!sec" {
 		t.Fatal("password was stored in plain text")
 	}
 
@@ -38,7 +38,7 @@ func TestAuthServiceBootstrapStoresHashAndAudit(t *testing.T) {
 		t.Fatalf("audit event = %q, want %q", eventType, "auth.bootstrap")
 	}
 
-	if _, _, err := service.RegisterInitial("bob", "password123"); err == nil {
+	if _, _, err := service.RegisterInitial("bob", "Alice2025!sec"); err == nil {
 		t.Fatal("second RegisterInitial() error = nil, want rejection")
 	}
 }
@@ -47,7 +47,7 @@ func TestAuthServiceLoginRateLimitAndClearAfterSuccess(t *testing.T) {
 	t.Parallel()
 
 	service := newTestAuthService(t)
-	if _, _, err := service.RegisterInitial("alice", "password123"); err != nil {
+	if _, _, err := service.RegisterInitial("alice", "Alice2025!sec"); err != nil {
 		t.Fatalf("RegisterInitial() error = %v", err)
 	}
 
@@ -62,7 +62,7 @@ func TestAuthServiceLoginRateLimitAndClearAfterSuccess(t *testing.T) {
 	}
 
 	service.clearLoginFailures("alice", "127.0.0.1:1234")
-	if _, _, err := service.Login("alice", "password123", "127.0.0.1:1234"); err != nil {
+	if _, _, err := service.Login("alice", "Alice2025!sec", "127.0.0.1:1234"); err != nil {
 		t.Fatalf("successful Login() error = %v", err)
 	}
 
@@ -75,7 +75,7 @@ func TestAuthServiceVerifyAndRevokeToken(t *testing.T) {
 	t.Parallel()
 
 	service := newTestAuthService(t)
-	_, token, err := service.RegisterInitial("alice", "password123")
+	_, token, err := service.RegisterInitial("alice", "Alice2025!sec")
 	if err != nil {
 		t.Fatalf("RegisterInitial() error = %v", err)
 	}

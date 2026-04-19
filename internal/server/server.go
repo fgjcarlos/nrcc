@@ -38,6 +38,7 @@ type Config struct {
 
 type Server struct {
 	httpServer *http.Server
+	apiLimiter *middleware.RateLimiter
 }
 
 type authResponse struct {
@@ -53,6 +54,14 @@ const sessionCookieSameSite = http.SameSiteStrictMode
 
 func New(cfg Config) *Server {
 	router := chi.NewRouter()
+
+	// Security headers on all responses (outermost).
+	router.Use(middleware.SecurityHeaders())
+
+	// General API rate limiting: 100 req/min per IP.
+	apiLimiter := middleware.NewRateLimiter(100, 20)
+	router.Use(apiLimiter.Middleware())
+
 	registerAPIRoutes(router, cfg.Runtime, cfg.Auth, cfg.Config, cfg.ManagedEnv, cfg.Backups, cfg.Libraries, cfg.Updates, cfg.Operations, cfg.LocalAccess, cfg.Assets)
 	registerDiagnosticsRoutes(router, cfg)
 	registerAssetRoutes(router, cfg.Auth, cfg.Assets)
@@ -64,6 +73,7 @@ func New(cfg Config) *Server {
 			Handler:           router,
 			ReadHeaderTimeout: 5 * time.Second,
 		},
+		apiLimiter: apiLimiter,
 	}
 }
 
@@ -72,6 +82,9 @@ func (s *Server) Start() error {
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
+	if s.apiLimiter != nil {
+		s.apiLimiter.Stop()
+	}
 	return s.httpServer.Shutdown(ctx)
 }
 
@@ -87,6 +100,7 @@ func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager
 	})
 
 	if authService != nil {
+		loginLimiter := middleware.NewRateLimiter(5, 5)
 		router.Route("/api/auth", func(r chi.Router) {
 			r.Get("/status", func(w http.ResponseWriter, r *http.Request) {
 				hasUsers, err := authService.HasUsers()
@@ -123,7 +137,7 @@ func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager
 				})
 			})
 
-			r.Post("/login", func(w http.ResponseWriter, r *http.Request) {
+			r.With(loginLimiter.Middleware()).Post("/login", func(w http.ResponseWriter, r *http.Request) {
 				var payload struct {
 					Username string `json:"username"`
 					Password string `json:"password"`
