@@ -8,7 +8,8 @@ import (
 
 // commonPasswords is a small list of the most commonly used passwords.
 // Kept deliberately short — this is a local tool, not a bank.
-var commonPasswords = map[string]struct{}{
+// pragma: allowlist nextline secret
+var commonPasswords = map[string]struct{}{ // pragma: allowlist secret
 	"password": {}, "12345678": {}, "123456789": {}, "1234567890": {},
 	"qwerty123": {}, "password1": {}, "iloveyou": {}, "sunshine": {},
 	"princess": {}, "football": {}, "charlie1": {}, "trustno1": {},
