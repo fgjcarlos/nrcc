@@ -33,6 +33,7 @@ type Config struct {
 	Doctor      *service.DoctorService
 	Support     *service.SupportBundleService
 	LocalAccess *service.LocalAccessService
+	Assets      *service.AssetService
 }
 
 type Server struct {
@@ -52,8 +53,9 @@ const sessionCookieSameSite = http.SameSiteStrictMode
 
 func New(cfg Config) *Server {
 	router := chi.NewRouter()
-	registerAPIRoutes(router, cfg.Runtime, cfg.Auth, cfg.Config, cfg.ManagedEnv, cfg.Backups, cfg.Libraries, cfg.Updates, cfg.Operations, cfg.LocalAccess)
+	registerAPIRoutes(router, cfg.Runtime, cfg.Auth, cfg.Config, cfg.ManagedEnv, cfg.Backups, cfg.Libraries, cfg.Updates, cfg.Operations, cfg.LocalAccess, cfg.Assets)
 	registerDiagnosticsRoutes(router, cfg)
+	registerAssetRoutes(router, cfg.Auth, cfg.Assets)
 	registerSPARoutes(router, cfg.Frontend)
 
 	return &Server{
@@ -73,7 +75,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return s.httpServer.Shutdown(ctx)
 }
 
-func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager, authService *service.AuthService, configService service.ConfigService, managedEnvService service.ManagedEnvService, backupService service.BackupService, libraryService service.LibraryService, updateService service.UpdateService, operationLock *service.OperationLock, localAccessService *service.LocalAccessService) {
+func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager, authService *service.AuthService, configService service.ConfigService, managedEnvService service.ManagedEnvService, backupService service.BackupService, libraryService service.LibraryService, updateService service.UpdateService, operationLock *service.OperationLock, localAccessService *service.LocalAccessService, assetService *service.AssetService) {
 	if operationLock == nil {
 		operationLock = service.NewOperationLock()
 	}
