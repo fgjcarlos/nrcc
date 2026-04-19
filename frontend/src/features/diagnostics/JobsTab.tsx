@@ -1,5 +1,5 @@
 import type { JobRecord } from '../../api'
-import { InlineNotice } from '../../common/components'
+import { InlineNotice, LoadingState, EmptyState } from '../../common/components'
 import { formatErrorMessage, formatDuration } from '../../common/utils/format'
 
 export function JobsTab({
@@ -51,9 +51,12 @@ export function JobsTab({
 
         <div className="table-shell overflow-x-auto">
           {loading ? (
-            <p className="px-4 py-5 text-sm text-base-content opacity-60">Loading jobs...</p>
+            <LoadingState message="Loading jobs..." />
           ) : jobs.length === 0 ? (
-            <p className="px-4 py-5 text-sm text-base-content opacity-60">No jobs recorded yet.</p>
+            <EmptyState
+              title="No jobs recorded yet"
+              description="Scheduled and manual jobs will appear here once they run."
+            />
           ) : (
             <table className="table w-full">
               <thead>

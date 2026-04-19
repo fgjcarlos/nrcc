@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { api, type BackupList } from '../../api'
-import { InlineNotice } from '../../common/components'
+import { InlineNotice, LoadingState, EmptyState } from '../../common/components'
 import { formatErrorMessage } from '../../common/utils/format'
 import type { ToastTone } from '../../common/types'
 import { BackupCard } from './BackupCard'
@@ -79,8 +79,18 @@ export function BackupsPage({
           <h3 className="section-title">Backup history</h3>
           <p className="mt-1 text-sm text-base-content/60">Restore points created manually and automatically by the backend.</p>
         </div>
-          {loading ? <p className="text-sm text-base-content/60">Loading backups...</p> : null}
-          {!loading && (!backups || backups.items.length === 0) ? <p className="text-sm text-base-content/60">No backups created yet.</p> : null}
+          {loading ? <LoadingState message="Loading backups..." /> : null}
+          {!loading && (!backups || backups.items.length === 0) ? (
+            <EmptyState
+              title="No backups created yet"
+              description="Create a manual backup or wait for an automatic one to appear here."
+              action={{
+                label: 'Create backup',
+                onClick: () => createMutation.mutate(),
+                disabled: createMutation.isPending,
+              }}
+            />
+          ) : null}
           {backups?.items.length ? (
             <div className="space-y-4">
               {backups.items.map((backup) => {

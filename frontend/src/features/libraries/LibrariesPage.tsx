@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { api, type LibraryList, type OperationStatus } from '../../api'
-import { InlineNotice } from '../../common/components'
+import { InlineNotice, LoadingState, EmptyState, ConfirmDialog } from '../../common/components'
 import { formatErrorMessage } from '../../common/utils/format'
 import type { ToastTone } from '../../common/types'
 import { LibraryCard } from './LibraryCard'
@@ -21,6 +21,7 @@ export function LibrariesPage({
   onChanged: (message: string, tone: ToastTone) => Promise<void>
 }) {
   const [packageName, setPackageName] = useState('')
+  const [uninstallTarget, setUninstallTarget] = useState<string | null>(null)
 
   const installMutation = useMutation({
     mutationFn: api.installLibrary,
@@ -37,9 +38,11 @@ export function LibrariesPage({
     mutationFn: api.uninstallLibrary,
     onSuccess: async (result) => {
       await onChanged(result.message, 'success')
+      setUninstallTarget(null)
     },
     onError: async (mutationError) => {
       await onChanged(formatErrorMessage(mutationError, 'The package could not be removed.'), 'error')
+      setUninstallTarget(null)
     },
   })
 
@@ -93,8 +96,13 @@ export function LibrariesPage({
           <h3 className="section-title">Installed packages</h3>
           <p className="mt-1 text-sm text-base-content/60">Packages currently available inside the runtime.</p>
         </div>
-          {loading ? <p className="text-sm text-base-content/60">Loading installed packages...</p> : null}
-          {!loading && (!libraries || libraries.items.length === 0) ? <p className="text-sm text-base-content/60">No additional packages installed.</p> : null}
+          {loading ? <LoadingState message="Loading installed packages..." /> : null}
+          {!loading && (!libraries || libraries.items.length === 0) ? (
+            <EmptyState
+              title="No additional packages installed"
+              description="Use the form above to install npm packages into the Node-RED runtime."
+            />
+          ) : null}
           {libraries?.items.length ? (
             <div className="space-y-4">
               {libraries.items.map((item) => (
@@ -103,12 +111,25 @@ export function LibrariesPage({
                   item={item}
                   isPending={uninstallMutation.isPending}
                   busy={busy}
-                  onUninstall={() => uninstallMutation.mutate(item.name)}
+                  onUninstall={() => setUninstallTarget(item.name)}
                 />
               ))}
             </div>
           ) : null}
       </article>
+
+      <ConfirmDialog
+        open={uninstallTarget !== null}
+        title="Remove package"
+        description={`Are you sure you want to uninstall "${uninstallTarget}"? This will remove it from the Node-RED runtime.`}
+        confirmLabel="Remove"
+        tone="danger"
+        busy={uninstallMutation.isPending}
+        onConfirm={() => {
+          if (uninstallTarget) uninstallMutation.mutate(uninstallTarget)
+        }}
+        onCancel={() => setUninstallTarget(null)}
+      />
     </>
   )
 }

@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { api } from './api'
 import { buildGlobalStatus } from './common/utils/status'
-import { ThemeProvider, PageTransition } from './common/components'
+import { ThemeProvider, PageTransition, ErrorBoundary } from './common/components'
 import { useAuth } from './features/auth/useAuth'
 import { AuthScreen } from './features/auth/AuthScreen'
 import { LoadingScreen } from './features/auth/LoadingScreen'
@@ -452,8 +452,10 @@ function AppContent() {
 
 export function App() {
   return (
-    <ThemeProvider>
-      <AppContent />
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <AppContent />
+      </ThemeProvider>
+    </ErrorBoundary>
   )
 }
