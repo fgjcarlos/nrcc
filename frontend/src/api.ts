@@ -223,6 +223,21 @@ export type ExportResponse = {
   size: number
 }
 
+export type AssetInfo = {
+  id: string
+  category: string
+  filename: string
+  original: string
+  mimeType: string
+  size: number
+  url: string
+  createdAt: string
+}
+
+export type AssetList = {
+  items: AssetInfo[]
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const method = (init?.method ?? 'GET').toUpperCase()
   const headers = new Headers(init?.headers ?? {})
@@ -277,6 +292,36 @@ function syncCSRFToken(path: string, data: unknown) {
 
 function requiresCSRF(method: string) {
   return method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE'
+}
+
+async function requestMultipart<T>(path: string, formData: FormData): Promise<T> {
+  const headers = new Headers()
+  // Do NOT set Content-Type — browser sets it with boundary for multipart
+  if (csrfToken) {
+    headers.set('X-CSRF-Token', csrfToken)
+  }
+
+  const response = await fetch(path, {
+    method: 'POST',
+    credentials: 'include',
+    headers,
+    body: formData,
+  })
+
+  let payload: ApiResponse<T> | null = null
+  try {
+    payload = (await response.json()) as ApiResponse<T>
+  } catch {
+    payload = null
+  }
+
+  if (!response.ok || !payload || !payload.success) {
+    const message = payload && !payload.success ? payload.error.message : `Request failed with status ${response.status}`
+    const code = payload && !payload.success ? payload.error.code : undefined
+    throw new APIRequestError(message, response.status, code)
+  }
+
+  return payload.data
 }
 
 export const api = {
@@ -400,5 +445,17 @@ export const api = {
       request<{ config: FullAppConfig; warnings: string[] }>('/api/config/import', {
         method: 'POST',
         body: JSON.stringify({ content }),
+      }),
+
+    // Asset management
+    uploadAsset: (category: string, file: File) => {
+      const formData = new FormData()
+      formData.append('file', file)
+      return requestMultipart<AssetInfo>(`/api/assets/${category}/upload`, formData)
+    },
+    listAssets: (category: string) => request<AssetList>(`/api/assets/${category}`),
+    deleteAsset: (category: string, id: string) =>
+      request<{ deleted: boolean }>(`/api/assets/${category}/${id}`, {
+        method: 'DELETE',
       }),
 }

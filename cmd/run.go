@@ -107,6 +107,7 @@ func start(frontend fs.FS) error {
 		return fmt.Errorf("invalid NRCC_NODE_RED_PORT: %w", err)
 	}
 	localAccessService := service.NewLocalAccessService(localAccessPort)
+	assetService := service.NewAssetService(dataDir)
 
 	processManager := service.NewProcessManager(service.ProcessConfig{
 		DataDir: dataDir,
@@ -146,6 +147,7 @@ func start(frontend fs.FS) error {
 		Doctor:      doctorService,
 		Support:     supportBundleService,
 		LocalAccess: localAccessService,
+		Assets:      &assetService,
 	})
 
 	localAccess := localAccessService.EnsureConfigured()

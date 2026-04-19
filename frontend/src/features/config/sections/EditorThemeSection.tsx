@@ -1,11 +1,190 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { EditorThemeConfig } from '../../../types/config'
 import { FormField } from '../../../components/forms'
+import { api, AssetInfo } from '../../../api'
 
 type SectionProps<T> = {
   value: T
   onChange: (next: T) => void
   errors: Record<string, string>
+}
+
+type BrandingSlotProps = {
+  id: string
+  label: string
+  hint: string
+  category: string
+  currentUrl: string
+  onUrlChange: (url: string) => void
+}
+
+function BrandingSlot({ id, label, hint, category, currentUrl, onUrlChange }: BrandingSlotProps) {
+  const [assets, setAssets] = useState<AssetInfo[]>([])
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState('')
+  const [showUrlInput, setShowUrlInput] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const loadAssets = useCallback(async () => {
+    try {
+      const list = await api.listAssets(category)
+      setAssets(list.items)
+    } catch {
+      // ignore — category may not have any assets yet
+    }
+  }, [category])
+
+  useEffect(() => {
+    loadAssets()
+  }, [loadAssets])
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setError('')
+    setUploading(true)
+    try {
+      const asset = await api.uploadAsset(category, file)
+      onUrlChange(asset.url)
+      await loadAssets()
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Upload failed')
+    } finally {
+      setUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  const handleDelete = async (assetId: string, assetUrl: string) => {
+    try {
+      await api.deleteAsset(category, assetId)
+      if (currentUrl === assetUrl) {
+        onUrlChange('')
+      }
+      await loadAssets()
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Delete failed')
+    }
+  }
+
+  const handleSelect = (url: string) => {
+    onUrlChange(url)
+  }
+
+  const isLocalAsset = currentUrl.startsWith('/assets/')
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <label className="label">
+          <span className="label-text font-medium">{label}</span>
+        </label>
+        <p className="text-xs text-base-content/60 mb-2">{hint}</p>
+      </div>
+
+      {/* Current image preview */}
+      {currentUrl && (
+        <div className="flex items-center gap-3 p-3 bg-base-200/50 rounded-lg">
+          <img
+            src={currentUrl}
+            alt={label}
+            className="h-10 w-10 object-contain rounded border border-base-300"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+          />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm truncate">{currentUrl}</p>
+          </div>
+          <button
+            type="button"
+            className="btn btn-ghost btn-xs"
+            onClick={() => onUrlChange('')}
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
+      {/* Upload button */}
+      <div className="flex flex-wrap gap-2">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/gif,image/svg+xml,image/x-icon,.ico"
+          className="hidden"
+          id={`upload-${id}`}
+          onChange={handleUpload}
+        />
+        <button
+          type="button"
+          className="btn btn-sm btn-outline"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+        >
+          {uploading ? 'Uploading...' : 'Upload Image'}
+        </button>
+        <button
+          type="button"
+          className="btn btn-sm btn-ghost"
+          onClick={() => setShowUrlInput(!showUrlInput)}
+        >
+          {showUrlInput ? 'Hide URL Input' : 'Use URL Instead'}
+        </button>
+      </div>
+
+      {/* Manual URL input */}
+      {showUrlInput && (
+        <FormField
+          id={`${id}-url`}
+          label="Image URL"
+          type="text"
+          value={isLocalAsset ? '' : currentUrl}
+          onChange={onUrlChange}
+          placeholder="https://example.com/image.png"
+        />
+      )}
+
+      {/* Uploaded assets gallery */}
+      {assets.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-xs font-medium text-base-content/70">Uploaded files</p>
+          <div className="flex flex-wrap gap-2">
+            {assets.map((asset) => (
+              <div
+                key={asset.id}
+                className={`relative group flex items-center gap-2 p-2 rounded border cursor-pointer transition-colors ${
+                  currentUrl === asset.url
+                    ? 'border-primary bg-primary/10'
+                    : 'border-base-300 hover:border-primary/50'
+                }`}
+                onClick={() => handleSelect(asset.url)}
+              >
+                <img
+                  src={asset.url}
+                  alt={asset.original}
+                  className="h-8 w-8 object-contain"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                />
+                <span className="text-xs truncate max-w-[100px]">{asset.original}</span>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleDelete(asset.id, asset.url)
+                  }}
+                  title="Delete"
+                >
+                  &times;
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {error && <p className="text-xs text-error">{error}</p>}
+    </div>
+  )
 }
 
 export function EditorThemeSection({ value, onChange, errors }: SectionProps<EditorThemeConfig>) {
@@ -178,12 +357,13 @@ export function EditorThemeSection({ value, onChange, errors }: SectionProps<Edi
              }
            />
 
-           <FormField
+           <BrandingSlot
              id="editor-page-favicon"
-             label="Favicon URL"
-             type="text"
-             value={value.page.favicon}
-             onChange={(v) =>
+             label="Favicon"
+             hint="Upload or link a favicon image (.ico, .png, .svg)."
+             category="favicon"
+             currentUrl={value.page.favicon}
+             onUrlChange={(v) =>
                updateField('page', { ...value.page!, favicon: v })
              }
            />
@@ -239,12 +419,13 @@ export function EditorThemeSection({ value, onChange, errors }: SectionProps<Edi
              }
            />
 
-           <FormField
+           <BrandingSlot
              id="editor-header-image"
              label="Header Image"
-             type="text"
-             value={value.header.image}
-             onChange={(v) =>
+             hint="Upload or link a header logo image."
+             category="header"
+             currentUrl={value.header.image}
+             onUrlChange={(v) =>
                updateField('header', { ...value.header!, image: v })
              }
            />
