@@ -8,26 +8,25 @@ import (
 
 // commonPasswords is a small list of the most commonly used passwords.
 // Kept deliberately short — this is a local tool, not a bank.
-// pragma: allowlist nextline secret
-var commonPasswords = map[string]struct{}{ // pragma: allowlist secret
-	"password": {}, "12345678": {}, "123456789": {}, "1234567890": {},
-	"qwerty123": {}, "password1": {}, "iloveyou": {}, "sunshine": {},
-	"princess": {}, "football": {}, "charlie1": {}, "trustno1": {},
-	"dragon12": {}, "baseball": {}, "abc12345": {}, "monkey12": {},
-	"letmein1": {}, "shadow12": {}, "master12": {}, "qwertyui": {},
-	"michael1": {}, "superman": {}, "1qaz2wsx": {}, "jennifer": {},
-	"hunter12": {}, "thomas12": {}, "password123": {}, "admin123": {},
-	"welcome1": {}, "passw0rd": {}, "starwars": {}, "whatever": {},
-	"computer": {}, "corvette": {}, "12341234": {}, "88888888": {},
-	"87654321": {}, "abcdefgh": {}, "11111111": {}, "22222222": {},
-	"33333333": {}, "44444444": {}, "55555555": {}, "66666666": {},
-	"77777777": {}, "99999999": {}, "00000000": {}, "qwerty12": {},
-	"iloveu12": {}, "trustme1": {}, "changeme": {}, "admin1234": {},
-	"password12": {}, "letmein12": {}, "welcome12": {}, "monkey123": {},
-	"dragon123": {}, "master123": {}, "qwerty1234": {}, "password1234": {},
-	"abc123456": {}, "654321abc": {}, "123abc456": {}, "pass1234": {},
-	"test1234": {}, "hello123": {}, "p@ssw0rd": {}, "p@ssword": {},
-	"Pa$$w0rd": {}, "asdfghjk": {}, "zxcvbnm1": {},
+var commonPasswords = map[string]struct{}{
+	"password": {}, "12345678": {}, "123456789": {}, "1234567890": {}, // pragma: allowlist secret
+	"qwerty123": {}, "password1": {}, "iloveyou": {}, "sunshine": {}, // pragma: allowlist secret
+	"princess": {}, "football": {}, "charlie1": {}, "trustno1": {}, // pragma: allowlist secret
+	"dragon12": {}, "baseball": {}, "abc12345": {}, "monkey12": {}, // pragma: allowlist secret
+	"letmein1": {}, "shadow12": {}, "master12": {}, "qwertyui": {}, // pragma: allowlist secret
+	"michael1": {}, "superman": {}, "1qaz2wsx": {}, "jennifer": {}, // pragma: allowlist secret
+	"hunter12": {}, "thomas12": {}, "password123": {}, "admin123": {}, // pragma: allowlist secret
+	"welcome1": {}, "passw0rd": {}, "starwars": {}, "whatever": {}, // pragma: allowlist secret
+	"computer": {}, "corvette": {}, "12341234": {}, "88888888": {}, // pragma: allowlist secret
+	"87654321": {}, "abcdefgh": {}, "11111111": {}, "22222222": {}, // pragma: allowlist secret
+	"33333333": {}, "44444444": {}, "55555555": {}, "66666666": {}, // pragma: allowlist secret
+	"77777777": {}, "99999999": {}, "00000000": {}, "qwerty12": {}, // pragma: allowlist secret
+	"iloveu12": {}, "trustme1": {}, "changeme": {}, "admin1234": {}, // pragma: allowlist secret
+	"password12": {}, "letmein12": {}, "welcome12": {}, "monkey123": {}, // pragma: allowlist secret
+	"dragon123": {}, "master123": {}, "qwerty1234": {}, "password1234": {}, // pragma: allowlist secret
+	"abc123456": {}, "654321abc": {}, "123abc456": {}, "pass1234": {}, // pragma: allowlist secret
+	"test1234": {}, "hello123": {}, "p@ssw0rd": {}, "p@ssword": {}, // pragma: allowlist secret
+	"Pa$$w0rd": {}, "asdfghjk": {}, "zxcvbnm1": {}, // pragma: allowlist secret
 }
 
 // PasswordValidationError contains structured information about why a password
