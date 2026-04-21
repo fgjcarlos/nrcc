@@ -1,15 +1,16 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { api } from '../../api'
+import { api, type OperationStatus } from '../../api'
 import { FullAppConfig } from '../../types/config'
 import { SettingsPanel } from './SettingsPanel'
 
 type ConfigPageCallbacks = {
+  operationStatus?: OperationStatus
   onSaved?: (restartRequired: boolean) => void
   onError?: (message: string) => void
   onToast?: (message: string, type: 'success' | 'error' | 'info') => void
 }
 
-export function ConfigPage({ onSaved, onError, onToast }: ConfigPageCallbacks = {}) {
+export function ConfigPage({ operationStatus, onSaved, onError, onToast }: ConfigPageCallbacks = {}) {
   const queryClient = useQueryClient()
 
   const configQuery = useQuery({
@@ -55,6 +56,7 @@ export function ConfigPage({ onSaved, onError, onToast }: ConfigPageCallbacks = 
       <SettingsPanel
         config={configQuery.data}
         loading={configQuery.isLoading}
+        operationStatus={operationStatus}
         onSaved={handleSaved}
         onError={handleError}
         onToast={onToast}

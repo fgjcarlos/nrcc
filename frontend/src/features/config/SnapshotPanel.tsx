@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react'
-import { api } from '../../api'
+import { api, type OperationStatus } from '../../api'
 import { ConfigSnapshot } from '../../types/config'
-import { LoadingState, EmptyState } from '../../common/components'
+import { InlineNotice, LoadingState, EmptyState } from '../../common/components'
 
 type SnapshotPanelProps = {
   isOpen: boolean
+  operationStatus?: OperationStatus
   onClose: () => void
   onRestored: () => void
 }
 
-export function SnapshotPanel({ isOpen, onClose, onRestored }: SnapshotPanelProps) {
+export function SnapshotPanel({ isOpen, operationStatus, onClose, onRestored }: SnapshotPanelProps) {
   const [snapshots, setSnapshots] = useState<ConfigSnapshot[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string>('')
@@ -17,6 +18,7 @@ export function SnapshotPanel({ isOpen, onClose, onRestored }: SnapshotPanelProp
   const [newLabel, setNewLabel] = useState('')
   const [restoring, setRestoring] = useState<string | null>(null)
   const [confirmRestoreId, setConfirmRestoreId] = useState<string | null>(null)
+  const busy = operationStatus?.busy ?? false
 
   // Fetch snapshots on open
   useEffect(() => {
@@ -111,6 +113,17 @@ export function SnapshotPanel({ isOpen, onClose, onRestored }: SnapshotPanelProp
             </p>
           )}
 
+          {busy && !restoring ? (
+            <InlineNotice
+              tone="warn"
+              title="System busy"
+              detail={
+                (operationStatus?.type ? `${operationStatus.type} in progress` : 'Another operation is in progress') +
+                (operationStatus?.detail ? `: ${operationStatus.detail}` : '.')
+              }
+            />
+          ) : null}
+
           {/* Snapshots list */}
           {loading && <LoadingState message="Loading snapshots..." />}
 
@@ -145,17 +158,17 @@ export function SnapshotPanel({ isOpen, onClose, onRestored }: SnapshotPanelProp
                            <div className="flex gap-2 items-center">
                               <p className="text-sm">Restore this snapshot?</p>
                               <button
-                                className="action-btn-danger"
-                                onClick={() => handleRestore(snapshot.id)}
-                                disabled={restoring === snapshot.id}
-                              >
+                                 className="action-btn-danger"
+                                 onClick={() => handleRestore(snapshot.id)}
+                                 disabled={busy || restoring === snapshot.id}
+                               >
                                {restoring === snapshot.id ? 'Restoring...' : 'Confirm'}
                               </button>
                               <button
-                                className="action-btn-ghost"
-                               onClick={() => setConfirmRestoreId(null)}
-                               disabled={restoring === snapshot.id}
-                             >
+                                 className="action-btn-ghost"
+                                onClick={() => setConfirmRestoreId(null)}
+                                disabled={busy || restoring === snapshot.id}
+                              >
                               Cancel
                             </button>
                           </div>
@@ -163,7 +176,8 @@ export function SnapshotPanel({ isOpen, onClose, onRestored }: SnapshotPanelProp
                            <button
                              className="action-btn-secondary"
                              onClick={() => setConfirmRestoreId(snapshot.id)}
-                           >
+                              disabled={busy}
+                            >
                              Restore
                           </button>
                         )}
