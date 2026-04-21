@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { api, type BackupList } from '../../api'
+import { api, type BackupList, type OperationStatus } from '../../api'
 import { InlineNotice, LoadingState, EmptyState } from '../../common/components'
 import { formatErrorMessage } from '../../common/utils/format'
 import type { ToastTone } from '../../common/types'
@@ -10,14 +10,17 @@ export function BackupsPage({
   backups,
   loading,
   error,
+  operationStatus,
   onChanged,
 }: {
   backups?: BackupList
   loading: boolean
   error: unknown
+  operationStatus?: OperationStatus
   onChanged: (message: string, tone: ToastTone) => Promise<void>
 }) {
   const [restoreTarget, setRestoreTarget] = useState<string | null>(null)
+  const busy = operationStatus?.busy ?? false
 
   const createMutation = useMutation({
     mutationFn: api.createBackup,
@@ -74,6 +77,17 @@ export function BackupsPage({
         />
       ) : null}
 
+      {busy ? (
+        <InlineNotice
+          tone="warn"
+          title="System busy"
+          detail={
+            (operationStatus?.type ? `${operationStatus.type} in progress` : 'Another operation is in progress') +
+            (operationStatus?.detail ? `: ${operationStatus.detail}` : '.')
+          }
+        />
+      ) : null}
+
       <article className="surface-card border border-base-300/60 p-6 md:p-7">
         <div className="mb-5">
           <h3 className="section-title">Backup history</h3>
@@ -100,7 +114,7 @@ export function BackupsPage({
                     key={backup.id}
                     backup={backup}
                     confirming={confirming}
-                    isPending={restoreMutation.isPending}
+                    isPending={busy || restoreMutation.isPending}
                     onRestore={() => setRestoreTarget(backup.id)}
                     onCancel={() => setRestoreTarget(null)}
                     onConfirm={() => restoreMutation.mutate(backup.id)}

@@ -149,6 +149,7 @@ export function OverviewPage({
             </span>
             <RestartButton
               confirmRestart={confirmRestart}
+              blocked={operationStatus?.busy ?? false}
               restarting={restarting}
               onConfirm={handleRestartConfirm}
               onCancel={() => setConfirmRestart(false)}

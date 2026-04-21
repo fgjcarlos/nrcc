@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"nrcc/internal/middleware"
 	"nrcc/internal/model"
 	"nrcc/internal/service"
 )
@@ -193,6 +194,7 @@ func TestOperationStatusAndRestoreConflict(t *testing.T) {
 
 	backupSvc := service.NewBackupService(testDataDir)
 	router := chi.NewRouter()
+	router.Use(middleware.RequestID)
 	registerAPIRoutes(
 		router,
 		nil,
@@ -246,6 +248,109 @@ func TestOperationStatusAndRestoreConflict(t *testing.T) {
 	router.ServeHTTP(restoreRec, restoreReq)
 	if restoreRec.Code != http.StatusConflict {
 		t.Fatalf("restore while locked = %d, want %d body=%s", restoreRec.Code, http.StatusConflict, restoreRec.Body.String())
+	}
+
+	var conflictResp model.APIResponse[any]
+	decodeResponse(t, restoreRec.Body.Bytes(), &conflictResp)
+	if !strings.EqualFold(conflictResp.Error.Code, "OPERATION_IN_PROGRESS") {
+		t.Fatalf("conflict code = %q, want OPERATION_IN_PROGRESS", conflictResp.Error.Code)
+	}
+	if conflictResp.RequestID == "" || conflictResp.Error.RequestID == "" {
+		t.Fatalf("request ids missing in conflict response: %+v", conflictResp)
+	}
+	details, ok := conflictResp.Error.Details.(map[string]any)
+	if !ok {
+		t.Fatalf("conflict details type = %T, want map", conflictResp.Error.Details)
+	}
+	if busy, _ := details["busy"].(bool); !busy {
+		t.Fatalf("conflict details busy = %v, want true", details["busy"])
+	}
+	if opType, _ := details["type"].(string); opType != "installing" {
+		t.Fatalf("conflict details type = %q, want installing", opType)
+	}
+}
+
+func TestLockedRuntimeAndConfigRestoreReturnConflict(t *testing.T) {
+	t.Parallel()
+
+	testDataDir := t.TempDir()
+	lock := service.NewOperationLock()
+	release, err := lock.Acquire("updating", "node-red")
+	if err != nil {
+		t.Fatalf("Acquire() error = %v", err)
+	}
+	defer release()
+
+	backupSvc := service.NewBackupService(testDataDir)
+	router := chi.NewRouter()
+	router.Use(middleware.RequestID)
+	registerAPIRoutes(
+		router,
+		service.NewProcessManager(service.ProcessConfig{DataDir: testDataDir, Port: 1880}),
+		nil,
+		service.NewConfigService(testDataDir, nil),
+		service.NewManagedEnvService(testDataDir),
+		backupSvc,
+		service.NewLibraryService(testDataDir),
+		service.NewUpdateService(testDataDir, &backupSvc),
+		lock,
+		nil,
+		nil,
+	)
+
+	for _, path := range []string{"/api/runtime/restart", "/api/config/backups/snapshot-1/restore"} {
+		req := httptest.NewRequest(http.MethodPost, path, nil)
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusConflict {
+			t.Fatalf("%s status = %d, want %d body=%s", path, rec.Code, http.StatusConflict, rec.Body.String())
+		}
+
+		var resp model.APIResponse[any]
+		decodeResponse(t, rec.Body.Bytes(), &resp)
+		if resp.Error == nil || resp.Error.Code != "OPERATION_IN_PROGRESS" {
+			t.Fatalf("%s error = %+v", path, resp.Error)
+		}
+	}
+}
+
+func TestRuntimeRestartErrorIncludesRequestID(t *testing.T) {
+	t.Parallel()
+
+	testDataDir := t.TempDir()
+	backupSvc := service.NewBackupService(testDataDir)
+	router := chi.NewRouter()
+	router.Use(middleware.RequestID)
+	registerAPIRoutes(
+		router,
+		service.NewProcessManager(service.ProcessConfig{DataDir: testDataDir, Port: 1880}),
+		nil,
+		service.NewConfigService(testDataDir, nil),
+		service.NewManagedEnvService(testDataDir),
+		backupSvc,
+		service.NewLibraryService(testDataDir),
+		service.NewUpdateService(testDataDir, &backupSvc),
+		service.NewOperationLock(),
+		nil,
+		nil,
+	)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/runtime/restart", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("restart status = %d, want %d body=%s", rec.Code, http.StatusInternalServerError, rec.Body.String())
+	}
+
+	var resp model.APIResponse[any]
+	decodeResponse(t, rec.Body.Bytes(), &resp)
+	if resp.Error == nil || resp.Error.Code != "RUNTIME_RESTART_FAILED" {
+		t.Fatalf("restart error = %+v", resp.Error)
+	}
+	if resp.RequestID == "" || resp.Error.RequestID == "" {
+		t.Fatalf("request ids missing in restart error response: %+v", resp)
 	}
 }
 

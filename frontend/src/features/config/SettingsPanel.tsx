@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
-import { api, APIRequestError } from '../../api'
+import { api, APIRequestError, type OperationStatus } from '../../api'
 import { FullAppConfig, FieldError } from '../../types/config'
 import { TabBar } from './TabBar'
 import { ServerSection } from './sections/ServerSection'
@@ -24,12 +24,13 @@ import { LoadingState } from '../../common/components'
 type SettingsPanelProps = {
   config?: FullAppConfig
   loading: boolean
+  operationStatus?: OperationStatus
   onSaved: (restartRequired: boolean) => Promise<void>
   onError: (message: string) => void
   onToast?: (message: string, type: 'success' | 'error' | 'info') => void
 }
 
-export function SettingsPanel({ config, loading, onSaved, onError, onToast }: SettingsPanelProps) {
+export function SettingsPanel({ config, loading, operationStatus, onSaved, onError, onToast }: SettingsPanelProps) {
   const queryClient = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
   const activeSection = searchParams.get('section') ?? 'server'
@@ -334,6 +335,7 @@ export function SettingsPanel({ config, loading, onSaved, onError, onToast }: Se
 
       <SnapshotPanel
         isOpen={showSnapshots}
+        operationStatus={operationStatus}
         onClose={() => setShowSnapshots(false)}
         onRestored={handleSnapshotRestored}
       />
