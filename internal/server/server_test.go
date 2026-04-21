@@ -38,7 +38,7 @@ func TestAuthFlowAndProtectedRoutes(t *testing.T) {
 
 	registerBody := map[string]string{
 		"username": "alice",
-		"password": "password123",
+		"password": "Alice2025!secure",
 	}
 
 	registerReq := newJSONRequest(t, http.MethodPost, "/api/auth/register", registerBody)
@@ -139,7 +139,7 @@ func TestLoginCookieSecureOnForwardedHTTPS(t *testing.T) {
 	t.Parallel()
 
 	authService, configService := newTestServices(t)
-	if _, _, err := authService.RegisterInitial("alice", "password123"); err != nil {
+	if _, _, err := authService.RegisterInitial("alice", "Alice2025!secure"); err != nil {
 		t.Fatalf("RegisterInitial() error = %v", err)
 	}
 
@@ -162,7 +162,7 @@ func TestLoginCookieSecureOnForwardedHTTPS(t *testing.T) {
 
 	loginReq := newJSONRequest(t, http.MethodPost, "/api/auth/login", map[string]string{
 		"username": "alice",
-		"password": "password123",
+		"password": "Alice2025!secure",
 	})
 	loginReq.Header.Set("X-Forwarded-Proto", "https")
 
@@ -207,13 +207,13 @@ func TestOperationStatusAndRestoreConflict(t *testing.T) {
 		nil,
 	)
 
-	if _, _, err := authService.RegisterInitial("alice", "password123"); err != nil {
+	if _, _, err := authService.RegisterInitial("alice", "Alice2025!secure"); err != nil {
 		t.Fatalf("RegisterInitial() error = %v", err)
 	}
 
 	loginReq := newJSONRequest(t, http.MethodPost, "/api/auth/login", map[string]string{
 		"username": "alice",
-		"password": "password123",
+		"password": "Alice2025!secure",
 	})
 	loginRec := httptest.NewRecorder()
 	router.ServeHTTP(loginRec, loginReq)

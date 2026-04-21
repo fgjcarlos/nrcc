@@ -1,0 +1,6 @@
+version: 2
+secret:
+  ignored_paths:
+    - "internal/security/password.go"
+    - "**/*_test.go"
+    - "internal/config/config.go"
