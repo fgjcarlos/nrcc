@@ -2,6 +2,7 @@ package service
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"nrcc/internal/model"
@@ -29,8 +30,9 @@ func TestBackupServiceCreateListAndRestore(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("Apply(config) error = %v", err)
 	}
-	if err := platform.WriteFileAtomic(filepath.Join(dataDir, ".env.managed"), []byte("API_KEY=before\n"), 0o600); err != nil {
-		t.Fatalf("WriteFileAtomic(.env.managed) error = %v", err)
+	managedEnvService := NewManagedEnvService(dataDir)
+	if _, err := managedEnvService.Apply([]model.ManagedEnvVar{{Name: "API_KEY", Value: "before", Secret: true}}); err != nil {
+		t.Fatalf("Apply(managed env) error = %v", err)
 	}
 	if err := platform.WriteFileAtomic(filepath.Join(dataDir, "flows.json"), []byte(`{"rev":"one"}`), 0o644); err != nil {
 		t.Fatalf("WriteFileAtomic(flows.json) error = %v", err)
@@ -60,8 +62,8 @@ func TestBackupServiceCreateListAndRestore(t *testing.T) {
 		t.Fatalf("List() len = %d, want 1", len(list.Items))
 	}
 
-	if err := platform.WriteFileAtomic(filepath.Join(dataDir, ".env.managed"), []byte("API_KEY=after\n"), 0o600); err != nil {
-		t.Fatalf("mutate .env.managed error = %v", err)
+	if _, err := managedEnvService.Apply([]model.ManagedEnvVar{{Name: "API_KEY", Value: "after", Secret: true}}); err != nil {
+		t.Fatalf("mutate managed env error = %v", err)
 	}
 	if err := platform.WriteFileAtomic(filepath.Join(dataDir, "flows.json"), []byte(`{"rev":"two"}`), 0o644); err != nil {
 		t.Fatalf("mutate flows.json error = %v", err)
@@ -79,8 +81,19 @@ func TestBackupServiceCreateListAndRestore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile(.env.managed) error = %v", err)
 	}
-	if string(envRaw) != "API_KEY=before\n" {
+	if !strings.Contains(string(envRaw), managedEnvEncryptedPrefix) || strings.Contains(string(envRaw), "before") {
 		t.Fatalf("restored .env.managed = %q", string(envRaw))
+	}
+
+	if _, err := platform.ReadFile(filepath.Join(dataDir, managedEnvKeyFile)); err != nil {
+		t.Fatalf("ReadFile(managed env key) error = %v", err)
+	}
+	runtimeLines, err := managedEnvService.RuntimeLines()
+	if err != nil {
+		t.Fatalf("RuntimeLines() error = %v", err)
+	}
+	if len(runtimeLines) != 1 || runtimeLines[0] != "API_KEY=before" {
+		t.Fatalf("RuntimeLines() = %v, want restored secret", runtimeLines)
 	}
 
 	flowsRaw, err := platform.ReadFile(filepath.Join(dataDir, "flows.json"))

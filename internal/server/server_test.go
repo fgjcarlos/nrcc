@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -351,6 +353,75 @@ func TestRuntimeRestartErrorIncludesRequestID(t *testing.T) {
 	}
 	if resp.RequestID == "" || resp.Error.RequestID == "" {
 		t.Fatalf("request ids missing in restart error response: %+v", resp)
+	}
+}
+
+func TestEnvironmentAPIHidesSecretValues(t *testing.T) {
+	t.Parallel()
+
+	const strongPassword = "NRCCTestVault847"
+
+	authService, configService := newTestServices(t)
+	testDataDir := t.TempDir()
+	managedEnvService := service.NewManagedEnvService(testDataDir)
+	if _, err := managedEnvService.Apply([]model.ManagedEnvVar{{Name: "API_KEY", Value: "super-secret", Secret: true}}); err != nil {
+		t.Fatalf("Apply(managed env) error = %v", err)
+	}
+
+	backupSvc := service.NewBackupService(testDataDir)
+	router := chi.NewRouter()
+	registerAPIRoutes(
+		router,
+		nil,
+		authService,
+		configService,
+		managedEnvService,
+		backupSvc,
+		service.NewLibraryService(testDataDir),
+		service.NewUpdateService(testDataDir, &backupSvc),
+		service.NewOperationLock(),
+		nil,
+		nil,
+	)
+
+	if _, _, err := authService.RegisterInitial("alice", strongPassword); err != nil {
+		t.Fatalf("RegisterInitial() error = %v", err)
+	}
+
+	loginReq := newJSONRequest(t, http.MethodPost, "/api/auth/login", map[string]string{
+		"username": "alice",
+		"password": strongPassword,
+	})
+	loginRec := httptest.NewRecorder()
+	router.ServeHTTP(loginRec, loginReq)
+	if loginRec.Code != http.StatusOK {
+		t.Fatalf("login status = %d, want %d", loginRec.Code, http.StatusOK)
+	}
+
+	cookie := sessionCookieFromResponse(t, loginRec.Result())
+	getReq := httptest.NewRequest(http.MethodGet, "/api/environment", nil)
+	getReq.AddCookie(cookie)
+	getRec := httptest.NewRecorder()
+	router.ServeHTTP(getRec, getReq)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("GET /api/environment status = %d, want %d body=%s", getRec.Code, http.StatusOK, getRec.Body.String())
+	}
+
+	var getResp model.APIResponse[model.ManagedEnvState]
+	decodeResponse(t, getRec.Body.Bytes(), &getResp)
+	if len(getResp.Data.Variables) != 1 {
+		t.Fatalf("GET /api/environment len = %d, want 1", len(getResp.Data.Variables))
+	}
+	if !getResp.Data.Variables[0].Secret || getResp.Data.Variables[0].Value != "" || !getResp.Data.Variables[0].HasValue {
+		t.Fatalf("GET /api/environment variable = %+v, want masked secret", getResp.Data.Variables[0])
+	}
+
+	raw, err := os.ReadFile(filepath.Join(testDataDir, ".env.managed"))
+	if err != nil {
+		t.Fatalf("ReadFile(.env.managed) error = %v", err)
+	}
+	if strings.Contains(string(raw), "super-secret") {
+		t.Fatalf(".env.managed leaked plaintext secret: %q", string(raw))
 	}
 }
 
