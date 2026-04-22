@@ -149,6 +149,7 @@ export function OverviewPage({
             </span>
             <RestartButton
               confirmRestart={confirmRestart}
+              blocked={operationStatus?.busy ?? false}
               restarting={restarting}
               onConfirm={handleRestartConfirm}
               onCancel={() => setConfirmRestart(false)}
@@ -325,6 +326,7 @@ export function OverviewPage({
                 <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
                   <RestartButton
                     confirmRestart={confirmRestart}
+                    blocked={operationStatus?.busy ?? false}
                     restarting={restarting}
                     onConfirm={handleRestartConfirm}
                     onCancel={() => setConfirmRestart(false)}

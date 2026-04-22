@@ -260,4 +260,28 @@ describe('App routing', () => {
       expect(screen.getByRole('heading', { name: 'Sign in to the local control center' })).toBeInTheDocument()
     })
   })
+
+  it('disables restart actions while another operation is in progress', async () => {
+    vi.mocked(api.operationsStatus).mockResolvedValue({ busy: true, type: 'updating', detail: 'node-red' })
+
+    renderApp('/app/overview')
+
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getAllByRole('button', { name: /restart/i })[0]).toBeDisabled()
+    })
+    expect(screen.getAllByText(/updating in progress: node-red/i).length).toBeGreaterThan(0)
+  })
+
+  it('disables backup restore actions while another operation is in progress', async () => {
+    vi.mocked(api.operationsStatus).mockResolvedValue({ busy: true, type: 'restarting', detail: 'node-red' })
+
+    renderApp('/app/backups')
+
+    expect(await screen.findByRole('heading', { name: 'Backups' })).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Restore' })).toBeDisabled()
+    })
+    expect(screen.getByText(/restarting in progress: node-red/i)).toBeInTheDocument()
+  })
 })

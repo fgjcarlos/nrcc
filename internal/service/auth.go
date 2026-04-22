@@ -282,8 +282,8 @@ func validateCredentials(username, password string) error {
 	if len(username) < 3 {
 		return fmt.Errorf("username must be at least 3 characters")
 	}
-	if len(password) < 8 {
-		return fmt.Errorf("password must be at least 8 characters")
+	if err := security.ValidatePassword(password); err != nil {
+		return err
 	}
 	return nil
 }

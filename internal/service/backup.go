@@ -269,6 +269,7 @@ func (s *BackupService) collectBackupFiles() ([]string, error) {
 		"config.json",
 		"settings.js",
 		".env.managed",
+		managedEnvKeyFile,
 		"package.json",
 		config.FlowFile,
 		credentialFileName(config.FlowFile),
@@ -378,7 +379,7 @@ func (s *BackupService) restoreArchive(manifest model.BackupManifest, archivePat
 
 		targetPath := filepath.Join(s.dataDir, cleanName)
 		perm := os.FileMode(0o644)
-		if cleanName == ".env.managed" {
+		if cleanName == ".env.managed" || cleanName == managedEnvKeyFile {
 			perm = 0o600
 		}
 		if err := platform.WriteFileAtomic(targetPath, content, perm); err != nil {

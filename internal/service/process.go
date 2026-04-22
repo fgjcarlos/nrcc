@@ -217,22 +217,11 @@ func (pm *ProcessManager) buildEnv() []string {
 	env := append([]string{}, os.Environ()...)
 	env = append(env, fmt.Sprintf("PORT=%d", pm.cfg.Port))
 
-	managedEnvPath := filepath.Join(pm.cfg.DataDir, ".env.managed")
-	file, err := os.Open(managedEnvPath)
+	managedLines, err := NewManagedEnvService(pm.cfg.DataDir).RuntimeLines()
 	if err != nil {
 		return env
 	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		env = append(env, line)
-	}
-
+	env = append(env, managedLines...)
 	return env
 }
 
