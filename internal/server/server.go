@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io/fs"
 	"net/http"
 	"os"
@@ -26,6 +27,7 @@ type Config struct {
 	ManagedEnv  service.ManagedEnvService
 	Backups     service.BackupService
 	Libraries   service.LibraryService
+	Flows       service.FlowService
 	Updates     service.UpdateService
 	Operations  *service.OperationLock
 	Logs        *service.LogService
@@ -58,7 +60,7 @@ func New(cfg Config) *Server {
 	router.Use(middleware.RequestID)
 	router.Use(middleware.RequestLogger)
 
-	registerAPIRoutes(router, cfg.Runtime, cfg.Auth, cfg.Config, cfg.ManagedEnv, cfg.Backups, cfg.Libraries, cfg.Updates, cfg.Operations, cfg.LocalAccess, cfg.Assets)
+	registerAPIRoutes(router, cfg.Runtime, cfg.Auth, cfg.Config, cfg.ManagedEnv, cfg.Backups, cfg.Libraries, cfg.Flows, cfg.Updates, cfg.Operations, cfg.LocalAccess, cfg.Assets)
 	registerDiagnosticsRoutes(router, cfg)
 	registerAssetRoutes(router, cfg.Auth, cfg.Assets)
 	registerSPARoutes(router, cfg.Frontend)
@@ -80,7 +82,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return s.httpServer.Shutdown(ctx)
 }
 
-func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager, authService *service.AuthService, configService service.ConfigService, managedEnvService service.ManagedEnvService, backupService service.BackupService, libraryService service.LibraryService, updateService service.UpdateService, operationLock *service.OperationLock, localAccessService *service.LocalAccessService, assetService *service.AssetService) {
+func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager, authService *service.AuthService, configService service.ConfigService, managedEnvService service.ManagedEnvService, backupService service.BackupService, libraryService service.LibraryService, flowService service.FlowService, updateService service.UpdateService, operationLock *service.OperationLock, localAccessService *service.LocalAccessService, assetService *service.AssetService) {
 	if operationLock == nil {
 		operationLock = service.NewOperationLock()
 	}
@@ -586,6 +588,35 @@ func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager
 				return
 			}
 			respondOK(w, libraries)
+		})
+
+		r.Get("/api/flows", func(w http.ResponseWriter, r *http.Request) {
+			flows, err := flowService.List()
+			if err != nil {
+				respondError(w, http.StatusInternalServerError, "FLOWS_LIST_FAILED", err.Error())
+				return
+			}
+			respondOK(w, flows)
+		})
+
+		r.Get("/api/flows/{id}", func(w http.ResponseWriter, r *http.Request) {
+			flowID := strings.TrimSpace(chi.URLParam(r, "id"))
+			if flowID == "" {
+				respondError(w, http.StatusBadRequest, "INVALID_REQUEST", "flow id is required")
+				return
+			}
+
+			flow, err := flowService.Get(flowID)
+			if err != nil {
+				if errors.Is(err, service.ErrFlowNotFound) {
+					respondError(w, http.StatusNotFound, "FLOW_NOT_FOUND", "flow not found")
+					return
+				}
+				respondError(w, http.StatusInternalServerError, "FLOW_DETAIL_FAILED", err.Error())
+				return
+			}
+
+			respondOK(w, flow)
 		})
 
 		r.Post("/api/libraries/{name}", func(w http.ResponseWriter, r *http.Request) {

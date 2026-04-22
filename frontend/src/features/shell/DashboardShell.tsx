@@ -21,6 +21,7 @@ export function DashboardShell({
   const items: Array<{ to: string; label: string; page: PageKey }> = [
     { to: '/app/overview', label: 'Overview', page: 'overview' },
     { to: '/app/logs', label: 'Logs', page: 'logs' },
+    { to: '/app/flows', label: 'Flows', page: 'flows' },
     { to: '/app/diagnostics', label: 'Diagnostics', page: 'diagnostics' },
     { to: '/app/config', label: 'Config', page: 'config' },
     { to: '/app/environment', label: 'Environment', page: 'environment' },
