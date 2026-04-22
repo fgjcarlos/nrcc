@@ -169,6 +169,7 @@ function AppContent() {
         title: 'Restart requested',
         detail: 'Node-RED is restarting and status will refresh automatically.',
       })
+      await queryClient.invalidateQueries({ queryKey: ['operations-status'] })
       await queryClient.invalidateQueries({ queryKey: ['runtime-status'] })
       await queryClient.invalidateQueries({ queryKey: ['runtime-logs'] })
     },
@@ -292,6 +293,7 @@ function AppContent() {
                         element={
                           <PageTransition>
                             <ConfigPage
+                              operationStatus={operationsQuery.data}
                               onSaved={(restartRequired) => {
                                 pushToast({
                                   tone: 'success',
@@ -354,8 +356,10 @@ function AppContent() {
                               backups={backupsQuery.data}
                               loading={backupsQuery.isLoading}
                               error={backupsQuery.error}
+                              operationStatus={operationsQuery.data}
                               onChanged={async (message, tone) => {
                                 await queryClient.invalidateQueries({ queryKey: ['backups'] })
+                                await queryClient.invalidateQueries({ queryKey: ['operations-status'] })
                                 pushToast({
                                   tone,
                                   title: tone === 'success' ? 'Backups updated' : 'Backup action failed',

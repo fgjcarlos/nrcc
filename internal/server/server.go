@@ -40,6 +40,7 @@ type Config struct {
 
 type Server struct {
 	httpServer *http.Server
+	apiLimiter *middleware.RateLimiter
 }
 
 type authResponse struct {
@@ -56,9 +57,17 @@ const sessionCookieSameSite = http.SameSiteStrictMode
 func New(cfg Config) *Server {
 	router := chi.NewRouter()
 
+	// Security headers on all responses (outermost).
+	router.Use(middleware.SecurityHeaders())
+
+	// General API rate limiting: 100 req/min per IP.
+	apiLimiter := middleware.NewRateLimiter(100, 20)
+	router.Use(apiLimiter.Middleware())
+
 	// Global middleware: request ID and request logging
 	router.Use(middleware.RequestID)
 	router.Use(middleware.RequestLogger)
+	router.Use(middleware.Recoverer)
 
 	registerAPIRoutes(router, cfg.Runtime, cfg.Auth, cfg.Config, cfg.ManagedEnv, cfg.Backups, cfg.Libraries, cfg.Flows, cfg.Updates, cfg.Operations, cfg.LocalAccess, cfg.Assets)
 	registerDiagnosticsRoutes(router, cfg)
@@ -71,6 +80,7 @@ func New(cfg Config) *Server {
 			Handler:           router,
 			ReadHeaderTimeout: 5 * time.Second,
 		},
+		apiLimiter: apiLimiter,
 	}
 }
 
@@ -79,6 +89,9 @@ func (s *Server) Start() error {
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {
+	if s.apiLimiter != nil {
+		s.apiLimiter.Stop()
+	}
 	return s.httpServer.Shutdown(ctx)
 }
 
@@ -94,6 +107,7 @@ func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager
 	})
 
 	if authService != nil {
+		loginLimiter := middleware.NewRateLimiter(5, 5)
 		router.Route("/api/auth", func(r chi.Router) {
 			r.Get("/status", func(w http.ResponseWriter, r *http.Request) {
 				hasUsers, err := authService.HasUsers()
@@ -130,7 +144,7 @@ func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager
 				})
 			})
 
-			r.Post("/login", func(w http.ResponseWriter, r *http.Request) {
+			r.With(loginLimiter.Middleware()).Post("/login", func(w http.ResponseWriter, r *http.Request) {
 				var payload struct {
 					Username string `json:"username"`
 					Password string `json:"password"`
@@ -217,6 +231,12 @@ func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager
 			})
 
 			r.Post("/api/runtime/restart", func(w http.ResponseWriter, r *http.Request) {
+				release, ok := acquireOperationOrRespond(w, r, operationLock, "restarting", "node-red")
+				if !ok {
+					return
+				}
+				defer release()
+
 				if err := runtimeManager.Restart(); err != nil {
 					respondError(w, http.StatusInternalServerError, "RUNTIME_RESTART_FAILED", err.Error())
 					return
@@ -413,6 +433,12 @@ func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager
 				return
 			}
 
+			release, ok := acquireOperationOrRespond(w, r, operationLock, "restoring", snapshotID)
+			if !ok {
+				return
+			}
+			defer release()
+
 			// Get snapshot
 			snapshot, err := configService.GetSnapshot(snapshotID)
 			if err != nil {
@@ -556,9 +582,8 @@ func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager
 				return
 			}
 
-			release, err := operationLock.Acquire("restoring", backupID)
-			if err != nil {
-				respondError(w, http.StatusConflict, "OPERATION_LOCKED", err.Error())
+			release, ok := acquireOperationOrRespond(w, r, operationLock, "restoring", backupID)
+			if !ok {
 				return
 			}
 			defer release()
@@ -626,9 +651,8 @@ func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager
 				return
 			}
 
-			release, err := operationLock.Acquire("installing", name)
-			if err != nil {
-				respondError(w, http.StatusConflict, "OPERATION_LOCKED", err.Error())
+			release, ok := acquireOperationOrRespond(w, r, operationLock, "installing", name)
+			if !ok {
 				return
 			}
 			defer release()
@@ -655,9 +679,8 @@ func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager
 				return
 			}
 
-			release, err := operationLock.Acquire("installing", name)
-			if err != nil {
-				respondError(w, http.StatusConflict, "OPERATION_LOCKED", err.Error())
+			release, ok := acquireOperationOrRespond(w, r, operationLock, "installing", name)
+			if !ok {
 				return
 			}
 			defer release()
@@ -687,9 +710,8 @@ func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager
 		})
 
 		r.Post("/api/updates/apply", func(w http.ResponseWriter, r *http.Request) {
-			release, err := operationLock.Acquire("updating", "node-red")
-			if err != nil {
-				respondError(w, http.StatusConflict, "OPERATION_LOCKED", err.Error())
+			release, ok := acquireOperationOrRespond(w, r, operationLock, "updating", "node-red")
+			if !ok {
 				return
 			}
 			defer release()
@@ -711,24 +733,39 @@ func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager
 	})
 }
 
+func acquireOperationOrRespond(w http.ResponseWriter, r *http.Request, operationLock *service.OperationLock, opType, detail string) (func(), bool) {
+	release, err := operationLock.Acquire(opType, detail)
+	if err == nil {
+		return release, true
+	}
+
+	respondErrorWithDetails(w, r, http.StatusConflict, "OPERATION_IN_PROGRESS", err.Error(), operationLock.Status())
+	return nil, false
+}
+
 func respondOK(w http.ResponseWriter, data any) {
+	reqID := responseRequestID(w)
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(model.APIResponse[any]{
 		Success:   true,
 		Data:      data,
+		RequestID: reqID,
 		Timestamp: time.Now().UTC(),
 	})
 }
 
 func respondError(w http.ResponseWriter, status int, code, message string) {
+	reqID := responseRequestID(w)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(model.APIResponse[any]{
 		Success: false,
 		Error: &model.APIError{
-			Code:    code,
-			Message: message,
+			Code:      code,
+			Message:   message,
+			RequestID: reqID,
 		},
+		RequestID: reqID,
 		Timestamp: time.Now().UTC(),
 	})
 }
@@ -775,6 +812,10 @@ func respondOKWithRequest(w http.ResponseWriter, r *http.Request, data any) {
 		RequestID: reqID,
 		Timestamp: time.Now().UTC(),
 	})
+}
+
+func responseRequestID(w http.ResponseWriter) string {
+	return w.Header().Get("X-Request-Id")
 }
 
 func decodeJSON(r *http.Request, target any) error {
