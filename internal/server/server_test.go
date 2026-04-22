@@ -297,6 +297,7 @@ func TestLockedRuntimeAndConfigRestoreReturnConflict(t *testing.T) {
 		service.NewManagedEnvService(testDataDir),
 		backupSvc,
 		service.NewLibraryService(testDataDir),
+		service.NewFlowService(testDataDir),
 		service.NewUpdateService(testDataDir, &backupSvc),
 		lock,
 		nil,
@@ -335,6 +336,7 @@ func TestRuntimeRestartErrorIncludesRequestID(t *testing.T) {
 		service.NewManagedEnvService(testDataDir),
 		backupSvc,
 		service.NewLibraryService(testDataDir),
+		service.NewFlowService(testDataDir),
 		service.NewUpdateService(testDataDir, &backupSvc),
 		service.NewOperationLock(),
 		nil,
@@ -381,6 +383,7 @@ func TestEnvironmentAPIHidesSecretValues(t *testing.T) {
 		managedEnvService,
 		backupSvc,
 		service.NewLibraryService(testDataDir),
+		service.NewFlowService(testDataDir),
 		service.NewUpdateService(testDataDir, &backupSvc),
 		service.NewOperationLock(),
 		nil,
@@ -431,6 +434,8 @@ func TestEnvironmentAPIHidesSecretValues(t *testing.T) {
 func TestFlowsEndpoints(t *testing.T) {
 	t.Parallel()
 
+	const strongPassword = "NRCCTestVault847"
+
 	authService, configService := newTestServices(t)
 	testDataDir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(testDataDir, "nodered"), 0o755); err != nil {
@@ -460,13 +465,13 @@ func TestFlowsEndpoints(t *testing.T) {
 		nil,
 	)
 
-	if _, _, err := authService.RegisterInitial("alice", "password123"); err != nil {
+	if _, _, err := authService.RegisterInitial("alice", strongPassword); err != nil {
 		t.Fatalf("RegisterInitial() error = %v", err)
 	}
 
 	loginReq := newJSONRequest(t, http.MethodPost, "/api/auth/login", map[string]string{
 		"username": "alice",
-		"password": "password123",
+		"password": strongPassword,
 	})
 	loginRec := httptest.NewRecorder()
 	router.ServeHTTP(loginRec, loginReq)
