@@ -130,6 +130,7 @@ type rawFlowItem struct {
 	Label string     `json:"label"`
 	D     bool       `json:"d"`
 	Wires [][]string `json:"wires"`
+	Raw   json.RawMessage `json:"-"`
 }
 
 type flowComputation struct {
@@ -170,6 +171,146 @@ func (s FlowService) Get(id string) (model.FlowDetailResponse, error) {
 	}
 
 	return model.FlowDetailResponse{Source: computed.source, Flow: flow}, nil
+}
+
+// Export serializes the raw flow items for the given tab IDs (plus their
+// child nodes and global config nodes) as a Node-RED-compatible flows.json byte slice.
+// Returns ErrFlowNotFound if any requested ID does not exist as a tab.
+func (s FlowService) Export(ids []string) ([]byte, error) {
+	if len(ids) == 0 {
+		return nil, fmt.Errorf("at least one flow ID required")
+	}
+
+	path, _, err := s.resolveFlowPath()
+	if err != nil {
+		return nil, err
+	}
+
+	items, err := s.rawFlowsFromPath(path)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build a set of requested tab IDs and verify they exist
+	requestedTabIDs := make(map[string]struct{})
+	tabExists := make(map[string]bool)
+	for _, item := range items {
+		if item.Type == "tab" {
+			tabExists[item.ID] = false
+		}
+	}
+	for _, id := range ids {
+		requestedTabIDs[id] = struct{}{}
+	}
+
+	// Check if all requested IDs exist as tabs
+	for id := range requestedTabIDs {
+		if _, ok := tabExists[id]; !ok {
+			return nil, fmt.Errorf("flow not found: %s", id)
+		}
+		tabExists[id] = true
+	}
+
+	// Filter items: keep tabs in requested set, all nodes belonging to those tabs, and global config nodes
+	filtered := make([]json.RawMessage, 0)
+	for _, item := range items {
+		// Include if it's a requested tab
+		if item.Type == "tab" {
+			if _, ok := requestedTabIDs[item.ID]; ok {
+				filtered = append(filtered, item.Raw)
+			}
+			continue
+		}
+
+		// Include if it's a global config node (z == "")
+		if item.Z == "" {
+			filtered = append(filtered, item.Raw)
+			continue
+		}
+
+		// Include if it's a child node of a requested tab
+		if _, ok := requestedTabIDs[item.Z]; ok {
+			filtered = append(filtered, item.Raw)
+		}
+	}
+
+	result, err := json.Marshal(filtered)
+	if err != nil {
+		return nil, fmt.Errorf("serialize flows: %w", err)
+	}
+	return result, nil
+}
+
+// Import validates data as a JSON array, atomically writes it to flows.json
+// via a .tmp file + os.Rename, and returns an ImportResponse.
+// Caller is responsible for holding OperationLock before calling.
+func (s FlowService) Import(data []byte) (model.ImportResponse, error) {
+	// 1. Validate: must be a JSON array
+	var items []json.RawMessage
+	if err := json.Unmarshal(data, &items); err != nil {
+		return model.ImportResponse{}, fmt.Errorf("invalid flows JSON: %w", err)
+	}
+
+	// 2. Resolve destination path
+	path, _, err := s.resolveFlowPath()
+	if err != nil {
+		return model.ImportResponse{}, err
+	}
+
+	// 3. Write to .tmp (same directory = same filesystem)
+	tmpPath := path + ".tmp"
+	if err := os.WriteFile(tmpPath, data, 0644); err != nil {
+		return model.ImportResponse{}, fmt.Errorf("write temp flow file: %w", err)
+	}
+
+	// 4. Validate .tmp can be re-parsed (double-check disk write)
+	tmpBytes, err := os.ReadFile(tmpPath)
+	if err != nil {
+		_ = os.Remove(tmpPath)
+		return model.ImportResponse{}, fmt.Errorf("read temp flow file: %w", err)
+	}
+
+	if err := json.Unmarshal(tmpBytes, &[]json.RawMessage{}); err != nil {
+		_ = os.Remove(tmpPath)
+		return model.ImportResponse{}, fmt.Errorf("temp file validation failed: %w", err)
+	}
+
+	// 5. Atomic rename
+	if err := os.Rename(tmpPath, path); err != nil {
+		_ = os.Remove(tmpPath)
+		return model.ImportResponse{}, fmt.Errorf("atomic rename failed: %w", err)
+	}
+
+	return model.ImportResponse{
+		ImportedCount:   len(items),
+		Message:         "Flows imported successfully.",
+		RestartAdvisory: true,
+	}, nil
+}
+
+// rawFlowsFromPath reads and parses the flows file, returning items with preserved raw fields.
+func (s FlowService) rawFlowsFromPath(path string) ([]rawFlowItem, error) {
+	raw, err := platform.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read flow file: %w", err)
+	}
+
+	var items []json.RawMessage
+	if err := json.Unmarshal(raw, &items); err != nil {
+		return nil, fmt.Errorf("parse flow file: %w", err)
+	}
+
+	result := make([]rawFlowItem, len(items))
+	for i, rawMsg := range items {
+		var item rawFlowItem
+		if err := json.Unmarshal(rawMsg, &item); err != nil {
+			return nil, fmt.Errorf("parse flow item %d: %w", i, err)
+		}
+		item.Raw = rawMsg
+		result[i] = item
+	}
+
+	return result, nil
 }
 
 func (s FlowService) Analyze(ctx context.Context, id string) (model.FlowAnalysis, error) {

@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"io/fs"
 	"net/http"
 	"os"
@@ -671,6 +673,89 @@ func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager
 			}
 
 			respondOK(w, result)
+		})
+
+		r.Post("/api/flows/export", func(w http.ResponseWriter, r *http.Request) {
+			var req model.ExportRequest
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				respondError(w, http.StatusBadRequest, "INVALID_REQUEST", "invalid request body")
+				return
+			}
+
+			flowBytes, err := flowService.Export(req.IDs)
+			if err != nil {
+				if errors.Is(err, service.ErrFlowNotFound) || strings.Contains(err.Error(), "flow not found") {
+					respondError(w, http.StatusNotFound, "FLOW_NOT_FOUND", err.Error())
+					return
+				}
+				if strings.Contains(err.Error(), "at least one flow ID required") {
+					respondError(w, http.StatusBadRequest, "INVALID_REQUEST", err.Error())
+					return
+				}
+				respondError(w, http.StatusInternalServerError, "FLOWS_EXPORT_FAILED", err.Error())
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/octet-stream")
+			w.Header().Set("Content-Disposition", `attachment; filename="flows.json"`)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(flowBytes)
+		})
+
+		r.Post("/api/flows/import", func(w http.ResponseWriter, r *http.Request) {
+			// Enforce 10MB max size BEFORE parsing
+			r.Body = http.MaxBytesReader(w, r.Body, 10<<20)
+
+			release, ok := acquireOperationOrRespond(w, r, operationLock, "importing", "flows")
+			if !ok {
+				return
+			}
+			defer release()
+
+			if err := r.ParseMultipartForm(0); err != nil {
+				respondError(w, http.StatusBadRequest, "INVALID_REQUEST", "failed to parse multipart form")
+				return
+			}
+
+			file, fileHeader, err := r.FormFile("file")
+			if err != nil {
+				respondError(w, http.StatusBadRequest, "INVALID_REQUEST", "file is required")
+				return
+			}
+			defer file.Close()
+
+			fileBytes, err := io.ReadAll(file)
+			if err != nil {
+				respondError(w, http.StatusBadRequest, "INVALID_REQUEST", "failed to read file")
+				return
+			}
+
+			// Validate it's valid JSON and a JSON array
+			var items []json.RawMessage
+			if err := json.Unmarshal(fileBytes, &items); err != nil {
+				respondError(w, http.StatusUnprocessableEntity, "FLOWS_IMPORT_INVALID", "invalid JSON: "+err.Error())
+				return
+			}
+
+			// Call service to perform atomic import
+			importResp, err := flowService.Import(fileBytes)
+			if err != nil {
+				if strings.Contains(err.Error(), "invalid flows JSON") {
+					respondError(w, http.StatusUnprocessableEntity, "FLOWS_IMPORT_INVALID", err.Error())
+					return
+				}
+				respondError(w, http.StatusInternalServerError, "FLOWS_IMPORT_FAILED", err.Error())
+				return
+			}
+
+			// Log audit event
+			if authService != nil {
+				if claims, ok := middleware.AuthClaimsFromContext(r.Context()); ok {
+					authService.LogAudit("flows.import", claims.Username, fmt.Sprintf("imported %d flows from %s", importResp.ImportedCount, fileHeader.Filename))
+				}
+			}
+
+			respondOK(w, importResp)
 		})
 
 		r.Post("/api/libraries/{name}", func(w http.ResponseWriter, r *http.Request) {

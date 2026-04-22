@@ -233,7 +233,7 @@ describe('App routing', () => {
     renderApp('/app/flows/main-flow')
 
     expect(await screen.findByRole('heading', { name: 'Flows' })).toBeInTheDocument()
-    expect(screen.getByText('Inspection only')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Export Selected/i })).toBeInTheDocument()
     expect(await screen.findByText('Widget')).toBeInTheDocument()
     expect(api.flow).toHaveBeenCalledWith('main-flow')
   })

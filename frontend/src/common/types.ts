@@ -10,3 +10,13 @@ export type Toast = {
 }
 
 export type GlobalStatus = { title: string; detail: string; tone: 'ok' | 'warn' | 'neutral' }
+
+export type ExportRequest = {
+  ids: string[]
+}
+
+export type ImportResponse = {
+  importedCount: number
+  message: string
+  restartAdvisory: boolean
+}
