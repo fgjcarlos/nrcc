@@ -48,6 +48,20 @@ type authResponse struct {
 	CSRFToken string            `json:"csrfToken"`
 }
 
+type usersListResponse struct {
+	Items []model.UserPublic `json:"items"`
+}
+
+type userMutationResponse struct {
+	User           *model.UserPublic `json:"user"`
+	SessionRevoked bool              `json:"sessionRevoked"`
+}
+
+type userDeleteResponse struct {
+	Deleted        bool `json:"deleted"`
+	SessionRevoked bool `json:"sessionRevoked"`
+}
+
 // Session cookies stay on same-site requests only. The API already uses an
 // explicit CSRF token for authenticated state changes, and Strict avoids
 // silently broadening the browser cookie contract across login, register,
@@ -211,12 +225,132 @@ func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager
 				respondOK(w, map[string]any{"loggedOut": true})
 			})
 		})
+
+		router.Route("/api/users", func(r chi.Router) {
+			r.Use(requireAuth(authService))
+			r.Use(requireCSRF(authService))
+			r.Use(requireRole(model.RoleAdmin))
+
+			r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+				users, err := authService.ListUsers()
+				if err != nil {
+					respondError(w, http.StatusInternalServerError, "USERS_LIST_FAILED", err.Error())
+					return
+				}
+				respondOK(w, usersListResponse{Items: users})
+			})
+
+			r.Post("/", func(w http.ResponseWriter, r *http.Request) {
+				var payload struct {
+					Username string `json:"username"`
+					Password string `json:"password"`
+					Role     string `json:"role"`
+				}
+				if err := decodeJSON(r, &payload); err != nil {
+					respondError(w, http.StatusBadRequest, "INVALID_REQUEST", err.Error())
+					return
+				}
+
+				claims, ok := middleware.AuthClaimsFromContext(r.Context())
+				if !ok {
+					respondError(w, http.StatusUnauthorized, "AUTH_REQUIRED", "authentication required")
+					return
+				}
+
+				user, err := authService.CreateUser(payload.Username, payload.Password, model.UserRole(payload.Role), claims.Username)
+				if err != nil {
+					respondUserActionError(w, err, "USERS_CREATE_FAILED")
+					return
+				}
+
+				respondOK(w, userMutationResponse{User: user})
+			})
+
+			r.Patch("/{id}/role", func(w http.ResponseWriter, r *http.Request) {
+				var payload struct {
+					Role string `json:"role"`
+				}
+				if err := decodeJSON(r, &payload); err != nil {
+					respondError(w, http.StatusBadRequest, "INVALID_REQUEST", err.Error())
+					return
+				}
+
+				claims, ok := middleware.AuthClaimsFromContext(r.Context())
+				if !ok {
+					respondError(w, http.StatusUnauthorized, "AUTH_REQUIRED", "authentication required")
+					return
+				}
+
+				userID := chi.URLParam(r, "id")
+				user, err := authService.UpdateUserRole(userID, model.UserRole(payload.Role), claims)
+				if err != nil {
+					respondUserActionError(w, err, "USER_ROLE_UPDATE_FAILED")
+					return
+				}
+
+				sessionRevoked := userID == claims.Sub
+				if sessionRevoked {
+					clearSessionCookie(w, r)
+				}
+				respondOK(w, userMutationResponse{User: user, SessionRevoked: sessionRevoked})
+			})
+
+			r.Post("/{id}/reset-password", func(w http.ResponseWriter, r *http.Request) {
+				var payload struct {
+					Password string `json:"password"`
+				}
+				if err := decodeJSON(r, &payload); err != nil {
+					respondError(w, http.StatusBadRequest, "INVALID_REQUEST", err.Error())
+					return
+				}
+
+				claims, ok := middleware.AuthClaimsFromContext(r.Context())
+				if !ok {
+					respondError(w, http.StatusUnauthorized, "AUTH_REQUIRED", "authentication required")
+					return
+				}
+
+				userID := chi.URLParam(r, "id")
+				user, err := authService.ResetUserPassword(userID, payload.Password, claims.Username)
+				if err != nil {
+					respondUserActionError(w, err, "USER_PASSWORD_RESET_FAILED")
+					return
+				}
+
+				sessionRevoked := userID == claims.Sub
+				if sessionRevoked {
+					clearSessionCookie(w, r)
+				}
+				respondOK(w, userMutationResponse{User: user, SessionRevoked: sessionRevoked})
+			})
+
+			r.Delete("/{id}", func(w http.ResponseWriter, r *http.Request) {
+				claims, ok := middleware.AuthClaimsFromContext(r.Context())
+				if !ok {
+					respondError(w, http.StatusUnauthorized, "AUTH_REQUIRED", "authentication required")
+					return
+				}
+
+				userID := chi.URLParam(r, "id")
+				if err := authService.DeleteUser(userID, claims); err != nil {
+					respondUserActionError(w, err, "USER_DELETE_FAILED")
+					return
+				}
+
+				sessionRevoked := userID == claims.Sub
+				if sessionRevoked {
+					clearSessionCookie(w, r)
+				}
+				respondOK(w, userDeleteResponse{Deleted: true, SessionRevoked: sessionRevoked})
+			})
+		})
 	}
 
 	router.Group(func(r chi.Router) {
 		if authService != nil {
 			r.Use(middleware.RequireAuth(authService))
 			r.Use(middleware.RequireCSRF(authService))
+			r.Use(middleware.RequireRole(model.RoleAdmin))
 		}
 
 		if runtimeManager != nil {
@@ -893,6 +1027,18 @@ func requireAuth(authService *service.AuthService) func(http.Handler) http.Handl
 
 func requireCSRF(authService *service.AuthService) func(http.Handler) http.Handler {
 	return middleware.RequireCSRF(authService)
+}
+
+func requireRole(role model.UserRole) func(http.Handler) http.Handler {
+	return middleware.RequireRole(role)
+}
+
+func respondUserActionError(w http.ResponseWriter, err error, fallbackCode string) {
+	if actionErr, ok := service.IsUserActionError(err); ok {
+		respondError(w, actionErr.Status, actionErr.Code, actionErr.Message)
+		return
+	}
+	respondError(w, http.StatusInternalServerError, fallbackCode, err.Error())
 }
 
 func requestClientAddress(r *http.Request) string {

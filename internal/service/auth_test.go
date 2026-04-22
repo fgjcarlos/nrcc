@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"strings"
 	"testing"
+
+	"nrcc/internal/model"
 )
 
 func TestAuthServiceBootstrapStoresHashAndAudit(t *testing.T) {
@@ -93,6 +95,85 @@ func TestAuthServiceVerifyAndRevokeToken(t *testing.T) {
 	}
 	if _, err := service.VerifyToken(token); err == nil {
 		t.Fatal("VerifyToken() after revoke error = nil, want invalid session")
+	}
+}
+
+func TestAuthServiceUserManagementAndSafeguards(t *testing.T) {
+	t.Parallel()
+
+	service := newTestAuthService(t)
+	admin, _, err := service.RegisterInitial("alice", "Alice2025!sec")
+	if err != nil {
+		t.Fatalf("RegisterInitial() error = %v", err)
+	}
+
+	created, err := service.CreateUser("operator1", "Operator2025!pass", model.RoleOperator, admin.Username)
+	if err != nil {
+		t.Fatalf("CreateUser() error = %v", err)
+	}
+	if created.Role != model.RoleOperator {
+		t.Fatalf("CreateUser() role = %q, want %q", created.Role, model.RoleOperator)
+	}
+
+	users, err := service.ListUsers()
+	if err != nil {
+		t.Fatalf("ListUsers() error = %v", err)
+	}
+	if len(users) != 2 {
+		t.Fatalf("ListUsers() len = %d, want 2", len(users))
+	}
+
+	adminRecord, err := service.findUserByUsername("alice")
+	if err != nil {
+		t.Fatalf("findUserByUsername(admin) error = %v", err)
+	}
+	operatorRecord, err := service.findUserByUsername("operator1")
+	if err != nil {
+		t.Fatalf("findUserByUsername(operator) error = %v", err)
+	}
+
+	actor := model.SessionClaims{Sub: adminRecord.ID, Username: adminRecord.Username, Role: adminRecord.Role}
+	if _, err := service.UpdateUserRole(adminRecord.ID, model.RoleOperator, actor); err == nil {
+		t.Fatal("UpdateUserRole(last admin) error = nil, want safeguard")
+	} else if actionErr, ok := IsUserActionError(err); !ok || actionErr.Code != "LAST_ADMIN_REQUIRED" {
+		t.Fatalf("UpdateUserRole(last admin) error = %v, want LAST_ADMIN_REQUIRED", err)
+	}
+
+	if _, err := service.UpdateUserRole(operatorRecord.ID, model.RoleViewer, actor); err != nil {
+		t.Fatalf("UpdateUserRole(operator) error = %v", err)
+	}
+
+	if _, _, err := service.Login("operator1", "Operator2025!pass", "127.0.0.1:1234"); err != nil {
+		t.Fatalf("Login(operator) error = %v", err)
+	}
+	if _, err := service.ResetUserPassword(operatorRecord.ID, "Changed2025!pass", admin.Username); err != nil {
+		t.Fatalf("ResetUserPassword() error = %v", err)
+	}
+	if _, _, err := service.Login("operator1", "Operator2025!pass", "127.0.0.1:1234"); err == nil {
+		t.Fatal("Login(old password) error = nil, want failure")
+	}
+	if _, _, err := service.Login("operator1", "Changed2025!pass", "127.0.0.1:1234"); err != nil {
+		t.Fatalf("Login(new password) error = %v", err)
+	}
+
+	if err := service.DeleteUser(adminRecord.ID, actor); err == nil {
+		t.Fatal("DeleteUser(last admin) error = nil, want safeguard")
+	} else if actionErr, ok := IsUserActionError(err); !ok || actionErr.Code != "LAST_ADMIN_REQUIRED" {
+		t.Fatalf("DeleteUser(last admin) error = %v, want LAST_ADMIN_REQUIRED", err)
+	}
+
+	secondAdmin, err := service.CreateUser("admin2", "Admin2025!pass", model.RoleAdmin, admin.Username)
+	if err != nil {
+		t.Fatalf("CreateUser(second admin) error = %v", err)
+	}
+	if err := service.DeleteUser(adminRecord.ID, actor); err != nil {
+		t.Fatalf("DeleteUser(with another admin) error = %v", err)
+	}
+	if user, err := service.FindPublicUserByID(adminRecord.ID); err != nil || user != nil {
+		t.Fatalf("FindPublicUserByID(deleted admin) = %#v, %v; want nil, nil", user, err)
+	}
+	if user, err := service.FindPublicUserByID(secondAdmin.ID); err != nil || user == nil {
+		t.Fatalf("FindPublicUserByID(second admin) = %#v, %v; want user, nil", user, err)
 	}
 }
 

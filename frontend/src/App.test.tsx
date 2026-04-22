@@ -11,12 +11,13 @@ import { useAuth } from './features/auth/useAuth'
 vi.mock('./api', async () => {
   const actual = await vi.importActual<typeof import('./api')>('./api')
 
-  return {
-    ...actual,
-    api: {
-      ...actual.api,
-      runtimeStatus: vi.fn(),
-      runtimeLogs: vi.fn(),
+    return {
+      ...actual,
+      api: {
+        ...actual.api,
+        usersList: vi.fn(),
+        runtimeStatus: vi.fn(),
+        runtimeLogs: vi.fn(),
       systemInfo: vi.fn(),
       environment: vi.fn(),
       backups: vi.fn(),
@@ -207,6 +208,9 @@ describe('App routing', () => {
       jobs: [{ id: 'job-1', type: 'backup', status: 'completed', started_at: '2026-01-01T00:00:00Z' }],
       total: 1,
     })
+    vi.mocked(api.usersList).mockResolvedValue({
+      items: [defaultUser],
+    })
   })
 
   it('renders the overview dashboard for authenticated users', async () => {
@@ -227,6 +231,14 @@ describe('App routing', () => {
 
     expect(await screen.findByRole('heading', { name: 'Libraries' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Install package' })).toBeInTheDocument()
+  })
+
+  it('shows the users page for administrators', async () => {
+    renderApp('/app/users')
+
+    expect(await screen.findByRole('heading', { name: 'Users' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Create user' })).toBeInTheDocument()
+    expect((await screen.findAllByText('admin')).length).toBeGreaterThan(0)
   })
 
   it('renders the flows page and selected flow detail by route', async () => {
@@ -259,6 +271,22 @@ describe('App routing', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Sign in to the local control center' })).toBeInTheDocument()
     })
+  })
+
+  it('shows an explicit denied screen for non-admin accounts', async () => {
+    vi.mocked(useAuth).mockReturnValue(
+      createMockAuthState({
+        user: {
+          ...defaultUser,
+          role: 'viewer',
+        },
+      }),
+    )
+
+    renderApp('/app/overview')
+
+    expect(await screen.findByRole('heading', { name: 'This first slice is admin-only' })).toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Primary' })).not.toBeInTheDocument()
   })
 
   it('disables restart actions while another operation is in progress', async () => {
