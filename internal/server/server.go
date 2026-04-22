@@ -644,6 +644,35 @@ func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager
 			respondOK(w, flow)
 		})
 
+		r.Post("/api/flows/{id}/analysis", func(w http.ResponseWriter, r *http.Request) {
+			flowID := strings.TrimSpace(chi.URLParam(r, "id"))
+			if flowID == "" {
+				respondError(w, http.StatusBadRequest, "INVALID_REQUEST", "flow id is required")
+				return
+			}
+
+			result, err := flowService.Analyze(r.Context(), flowID)
+			if err != nil {
+				if errors.Is(err, service.ErrFlowNotFound) {
+					respondError(w, http.StatusNotFound, "FLOW_NOT_FOUND", "flow not found")
+					return
+				}
+				providerErr := new(service.FlowAnalysisProviderUnavailableError)
+				if errors.As(err, &providerErr) {
+					respondErrorWithDetails(w, r, http.StatusServiceUnavailable, "FLOW_ANALYSIS_PROVIDER_UNAVAILABLE", providerErr.Error(), map[string]any{
+						"provider": providerErr.Provider,
+						"model":    providerErr.Model,
+						"action":   providerErr.Action,
+					})
+					return
+				}
+				respondError(w, http.StatusInternalServerError, "FLOW_ANALYSIS_FAILED", err.Error())
+				return
+			}
+
+			respondOK(w, result)
+		})
+
 		r.Post("/api/libraries/{name}", func(w http.ResponseWriter, r *http.Request) {
 			name := strings.TrimSpace(chi.URLParam(r, "name"))
 			if name == "" {

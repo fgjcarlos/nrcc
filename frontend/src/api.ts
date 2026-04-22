@@ -207,6 +207,23 @@ export type FlowDetailResponse = {
   flow: FlowDetail
 }
 
+export type FlowAnalysisProvider = {
+  name: string
+  model: string
+  local: boolean
+}
+
+export type FlowAnalysis = {
+  source: FlowSource
+  flow: FlowSummary
+  advisory: boolean
+  summary: string
+  strengths: string[]
+  issues: string[]
+  suggestions: string[]
+  provider: FlowAnalysisProvider
+}
+
 export type OperationStatus = {
   busy: boolean
   type?: string
@@ -437,6 +454,10 @@ export const api = {
     }),
   flows: () => request<FlowList>('/api/flows'),
   flow: (id: string) => request<FlowDetailResponse>(`/api/flows/${encodeURIComponent(id)}`),
+  analyzeFlow: (id: string) =>
+    request<FlowAnalysis>(`/api/flows/${encodeURIComponent(id)}/analysis`, {
+      method: 'POST',
+    }),
   libraries: () => request<LibraryList>('/api/libraries'),
   installLibrary: (name: string) =>
     request<LibraryOperationResult>(`/api/libraries/${encodeURIComponent(name)}`, {
