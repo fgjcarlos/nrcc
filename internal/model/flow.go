@@ -76,3 +76,15 @@ type FlowAnalysis struct {
 	Suggestions []string             `json:"suggestions"`
 	Provider    FlowAnalysisProvider `json:"provider"`
 }
+
+// ExportRequest is the JSON body for POST /api/flows/export.
+type ExportRequest struct {
+	IDs []string `json:"ids"`
+}
+
+// ImportResponse is the JSON body returned from POST /api/flows/import.
+type ImportResponse struct {
+	ImportedCount   int  `json:"importedCount"`
+	Message         string `json:"message"`
+	RestartAdvisory bool  `json:"restartAdvisory"`
+}

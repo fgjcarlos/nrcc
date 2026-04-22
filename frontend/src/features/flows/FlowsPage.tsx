@@ -1,10 +1,12 @@
-import { useEffect } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useEffect, useRef, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 
 import { APIRequestError, api, type FlowAnalysis, type FlowList, type OperationStatus } from '../../api'
 import { EmptyState, InlineNotice, LoadingState, StatCard } from '../../common/components'
 import { formatErrorMessage } from '../../common/utils/format'
+import { type ImportResponse } from '../../common/types'
+import { useToasts } from '../shell/useToasts'
 
 function formatCount(value: number) {
   return new Intl.NumberFormat().format(value)
@@ -64,6 +66,12 @@ export function FlowsPage({
 }) {
   const { flowId } = useParams()
   const selectedFlowId = flowId ?? ''
+  const { pushToast } = useToasts()
+  const queryClient = useQueryClient()
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Multi-select state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   const detailQuery = useQuery({
     queryKey: ['flow-detail', selectedFlowId],
@@ -75,6 +83,58 @@ export function FlowsPage({
     mutationFn: () => api.analyzeFlow(selectedFlowId),
   })
 
+  // Export mutation
+  const exportMutation = useMutation({
+    mutationFn: () => api.exportFlows([...selectedIds]),
+    onSuccess: (blob) => {
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'flows.json'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      pushToast({
+        title: 'Export successful',
+        detail: 'Flows exported successfully',
+        tone: 'success',
+      })
+    },
+    onError: (error) => {
+      pushToast({
+        title: 'Export failed',
+        detail: formatErrorMessage(error, 'Failed to export flows'),
+        tone: 'error',
+      })
+    },
+  })
+
+  // Import mutation
+  const importMutation = useMutation({
+    mutationFn: (file: File) => api.importFlows(file),
+    onSuccess: (response: ImportResponse) => {
+      // Invalidate flows query to refresh the table
+      queryClient.invalidateQueries({ queryKey: ['flows'] })
+      // Clear selection
+      setSelectedIds(new Set())
+      // Show success toast
+      const detail = `${response.importedCount} flow(s) imported. ${response.restartAdvisory ? 'Node-RED may need to be restarted.' : ''}`
+      pushToast({
+        title: 'Import successful',
+        detail,
+        tone: 'success',
+      })
+    },
+    onError: (error) => {
+      pushToast({
+        title: 'Import failed',
+        detail: formatErrorMessage(error, 'Failed to import flows'),
+        tone: 'error',
+      })
+    },
+  })
+
   useEffect(() => {
     analysisMutation.reset()
   }, [selectedFlowId])
@@ -83,6 +143,47 @@ export function FlowsPage({
   const analysis = analysisMutation.data?.flow.id === selectedFlowId ? analysisMutation.data : undefined
   const analysisAction = getAnalysisAction(analysisMutation.error)
 
+  const isLoadingExportOrImport = exportMutation.isPending || importMutation.isPending
+
+  // Helper functions for multi-select
+  const toggleSelect = (id: string) => {
+    const newSet = new Set(selectedIds)
+    if (newSet.has(id)) {
+      newSet.delete(id)
+    } else {
+      newSet.add(id)
+    }
+    setSelectedIds(newSet)
+  }
+
+  const selectAll = () => {
+    if (flows) {
+      setSelectedIds(new Set(flows.items.map((f) => f.id)))
+    }
+  }
+
+  const clearAll = () => {
+    setSelectedIds(new Set())
+  }
+
+  const allSelected = flows && flows.items.length > 0 && selectedIds.size === flows.items.length
+  const partialSelected = selectedIds.size > 0 && !allSelected
+
+  const handleImportFile = (file: File) => {
+    if (file.type !== 'application/json' && !file.name.endsWith('.json')) {
+      pushToast({
+        title: 'Invalid file',
+        detail: 'Please select a valid JSON file',
+        tone: 'error',
+      })
+      return
+    }
+    importMutation.mutate(file)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
   return (
     <div className="space-y-6 sm:space-y-8">
       <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
@@ -90,20 +191,13 @@ export function FlowsPage({
           <p className="text-xs uppercase tracking-[0.28em] text-base-content/50">Runtime</p>
           <h2 className="page-title text-3xl mt-1">Flows</h2>
           <p className="mt-2 max-w-3xl text-sm text-base-content/65">
-            Inspect the configured Node-RED flow file from the control center. This module is read-only in this phase.
+            Inspect and manage the configured Node-RED flow file from the control center.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 text-sm text-base-content/70">
-          <span className="rounded-full bg-base-300/60 px-3 py-1">Read-only</span>
           <span className="rounded-full bg-base-300/60 px-3 py-1">Busy: {operationStatus?.busy ? 'Yes' : 'No'}</span>
         </div>
       </header>
-
-      <InlineNotice
-        tone="info"
-        title="Inspection only"
-        detail="Flows can be reviewed here, but editing, import/export, and bulk actions are intentionally out of scope for this phase."
-      />
 
       {operationStatus?.busy ? (
         <InlineNotice
@@ -160,7 +254,40 @@ export function FlowsPage({
                 Source: <span className="font-medium text-base-content">{flows?.source.path ?? 'Loading...'}</span>
               </p>
             </div>
-            <div className="text-sm text-base-content/60">Updated: {formatTimestamp(flows?.source.updatedAt)}</div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                className="action-btn-primary"
+                type="button"
+                disabled={selectedIds.size === 0 || isLoadingExportOrImport || operationStatus?.busy}
+                onClick={() => exportMutation.mutate()}
+              >
+                {exportMutation.isPending ? 'Exporting…' : 'Export Selected'}
+              </button>
+              <button
+                className="action-btn-secondary"
+                type="button"
+                disabled={isLoadingExportOrImport || operationStatus?.busy}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {importMutation.isPending ? 'Importing…' : 'Import'}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.currentTarget.files?.[0]
+                  if (file) {
+                    handleImportFile(file)
+                  }
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="mt-1 text-sm text-base-content/60">
+            Updated: {formatTimestamp(flows?.source.updatedAt)}
           </div>
 
           {loading ? <div className="mt-6"><LoadingState message="Loading flow inventory..." /></div> : null}
@@ -179,6 +306,25 @@ export function FlowsPage({
               <table className="table table-zebra">
                 <thead>
                   <tr>
+                    <th>
+                      <input
+                        type="checkbox"
+                        className="checkbox"
+                        checked={allSelected}
+                        ref={(el) => {
+                          if (el) {
+                            el.indeterminate = partialSelected
+                          }
+                        }}
+                        onChange={() => {
+                          if (allSelected) {
+                            clearAll()
+                          } else {
+                            selectAll()
+                          }
+                        }}
+                      />
+                    </th>
                     <th>Flow</th>
                     <th>Nodes</th>
                     <th>Disabled</th>
@@ -190,8 +336,17 @@ export function FlowsPage({
                 <tbody>
                   {flows.items.map((item) => {
                     const isSelected = item.id === selectedFlowId
+                    const isChecked = selectedIds.has(item.id)
                     return (
                       <tr key={item.id} className={isSelected ? 'active' : undefined}>
+                        <td>
+                          <input
+                            type="checkbox"
+                            className="checkbox"
+                            checked={isChecked}
+                            onChange={() => toggleSelect(item.id)}
+                          />
+                        </td>
                         <td>
                           <div className="font-medium text-base-content">{item.label}</div>
                           <div className="text-xs text-base-content/55">{item.id}</div>
@@ -248,7 +403,7 @@ export function FlowsPage({
               <div className="mt-6">
                 <EmptyState
                   title="No flow selected"
-                  description="Choose a flow from the table to review node counts, wires, and the current read-only node inventory."
+                  description="Choose a flow from the table to review node counts, wires, and the current node inventory."
                 />
               </div>
             ) : null}

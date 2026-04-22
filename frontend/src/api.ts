@@ -4,6 +4,7 @@ import {
   ConfigSnapshot,
   ConfigSnapshotList,
 } from './types/config'
+import type { ImportResponse } from './common/types'
 
 export type ApiSuccess<T> = {
   success: true
@@ -492,6 +493,42 @@ export const api = {
     request<FlowAnalysis>(`/api/flows/${encodeURIComponent(id)}/analysis`, {
       method: 'POST',
     }),
+  exportFlows: async (ids: string[]): Promise<Blob> => {
+    const headers = new Headers()
+    if (csrfToken) {
+      headers.set('X-CSRF-Token', csrfToken)
+    }
+
+    const response = await fetch('/api/flows/export', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        ...Object.fromEntries(headers),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ids }),
+    })
+
+    if (!response.ok) {
+      let errorMessage = `Export failed with status ${response.status}`
+      try {
+        const payload = (await response.json()) as ApiResponse<unknown>
+        if (!payload.success && payload.error) {
+          errorMessage = payload.error.message
+        }
+      } catch {
+        // Ignore JSON parse errors
+      }
+      throw new APIRequestError(errorMessage, response.status)
+    }
+
+    return response.blob()
+  },
+  importFlows: async (file: File): Promise<ImportResponse> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return requestMultipart<ImportResponse>('/api/flows/import', formData)
+  },
   libraries: () => request<LibraryList>('/api/libraries'),
   installLibrary: (name: string) =>
     request<LibraryOperationResult>(`/api/libraries/${encodeURIComponent(name)}`, {
