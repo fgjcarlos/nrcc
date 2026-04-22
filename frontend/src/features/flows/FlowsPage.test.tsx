@@ -15,6 +15,7 @@ vi.mock('../../api', async () => {
     api: {
       ...actual.api,
       flow: vi.fn(),
+      analyzeFlow: vi.fn(),
     },
   }
 })
@@ -84,5 +85,47 @@ describe('FlowsPage', () => {
 
     expect(await screen.findByText('Widget')).toBeInTheDocument()
     expect(screen.getByText('custom')).toBeInTheDocument()
+  })
+
+  it('runs advisory analysis for the selected flow', async () => {
+    vi.mocked(api.flow).mockResolvedValue({
+      source: flows.source,
+      flow: {
+        ...flows.items[0],
+        nodeTypes: [{ type: 'inject', count: 1, custom: false }],
+        nodes: [{ id: 'n1', type: 'inject', name: 'Start', disabled: false, wireCount: 1 }],
+      },
+    })
+    vi.mocked(api.analyzeFlow).mockResolvedValue({
+      source: flows.source,
+      flow: flows.items[0],
+      advisory: true,
+      summary: 'Resumen claro del flujo principal.',
+      strengths: ['Tiene una entrada simple y visible.'],
+      issues: ['Solo existe un punto de observacion.'],
+      suggestions: ['Agregar mas validacion operacional.'],
+      provider: { name: 'ollama', model: 'llama3.2', local: true },
+    })
+
+    render(
+      <QueryClientProvider client={createTestQueryClient()}>
+        <MemoryRouter initialEntries={['/app/flows/main-flow']}>
+          <Routes>
+            <Route path="/app/flows/:flowId" element={<FlowsPage flows={flows} loading={false} error={null} operationStatus={{ busy: false }} />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    expect(await screen.findByRole('button', { name: 'Analyze selected flow' })).toBeInTheDocument()
+    screen.getByRole('button', { name: 'Analyze selected flow' }).click()
+
+    await waitFor(() => {
+      expect(api.analyzeFlow).toHaveBeenCalledWith('main-flow')
+    })
+
+    expect(await screen.findByText('Resumen claro del flujo principal.')).toBeInTheDocument()
+    expect(screen.getByText('Tiene una entrada simple y visible.')).toBeInTheDocument()
+    expect(screen.getByText('ollama')).toBeInTheDocument()
   })
 })

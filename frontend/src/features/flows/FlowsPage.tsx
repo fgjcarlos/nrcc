@@ -1,7 +1,8 @@
-import { useQuery } from '@tanstack/react-query'
+import { useEffect } from 'react'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 
-import { api, type FlowList, type OperationStatus } from '../../api'
+import { APIRequestError, api, type FlowAnalysis, type FlowList, type OperationStatus } from '../../api'
 import { EmptyState, InlineNotice, LoadingState, StatCard } from '../../common/components'
 import { formatErrorMessage } from '../../common/utils/format'
 
@@ -20,6 +21,34 @@ function formatTimestamp(value?: string) {
   }
 
   return parsed.toLocaleString()
+}
+
+function getAnalysisAction(error: unknown) {
+  if (!(error instanceof APIRequestError) || !error.details || typeof error.details !== 'object') {
+    return ''
+  }
+
+  const details = error.details as Record<string, unknown>
+  return typeof details.action === 'string' ? details.action : ''
+}
+
+function AnalysisList({ title, items }: { title: string; items: string[] }) {
+  return (
+    <section>
+      <h4 className="text-sm font-semibold uppercase tracking-[0.18em] text-base-content/55">{title}</h4>
+      {items.length ? (
+        <ul className="mt-3 space-y-2 text-sm text-base-content/80">
+          {items.map((item) => (
+            <li key={item} className="rounded-2xl border border-base-300/60 bg-base-100/70 px-3 py-2">
+              {item}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-3 text-sm text-base-content/60">No items reported.</p>
+      )}
+    </section>
+  )
 }
 
 export function FlowsPage({
@@ -42,7 +71,17 @@ export function FlowsPage({
     enabled: selectedFlowId.length > 0,
   })
 
+  const analysisMutation = useMutation({
+    mutationFn: () => api.analyzeFlow(selectedFlowId),
+  })
+
+  useEffect(() => {
+    analysisMutation.reset()
+  }, [selectedFlowId])
+
   const selectedFlow = !flows || !selectedFlowId ? undefined : flows.items.find((item) => item.id === selectedFlowId)
+  const analysis = analysisMutation.data?.flow.id === selectedFlowId ? analysisMutation.data : undefined
+  const analysisAction = getAnalysisAction(analysisMutation.error)
 
   return (
     <div className="space-y-6 sm:space-y-8">
@@ -177,96 +216,161 @@ export function FlowsPage({
           ) : null}
         </article>
 
-        <article className="surface-card border border-base-300/60 p-6 md:p-7">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h3 className="section-title">Flow detail</h3>
-              <p className="mt-1 text-sm text-base-content/60">
-                {selectedFlow ? `Inspecting ${selectedFlow.label}` : 'Select a flow from the list to inspect its nodes and type mix.'}
-              </p>
+        <div className="space-y-6">
+          <article className="surface-card border border-base-300/60 p-6 md:p-7">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="section-title">Flow detail</h3>
+                <p className="mt-1 text-sm text-base-content/60">
+                  {selectedFlow ? `Inspecting ${selectedFlow.label}` : 'Select a flow from the list to inspect its nodes and type mix.'}
+                </p>
+              </div>
+              {selectedFlowId ? (
+                <Link className="btn btn-sm btn-ghost" to="/app/flows">
+                  Clear
+                </Link>
+              ) : null}
             </div>
-            {selectedFlowId ? (
-              <Link className="btn btn-sm btn-ghost" to="/app/flows">
-                Clear
-              </Link>
+
+            {selectedFlowId && detailQuery.isLoading ? <div className="mt-6"><LoadingState message="Loading flow detail..." /></div> : null}
+
+            {detailQuery.error ? (
+              <div className="mt-6">
+                <InlineNotice
+                  tone="error"
+                  title="Flow detail unavailable"
+                  detail={formatErrorMessage(detailQuery.error, 'The selected flow could not be loaded.')}
+                />
+              </div>
             ) : null}
-          </div>
 
-          {selectedFlowId && detailQuery.isLoading ? <div className="mt-6"><LoadingState message="Loading flow detail..." /></div> : null}
+            {!selectedFlowId ? (
+              <div className="mt-6">
+                <EmptyState
+                  title="No flow selected"
+                  description="Choose a flow from the table to review node counts, wires, and the current read-only node inventory."
+                />
+              </div>
+            ) : null}
 
-          {detailQuery.error ? (
-            <div className="mt-6">
-              <InlineNotice
-                tone="error"
-                title="Flow detail unavailable"
-                detail={formatErrorMessage(detailQuery.error, 'The selected flow could not be loaded.')}
-              />
-            </div>
-          ) : null}
+            {detailQuery.data ? (
+              <div className="mt-6 space-y-6">
+                <section className="grid grid-cols-2 gap-3">
+                  <StatCard label="Nodes" value={formatCount(detailQuery.data.flow.nodeCount)} accent="ok" />
+                  <StatCard label="Disabled" value={formatCount(detailQuery.data.flow.disabledNodeCount)} accent="warn" />
+                  <StatCard label="Inbound wires" value={formatCount(detailQuery.data.flow.inboundWireCount)} accent="info" />
+                  <StatCard label="Outbound wires" value={formatCount(detailQuery.data.flow.outboundWireCount)} accent="info" />
+                </section>
 
-          {!selectedFlowId ? (
-            <div className="mt-6">
-              <EmptyState
-                title="No flow selected"
-                description="Choose a flow from the table to review node counts, wires, and the current read-only node inventory."
-              />
-            </div>
-          ) : null}
-
-          {detailQuery.data ? (
-            <div className="mt-6 space-y-6">
-              <section className="grid grid-cols-2 gap-3">
-                <StatCard label="Nodes" value={formatCount(detailQuery.data.flow.nodeCount)} accent="ok" />
-                <StatCard label="Disabled" value={formatCount(detailQuery.data.flow.disabledNodeCount)} accent="warn" />
-                <StatCard label="Inbound wires" value={formatCount(detailQuery.data.flow.inboundWireCount)} accent="info" />
-                <StatCard label="Outbound wires" value={formatCount(detailQuery.data.flow.outboundWireCount)} accent="info" />
-              </section>
-
-              <section>
-                <h4 className="text-sm font-semibold uppercase tracking-[0.18em] text-base-content/55">Node type mix</h4>
-                {detailQuery.data.flow.nodeTypes.length ? (
-                  <div className="mt-3 space-y-2">
-                    {detailQuery.data.flow.nodeTypes.map((item) => (
-                      <div key={item.type} className="flex items-center justify-between rounded-xl bg-base-200/60 px-3 py-2 text-sm">
-                        <div>
-                          <span className="font-medium text-base-content">{item.type}</span>
-                          {item.custom ? <span className="ml-2 text-xs text-info">custom</span> : null}
-                        </div>
-                        <span className="text-base-content/70">{formatCount(item.count)}</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="mt-3 text-sm text-base-content/60">No node types available for this flow.</p>
-                )}
-              </section>
-
-              <section>
-                <h4 className="text-sm font-semibold uppercase tracking-[0.18em] text-base-content/55">Nodes</h4>
-                {detailQuery.data.flow.nodes.length ? (
-                  <div className="mt-3 space-y-2">
-                    {detailQuery.data.flow.nodes.map((node) => (
-                      <div key={node.id} className="rounded-2xl border border-base-300/60 bg-base-100/70 p-3">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
+                <section>
+                  <h4 className="text-sm font-semibold uppercase tracking-[0.18em] text-base-content/55">Node type mix</h4>
+                  {detailQuery.data.flow.nodeTypes.length ? (
+                    <div className="mt-3 space-y-2">
+                      {detailQuery.data.flow.nodeTypes.map((item) => (
+                        <div key={item.type} className="flex items-center justify-between rounded-xl bg-base-200/60 px-3 py-2 text-sm">
                           <div>
-                            <div className="font-medium text-base-content">{node.name}</div>
-                            <div className="text-xs text-base-content/55">{node.type} • {node.id}</div>
+                            <span className="font-medium text-base-content">{item.type}</span>
+                            {item.custom ? <span className="ml-2 text-xs text-info">custom</span> : null}
                           </div>
-                          <div className="flex flex-wrap gap-2 text-xs text-base-content/70">
-                            <span className="rounded-full bg-base-200 px-2 py-1">Wires: {formatCount(node.wireCount)}</span>
-                            {node.disabled ? <span className="rounded-full bg-warning/15 px-2 py-1 text-warning">Disabled</span> : null}
+                          <span className="text-base-content/70">{formatCount(item.count)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-sm text-base-content/60">No node types available for this flow.</p>
+                  )}
+                </section>
+
+                <section>
+                  <h4 className="text-sm font-semibold uppercase tracking-[0.18em] text-base-content/55">Nodes</h4>
+                  {detailQuery.data.flow.nodes.length ? (
+                    <div className="mt-3 space-y-2">
+                      {detailQuery.data.flow.nodes.map((node) => (
+                        <div key={node.id} className="rounded-2xl border border-base-300/60 bg-base-100/70 p-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                              <div className="font-medium text-base-content">{node.name}</div>
+                              <div className="text-xs text-base-content/55">{node.type} • {node.id}</div>
+                            </div>
+                            <div className="flex flex-wrap gap-2 text-xs text-base-content/70">
+                              <span className="rounded-full bg-base-200 px-2 py-1">Wires: {formatCount(node.wireCount)}</span>
+                              {node.disabled ? <span className="rounded-full bg-warning/15 px-2 py-1 text-warning">Disabled</span> : null}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="mt-3 text-sm text-base-content/60">This flow has no operational nodes.</p>
-                )}
-              </section>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-sm text-base-content/60">This flow has no operational nodes.</p>
+                  )}
+                </section>
+              </div>
+            ) : null}
+          </article>
+
+          <article className="surface-card border border-base-300/60 p-6 md:p-7">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h3 className="section-title">Advisory AI analysis</h3>
+                <p className="mt-1 text-sm text-base-content/60">
+                  {selectedFlow ? `Run an explicit analysis for ${selectedFlow.label}. Results are advisory only and never modify the flow file.` : 'Select a single flow to request an advisory AI review.'}
+                </p>
+              </div>
+              <button
+                className="action-btn-primary"
+                type="button"
+                disabled={!selectedFlowId || detailQuery.isLoading || analysisMutation.isPending || operationStatus?.busy}
+                onClick={() => analysisMutation.mutate()}
+              >
+                {analysisMutation.isPending ? 'Analyzing…' : 'Analyze selected flow'}
+              </button>
             </div>
-          ) : null}
-        </article>
+
+            <div className="mt-6 space-y-4">
+              <InlineNotice
+                tone="info"
+                title="Advisory output"
+                detail="This review is AI-generated guidance for operators. It summarizes likely strengths, issues, and next checks from the current flow structure only."
+              />
+
+              {!selectedFlowId ? (
+                <EmptyState
+                  title="No flow selected"
+                  description="Choose one flow first. This MVP intentionally analyzes one selected flow at a time."
+                />
+              ) : null}
+
+              {analysisMutation.error ? (
+                <InlineNotice
+                  tone="error"
+                  title="Analysis unavailable"
+                  detail={[formatErrorMessage(analysisMutation.error, 'The AI analysis could not be completed.'), analysisAction].filter(Boolean).join(' ')}
+                />
+              ) : null}
+
+              {analysisMutation.isPending ? <LoadingState message="Requesting advisory AI analysis..." /> : null}
+
+              {analysis ? (
+                <div className="space-y-6">
+                  <div className="rounded-2xl border border-base-300/60 bg-base-100/70 p-4">
+                    <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.16em] text-base-content/55">
+                      <span>{analysis.provider.name}</span>
+                      <span>•</span>
+                      <span>{analysis.provider.model}</span>
+                      <span>•</span>
+                      <span>{analysis.provider.local ? 'local-first' : 'remote'}</span>
+                    </div>
+                    <p className="mt-3 text-sm leading-6 text-base-content/85">{analysis.summary}</p>
+                  </div>
+
+                  <AnalysisList title="Strengths" items={analysis.strengths} />
+                  <AnalysisList title="Issues" items={analysis.issues} />
+                  <AnalysisList title="Suggestions" items={analysis.suggestions} />
+                </div>
+              ) : null}
+            </div>
+          </article>
+        </div>
       </section>
     </div>
   )

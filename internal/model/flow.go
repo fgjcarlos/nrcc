@@ -59,3 +59,20 @@ type FlowDetailResponse struct {
 	Source FlowSource `json:"source"`
 	Flow   FlowDetail `json:"flow"`
 }
+
+type FlowAnalysisProvider struct {
+	Name  string `json:"name"`
+	Model string `json:"model"`
+	Local bool   `json:"local"`
+}
+
+type FlowAnalysis struct {
+	Source      FlowSource           `json:"source"`
+	Flow        FlowSummary          `json:"flow"`
+	Advisory    bool                 `json:"advisory"`
+	Summary     string               `json:"summary"`
+	Strengths   []string             `json:"strengths"`
+	Issues      []string             `json:"issues"`
+	Suggestions []string             `json:"suggestions"`
+	Provider    FlowAnalysisProvider `json:"provider"`
+}
