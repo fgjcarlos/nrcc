@@ -32,7 +32,6 @@ func TestAuthFlowAndProtectedRoutes(t *testing.T) {
 		service.NewManagedEnvService(testDataDir),
 		backupSvc,
 		service.NewLibraryService(testDataDir),
-		service.NewFlowService(testDataDir),
 		service.NewUpdateService(testDataDir, &backupSvc),
 		service.NewOperationLock(),
 		nil,
@@ -157,7 +156,6 @@ func TestLoginCookieSecureOnForwardedHTTPS(t *testing.T) {
 		service.NewManagedEnvService(testDataDir),
 		backupSvc,
 		service.NewLibraryService(testDataDir),
-		service.NewFlowService(testDataDir),
 		service.NewUpdateService(testDataDir, &backupSvc),
 		service.NewOperationLock(),
 		nil,
@@ -205,7 +203,6 @@ func TestOperationStatusAndRestoreConflict(t *testing.T) {
 		service.NewManagedEnvService(testDataDir),
 		backupSvc,
 		service.NewLibraryService(testDataDir),
-		service.NewFlowService(testDataDir),
 		service.NewUpdateService(testDataDir, &backupSvc),
 		lock,
 		nil,
@@ -254,93 +251,6 @@ func TestOperationStatusAndRestoreConflict(t *testing.T) {
 	}
 }
 
-func TestFlowsEndpoints(t *testing.T) {
-	t.Parallel()
-
-	authService, configService := newTestServices(t)
-	testDataDir := t.TempDir()
-	if err := service.NewConfigService(testDataDir, nil).SaveFullConfig(model.DefaultFullAppConfig()); err != nil {
-		t.Fatalf("SaveFullConfig() error = %v", err)
-	}
-	if err := os.MkdirAll(filepath.Join(testDataDir, "nodered"), 0o755); err != nil {
-		t.Fatalf("MkdirAll(nodered) error = %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(testDataDir, "nodered", "flows.json"), []byte(`[
-		{"id":"tab-a","type":"tab","label":"Main"},
-		{"id":"inject-1","type":"inject","z":"tab-a","name":"Start","wires":[]}
-	]`), 0o644); err != nil {
-		t.Fatalf("WriteFile(flows.json) error = %v", err)
-	}
-
-	backupSvc := service.NewBackupService(testDataDir)
-	router := chi.NewRouter()
-	registerAPIRoutes(
-		router,
-		nil,
-		authService,
-		configService,
-		service.NewManagedEnvService(testDataDir),
-		backupSvc,
-		service.NewLibraryService(testDataDir),
-		service.NewFlowService(testDataDir),
-		service.NewUpdateService(testDataDir, &backupSvc),
-		service.NewOperationLock(),
-		nil,
-		nil,
-	)
-
-	if _, _, err := authService.RegisterInitial("alice", "password123"); err != nil {
-		t.Fatalf("RegisterInitial() error = %v", err)
-	}
-
-	loginReq := newJSONRequest(t, http.MethodPost, "/api/auth/login", map[string]string{
-		"username": "alice",
-		"password": "password123",
-	})
-	loginRec := httptest.NewRecorder()
-	router.ServeHTTP(loginRec, loginReq)
-	if loginRec.Code != http.StatusOK {
-		t.Fatalf("login status = %d, want %d", loginRec.Code, http.StatusOK)
-	}
-	cookie := sessionCookieFromResponse(t, loginRec.Result())
-
-	listReq := httptest.NewRequest(http.MethodGet, "/api/flows", nil)
-	listReq.AddCookie(cookie)
-	listRec := httptest.NewRecorder()
-	router.ServeHTTP(listRec, listReq)
-	if listRec.Code != http.StatusOK {
-		t.Fatalf("flows list status = %d, want %d body=%s", listRec.Code, http.StatusOK, listRec.Body.String())
-	}
-
-	var listResp model.APIResponse[model.FlowList]
-	decodeResponse(t, listRec.Body.Bytes(), &listResp)
-	if !listResp.Success || len(listResp.Data.Items) != 1 || listResp.Data.Items[0].ID != "tab-a" {
-		t.Fatalf("flows list response = %+v", listResp)
-	}
-
-	detailReq := httptest.NewRequest(http.MethodGet, "/api/flows/tab-a", nil)
-	detailReq.AddCookie(cookie)
-	detailRec := httptest.NewRecorder()
-	router.ServeHTTP(detailRec, detailReq)
-	if detailRec.Code != http.StatusOK {
-		t.Fatalf("flow detail status = %d, want %d body=%s", detailRec.Code, http.StatusOK, detailRec.Body.String())
-	}
-
-	var detailResp model.APIResponse[model.FlowDetailResponse]
-	decodeResponse(t, detailRec.Body.Bytes(), &detailResp)
-	if !detailResp.Success || detailResp.Data.Flow.ID != "tab-a" || len(detailResp.Data.Flow.Nodes) != 1 {
-		t.Fatalf("flow detail response = %+v", detailResp)
-	}
-
-	notFoundReq := httptest.NewRequest(http.MethodGet, "/api/flows/missing", nil)
-	notFoundReq.AddCookie(cookie)
-	notFoundRec := httptest.NewRecorder()
-	router.ServeHTTP(notFoundRec, notFoundReq)
-	if notFoundRec.Code != http.StatusNotFound {
-		t.Fatalf("missing flow status = %d, want %d body=%s", notFoundRec.Code, http.StatusNotFound, notFoundRec.Body.String())
-	}
-}
-
 func TestEnvironmentAPIHidesSecretValues(t *testing.T) {
 	t.Parallel()
 
@@ -363,7 +273,6 @@ func TestEnvironmentAPIHidesSecretValues(t *testing.T) {
 		managedEnvService,
 		backupSvc,
 		service.NewLibraryService(testDataDir),
-		service.NewFlowService(testDataDir),
 		service.NewUpdateService(testDataDir, &backupSvc),
 		service.NewOperationLock(),
 		nil,
