@@ -109,6 +109,8 @@ export type ConfigValidationResult = {
 export type ManagedEnvVar = {
   name: string
   value: string
+  secret?: boolean
+  hasValue?: boolean
 }
 
 export type ManagedEnvState = {

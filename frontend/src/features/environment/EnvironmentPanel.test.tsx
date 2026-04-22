@@ -63,4 +63,42 @@ describe('EnvironmentPanel', () => {
     expect(onError).not.toHaveBeenCalled()
     expect(await screen.findByText('Managed environment saved. Restart Node-RED to apply the changes.')).toBeInTheDocument()
   })
+
+  it('preserves masked secrets unless explicitly cleared', async () => {
+    const user = userEvent.setup()
+    const onSaved = vi.fn().mockResolvedValue(undefined)
+    const onError = vi.fn()
+
+    vi.mocked(api.applyEnvironment).mockResolvedValue({ restartRequired: true, variables: [] })
+
+    render(
+      <QueryClientProvider client={createTestQueryClient()}>
+        <EnvironmentPanel
+          state={{
+            restartRequired: true,
+            variables: [{ name: 'API_TOKEN', value: '', secret: true, hasValue: true }],
+          }}
+          loading={false}
+          onSaved={onSaved}
+          onError={onError}
+        />
+      </QueryClientProvider>,
+    )
+
+    expect(screen.getByPlaceholderText(/stored secret hidden/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Save environment' }))
+
+    await waitFor(() => {
+      expect(api.applyEnvironment).toHaveBeenCalledWith([{ name: 'API_TOKEN', value: '', secret: true, hasValue: true }])
+    })
+
+    vi.mocked(api.applyEnvironment).mockClear()
+    await user.click(screen.getByRole('button', { name: /clear stored secret/i }))
+    await user.click(screen.getByRole('button', { name: 'Save environment' }))
+
+    await waitFor(() => {
+      expect(api.applyEnvironment).toHaveBeenCalledWith([{ name: 'API_TOKEN', value: '', secret: true, hasValue: false }])
+    })
+  })
 })
