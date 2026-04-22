@@ -16,6 +16,7 @@ import { OverviewPage } from './features/overview/OverviewPage'
 import { LogsPage } from './features/logs/LogsPage'
 import { EnvironmentPage } from './features/environment/EnvironmentPage'
 import { BackupsPage } from './features/backups/BackupsPage'
+import { FlowsPage } from './features/flows/FlowsPage'
 import { LibrariesPage } from './features/libraries/LibrariesPage'
 import { UpdatesPage } from './features/updates/UpdatesPage'
 import { DiagnosticsPage } from './features/diagnostics/DiagnosticsPage'
@@ -141,6 +142,12 @@ function AppContent() {
     queryKey: ['backups'],
     queryFn: api.backups,
     enabled: !!user && isAdmin,
+  })
+
+  const flowsQuery = useQuery({
+    queryKey: ['flows'],
+    queryFn: api.flows,
+    enabled: !!user,
   })
 
   const librariesQuery = useQuery({
@@ -390,6 +397,32 @@ function AppContent() {
                                     detail: message,
                                   })
                                 }}
+                              />
+                            </PageTransition>
+                          }
+                        />
+                        <Route
+                          path="flows"
+                          element={
+                            <PageTransition>
+                              <FlowsPage
+                                flows={flowsQuery.data}
+                                loading={flowsQuery.isLoading}
+                                error={flowsQuery.error}
+                                operationStatus={operationsQuery.data}
+                              />
+                            </PageTransition>
+                          }
+                        />
+                        <Route
+                          path="flows/:flowId"
+                          element={
+                            <PageTransition>
+                              <FlowsPage
+                                flows={flowsQuery.data}
+                                loading={flowsQuery.isLoading}
+                                error={flowsQuery.error}
+                                operationStatus={operationsQuery.data}
                               />
                             </PageTransition>
                           }

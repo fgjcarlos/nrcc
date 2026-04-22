@@ -162,6 +162,82 @@ export type LibraryOperationResult = {
   operation: string
 }
 
+export type FlowSource = {
+  userDir: string
+  flowFile: string
+  path: string
+  readOnly: boolean
+  updatedAt?: string
+}
+
+export type FlowSummary = {
+  id: string
+  label: string
+  nodeCount: number
+  disabledNodeCount: number
+  customNodeCount: number
+  inboundWireCount: number
+  outboundWireCount: number
+  subflowUsageCount: number
+}
+
+export type FlowSummaryTotals = {
+  flowCount: number
+  nodeCount: number
+  disabledNodeCount: number
+  customNodeCount: number
+  inboundWireCount: number
+  outboundWireCount: number
+  subflowUsageCount: number
+}
+
+export type FlowList = {
+  source: FlowSource
+  summary: FlowSummaryTotals
+  items: FlowSummary[]
+}
+
+export type FlowTypeMetric = {
+  type: string
+  count: number
+  custom: boolean
+}
+
+export type FlowNodeSummary = {
+  id: string
+  type: string
+  name: string
+  disabled: boolean
+  wireCount: number
+}
+
+export type FlowDetail = FlowSummary & {
+  nodeTypes: FlowTypeMetric[]
+  nodes: FlowNodeSummary[]
+}
+
+export type FlowDetailResponse = {
+  source: FlowSource
+  flow: FlowDetail
+}
+
+export type FlowAnalysisProvider = {
+  name: string
+  model: string
+  local: boolean
+}
+
+export type FlowAnalysis = {
+  source: FlowSource
+  flow: FlowSummary
+  advisory: boolean
+  summary: string
+  strengths: string[]
+  issues: string[]
+  suggestions: string[]
+  provider: FlowAnalysisProvider
+}
+
 export type OperationStatus = {
   busy: boolean
   type?: string
@@ -408,6 +484,12 @@ export const api = {
     }),
   restoreBackup: (id: string) =>
     request<{ restoredBackupId: string; preventiveBackupId: string }>(`/api/backups/${id}/restore`, {
+      method: 'POST',
+    }),
+  flows: () => request<FlowList>('/api/flows'),
+  flow: (id: string) => request<FlowDetailResponse>(`/api/flows/${encodeURIComponent(id)}`),
+  analyzeFlow: (id: string) =>
+    request<FlowAnalysis>(`/api/flows/${encodeURIComponent(id)}/analysis`, {
       method: 'POST',
     }),
   libraries: () => request<LibraryList>('/api/libraries'),

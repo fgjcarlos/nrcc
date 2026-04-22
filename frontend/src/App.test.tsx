@@ -21,6 +21,8 @@ vi.mock('./api', async () => {
       systemInfo: vi.fn(),
       environment: vi.fn(),
       backups: vi.fn(),
+      flows: vi.fn(),
+      flow: vi.fn(),
       libraries: vi.fn(),
       operationsStatus: vi.fn(),
       updateStatus: vi.fn(),
@@ -127,6 +129,63 @@ describe('App routing', () => {
         },
       ],
     })
+    vi.mocked(api.flows).mockResolvedValue({
+      source: {
+        userDir: '/var/lib/node-red',
+        flowFile: 'flows.json',
+        path: '/var/lib/node-red/flows.json',
+        readOnly: true,
+        updatedAt: '2026-01-01T00:00:00Z',
+      },
+      summary: {
+        flowCount: 1,
+        nodeCount: 3,
+        disabledNodeCount: 1,
+        customNodeCount: 1,
+        inboundWireCount: 2,
+        outboundWireCount: 2,
+        subflowUsageCount: 0,
+      },
+      items: [
+        {
+          id: 'main-flow',
+          label: 'Main Flow',
+          nodeCount: 3,
+          disabledNodeCount: 1,
+          customNodeCount: 1,
+          inboundWireCount: 2,
+          outboundWireCount: 2,
+          subflowUsageCount: 0,
+        },
+      ],
+    })
+    vi.mocked(api.flow).mockResolvedValue({
+      source: {
+        userDir: '/var/lib/node-red',
+        flowFile: 'flows.json',
+        path: '/var/lib/node-red/flows.json',
+        readOnly: true,
+        updatedAt: '2026-01-01T00:00:00Z',
+      },
+      flow: {
+        id: 'main-flow',
+        label: 'Main Flow',
+        nodeCount: 3,
+        disabledNodeCount: 1,
+        customNodeCount: 1,
+        inboundWireCount: 2,
+        outboundWireCount: 2,
+        subflowUsageCount: 0,
+        nodeTypes: [
+          { type: 'inject', count: 1, custom: false },
+          { type: 'acme-widget', count: 1, custom: true },
+        ],
+        nodes: [
+          { id: 'n1', type: 'inject', name: 'Trigger', disabled: false, wireCount: 1 },
+          { id: 'n2', type: 'acme-widget', name: 'Widget', disabled: true, wireCount: 1 },
+        ],
+      },
+    })
     vi.mocked(api.libraries).mockResolvedValue({
       items: [{ name: '@node-red/dashboard', version: '1.0.0', direct: true }],
     })
@@ -180,6 +239,15 @@ describe('App routing', () => {
     expect(await screen.findByRole('heading', { name: 'Users' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Create user' })).toBeInTheDocument()
     expect((await screen.findAllByText('admin')).length).toBeGreaterThan(0)
+  })
+
+  it('renders the flows page and selected flow detail by route', async () => {
+    renderApp('/app/flows/main-flow')
+
+    expect(await screen.findByRole('heading', { name: 'Flows' })).toBeInTheDocument()
+    expect(screen.getByText('Inspection only')).toBeInTheDocument()
+    expect(await screen.findByText('Widget')).toBeInTheDocument()
+    expect(api.flow).toHaveBeenCalledWith('main-flow')
   })
 
   it('redirects unknown protected routes back to the overview page', async () => {

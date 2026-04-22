@@ -153,4 +153,46 @@ describe('api client', () => {
 
     expect(fetchMock.mock.calls[0][0]).toBe('/api/diagnostics/logs?level=error&source=runtime&limit=25&offset=50')
   })
+
+  it('posts flow analysis requests to the selected flow endpoint', async () => {
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          success: true,
+          data: {
+            user: { id: '1', username: 'admin', role: 'admin', createdAt: '2026-01-01T00:00:00Z' },
+            csrfToken: 'csrf-123',
+          },
+          timestamp: '2026-01-01T00:00:00Z',
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          success: true,
+          data: {
+            source: { userDir: '/tmp/node-red', flowFile: 'flows.json', path: '/tmp/node-red/flows.json', readOnly: true },
+            flow: { id: 'main-flow', label: 'Main Flow', nodeCount: 2, disabledNodeCount: 0, customNodeCount: 0, inboundWireCount: 0, outboundWireCount: 1, subflowUsageCount: 0 },
+            advisory: true,
+            summary: 'ok',
+            strengths: [],
+            issues: [],
+            suggestions: [],
+            provider: { name: 'ollama', model: 'llama3.2', local: true },
+          },
+          timestamp: '2026-01-01T00:00:00Z',
+        }),
+      })
+
+    await api.login('admin', 'secret')
+    await api.analyzeFlow('main-flow')
+
+    expect(fetchMock.mock.calls[1][0]).toBe('/api/flows/main-flow/analysis')
+    const options = fetchMock.mock.calls[1][1] as RequestInit
+    expect(options.method).toBe('POST')
+    expect(new Headers(options.headers).get('X-CSRF-Token')).toBe('csrf-123')
+  })
 })
