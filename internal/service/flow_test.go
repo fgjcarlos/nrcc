@@ -1,13 +1,34 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"nrcc/internal/model"
 	"nrcc/internal/platform"
 )
+
+type stubFlowAnalysisProvider struct {
+	metadata model.FlowAnalysisProvider
+	result   FlowAnalysisPayload
+	err      error
+	prompt   string
+}
+
+func (s *stubFlowAnalysisProvider) Metadata() model.FlowAnalysisProvider {
+	return s.metadata
+}
+
+func (s *stubFlowAnalysisProvider) Analyze(_ context.Context, prompt string) (FlowAnalysisPayload, error) {
+	s.prompt = prompt
+	if s.err != nil {
+		return FlowAnalysisPayload{}, s.err
+	}
+	return s.result, nil
+}
 
 func TestFlowServiceListAndDetail(t *testing.T) {
 	t.Parallel()
@@ -122,5 +143,45 @@ func TestFlowServiceGetNotFound(t *testing.T) {
 	_, err := NewFlowService(dataDir).Get("missing")
 	if !errors.Is(err, ErrFlowNotFound) {
 		t.Fatalf("Get(missing) error = %v, want ErrFlowNotFound", err)
+	}
+}
+
+func TestFlowServiceAnalyze(t *testing.T) {
+	t.Parallel()
+
+	dataDir := t.TempDir()
+	if err := platform.WriteFileAtomic(filepath.Join(dataDir, "nodered", "flows.json"), []byte(`[
+		{"id":"tab-a","type":"tab","label":"Main"},
+		{"id":"inject-1","type":"inject","z":"tab-a","name":"Start","wires":[["debug-1"]]},
+		{"id":"debug-1","type":"debug","z":"tab-a","name":"Logger","wires":[]}
+	]`), 0o644); err != nil {
+		t.Fatalf("WriteFileAtomic(flows.json) error = %v", err)
+	}
+
+	provider := &stubFlowAnalysisProvider{
+		metadata: model.FlowAnalysisProvider{Name: "ollama", Model: "llama3.2", Local: true},
+		result: FlowAnalysisPayload{
+			Summary:     "Resumen del flujo.",
+			Strengths:   []string{"- Entrada clara"},
+			Issues:      []string{"* Falta manejo de errores"},
+			Suggestions: []string{"Agregar observabilidad adicional"},
+		},
+	}
+
+	analysis, err := NewFlowServiceWithProvider(dataDir, provider).Analyze(context.Background(), "tab-a")
+	if err != nil {
+		t.Fatalf("Analyze(tab-a) error = %v", err)
+	}
+	if analysis.Flow.ID != "tab-a" || analysis.Provider.Name != "ollama" {
+		t.Fatalf("Analyze(tab-a) = %+v", analysis)
+	}
+	if got := strings.Join(analysis.Strengths, ","); got != "Entrada clara" {
+		t.Fatalf("Analyze(tab-a) strengths = %q", got)
+	}
+	if !strings.Contains(provider.prompt, "Main") || !strings.Contains(provider.prompt, "inject:1") {
+		t.Fatalf("Analyze(tab-a) prompt = %q", provider.prompt)
+	}
+	if !analysis.Advisory {
+		t.Fatal("Analyze(tab-a) advisory = false, want true")
 	}
 }

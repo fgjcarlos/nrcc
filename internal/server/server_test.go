@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -17,6 +18,23 @@ import (
 	"nrcc/internal/model"
 	"nrcc/internal/service"
 )
+
+type stubFlowAnalysisProvider struct {
+	metadata model.FlowAnalysisProvider
+	result   service.FlowAnalysisPayload
+	err      error
+}
+
+func (s stubFlowAnalysisProvider) Metadata() model.FlowAnalysisProvider {
+	return s.metadata
+}
+
+func (s stubFlowAnalysisProvider) Analyze(_ context.Context, _ string) (service.FlowAnalysisPayload, error) {
+	if s.err != nil {
+		return service.FlowAnalysisPayload{}, s.err
+	}
+	return s.result, nil
+}
 
 func TestAuthFlowAndProtectedRoutes(t *testing.T) {
 	t.Parallel()
@@ -514,6 +532,84 @@ func TestFlowsEndpoints(t *testing.T) {
 	router.ServeHTTP(notFoundRec, notFoundReq)
 	if notFoundRec.Code != http.StatusNotFound {
 		t.Fatalf("missing flow status = %d, want %d body=%s", notFoundRec.Code, http.StatusNotFound, notFoundRec.Body.String())
+	}
+}
+
+func TestFlowAnalysisEndpoint(t *testing.T) {
+	t.Parallel()
+
+	const strongPassword = "NRCCTestVault847"
+
+	authService, configService := newTestServices(t)
+	testDataDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(testDataDir, "nodered"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(nodered) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(testDataDir, "nodered", "flows.json"), []byte(`[
+		{"id":"tab-a","type":"tab","label":"Main"},
+		{"id":"inject-1","type":"inject","z":"tab-a","name":"Start","wires":[]}
+	]`), 0o644); err != nil {
+		t.Fatalf("WriteFile(flows.json) error = %v", err)
+	}
+
+	backupSvc := service.NewBackupService(testDataDir)
+	flowSvc := service.NewFlowServiceWithProvider(testDataDir, stubFlowAnalysisProvider{
+		metadata: model.FlowAnalysisProvider{Name: "ollama", Model: "llama3.2", Local: true},
+		result: service.FlowAnalysisPayload{
+			Summary:     "Resumen del flujo.",
+			Strengths:   []string{"Entrada clara"},
+			Issues:      []string{"Falta manejo de errores"},
+			Suggestions: []string{"Agregar validacion"},
+		},
+	})
+
+	router := chi.NewRouter()
+	registerAPIRoutes(
+		router,
+		nil,
+		authService,
+		configService,
+		service.NewManagedEnvService(testDataDir),
+		backupSvc,
+		service.NewLibraryService(testDataDir),
+		flowSvc,
+		service.NewUpdateService(testDataDir, &backupSvc),
+		service.NewOperationLock(),
+		nil,
+		nil,
+	)
+
+	if _, _, err := authService.RegisterInitial("alice", strongPassword); err != nil {
+		t.Fatalf("RegisterInitial() error = %v", err)
+	}
+
+	loginReq := newJSONRequest(t, http.MethodPost, "/api/auth/login", map[string]string{
+		"username": "alice",
+		"password": strongPassword,
+	})
+	loginRec := httptest.NewRecorder()
+	router.ServeHTTP(loginRec, loginReq)
+	if loginRec.Code != http.StatusOK {
+		t.Fatalf("login status = %d, want %d", loginRec.Code, http.StatusOK)
+	}
+	cookie := sessionCookieFromResponse(t, loginRec.Result())
+
+	var loginResp model.APIResponse[authResponse]
+	decodeResponse(t, loginRec.Body.Bytes(), &loginResp)
+
+	analysisReq := newJSONRequest(t, http.MethodPost, "/api/flows/tab-a/analysis", nil)
+	analysisReq.AddCookie(cookie)
+	analysisReq.Header.Set("X-CSRF-Token", loginResp.Data.CSRFToken)
+	analysisRec := httptest.NewRecorder()
+	router.ServeHTTP(analysisRec, analysisReq)
+	if analysisRec.Code != http.StatusOK {
+		t.Fatalf("analysis status = %d, want %d body=%s", analysisRec.Code, http.StatusOK, analysisRec.Body.String())
+	}
+
+	var analysisResp model.APIResponse[model.FlowAnalysis]
+	decodeResponse(t, analysisRec.Body.Bytes(), &analysisResp)
+	if !analysisResp.Success || analysisResp.Data.Flow.ID != "tab-a" || analysisResp.Data.Provider.Name != "ollama" {
+		t.Fatalf("analysis response = %+v", analysisResp)
 	}
 }
 
