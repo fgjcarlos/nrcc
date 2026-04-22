@@ -61,6 +61,24 @@ func RequireCSRF(authService *service.AuthService) func(http.Handler) http.Handl
 	}
 }
 
+func RequireRole(role model.UserRole) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			claims, ok := AuthClaimsFromContext(r.Context())
+			if !ok {
+				writeAuthError(w, r, http.StatusUnauthorized, "AUTH_REQUIRED", "authentication required")
+				return
+			}
+			if claims.Role != role {
+				writeAuthError(w, r, http.StatusForbidden, "AUTH_FORBIDDEN", "administrator access required")
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 func AuthClaimsFromContext(ctx context.Context) (model.SessionClaims, bool) {
 	claims, ok := ctx.Value(authClaimsContextKey).(model.SessionClaims)
 	return claims, ok

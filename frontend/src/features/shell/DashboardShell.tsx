@@ -28,6 +28,9 @@ export function DashboardShell({
     { to: '/app/libraries', label: 'Libraries', page: 'libraries' },
     { to: '/app/updates', label: 'Updates', page: 'updates' },
   ]
+  if (user.role === 'admin') {
+    items.push({ to: '/app/users', label: 'Users', page: 'users' })
+  }
 
   return (
     <div className="drawer bg-base-100 lg:drawer-open">

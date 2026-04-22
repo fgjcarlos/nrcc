@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"nrcc/internal/middleware"
+	"nrcc/internal/model"
 	"nrcc/internal/service"
 )
 
@@ -35,6 +36,7 @@ func registerAssetRoutes(router chi.Router, authService *service.AuthService, as
 		if authService != nil {
 			r.Use(middleware.RequireAuth(authService))
 			r.Use(middleware.RequireCSRF(authService))
+			r.Use(middleware.RequireRole(model.RoleAdmin))
 		}
 
 		// POST /api/assets/{category}/upload — multipart upload

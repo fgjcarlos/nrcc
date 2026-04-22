@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { api } from './api'
 import { buildGlobalStatus } from './common/utils/status'
-import { ThemeProvider, PageTransition, ErrorBoundary } from './common/components'
+import { ThemeProvider, PageTransition, ErrorBoundary, InlineNotice } from './common/components'
 import { useAuth } from './features/auth/useAuth'
 import { AuthScreen } from './features/auth/AuthScreen'
 import { LoadingScreen } from './features/auth/LoadingScreen'
@@ -20,6 +20,35 @@ import { LibrariesPage } from './features/libraries/LibrariesPage'
 import { UpdatesPage } from './features/updates/UpdatesPage'
 import { DiagnosticsPage } from './features/diagnostics/DiagnosticsPage'
 import { ConfigPage } from './features/config/ConfigPage'
+import { UsersPage } from './features/users/UsersPage'
+
+function AccessDeniedPage({ userRole, onLogout, logoutBusy }: { userRole: string; onLogout: () => void; logoutBusy: boolean }) {
+  return (
+    <PageTransition>
+      <main id="auth-main" tabIndex={-1} className="min-h-screen bg-base-100 px-6 py-16">
+        <div className="mx-auto flex max-w-2xl flex-col gap-6">
+          <header>
+            <p className="text-xs uppercase tracking-[0.28em] text-base-content/50">Access denied</p>
+            <h1 className="mt-2 text-3xl font-semibold text-base-content">This first slice is admin-only</h1>
+            <p className="mt-3 text-sm text-base-content/70">
+              Signed in as <span className="font-semibold">{userRole}</span>. Viewer and operator rollout is intentionally deferred, so this account cannot use the control center yet.
+            </p>
+          </header>
+          <InlineNotice
+            tone="info"
+            title="Administrator required"
+            detail="Ask an administrator to promote this account or sign in with an existing administrator account."
+          />
+          <div>
+            <button className="btn btn-primary" type="button" onClick={onLogout} disabled={logoutBusy}>
+              {logoutBusy ? 'Signing out...' : 'Sign out'}
+            </button>
+          </div>
+        </div>
+      </main>
+    </PageTransition>
+  )
+}
 
 function AppContent() {
   const navigate = useNavigate()
@@ -27,6 +56,7 @@ function AppContent() {
   const queryClient = useQueryClient()
   const { toasts, pushToast, dismissToast } = useToasts()
   const { user, isLoading, authMode, setAuthMode, authMessage, loginMutation, registerMutation, logoutMutation } = useAuth()
+  const isAdmin = user?.role === 'admin'
 
   // Set up auth navigation effects
   useEffect(() => {
@@ -83,74 +113,74 @@ function AppContent() {
   const runtimeQuery = useQuery({
     queryKey: ['runtime-status'],
     queryFn: api.runtimeStatus,
-    enabled: !!user,
+    enabled: !!user && isAdmin,
     refetchInterval: 5000,
   })
 
   const runtimeLogsQuery = useQuery({
     queryKey: ['runtime-logs'],
     queryFn: api.runtimeLogs,
-    enabled: !!user,
+    enabled: !!user && isAdmin,
     refetchInterval: 5000,
   })
 
   const systemInfoQuery = useQuery({
     queryKey: ['system-info'],
     queryFn: api.systemInfo,
-    enabled: !!user,
+    enabled: !!user && isAdmin,
     refetchInterval: 15000,
   })
 
   const environmentQuery = useQuery({
     queryKey: ['environment'],
     queryFn: api.environment,
-    enabled: !!user,
+    enabled: !!user && isAdmin,
   })
 
   const backupsQuery = useQuery({
     queryKey: ['backups'],
     queryFn: api.backups,
-    enabled: !!user,
+    enabled: !!user && isAdmin,
   })
 
   const librariesQuery = useQuery({
     queryKey: ['libraries'],
     queryFn: api.libraries,
-    enabled: !!user,
+    enabled: !!user && isAdmin,
   })
 
   const operationsQuery = useQuery({
     queryKey: ['operations-status'],
     queryFn: api.operationsStatus,
-    enabled: !!user,
+    enabled: !!user && isAdmin,
     refetchInterval: 2000,
   })
 
   const updatesQuery = useQuery({
     queryKey: ['updates-status'],
     queryFn: api.updateStatus,
-    enabled: !!user,
+    enabled: !!user && isAdmin,
     refetchInterval: 15000,
   })
 
   const diagnosticsReportQuery = useQuery({
     queryKey: ['diagnostics-report'],
     queryFn: api.diagnosticsReport,
-    enabled: !!user,
+    enabled: !!user && isAdmin,
     refetchInterval: 30000,
   })
 
   const diagnosticsLogsQuery = useQuery({
     queryKey: ['diagnostics-logs'],
     queryFn: () => api.diagnosticsLogs({ limit: 100 }),
-    enabled: !!user,
+    enabled: !!user && isAdmin,
     refetchInterval: 10000,
   })
 
   const diagnosticsJobsQuery = useQuery({
     queryKey: ['diagnostics-jobs'],
     queryFn: () => api.diagnosticsJobs({ limit: 50 }),
-    enabled: !!user,
+    enabled: !!user && isAdmin,
     refetchInterval: 10000,
   })
 
@@ -238,209 +268,235 @@ function AppContent() {
             path="/app/*"
             element={
               user ? (
-                <DashboardShell
-                  user={user}
-                  globalStatus={globalStatus}
-                  logoutBusy={logoutMutation.isPending}
-                  onLogout={() => logoutMutation.mutate()}
-                >
-                  <AnimatePresence mode="wait">
-                    <Routes>
-                      <Route
-                        path="overview"
-                        element={
-                          <PageTransition>
-                            <OverviewPage
-                              runtime={runtimeQuery.data}
-                              runtimeLoading={runtimeQuery.isLoading}
-                              runtimeError={runtimeQuery.error}
-                              systemInfo={systemInfoQuery.data}
-                              systemLoading={systemInfoQuery.isLoading}
-                              systemError={systemInfoQuery.error}
-                              backups={backupsQuery.data}
-                              backupsLoading={backupsQuery.isLoading}
-                              environment={environmentQuery.data}
-                              environmentLoading={environmentQuery.isLoading}
-                              operationStatus={operationsQuery.data}
-                              restarting={restartMutation.isPending}
-                              onRestart={() => restartMutation.mutate()}
-                              globalStatus={globalStatus}
-                            />
-                          </PageTransition>
-                        }
-                      />
-                      <Route
-                        path="logs"
-                        element={
-                          <PageTransition>
-                            <LogsPage
-                              logs={runtimeLogsQuery.data?.lines ?? []}
-                              loading={runtimeLogsQuery.isLoading}
-                              error={runtimeLogsQuery.error}
-                            />
-                          </PageTransition>
-                        }
-                      />
-                      <Route
-                        path="config"
-                        element={
-                          <PageTransition>
-                            <ConfigPage
-                              operationStatus={operationsQuery.data}
-                              onSaved={(restartRequired) => {
-                                pushToast({
-                                  tone: 'success',
-                                  title: 'Configuration saved',
-                                  detail: restartRequired
-                                    ? 'Saved successfully. Restart Node-RED to apply the changes.'
-                                    : 'Saved successfully.',
-                                })
-                              }}
-                              onError={(message) => {
-                                pushToast({
-                                  tone: 'error',
-                                  title: 'Configuration failed',
-                                  detail: message,
-                                })
-                              }}
-                              onToast={(message, type) => {
-                                pushToast({
-                                  tone: type,
-                                  title: message.split('\n')[0],
-                                  detail: message.split('\n').slice(1).join('\n') || undefined,
-                                })
-                              }}
-                            />
-                          </PageTransition>
-                        }
-                      />
-                      <Route
-                        path="environment"
-                        element={
-                          <PageTransition>
-                            <EnvironmentPage
-                              state={environmentQuery.data}
-                              loading={environmentQuery.isLoading}
-                              error={environmentQuery.error}
-                              onSaved={async () => {
-                                await queryClient.invalidateQueries({ queryKey: ['environment'] })
-                                pushToast({
-                                  tone: 'success',
-                                  title: 'Environment saved',
-                                  detail: 'Managed runtime variables were updated. Restart Node-RED to apply them.',
-                                })
-                              }}
-                              onError={(message) => {
-                                pushToast({
-                                  tone: 'error',
-                                  title: 'Environment update failed',
-                                  detail: message,
-                                })
-                              }}
-                            />
-                          </PageTransition>
-                        }
-                      />
-                      <Route
-                        path="backups"
-                        element={
-                          <PageTransition>
-                            <BackupsPage
-                              backups={backupsQuery.data}
-                              loading={backupsQuery.isLoading}
-                              error={backupsQuery.error}
-                              operationStatus={operationsQuery.data}
-                              onChanged={async (message, tone) => {
-                                await queryClient.invalidateQueries({ queryKey: ['backups'] })
-                                await queryClient.invalidateQueries({ queryKey: ['operations-status'] })
-                                pushToast({
-                                  tone,
-                                  title: tone === 'success' ? 'Backups updated' : 'Backup action failed',
-                                  detail: message,
-                                })
-                              }}
-                            />
-                          </PageTransition>
-                        }
-                      />
-                      <Route
-                        path="libraries"
-                        element={
-                          <PageTransition>
-                            <LibrariesPage
-                              libraries={librariesQuery.data}
-                              loading={librariesQuery.isLoading}
-                              error={librariesQuery.error}
-                              operationStatus={operationsQuery.data}
-                              onChanged={async (message, tone) => {
-                                await queryClient.invalidateQueries({ queryKey: ['libraries'] })
-                                await queryClient.invalidateQueries({ queryKey: ['operations-status'] })
-                                pushToast({
-                                  tone,
-                                  title: tone === 'success' ? 'Libraries updated' : 'Library action failed',
-                                  detail: message,
-                                })
-                              }}
-                            />
-                          </PageTransition>
-                        }
-                      />
-                      <Route
-                        path="updates"
-                        element={
-                          <PageTransition>
-                            <UpdatesPage
-                              updateStatus={updatesQuery.data}
-                              loading={updatesQuery.isLoading}
-                              error={updatesQuery.error}
-                              operationStatus={operationsQuery.data}
-                              onChanged={async (message, tone) => {
-                                await queryClient.invalidateQueries({ queryKey: ['updates-status'] })
-                                await queryClient.invalidateQueries({ queryKey: ['operations-status'] })
-                                await queryClient.invalidateQueries({ queryKey: ['runtime-status'] })
-                                pushToast({
-                                  tone,
-                                  title: tone === 'success' ? 'Update completed' : 'Update failed',
-                                  detail: message,
-                                })
-                              }}
-                            />
-                          </PageTransition>
-                        }
-                      />
-                      <Route
-                        path="diagnostics"
-                        element={
-                          <PageTransition>
-                            <DiagnosticsPage
-                              report={diagnosticsReportQuery.data}
-                              reportLoading={diagnosticsReportQuery.isLoading}
-                              reportError={diagnosticsReportQuery.error}
-                              logs={diagnosticsLogsQuery.data?.logs ?? []}
-                              logsLoading={diagnosticsLogsQuery.isLoading}
-                              logsError={diagnosticsLogsQuery.error}
-                              jobs={diagnosticsJobsQuery.data?.jobs ?? []}
-                              jobsLoading={diagnosticsJobsQuery.isLoading}
-                              jobsError={diagnosticsJobsQuery.error}
-                              exporting={exportMutation.isPending}
-                              onRefreshReport={async () => {
-                                await queryClient.invalidateQueries({ queryKey: ['diagnostics-report'] })
-                              }}
-                              onRefreshLogs={async () => {
-                                await queryClient.invalidateQueries({ queryKey: ['diagnostics-logs'] })
-                              }}
-                              onRefreshJobs={async () => {
-                                await queryClient.invalidateQueries({ queryKey: ['diagnostics-jobs'] })
-                              }}
-                              onExport={() => exportMutation.mutate()}
-                            />
-                          </PageTransition>
-                        }
-                      />
-                      <Route path="*" element={<Navigate to="/app/overview" replace />} />
-                    </Routes>
-                  </AnimatePresence>
-                </DashboardShell>
+                isAdmin ? (
+                  <DashboardShell
+                    user={user}
+                    globalStatus={globalStatus}
+                    logoutBusy={logoutMutation.isPending}
+                    onLogout={() => logoutMutation.mutate()}
+                  >
+                    <AnimatePresence mode="wait">
+                      <Routes>
+                        <Route
+                          path="overview"
+                          element={
+                            <PageTransition>
+                              <OverviewPage
+                                runtime={runtimeQuery.data}
+                                runtimeLoading={runtimeQuery.isLoading}
+                                runtimeError={runtimeQuery.error}
+                                systemInfo={systemInfoQuery.data}
+                                systemLoading={systemInfoQuery.isLoading}
+                                systemError={systemInfoQuery.error}
+                                backups={backupsQuery.data}
+                                backupsLoading={backupsQuery.isLoading}
+                                environment={environmentQuery.data}
+                                environmentLoading={environmentQuery.isLoading}
+                                operationStatus={operationsQuery.data}
+                                restarting={restartMutation.isPending}
+                                onRestart={() => restartMutation.mutate()}
+                                globalStatus={globalStatus}
+                              />
+                            </PageTransition>
+                          }
+                        />
+                        <Route
+                          path="logs"
+                          element={
+                            <PageTransition>
+                              <LogsPage
+                                logs={runtimeLogsQuery.data?.lines ?? []}
+                                loading={runtimeLogsQuery.isLoading}
+                                error={runtimeLogsQuery.error}
+                              />
+                            </PageTransition>
+                          }
+                        />
+                        <Route
+                          path="config"
+                          element={
+                            <PageTransition>
+                              <ConfigPage
+                                operationStatus={operationsQuery.data}
+                                onSaved={(restartRequired) => {
+                                  pushToast({
+                                    tone: 'success',
+                                    title: 'Configuration saved',
+                                    detail: restartRequired
+                                      ? 'Saved successfully. Restart Node-RED to apply the changes.'
+                                      : 'Saved successfully.',
+                                  })
+                                }}
+                                onError={(message) => {
+                                  pushToast({
+                                    tone: 'error',
+                                    title: 'Configuration failed',
+                                    detail: message,
+                                  })
+                                }}
+                                onToast={(message, type) => {
+                                  pushToast({
+                                    tone: type,
+                                    title: message.split('\n')[0],
+                                    detail: message.split('\n').slice(1).join('\n') || undefined,
+                                  })
+                                }}
+                              />
+                            </PageTransition>
+                          }
+                        />
+                        <Route
+                          path="environment"
+                          element={
+                            <PageTransition>
+                              <EnvironmentPage
+                                state={environmentQuery.data}
+                                loading={environmentQuery.isLoading}
+                                error={environmentQuery.error}
+                                onSaved={async () => {
+                                  await queryClient.invalidateQueries({ queryKey: ['environment'] })
+                                  pushToast({
+                                    tone: 'success',
+                                    title: 'Environment saved',
+                                    detail: 'Managed runtime variables were updated. Restart Node-RED to apply them.',
+                                  })
+                                }}
+                                onError={(message) => {
+                                  pushToast({
+                                    tone: 'error',
+                                    title: 'Environment update failed',
+                                    detail: message,
+                                  })
+                                }}
+                              />
+                            </PageTransition>
+                          }
+                        />
+                        <Route
+                          path="backups"
+                          element={
+                            <PageTransition>
+                              <BackupsPage
+                                backups={backupsQuery.data}
+                                loading={backupsQuery.isLoading}
+                                error={backupsQuery.error}
+                                operationStatus={operationsQuery.data}
+                                onChanged={async (message, tone) => {
+                                  await queryClient.invalidateQueries({ queryKey: ['backups'] })
+                                  await queryClient.invalidateQueries({ queryKey: ['operations-status'] })
+                                  pushToast({
+                                    tone,
+                                    title: tone === 'success' ? 'Backups updated' : 'Backup action failed',
+                                    detail: message,
+                                  })
+                                }}
+                              />
+                            </PageTransition>
+                          }
+                        />
+                        <Route
+                          path="libraries"
+                          element={
+                            <PageTransition>
+                              <LibrariesPage
+                                libraries={librariesQuery.data}
+                                loading={librariesQuery.isLoading}
+                                error={librariesQuery.error}
+                                operationStatus={operationsQuery.data}
+                                onChanged={async (message, tone) => {
+                                  await queryClient.invalidateQueries({ queryKey: ['libraries'] })
+                                  await queryClient.invalidateQueries({ queryKey: ['operations-status'] })
+                                  pushToast({
+                                    tone,
+                                    title: tone === 'success' ? 'Libraries updated' : 'Library action failed',
+                                    detail: message,
+                                  })
+                                }}
+                              />
+                            </PageTransition>
+                          }
+                        />
+                        <Route
+                          path="updates"
+                          element={
+                            <PageTransition>
+                              <UpdatesPage
+                                updateStatus={updatesQuery.data}
+                                loading={updatesQuery.isLoading}
+                                error={updatesQuery.error}
+                                operationStatus={operationsQuery.data}
+                                onChanged={async (message, tone) => {
+                                  await queryClient.invalidateQueries({ queryKey: ['updates-status'] })
+                                  await queryClient.invalidateQueries({ queryKey: ['operations-status'] })
+                                  await queryClient.invalidateQueries({ queryKey: ['runtime-status'] })
+                                  pushToast({
+                                    tone,
+                                    title: tone === 'success' ? 'Update completed' : 'Update failed',
+                                    detail: message,
+                                  })
+                                }}
+                              />
+                            </PageTransition>
+                          }
+                        />
+                        <Route
+                          path="diagnostics"
+                          element={
+                            <PageTransition>
+                              <DiagnosticsPage
+                                report={diagnosticsReportQuery.data}
+                                reportLoading={diagnosticsReportQuery.isLoading}
+                                reportError={diagnosticsReportQuery.error}
+                                logs={diagnosticsLogsQuery.data?.logs ?? []}
+                                logsLoading={diagnosticsLogsQuery.isLoading}
+                                logsError={diagnosticsLogsQuery.error}
+                                jobs={diagnosticsJobsQuery.data?.jobs ?? []}
+                                jobsLoading={diagnosticsJobsQuery.isLoading}
+                                jobsError={diagnosticsJobsQuery.error}
+                                exporting={exportMutation.isPending}
+                                onRefreshReport={async () => {
+                                  await queryClient.invalidateQueries({ queryKey: ['diagnostics-report'] })
+                                }}
+                                onRefreshLogs={async () => {
+                                  await queryClient.invalidateQueries({ queryKey: ['diagnostics-logs'] })
+                                }}
+                                onRefreshJobs={async () => {
+                                  await queryClient.invalidateQueries({ queryKey: ['diagnostics-jobs'] })
+                                }}
+                                onExport={() => exportMutation.mutate()}
+                              />
+                            </PageTransition>
+                          }
+                        />
+                        <Route
+                          path="users"
+                          element={
+                            <PageTransition>
+                              <UsersPage
+                                currentUser={user}
+                                onToast={(title, detail, tone) => {
+                                  pushToast({ title, detail, tone })
+                                }}
+                                onSessionRevoked={async () => {
+                                  await queryClient.invalidateQueries({ queryKey: ['me'] })
+                                  pushToast({
+                                    tone: 'info',
+                                    title: 'Session ended',
+                                    detail: 'Your role or password changed, so this session was closed.',
+                                  })
+                                  navigate('/login', { replace: true })
+                                }}
+                              />
+                            </PageTransition>
+                          }
+                        />
+                        <Route path="*" element={<Navigate to="/app/overview" replace />} />
+                      </Routes>
+                    </AnimatePresence>
+                  </DashboardShell>
+                ) : (
+                  <AccessDeniedPage userRole={user.role} onLogout={() => logoutMutation.mutate()} logoutBusy={logoutMutation.isPending} />
+                )
               ) : (
                 <Navigate to="/login" replace />
               )
