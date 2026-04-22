@@ -89,6 +89,7 @@ func start(frontend fs.FS) error {
 	managedEnvService := service.NewManagedEnvService(dataDir)
 	backupService := service.NewBackupService(dataDir)
 	libraryService := service.NewLibraryService(dataDir)
+	flowService := service.NewFlowService(dataDir)
 	updateService := service.NewUpdateService(dataDir, &backupService)
 	operationLock := service.NewOperationLock()
 
@@ -140,6 +141,7 @@ func start(frontend fs.FS) error {
 		ManagedEnv:  managedEnvService,
 		Backups:     backupService,
 		Libraries:   libraryService,
+		Flows:       flowService,
 		Updates:     updateService,
 		Operations:  operationLock,
 		Logs:        logService,
