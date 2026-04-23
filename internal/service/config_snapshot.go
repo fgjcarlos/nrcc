@@ -59,6 +59,7 @@ func (s *SnapshotService) CreateSnapshot(label, reason, configJSON, settingsJS s
 		DELETE FROM config_snapshots WHERE id IN (
 			SELECT id FROM config_snapshots
 			ORDER BY created_at DESC
+			-- LIMIT -1 is a SQLite extension meaning "all rows after OFFSET N" (no upper bound)
 			LIMIT -1 OFFSET ?
 		)`, maxSnapshots); err != nil {
 		return model.ConfigSnapshot{}, fmt.Errorf("enforce snapshot retention: %w", err)

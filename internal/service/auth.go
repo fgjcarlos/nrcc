@@ -101,7 +101,7 @@ func (s *AuthService) RegisterInitial(username, password string) (*model.UserPub
 	}
 
 	record := model.UserRecord{
-		ID:           fmt.Sprintf("usr_%d", time.Now().UnixNano()),
+		ID:           "usr_" + uuid.NewString(),
 		Username:     username,
 		PasswordHash: string(hash),
 		Role:         model.RoleAdmin,

@@ -154,7 +154,7 @@ func InitLogSchema(db *sql.DB) error {
 		triggered_by TEXT,
 		summary TEXT,
 		error TEXT,
-		created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+		created_at TEXT NOT NULL
 	);
 
 	CREATE TABLE IF NOT EXISTS doctor_runs (
@@ -162,7 +162,7 @@ func InitLogSchema(db *sql.DB) error {
 		generated_at TEXT NOT NULL,
 		overall_status TEXT NOT NULL,
 		checks_json TEXT NOT NULL,
-		created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+		created_at TEXT NOT NULL
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_job_history_type_status ON job_history(type, status);
