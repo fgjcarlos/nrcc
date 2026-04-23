@@ -1,13 +1,14 @@
 import { useEffect } from 'react'
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence } from 'framer-motion'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 
 import { api } from './api'
 import { ThemeProvider, PageTransition, ErrorBoundary, InlineNotice } from './common/components'
 import { useAuth } from './features/auth/useAuth'
 import { AuthScreen } from './features/auth/AuthScreen'
 import { LoadingScreen } from './features/auth/LoadingScreen'
+import { AccessDeniedPage } from './features/auth/AccessDeniedPage'
 import { useToasts } from './features/shell/useToasts'
 import { useGlobalStatus } from './features/shell/useGlobalStatus'
 import { DashboardShell } from './features/shell/DashboardShell'
@@ -22,34 +23,6 @@ import { UpdatesPage } from './features/updates/UpdatesPage'
 import { DiagnosticsPage } from './features/diagnostics/DiagnosticsPage'
 import { ConfigPage } from './features/config/ConfigPage'
 import { UsersPage } from './features/users/UsersPage'
-
-function AccessDeniedPage({ userRole, onLogout, logoutBusy }: { userRole: string; onLogout: () => void; logoutBusy: boolean }) {
-  return (
-    <PageTransition>
-      <main id="auth-main" tabIndex={-1} className="min-h-screen bg-base-100 px-6 py-16">
-        <div className="mx-auto flex max-w-2xl flex-col gap-6">
-          <header>
-            <p className="text-xs uppercase tracking-[0.28em] text-base-content/50">Access denied</p>
-            <h1 className="mt-2 text-3xl font-semibold text-base-content">This first slice is admin-only</h1>
-            <p className="mt-3 text-sm text-base-content/70">
-              Signed in as <span className="font-semibold">{userRole}</span>. Viewer and operator rollout is intentionally deferred, so this account cannot use the control center yet.
-            </p>
-          </header>
-          <InlineNotice
-            tone="info"
-            title="Administrator required"
-            detail="Ask an administrator to promote this account or sign in with an existing administrator account."
-          />
-          <div>
-            <button className="btn btn-primary" type="button" onClick={onLogout} disabled={logoutBusy}>
-              {logoutBusy ? 'Signing out...' : 'Sign out'}
-            </button>
-          </div>
-        </div>
-      </main>
-    </PageTransition>
-  )
-}
 
 function AppContent() {
   const navigate = useNavigate()
@@ -79,45 +52,6 @@ function AppContent() {
 
     return () => window.cancelAnimationFrame(frame)
   }, [location.pathname])
-
-  // Pass pushToast callback to auth mutations for toast notifications
-  useEffect(() => {
-    if (loginMutation.isSuccess) {
-      pushToast({
-        tone: 'success',
-        title: 'Signed in',
-        detail: 'The local administrator session is active.',
-      })
-    }
-  }, [loginMutation.isSuccess])
-
-  useEffect(() => {
-    if (registerMutation.isSuccess) {
-      pushToast({
-        tone: 'success',
-        title: 'Administrator created',
-        detail: 'Bootstrap completed and the local session is ready.',
-      })
-    }
-  }, [registerMutation.isSuccess])
-
-  useEffect(() => {
-    if (logoutMutation.isSuccess) {
-      pushToast({
-        tone: 'info',
-        title: 'Signed out',
-        detail: 'The local session has been closed.',
-      })
-    }
-  }, [logoutMutation.isSuccess])
-
-  // operationsQuery kept for ConfigPage (not in refactor scope)
-  const operationsQuery = useQuery({
-    queryKey: ['operations-status'],
-    queryFn: api.operationsStatus,
-    enabled: !!user && isAdmin,
-    refetchInterval: 2000,
-  })
 
   if (isLoading) {
     return (
@@ -188,32 +122,7 @@ function AppContent() {
                           path="config"
                           element={
                             <PageTransition>
-                              <ConfigPage
-                                operationStatus={operationsQuery.data}
-                                onSaved={(restartRequired) => {
-                                  pushToast({
-                                    tone: 'success',
-                                    title: 'Configuration saved',
-                                    detail: restartRequired
-                                      ? 'Saved successfully. Restart Node-RED to apply the changes.'
-                                      : 'Saved successfully.',
-                                  })
-                                }}
-                                onError={(message) => {
-                                  pushToast({
-                                    tone: 'error',
-                                    title: 'Configuration failed',
-                                    detail: message,
-                                  })
-                                }}
-                                onToast={(message, type) => {
-                                  pushToast({
-                                    tone: type,
-                                    title: message.split('\n')[0],
-                                    detail: message.split('\n').slice(1).join('\n') || undefined,
-                                  })
-                                }}
-                              />
+                              <ConfigPage />
                             </PageTransition>
                           }
                         />

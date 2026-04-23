@@ -1,17 +1,14 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { api, type OperationStatus } from '../../api'
+import { api } from '../../api'
 import { FullAppConfig } from '../../types/config'
+import { useToasts } from '../shell/useToasts'
+import { useConfigData } from './useConfigData'
 import { SettingsPanel } from './SettingsPanel'
 
-type ConfigPageCallbacks = {
-  operationStatus?: OperationStatus
-  onSaved?: (restartRequired: boolean) => void
-  onError?: (message: string) => void
-  onToast?: (message: string, type: 'success' | 'error' | 'info') => void
-}
-
-export function ConfigPage({ operationStatus, onSaved, onError, onToast }: ConfigPageCallbacks = {}) {
+export function ConfigPage() {
   const queryClient = useQueryClient()
+  const { pushToast } = useToasts()
+  const { operationStatus } = useConfigData()
 
   const configQuery = useQuery({
     queryKey: ['full-config'],
@@ -20,11 +17,21 @@ export function ConfigPage({ operationStatus, onSaved, onError, onToast }: Confi
 
   const handleSaved = async (restartRequired: boolean) => {
     await queryClient.invalidateQueries({ queryKey: ['full-config'] })
-    onSaved?.(restartRequired)
+    pushToast({
+      tone: restartRequired ? 'info' : 'success',
+      title: 'Configuration saved',
+      detail: restartRequired
+        ? 'Saved successfully. Restart Node-RED to apply the changes.'
+        : 'Saved successfully.',
+    })
   }
 
   const handleError = (message: string) => {
-    onError?.(message)
+    pushToast({
+      tone: 'error',
+      title: 'Configuration save failed',
+      detail: message,
+    })
   }
 
   return (
@@ -59,7 +66,6 @@ export function ConfigPage({ operationStatus, onSaved, onError, onToast }: Confi
         operationStatus={operationStatus}
         onSaved={handleSaved}
         onError={handleError}
-        onToast={onToast}
       />
     </>
   )
