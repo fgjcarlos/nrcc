@@ -6,27 +6,23 @@ import (
 	"time"
 
 	_ "modernc.org/sqlite"
+	"nrcc/internal/db"
 	"nrcc/internal/model"
 )
 
 func setupTestJobsService(t *testing.T) (*JobsService, *sql.DB) {
-	db, err := sql.Open("sqlite", ":memory:")
+	testDB, err := db.OpenMemory()
 	if err != nil {
 		t.Fatalf("failed to create in-memory database: %v", err)
 	}
 
-	// Initialize schema
-	if err := InitLogSchema(db); err != nil {
-		t.Fatalf("failed to initialize log schema: %v", err)
-	}
-
-	jobsService := NewJobsService(db)
+	jobsService := NewJobsService(testDB)
 
 	t.Cleanup(func() {
-		db.Close()
+		testDB.Close()
 	})
 
-	return jobsService, db
+	return jobsService, testDB
 }
 
 func TestJobsServiceStart(t *testing.T) {

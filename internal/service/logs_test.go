@@ -9,6 +9,7 @@ import (
 	"time"
 
 	_ "modernc.org/sqlite"
+	"nrcc/internal/db"
 	"nrcc/internal/model"
 )
 
@@ -16,29 +17,24 @@ func setupTestLogService(t *testing.T) (*LogService, *sql.DB, string) {
 	// Create temp directory
 	tempDir := t.TempDir()
 
-	// Setup in-memory SQLite
-	db, err := sql.Open("sqlite", ":memory:")
+	// Setup in-memory SQLite with migrations
+	testDB, err := db.OpenMemory()
 	if err != nil {
 		t.Fatalf("failed to create in-memory database: %v", err)
 	}
 
-	// Initialize schema
-	if err := InitLogSchema(db); err != nil {
-		t.Fatalf("failed to initialize log schema: %v", err)
-	}
-
 	// Create LogService
-	logService, err := NewLogService(tempDir, db)
+	logService, err := NewLogService(tempDir, testDB)
 	if err != nil {
 		t.Fatalf("failed to create LogService: %v", err)
 	}
 
 	t.Cleanup(func() {
 		logService.Close()
-		db.Close()
+		testDB.Close()
 	})
 
-	return logService, db, tempDir
+	return logService, testDB, tempDir
 }
 
 func TestLogServiceWrite(t *testing.T) {
@@ -253,12 +249,10 @@ func TestLogServiceDirectoryCreation(t *testing.T) {
 	t.Parallel()
 
 	tempDir := t.TempDir()
-	db, _ := sql.Open("sqlite", ":memory:")
-	defer db.Close()
+	testDB, _ := db.OpenMemory()
+	defer testDB.Close()
 
-	InitLogSchema(db)
-
-	logService, err := NewLogService(tempDir, db)
+	logService, err := NewLogService(tempDir, testDB)
 	if err != nil {
 		t.Fatalf("NewLogService() error = %v", err)
 	}
