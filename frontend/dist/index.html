@@ -1,11 +1,24 @@
 <!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>NRCC</title>
-</head>
-<body>
-  <div id="root">Frontend build placeholder for Go embed tests.</div>
-</body>
-</html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NRCC</title>
+    <!-- Berkeley Mono Font Preload -->
+    <link rel="preload" as="font" href="/fonts/BerkeleyMono-Regular.woff2" type="font/woff2" />
+    <link rel="preload" as="font" href="/fonts/BerkeleyMono-Medium.woff2" type="font/woff2" />
+    <link rel="preload" as="font" href="/fonts/BerkeleyMono-Bold.woff2" type="font/woff2" />
+    <script>
+      (function() {
+        // Set theme from localStorage or default to 'dark' (dark-first approach)
+        var t = localStorage.getItem('theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', t);
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-ffDQjhKo.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-DkOJm1_i.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+  </html>

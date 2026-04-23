@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"time"
 
+	"nrcc/internal/db"
 	"nrcc/internal/model"
 	"nrcc/internal/security"
 	"nrcc/internal/service"
@@ -74,13 +76,14 @@ func runDoctor(args []string) error {
 	// Handle --export flag (generate support bundle)
 	if *exportFlag {
 		// Initialize required services for support bundle
-		authService, err := service.NewAuthService(dataDir)
+		dbPath := filepath.Join(dataDir, "nrcc.db")
+		database, err := db.Open(dbPath)
 		if err != nil {
 			return err
 		}
-		defer authService.Close()
+		defer database.Close()
 
-		logService, err := service.NewLogService(dataDir, authService.GetDB())
+		logService, err := service.NewLogService(dataDir, database)
 		if err != nil {
 			return err
 		}

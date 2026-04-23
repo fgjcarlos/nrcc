@@ -224,20 +224,19 @@ function AppContent() {
                 <Navigate to="/app/overview" replace />
               ) : (
                 <PageTransition>
-                  <AuthScreen
-                    mode={authMode}
-                    message={authMessage}
-                    busy={loginMutation.isPending || registerMutation.isPending}
-                    onModeChange={setAuthMode}
-                    onSubmit={(username, password) => {
-                      if (authMode === 'register') {
-                        registerMutation.mutate({ username, password })
-                      } else {
-                        loginMutation.mutate({ username, password })
-                      }
-                    }}
-                  />
-                </PageTransition>
+                   <AuthScreen
+                     mode={authMode}
+                     message={authMessage}
+                     busy={loginMutation.isPending || registerMutation.isPending}
+                     onSubmit={(username, password) => {
+                       if (authMode === 'register') {
+                         registerMutation.mutate({ username, password })
+                       } else {
+                         loginMutation.mutate({ username, password })
+                       }
+                     }}
+                   />
+                 </PageTransition>
               )
             }
           />

@@ -257,7 +257,7 @@ describe('App routing', () => {
     renderApp('/app/overview')
 
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Sign in to the local control center' })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Sign In' })).toBeInTheDocument()
     })
   })
 

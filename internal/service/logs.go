@@ -141,7 +141,8 @@ func (ls *LogService) rotate() error {
 	return nil
 }
 
-// InitLogSchema creates the database tables for logging
+// InitLogSchema creates the database tables for logging.
+// DEPRECATED: Tables are now created by db.Open() migrations. This function is kept for backward compatibility and tests.
 func InitLogSchema(db *sql.DB) error {
 	schema := `
 	CREATE TABLE IF NOT EXISTS job_history (

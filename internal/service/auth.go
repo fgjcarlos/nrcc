@@ -10,12 +10,12 @@ import (
 	"sync"
 	"time"
 
+	"nrcc/internal/db"
 	"nrcc/internal/model"
 	"nrcc/internal/security"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
-	_ "modernc.org/sqlite"
 )
 
 const SessionCookieName = "nrcc_session"
@@ -29,37 +29,36 @@ type AuthService struct {
 	attempts  map[string][]time.Time
 }
 
+// NewAuthService opens the database and creates a new AuthService instance.
+// This is the legacy entry point that opens and configures the database.
+// Prefer NewAuthServiceWithDB when the database is already open.
 func NewAuthService(dataDir string) (*AuthService, error) {
 	dbPath := filepath.Join(dataDir, "nrcc.db")
-	db, err := sql.Open("sqlite", dbPath)
+	openedDB, err := db.Open(dbPath)
 	if err != nil {
-		return nil, fmt.Errorf("open sqlite database: %w", err)
-	}
-
-	if _, err := db.Exec("PRAGMA journal_mode = WAL"); err != nil {
-		return nil, fmt.Errorf("set WAL mode: %w", err)
-	}
-	if _, err := db.Exec("PRAGMA busy_timeout = 5000"); err != nil {
-		return nil, fmt.Errorf("set busy_timeout: %w", err)
-	}
-	if _, err := db.Exec("PRAGMA foreign_keys = ON"); err != nil {
-		return nil, fmt.Errorf("set foreign_keys: %w", err)
-	}
-
-	if err := initAuthSchema(db); err != nil {
-		_ = db.Close()
 		return nil, err
 	}
 
+	authSvc, err := NewAuthServiceWithDB(dataDir, openedDB)
+	if err != nil {
+		_ = openedDB.Close()
+		return nil, err
+	}
+
+	return authSvc, nil
+}
+
+// NewAuthServiceWithDB creates a new AuthService with an already-open database.
+// The database should have had migrations applied via db.Open().
+func NewAuthServiceWithDB(dataDir string, database *sql.DB) (*AuthService, error) {
 	session, err := security.NewSessionManager(filepath.Join(dataDir, ".session-secret"))
 	if err != nil {
-		_ = db.Close()
 		return nil, err
 	}
 
 	return &AuthService{
 		dataDir:   dataDir,
-		db:        db,
+		db:        database,
 		session:   session,
 		cookieTTL: 24 * time.Hour,
 		attempts:  make(map[string][]time.Time),
@@ -299,37 +298,7 @@ func validateCredentials(username, password string) error {
 	return nil
 }
 
-func initAuthSchema(db *sql.DB) error {
-	schema := `
-	CREATE TABLE IF NOT EXISTS users (
-		id TEXT PRIMARY KEY,
-		username TEXT NOT NULL UNIQUE,
-		password_hash TEXT NOT NULL,
-		role TEXT NOT NULL,
-		created_at TEXT NOT NULL
-	);
 
-	CREATE TABLE IF NOT EXISTS audit_logs (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		event_type TEXT NOT NULL,
-		username TEXT,
-		detail TEXT,
-		created_at TEXT NOT NULL
-	);
-
-	CREATE TABLE IF NOT EXISTS sessions (
-		id TEXT PRIMARY KEY,
-		user_id TEXT NOT NULL,
-		expires_at TEXT NOT NULL,
-		created_at TEXT NOT NULL
-	);
-	`
-
-	if _, err := db.Exec(schema); err != nil {
-		return fmt.Errorf("initialize auth schema: %w", err)
-	}
-	return nil
-}
 
 const (
 	loginRateWindow = 10 * time.Minute

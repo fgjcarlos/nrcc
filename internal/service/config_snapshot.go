@@ -19,7 +19,8 @@ func NewSnapshotService(db *sql.DB) *SnapshotService {
 	return &SnapshotService{db: db}
 }
 
-// InitConfigSnapshotSchema creates the config_snapshots table if it doesn't exist
+// InitConfigSnapshotSchema creates the config_snapshots table if it doesn't exist.
+// DEPRECATED: Tables are now created by db.Open() migrations. This function is kept for backward compatibility.
 func InitConfigSnapshotSchema(db *sql.DB) error {
 	schema := `
 	CREATE TABLE IF NOT EXISTS config_snapshots (

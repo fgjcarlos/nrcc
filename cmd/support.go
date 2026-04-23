@@ -5,9 +5,11 @@ import (
 	"flag"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"time"
 
+	"nrcc/internal/db"
 	"nrcc/internal/security"
 	"nrcc/internal/service"
 )
@@ -24,19 +26,15 @@ func runSupport(args []string) error {
 		return err
 	}
 
-	// Initialize required services for support bundle
-	authService, err := service.NewAuthService(dataDir)
+	// Open database with migrations
+	dbPath := filepath.Join(dataDir, "nrcc.db")
+	database, err := db.Open(dbPath)
 	if err != nil {
 		return err
 	}
-	defer authService.Close()
+	defer database.Close()
 
-	// Initialize log schema
-	if err := service.InitLogSchema(authService.GetDB()); err != nil {
-		return err
-	}
-
-	logService, err := service.NewLogService(dataDir, authService.GetDB())
+	logService, err := service.NewLogService(dataDir, database)
 	if err != nil {
 		return err
 	}

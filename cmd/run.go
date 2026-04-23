@@ -8,10 +8,12 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"syscall"
 	"time"
 
+	"nrcc/internal/db"
 	"nrcc/internal/security"
 	"nrcc/internal/server"
 	"nrcc/internal/service"
@@ -63,29 +65,29 @@ func start(frontend fs.FS) error {
 		return err
 	}
 
-	authService, err := service.NewAuthService(dataDir)
+	// Open database with migrations
+	dbPath := filepath.Join(dataDir, "nrcc.db")
+	database, err := db.Open(dbPath)
 	if err != nil {
 		return err
 	}
-	defer authService.Close()
+	defer database.Close()
 
-	// Initialize schemas
-	if err := service.InitLogSchema(authService.GetDB()); err != nil {
-		return err
-	}
-	if err := service.InitConfigSnapshotSchema(authService.GetDB()); err != nil {
+	// Create AuthService with the opened database
+	authService, err := service.NewAuthServiceWithDB(dataDir, database)
+	if err != nil {
 		return err
 	}
 
-	logService, err := service.NewLogService(dataDir, authService.GetDB())
+	logService, err := service.NewLogService(dataDir, database)
 	if err != nil {
 		return err
 	}
 	defer logService.Close()
 
-	jobsService := service.NewJobsService(authService.GetDB())
+	jobsService := service.NewJobsService(database)
 
-	configService := service.NewConfigService(dataDir, authService.GetDB())
+	configService := service.NewConfigService(dataDir, database)
 	managedEnvService := service.NewManagedEnvService(dataDir)
 	backupService := service.NewBackupService(dataDir)
 	libraryService := service.NewLibraryService(dataDir)
