@@ -27,6 +27,12 @@ func Open(path string) (*sql.DB, error) {
 		}
 	}
 
+	// Limit to a single connection — SQLite does not benefit from multiple
+	// concurrent writers and the extra connections only cause contention.
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+	db.SetConnMaxLifetime(0)
+
 	if err := migrate(db); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("migrate: %w", err)
@@ -105,7 +111,7 @@ func v1InitialSchema(tx *sql.Tx) error {
 		triggered_by TEXT,
 		summary TEXT,
 		error TEXT,
-		created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+		created_at TEXT NOT NULL
 	);
 
 	CREATE TABLE IF NOT EXISTS doctor_runs (
@@ -113,7 +119,7 @@ func v1InitialSchema(tx *sql.Tx) error {
 		generated_at TEXT NOT NULL,
 		overall_status TEXT NOT NULL,
 		checks_json TEXT NOT NULL,
-		created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+		created_at TEXT NOT NULL
 	);
 
 	CREATE TABLE IF NOT EXISTS config_snapshots (

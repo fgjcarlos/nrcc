@@ -56,13 +56,25 @@ func NewAuthServiceWithDB(dataDir string, database *sql.DB) (*AuthService, error
 		return nil, err
 	}
 
-	return &AuthService{
+	svc := &AuthService{
 		dataDir:   dataDir,
 		db:        database,
 		session:   session,
 		cookieTTL: 24 * time.Hour,
 		attempts:  make(map[string][]time.Time),
-	}, nil
+	}
+
+	// Run session cleanup in the background so it never blocks a request.
+	go func() {
+		ticker := time.NewTicker(1 * time.Hour)
+		for range ticker.C {
+			if err := svc.deleteExpiredSessions(); err != nil {
+				slog.Warn("session cleanup failed", "err", err)
+			}
+		}
+	}()
+
+	return svc, nil
 }
 
 func (s *AuthService) GetDB() *sql.DB {
@@ -152,10 +164,6 @@ func (s *AuthService) VerifyToken(token string) (*model.SessionClaims, error) {
 	}
 	if strings.TrimSpace(claims.SID) == "" {
 		return nil, fmt.Errorf("invalid session")
-	}
-
-	if err := s.deleteExpiredSessions(); err != nil {
-		return nil, err
 	}
 
 	var count int
