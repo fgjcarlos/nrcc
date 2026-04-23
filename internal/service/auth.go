@@ -3,6 +3,7 @@ package service
 import (
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"net"
 	"path/filepath"
 	"strings"
@@ -33,6 +34,16 @@ func NewAuthService(dataDir string) (*AuthService, error) {
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite database: %w", err)
+	}
+
+	if _, err := db.Exec("PRAGMA journal_mode = WAL"); err != nil {
+		return nil, fmt.Errorf("set WAL mode: %w", err)
+	}
+	if _, err := db.Exec("PRAGMA busy_timeout = 5000"); err != nil {
+		return nil, fmt.Errorf("set busy_timeout: %w", err)
+	}
+	if _, err := db.Exec("PRAGMA foreign_keys = ON"); err != nil {
+		return nil, fmt.Errorf("set foreign_keys: %w", err)
 	}
 
 	if err := initAuthSchema(db); err != nil {
@@ -401,7 +412,7 @@ func (s *AuthService) logAudit(eventType, username, detail string) {
 		VALUES (?, ?, ?, ?)
 	`, eventType, nullableString(username), nullableString(detail), time.Now().UTC().Format(time.RFC3339))
 	if err != nil {
-		// Audit logging must not break the primary request path.
+		slog.Warn("audit log write failed", "event", eventType, "err", err)
 		return
 	}
 }

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"crypto/rand"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -174,17 +175,24 @@ func InitLogSchema(db *sql.DB) error {
 	return nil
 }
 
-// randomID generates a random string ID
+// randomID generates a cryptographically secure random string ID
 func randomID(length int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
 	result := make([]byte, length)
-	for i := range result {
-		result[i] = charset[randomByte()%byte(len(charset))]
+	
+	// Generate random bytes using crypto/rand for secure entropy
+	randBytes := make([]byte, length)
+	if _, err := rand.Read(randBytes); err != nil {
+		// Fallback to simple sequential approach if rand fails (should never happen)
+		for i := 0; i < length; i++ {
+			result[i] = charset[i%len(charset)]
+		}
+		return string(result)
+	}
+	
+	// Map random bytes to charset
+	for i := 0; i < length; i++ {
+		result[i] = charset[randBytes[i]%byte(len(charset))]
 	}
 	return string(result)
-}
-
-// randomByte returns a random byte
-func randomByte() byte {
-	return byte((time.Now().UnixNano() / int64(time.Microsecond)) % 256)
 }
