@@ -54,6 +54,20 @@ export type AuthSession = {
   csrfToken: string
 }
 
+export type UserList = {
+  items: User[]
+}
+
+export type UserMutationResult = {
+  user: User
+  sessionRevoked: boolean
+}
+
+export type UserDeleteResult = {
+  deleted: boolean
+  sessionRevoked: boolean
+}
+
 export type RuntimeStatus = {
   running: boolean
   healthy: boolean
@@ -419,6 +433,26 @@ export const api = {
   logout: () =>
     request<{ loggedOut: boolean }>('/api/auth/logout', {
       method: 'POST',
+    }),
+  usersList: () => request<UserList>('/api/users'),
+  createUser: (payload: { username: string; password: string; role: string }) =>
+    request<UserMutationResult>('/api/users', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateUserRole: (id: string, role: string) =>
+    request<UserMutationResult>(`/api/users/${id}/role`, {
+      method: 'PATCH',
+      body: JSON.stringify({ role }),
+    }),
+  resetUserPassword: (id: string, password: string) =>
+    request<UserMutationResult>(`/api/users/${id}/reset-password`, {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    }),
+  deleteUser: (id: string) =>
+    request<UserDeleteResult>(`/api/users/${id}`, {
+      method: 'DELETE',
     }),
   runtimeStatus: () => request<RuntimeStatus>('/api/runtime/status'),
   runtimeLogs: () => request<{ lines: string[] }>('/api/runtime/logs'),

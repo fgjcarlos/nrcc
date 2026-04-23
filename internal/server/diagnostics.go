@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"nrcc/internal/middleware"
+	"nrcc/internal/model"
 )
 
 // registerDiagnosticsRoutes registers the diagnostics API endpoints
@@ -22,6 +23,7 @@ func registerDiagnosticsRoutes(r chi.Router, cfg Config) {
 		// Require authentication for all diagnostics endpoints
 		r.Use(middleware.RequireAuth(cfg.Auth))
 		r.Use(middleware.RequireCSRF(cfg.Auth))
+		r.Use(middleware.RequireRole(model.RoleAdmin))
 
 		// GET /api/diagnostics/report - run doctor checks
 		r.Get("/report", func(w http.ResponseWriter, req *http.Request) {

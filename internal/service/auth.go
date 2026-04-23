@@ -2,6 +2,7 @@ package service
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -19,6 +20,24 @@ import (
 )
 
 const SessionCookieName = "nrcc_session"
+
+type UserActionError struct {
+	Status  int
+	Code    string
+	Message string
+}
+
+func (e *UserActionError) Error() string {
+	return e.Message
+}
+
+func IsUserActionError(err error) (*UserActionError, bool) {
+	var actionErr *UserActionError
+	if !errors.As(err, &actionErr) {
+		return nil, false
+	}
+	return actionErr, true
+}
 
 type AuthService struct {
 	dataDir   string
@@ -240,6 +259,173 @@ func (s *AuthService) FindPublicUserByID(id string) (*model.UserPublic, error) {
 	return &user, nil
 }
 
+func (s *AuthService) ListUsers() ([]model.UserPublic, error) {
+	rows, err := s.db.Query(`
+		SELECT id, username, role, created_at
+		FROM users
+		ORDER BY username COLLATE NOCASE ASC
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list users: %w", err)
+	}
+	defer rows.Close()
+
+	users := make([]model.UserPublic, 0)
+	for rows.Next() {
+		var user model.UserPublic
+		if err := rows.Scan(&user.ID, &user.Username, &user.Role, &user.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan user: %w", err)
+		}
+		users = append(users, user)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate users: %w", err)
+	}
+
+	return users, nil
+}
+
+func (s *AuthService) CreateUser(username, password string, role model.UserRole, actorUsername string) (*model.UserPublic, error) {
+	username = strings.TrimSpace(username)
+	if err := validateCredentials(username, password); err != nil {
+		return nil, &UserActionError{Status: 400, Code: "USER_CREATE_INVALID", Message: err.Error()}
+	}
+	role, err := normalizeUserRole(role)
+	if err != nil {
+		return nil, err
+	}
+
+	existing, err := s.findUserByUsername(username)
+	if err != nil {
+		return nil, err
+	}
+	if existing != nil {
+		return nil, &UserActionError{Status: 409, Code: "USER_EXISTS", Message: "username already exists"}
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), 10)
+	if err != nil {
+		return nil, fmt.Errorf("hash password: %w", err)
+	}
+
+	record := model.UserRecord{
+		ID:           fmt.Sprintf("usr_%d", time.Now().UnixNano()),
+		Username:     username,
+		PasswordHash: string(hash),
+		Role:         role,
+		CreatedAt:    time.Now().UTC().Format(time.RFC3339),
+	}
+	if err := s.insertUser(record); err != nil {
+		return nil, err
+	}
+
+	s.logAudit("auth.user_created", actorUsername, "created user "+username+" with role "+string(role))
+	user := publicUser(record)
+	return &user, nil
+}
+
+func (s *AuthService) UpdateUserRole(userID string, role model.UserRole, actor model.SessionClaims) (*model.UserPublic, error) {
+	role, err := normalizeUserRole(role)
+	if err != nil {
+		return nil, err
+	}
+
+	record, err := s.findUserRecordByID(userID)
+	if err != nil {
+		return nil, err
+	}
+	if record == nil {
+		return nil, &UserActionError{Status: 404, Code: "USER_NOT_FOUND", Message: "user not found"}
+	}
+
+	if record.Role == model.RoleAdmin && role != model.RoleAdmin {
+		count, err := s.countUsersByRole(model.RoleAdmin)
+		if err != nil {
+			return nil, err
+		}
+		if count <= 1 {
+			return nil, &UserActionError{Status: 409, Code: "LAST_ADMIN_REQUIRED", Message: "at least one administrator is required"}
+		}
+	}
+
+	if record.Role == role {
+		public := publicUser(*record)
+		return &public, nil
+	}
+
+	if _, err := s.db.Exec(`UPDATE users SET role = ? WHERE id = ?`, role, userID); err != nil {
+		return nil, fmt.Errorf("update user role: %w", err)
+	}
+	if err := s.revokeSessionsForUser(userID); err != nil {
+		return nil, err
+	}
+
+	record.Role = role
+	s.logAudit("auth.user_role_updated", actor.Username, "updated role for "+record.Username+" to "+string(role))
+	public := publicUser(*record)
+	return &public, nil
+}
+
+func (s *AuthService) ResetUserPassword(userID, password string, actorUsername string) (*model.UserPublic, error) {
+	if err := security.ValidatePassword(password); err != nil {
+		return nil, &UserActionError{Status: 400, Code: "PASSWORD_INVALID", Message: err.Error()}
+	}
+
+	record, err := s.findUserRecordByID(userID)
+	if err != nil {
+		return nil, err
+	}
+	if record == nil {
+		return nil, &UserActionError{Status: 404, Code: "USER_NOT_FOUND", Message: "user not found"}
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), 10)
+	if err != nil {
+		return nil, fmt.Errorf("hash password: %w", err)
+	}
+
+	if _, err := s.db.Exec(`UPDATE users SET password_hash = ? WHERE id = ?`, string(hash), userID); err != nil {
+		return nil, fmt.Errorf("reset password: %w", err)
+	}
+	if err := s.revokeSessionsForUser(userID); err != nil {
+		return nil, err
+	}
+
+	s.logAudit("auth.user_password_reset", actorUsername, "reset password for "+record.Username)
+	public := publicUser(*record)
+	return &public, nil
+}
+
+func (s *AuthService) DeleteUser(userID string, actor model.SessionClaims) error {
+	record, err := s.findUserRecordByID(userID)
+	if err != nil {
+		return err
+	}
+	if record == nil {
+		return &UserActionError{Status: 404, Code: "USER_NOT_FOUND", Message: "user not found"}
+	}
+
+	if record.Role == model.RoleAdmin {
+		count, err := s.countUsersByRole(model.RoleAdmin)
+		if err != nil {
+			return err
+		}
+		if count <= 1 {
+			return &UserActionError{Status: 409, Code: "LAST_ADMIN_REQUIRED", Message: "at least one administrator is required"}
+		}
+	}
+
+	if err := s.revokeSessionsForUser(userID); err != nil {
+		return err
+	}
+	if _, err := s.db.Exec(`DELETE FROM users WHERE id = ?`, userID); err != nil {
+		return fmt.Errorf("delete user: %w", err)
+	}
+
+	s.logAudit("auth.user_deleted", actor.Username, "deleted user "+record.Username)
+	return nil
+}
+
 func (s *AuthService) findUserByUsername(username string) (*model.UserRecord, error) {
 	row := s.db.QueryRow(`
 		SELECT id, username, password_hash, role, created_at
@@ -257,6 +443,23 @@ func (s *AuthService) findUserByUsername(username string) (*model.UserRecord, er
 	return &user, nil
 }
 
+func (s *AuthService) findUserRecordByID(id string) (*model.UserRecord, error) {
+	row := s.db.QueryRow(`
+		SELECT id, username, password_hash, role, created_at
+		FROM users
+		WHERE id = ?
+	`, id)
+
+	var user model.UserRecord
+	if err := row.Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.CreatedAt); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("find user by id: %w", err)
+	}
+	return &user, nil
+}
+
 func (s *AuthService) insertUser(user model.UserRecord) error {
 	_, err := s.db.Exec(`
 		INSERT INTO users (id, username, password_hash, role, created_at)
@@ -264,6 +467,21 @@ func (s *AuthService) insertUser(user model.UserRecord) error {
 	`, user.ID, user.Username, user.PasswordHash, user.Role, user.CreatedAt)
 	if err != nil {
 		return fmt.Errorf("insert user: %w", err)
+	}
+	return nil
+}
+
+func (s *AuthService) countUsersByRole(role model.UserRole) (int, error) {
+	var count int
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM users WHERE role = ?`, role).Scan(&count); err != nil {
+		return 0, fmt.Errorf("count users by role: %w", err)
+	}
+	return count, nil
+}
+
+func (s *AuthService) revokeSessionsForUser(userID string) error {
+	if _, err := s.db.Exec(`DELETE FROM sessions WHERE user_id = ?`, userID); err != nil {
+		return fmt.Errorf("revoke user sessions: %w", err)
 	}
 	return nil
 }
@@ -302,6 +520,13 @@ func validateCredentials(username, password string) error {
 	return nil
 }
 
+func normalizeUserRole(role model.UserRole) (model.UserRole, error) {
+	normalized, ok := model.ParseUserRole(string(role))
+	if !ok {
+		return "", &UserActionError{Status: 400, Code: "ROLE_INVALID", Message: "role must be one of admin, operator, or viewer"}
+	}
+	return normalized, nil
+}
 
 
 const (
