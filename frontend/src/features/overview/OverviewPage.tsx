@@ -2,14 +2,12 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 
-import type { BackupList, ManagedEnvState, OperationStatus, RuntimeStatus, SystemInfo } from '../../api'
 import { AnimatedCard, InlineNotice, StatCard } from '../../common/components'
 import { formatErrorMessage, formatUptime } from '../../common/utils/format'
-import { buildGlobalStatus } from '../../common/utils/status'
-import type { GlobalStatus } from '../../common/types'
 import { RuntimeDetailsPanel } from './RuntimeDetailsPanel'
 import { SystemInfoPanel } from './SystemInfoPanel'
 import { RestartButton } from './RestartButton'
+import { useOverviewData } from './useOverviewData'
 
 function formatTimestamp(value?: string) {
   if (!value) {
@@ -24,8 +22,8 @@ function formatTimestamp(value?: string) {
   return parsed.toLocaleString()
 }
 
-function getLatestBackup(backups?: BackupList) {
-  return backups?.items.reduce<BackupList['items'][number] | undefined>((latest, current) => {
+function getLatestBackup(backups: any) {
+  return backups?.items.reduce((latest: any, current: any) => {
     if (!latest) {
       return current
     }
@@ -34,37 +32,8 @@ function getLatestBackup(backups?: BackupList) {
   }, undefined)
 }
 
-export function OverviewPage({
-  runtime,
-  runtimeLoading,
-  runtimeError,
-  systemInfo,
-  systemLoading,
-  systemError,
-  backups,
-  backupsLoading,
-  environment,
-  environmentLoading,
-  operationStatus,
-  restarting,
-  onRestart,
-  globalStatus,
-}: {
-  runtime?: RuntimeStatus
-  runtimeLoading: boolean
-  runtimeError: unknown
-  systemInfo?: SystemInfo
-  systemLoading: boolean
-  systemError: unknown
-  backups?: BackupList
-  backupsLoading: boolean
-  environment?: ManagedEnvState
-  environmentLoading: boolean
-  operationStatus?: OperationStatus
-  restarting: boolean
-  onRestart: () => void
-  globalStatus: GlobalStatus
-}) {
+export function OverviewPage() {
+  const { runtime, runtimeLoading, runtimeError, systemInfo, systemLoading, systemError, backups, backupsLoading, environment, environmentLoading, operationStatus, globalStatus, restarting, onRestart } = useOverviewData()
   const [confirmRestart, setConfirmRestart] = useState(false)
   const pageError = runtimeError ?? systemError
   const latestBackup = getLatestBackup(backups)
@@ -552,5 +521,3 @@ export function OverviewPage({
     </div>
   )
 }
-
-export { buildGlobalStatus }

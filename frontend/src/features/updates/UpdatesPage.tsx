@@ -1,22 +1,11 @@
-import type { UpdateStatus, OperationStatus } from '../../api'
 import { InlineNotice } from '../../common/components'
 import { formatErrorMessage } from '../../common/utils/format'
-import type { ToastTone } from '../../common/types'
+import { useUpdatesData } from './useUpdatesData'
 import { UpdateCard } from './UpdateCard'
 
-export function UpdatesPage({
-  updateStatus,
-  loading,
-  error,
-  operationStatus,
-  onChanged,
-}: {
-  updateStatus?: UpdateStatus
-  loading: boolean
-  error: unknown
-  operationStatus?: OperationStatus
-  onChanged: (message: string, tone: ToastTone) => Promise<void>
-}) {
+export function UpdatesPage() {
+  const { updateStatus, loading, error, operationStatus } = useUpdatesData()
+
   return (
     <>
       <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 mb-8">
@@ -58,7 +47,6 @@ export function UpdatesPage({
             <UpdateCard
               updateStatus={updateStatus}
               operationStatus={operationStatus}
-              onChanged={onChanged}
             />
           ) : null}
       </article>

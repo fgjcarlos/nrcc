@@ -1,21 +1,31 @@
-import type { ManagedEnvState } from '../../api'
+import { useQueryClient } from '@tanstack/react-query'
 import { InlineNotice } from '../../common/components'
 import { formatErrorMessage } from '../../common/utils/format'
+import { useToasts } from '../shell/useToasts'
 import { EnvironmentPanel } from './EnvironmentPanel'
+import { useEnvironmentData } from './useEnvironmentData'
 
-export function EnvironmentPage({
-  state,
-  loading,
-  error,
-  onSaved,
-  onError,
-}: {
-  state?: ManagedEnvState
-  loading: boolean
-  error: unknown
-  onSaved: () => Promise<void>
-  onError: (message: string) => void
-}) {
+export function EnvironmentPage() {
+  const { state, loading, error } = useEnvironmentData()
+  const queryClient = useQueryClient()
+  const { pushToast } = useToasts()
+
+  const handleSaved = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['environment'] })
+    pushToast({
+      tone: 'success',
+      title: 'Environment saved',
+      detail: 'Managed runtime variables were updated. Restart Node-RED to apply them.',
+    })
+  }
+
+  const handleError = (message: string) => {
+    pushToast({
+      tone: 'error',
+      title: 'Environment update failed',
+      detail: message,
+    })
+  }
   return (
     <>
       <header className="flex flex-col sm:flex-row sm:items-center gap-6 mb-8">
@@ -36,7 +46,7 @@ export function EnvironmentPage({
         />
       ) : null}
 
-      <EnvironmentPanel state={state} loading={loading} onSaved={onSaved} onError={onError} />
+      <EnvironmentPanel state={state} loading={loading} onSaved={handleSaved} onError={handleError} />
     </>
   )
 }

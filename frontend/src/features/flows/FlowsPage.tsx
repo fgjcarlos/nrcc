@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 
-import { APIRequestError, api, type FlowAnalysis, type FlowList, type OperationStatus } from '../../api'
+import { APIRequestError, api, type FlowAnalysis } from '../../api'
 import { EmptyState, InlineNotice, LoadingState, StatCard } from '../../common/components'
 import { formatErrorMessage } from '../../common/utils/format'
 import { type ImportResponse } from '../../common/types'
 import { useToasts } from '../shell/useToasts'
+import { useFlowsData } from './useFlowsData'
 
 function formatCount(value: number) {
   return new Intl.NumberFormat().format(value)
@@ -53,17 +54,8 @@ function AnalysisList({ title, items }: { title: string; items: string[] }) {
   )
 }
 
-export function FlowsPage({
-  flows,
-  loading,
-  error,
-  operationStatus,
-}: {
-  flows?: FlowList
-  loading: boolean
-  error: unknown
-  operationStatus?: OperationStatus
-}) {
+export function FlowsPage() {
+  const { flows, loading, error, operationStatus } = useFlowsData()
   const { flowId } = useParams()
   const selectedFlowId = flowId ?? ''
   const { pushToast } = useToasts()

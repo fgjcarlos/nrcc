@@ -1,16 +1,9 @@
-import type { LogEntry } from '../../api'
 import { InlineNotice } from '../../common/components'
 import { formatErrorMessage } from '../../common/utils/format'
+import { useLogsData } from './useLogsData'
 
-export function LogsPage({
-  logs,
-  loading,
-  error,
-}: {
-  logs: string[]
-  loading: boolean
-  error: unknown
-}) {
+export function LogsPage() {
+  const { logs, loading, error } = useLogsData()
   return (
     <>
       <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 mb-8">

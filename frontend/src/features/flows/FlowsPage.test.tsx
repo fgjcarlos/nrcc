@@ -14,11 +14,21 @@ vi.mock('../../api', async () => {
     ...actual,
     api: {
       ...actual.api,
+      flows: vi.fn(),
+      operationsStatus: vi.fn(),
       flow: vi.fn(),
       analyzeFlow: vi.fn(),
     },
   }
 })
+
+vi.mock('../auth/useAuth', () => ({
+  useAuth: vi.fn(() => ({
+    user: { id: 'test-user', role: 'admin', username: 'test' },
+    login: vi.fn(),
+    logout: vi.fn(),
+  })),
+}))
 
 const flows: FlowList = {
   source: {
@@ -54,6 +64,8 @@ const flows: FlowList = {
 describe('FlowsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(api.flows).mockResolvedValue(flows)
+    vi.mocked(api.operationsStatus).mockResolvedValue({ busy: false })
   })
 
   it('loads detail for the selected flow route', async () => {
@@ -70,7 +82,7 @@ describe('FlowsPage', () => {
       <QueryClientProvider client={createTestQueryClient()}>
         <MemoryRouter initialEntries={['/app/flows/main-flow']}>
           <Routes>
-            <Route path="/app/flows/:flowId" element={<FlowsPage flows={flows} loading={false} error={null} operationStatus={{ busy: false }} />} />
+            <Route path="/app/flows/:flowId" element={<FlowsPage />} />
           </Routes>
         </MemoryRouter>
       </QueryClientProvider>,
@@ -111,7 +123,7 @@ describe('FlowsPage', () => {
       <QueryClientProvider client={createTestQueryClient()}>
         <MemoryRouter initialEntries={['/app/flows/main-flow']}>
           <Routes>
-            <Route path="/app/flows/:flowId" element={<FlowsPage flows={flows} loading={false} error={null} operationStatus={{ busy: false }} />} />
+            <Route path="/app/flows/:flowId" element={<FlowsPage />} />
           </Routes>
         </MemoryRouter>
       </QueryClientProvider>,

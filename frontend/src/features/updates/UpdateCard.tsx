@@ -1,31 +1,45 @@
 import { useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { UpdateStatus, OperationStatus } from '../../api'
 import { api } from '../../api'
 import { Detail, InlineNotice } from '../../common/components'
 import { formatErrorMessage } from '../../common/utils/format'
-import type { ToastTone } from '../../common/types'
+import { useToasts } from '../shell/useToasts'
 
 export function UpdateCard({
   updateStatus,
   operationStatus,
-  onChanged,
 }: {
   updateStatus: UpdateStatus
   operationStatus?: OperationStatus
-  onChanged: (message: string, tone: ToastTone) => Promise<void>
 }) {
   const [confirmUpdate, setConfirmUpdate] = useState(false)
+  const queryClient = useQueryClient()
+  const { pushToast } = useToasts()
 
   const applyMutation = useMutation({
     mutationFn: api.applyUpdate,
     onSuccess: async (result) => {
       setConfirmUpdate(false)
-      await onChanged(result.message, result.rolledBack ? 'error' : 'success')
+      await queryClient.invalidateQueries({ queryKey: ['updates-status'] })
+      await queryClient.invalidateQueries({ queryKey: ['operations-status'] })
+      await queryClient.invalidateQueries({ queryKey: ['runtime-status'] })
+      pushToast({
+        tone: result.rolledBack ? 'error' : 'success',
+        title: result.rolledBack ? 'Update completed' : 'Update completed',
+        detail: result.message,
+      })
     },
     onError: async (mutationError) => {
       setConfirmUpdate(false)
-      await onChanged(formatErrorMessage(mutationError, 'The update could not be applied.'), 'error')
+      await queryClient.invalidateQueries({ queryKey: ['updates-status'] })
+      await queryClient.invalidateQueries({ queryKey: ['operations-status'] })
+      await queryClient.invalidateQueries({ queryKey: ['runtime-status'] })
+      pushToast({
+        tone: 'error',
+        title: 'Update failed',
+        detail: formatErrorMessage(mutationError, 'The update could not be applied.'),
+      })
     },
   })
 

@@ -1,25 +1,17 @@
 import { useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
-import { api, type LibraryList, type OperationStatus } from '../../api'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { api } from '../../api'
 import { InlineNotice, LoadingState, EmptyState, ConfirmDialog } from '../../common/components'
 import { formatErrorMessage } from '../../common/utils/format'
-import type { ToastTone } from '../../common/types'
+import { useToasts } from '../shell/useToasts'
+import { useLibrariesData } from './useLibrariesData'
 import { LibraryCard } from './LibraryCard'
 import { InstallForm } from './InstallForm'
 
-export function LibrariesPage({
-  libraries,
-  loading,
-  error,
-  operationStatus,
-  onChanged,
-}: {
-  libraries?: LibraryList
-  loading: boolean
-  error: unknown
-  operationStatus?: OperationStatus
-  onChanged: (message: string, tone: ToastTone) => Promise<void>
-}) {
+export function LibrariesPage() {
+  const { libraries, loading, error, operationStatus } = useLibrariesData()
+  const queryClient = useQueryClient()
+  const { pushToast } = useToasts()
   const [packageName, setPackageName] = useState('')
   const [uninstallTarget, setUninstallTarget] = useState<string | null>(null)
 
@@ -27,22 +19,46 @@ export function LibrariesPage({
     mutationFn: api.installLibrary,
     onSuccess: async (result) => {
       setPackageName('')
-      await onChanged(result.message, 'success')
+      await queryClient.invalidateQueries({ queryKey: ['libraries'] })
+      await queryClient.invalidateQueries({ queryKey: ['operations-status'] })
+      pushToast({
+        tone: 'success',
+        title: 'Libraries updated',
+        detail: result.message,
+      })
     },
     onError: async (mutationError) => {
-      await onChanged(formatErrorMessage(mutationError, 'The package could not be installed.'), 'error')
+      await queryClient.invalidateQueries({ queryKey: ['libraries'] })
+      await queryClient.invalidateQueries({ queryKey: ['operations-status'] })
+      pushToast({
+        tone: 'error',
+        title: 'Library action failed',
+        detail: formatErrorMessage(mutationError, 'The package could not be installed.'),
+      })
     },
   })
 
   const uninstallMutation = useMutation({
     mutationFn: api.uninstallLibrary,
     onSuccess: async (result) => {
-      await onChanged(result.message, 'success')
       setUninstallTarget(null)
+      await queryClient.invalidateQueries({ queryKey: ['libraries'] })
+      await queryClient.invalidateQueries({ queryKey: ['operations-status'] })
+      pushToast({
+        tone: 'success',
+        title: 'Libraries updated',
+        detail: result.message,
+      })
     },
     onError: async (mutationError) => {
-      await onChanged(formatErrorMessage(mutationError, 'The package could not be removed.'), 'error')
       setUninstallTarget(null)
+      await queryClient.invalidateQueries({ queryKey: ['libraries'] })
+      await queryClient.invalidateQueries({ queryKey: ['operations-status'] })
+      pushToast({
+        tone: 'error',
+        title: 'Library action failed',
+        detail: formatErrorMessage(mutationError, 'The package could not be removed.'),
+      })
     },
   })
 

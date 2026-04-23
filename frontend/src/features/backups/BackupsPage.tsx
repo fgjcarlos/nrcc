@@ -1,34 +1,39 @@
 import { useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
-import { api, type BackupList, type OperationStatus } from '../../api'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { api } from '../../api'
 import { InlineNotice, LoadingState, EmptyState } from '../../common/components'
 import { formatErrorMessage } from '../../common/utils/format'
 import type { ToastTone } from '../../common/types'
+import { useToasts } from '../shell/useToasts'
+import { useBackupsData } from './useBackupsData'
 import { BackupCard } from './BackupCard'
 
-export function BackupsPage({
-  backups,
-  loading,
-  error,
-  operationStatus,
-  onChanged,
-}: {
-  backups?: BackupList
-  loading: boolean
-  error: unknown
-  operationStatus?: OperationStatus
-  onChanged: (message: string, tone: ToastTone) => Promise<void>
-}) {
+export function BackupsPage() {
+  const { backups, loading, error, operationStatus } = useBackupsData()
+  const queryClient = useQueryClient()
+  const { pushToast } = useToasts()
   const [restoreTarget, setRestoreTarget] = useState<string | null>(null)
   const busy = operationStatus?.busy ?? false
 
   const createMutation = useMutation({
     mutationFn: api.createBackup,
     onSuccess: async () => {
-      await onChanged('A manual backup was created successfully.', 'success')
+      await queryClient.invalidateQueries({ queryKey: ['backups'] })
+      await queryClient.invalidateQueries({ queryKey: ['operations-status'] })
+      pushToast({
+        tone: 'success',
+        title: 'Backups updated',
+        detail: 'A manual backup was created successfully.',
+      })
     },
     onError: async (mutationError) => {
-      await onChanged(formatErrorMessage(mutationError, 'The backup could not be created.'), 'error')
+      await queryClient.invalidateQueries({ queryKey: ['backups'] })
+      await queryClient.invalidateQueries({ queryKey: ['operations-status'] })
+      pushToast({
+        tone: 'error',
+        title: 'Backup action failed',
+        detail: formatErrorMessage(mutationError, 'The backup could not be created.'),
+      })
     },
   })
 
@@ -36,14 +41,23 @@ export function BackupsPage({
     mutationFn: api.restoreBackup,
     onSuccess: async (result) => {
       setRestoreTarget(null)
-      await onChanged(
-        `Backup restored. Preventive backup created as ${result.preventiveBackupId}.`,
-        'success',
-      )
+      await queryClient.invalidateQueries({ queryKey: ['backups'] })
+      await queryClient.invalidateQueries({ queryKey: ['operations-status'] })
+      pushToast({
+        tone: 'success',
+        title: 'Backups updated',
+        detail: `Backup restored. Preventive backup created as ${result.preventiveBackupId}.`,
+      })
     },
     onError: async (mutationError) => {
       setRestoreTarget(null)
-      await onChanged(formatErrorMessage(mutationError, 'The backup could not be restored.'), 'error')
+      await queryClient.invalidateQueries({ queryKey: ['backups'] })
+      await queryClient.invalidateQueries({ queryKey: ['operations-status'] })
+      pushToast({
+        tone: 'error',
+        title: 'Backup action failed',
+        detail: formatErrorMessage(mutationError, 'The backup could not be restored.'),
+      })
     },
   })
 

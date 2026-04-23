@@ -1,40 +1,11 @@
 import { KeyboardEvent, useRef, useState } from 'react'
-import type { DoctorReport, LogEntry, JobRecord } from '../../api'
 import { DoctorTab } from './DoctorTab'
 import { LogsTab } from './LogsTab'
 import { JobsTab } from './JobsTab'
+import { useDiagnosticsData } from './useDiagnosticsData'
 
-export function DiagnosticsPage({
-  report,
-  reportLoading,
-  reportError,
-  logs,
-  logsLoading,
-  logsError,
-  jobs,
-  jobsLoading,
-  jobsError,
-  exporting,
-  onRefreshReport,
-  onRefreshLogs,
-  onRefreshJobs,
-  onExport,
-}: {
-  report?: DoctorReport
-  reportLoading: boolean
-  reportError: unknown
-  logs: LogEntry[]
-  logsLoading: boolean
-  logsError: unknown
-  jobs: JobRecord[]
-  jobsLoading: boolean
-  jobsError: unknown
-  exporting: boolean
-  onRefreshReport: () => Promise<void>
-  onRefreshLogs: () => Promise<void>
-  onRefreshJobs: () => Promise<void>
-  onExport: () => void
-}) {
+export function DiagnosticsPage() {
+  const { report, reportLoading, reportError, logs, logsLoading, logsError, jobs, jobsLoading, jobsError, exporting, onRefreshReport, onRefreshLogs, onRefreshJobs, onExport } = useDiagnosticsData()
   const tabs = [
     { id: 'doctor', label: 'Doctor' },
     { id: 'logs', label: 'Logs' },
