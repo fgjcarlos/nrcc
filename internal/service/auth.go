@@ -46,6 +46,7 @@ type AuthService struct {
 	cookieTTL time.Duration
 	mu        sync.Mutex
 	attempts  map[string][]time.Time
+	stopCh    chan struct{}
 }
 
 // NewAuthService opens the database and creates a new AuthService instance.
@@ -81,14 +82,21 @@ func NewAuthServiceWithDB(dataDir string, database *sql.DB) (*AuthService, error
 		session:   session,
 		cookieTTL: 24 * time.Hour,
 		attempts:  make(map[string][]time.Time),
+		stopCh:    make(chan struct{}),
 	}
 
 	// Run session cleanup in the background so it never blocks a request.
 	go func() {
 		ticker := time.NewTicker(1 * time.Hour)
-		for range ticker.C {
-			if err := svc.deleteExpiredSessions(); err != nil {
-				slog.Warn("session cleanup failed", "err", err)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				if err := svc.deleteExpiredSessions(); err != nil {
+					slog.Warn("session cleanup failed", "err", err)
+				}
+			case <-svc.stopCh:
+				return
 			}
 		}
 	}()
@@ -238,6 +246,7 @@ func (s *AuthService) RevokeToken(token string) error {
 }
 
 func (s *AuthService) Close() error {
+	close(s.stopCh)
 	return s.db.Close()
 }
 

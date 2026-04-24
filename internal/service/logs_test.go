@@ -1,10 +1,14 @@
 package service
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -268,6 +272,91 @@ func TestLogServiceDirectoryCreation(t *testing.T) {
 	logPath := filepath.Join(logsDir, "app.log")
 	if _, err := os.Stat(logPath); os.IsNotExist(err) {
 		t.Fatalf("app.log was not created at %s", logPath)
+	}
+}
+
+func TestLogServiceConcurrentWritesDuringRotation(t *testing.T) {
+	t.Parallel()
+
+	logService, _, tempDir := setupTestLogService(t)
+	logPath := filepath.Join(tempDir, "logs", "app.log")
+
+	seedLine := []byte("{\"seed\":true}\n")
+	seedData := bytes.Repeat(seedLine, (logRotationThreshold/len(seedLine))+1)
+	if err := os.WriteFile(logPath, seedData, 0600); err != nil {
+		t.Fatalf("failed to seed log file for rotation test: %v", err)
+	}
+	logService.writeCount = logRotationCheckFreq - 1
+
+	const writers = 32
+	errCh := make(chan error, writers)
+	var wg sync.WaitGroup
+
+	for i := 0; i < writers; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+
+			entry := model.LogEntry{
+				ID:        fmt.Sprintf("concurrent-%d", i),
+				Timestamp: time.Now().UTC(),
+				Level:     model.LogLevelInfo,
+				Source:    model.SourceRuntime,
+				Event:     model.EventRuntimeLifecycle,
+				Message:   strings.Repeat("x", 128),
+			}
+
+			if err := logService.Write(entry); err != nil {
+				errCh <- err
+			}
+		}(i)
+	}
+
+	wg.Wait()
+	close(errCh)
+
+	for err := range errCh {
+		t.Fatalf("concurrent Write() error = %v", err)
+	}
+
+	entries := logService.Get(100, "", "")
+	if len(entries) != writers {
+		t.Fatalf("expected %d entries in buffer, got %d", writers, len(entries))
+	}
+
+	totalLines := 0
+	seedLines := 0
+	for _, path := range []string{logPath, filepath.Join(tempDir, "logs", "app.log.1")} {
+		content, err := os.ReadFile(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			t.Fatalf("failed to read %s: %v", path, err)
+		}
+
+		for _, line := range strings.Split(strings.TrimSpace(string(content)), "\n") {
+			if line == "" {
+				continue
+			}
+
+			var entry model.LogEntry
+			if err := json.Unmarshal([]byte(line), &entry); err != nil {
+				t.Fatalf("failed to unmarshal log line from %s: %v", path, err)
+			}
+			if entry.ID == "" && entry.Message == "" {
+				seedLines++
+				continue
+			}
+			totalLines++
+		}
+	}
+
+	if totalLines != writers {
+		t.Fatalf("expected %d log lines across rotated files, got %d", writers, totalLines)
+	}
+	if seedLines == 0 {
+		t.Fatal("expected seeded lines to remain readable after rotation")
 	}
 }
 

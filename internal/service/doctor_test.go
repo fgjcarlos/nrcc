@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"nrcc/internal/model"
@@ -295,6 +296,55 @@ func TestDoctorServiceMissingDataDir(t *testing.T) {
 	// Overall status should be degraded or critical
 	if report.OverallStatus == "" {
 		t.Fatal("expected overall status to be set")
+	}
+}
+
+func TestRunCheckSafelyPanicRecovery(t *testing.T) {
+	t.Parallel()
+
+	panicMsg := "something went very wrong"
+	panicFn := func(_ context.Context) model.DoctorCheck {
+		panic(panicMsg)
+	}
+
+	result := runCheckSafely(context.Background(), panicFn)
+
+	if result.Status != model.CheckStatusFail {
+		t.Errorf("expected status %q after panic, got %q", model.CheckStatusFail, result.Status)
+	}
+
+	if result.Message == "" {
+		t.Error("expected non-empty Message after panic")
+	}
+
+	if !strings.Contains(result.Message, panicMsg) {
+		t.Errorf("expected Message to contain panic value %q, got %q", panicMsg, result.Message)
+	}
+
+	if result.ID == "" {
+		t.Error("expected non-empty ID after panic")
+	}
+}
+
+func TestRunCheckSafelyNoPanic(t *testing.T) {
+	t.Parallel()
+
+	okFn := func(_ context.Context) model.DoctorCheck {
+		return model.DoctorCheck{
+			ID:      "test-check",
+			Label:   "Test Check",
+			Status:  model.CheckStatusPass,
+			Message: "all good",
+		}
+	}
+
+	result := runCheckSafely(context.Background(), okFn)
+
+	if result.Status != model.CheckStatusPass {
+		t.Errorf("expected pass, got %q", result.Status)
+	}
+	if result.ID != "test-check" {
+		t.Errorf("expected ID %q, got %q", "test-check", result.ID)
 	}
 }
 

@@ -197,6 +197,38 @@ func TestClientIP(t *testing.T) {
 	}
 }
 
+// TestAuthServiceCloseStopsGoroutine verifies that Close() signals the cleanup
+// goroutine to stop before closing the DB. If the goroutine were still running
+// after Close() it would attempt DB writes against a closed connection, causing
+// errors visible as race conditions or panics in tests.
+func TestAuthServiceCloseStopsGoroutine(t *testing.T) {
+	t.Parallel()
+
+	svc, err := NewAuthService(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewAuthService() error = %v", err)
+	}
+
+	// stopCh must be open before Close().
+	select {
+	case <-svc.stopCh:
+		t.Fatal("stopCh already closed before Close()")
+	default:
+	}
+
+	if err := svc.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	// stopCh must be closed (readable) after Close().
+	select {
+	case <-svc.stopCh:
+		// expected: goroutine received the signal and will exit
+	default:
+		t.Fatal("stopCh not closed after Close(); goroutine leak likely")
+	}
+}
+
 func newTestAuthService(t *testing.T) *AuthService {
 	t.Helper()
 

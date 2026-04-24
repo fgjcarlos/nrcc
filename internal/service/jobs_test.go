@@ -2,6 +2,7 @@ package service
 
 import (
 	"database/sql"
+	"strings"
 	"testing"
 	"time"
 
@@ -23,6 +24,28 @@ func setupTestJobsService(t *testing.T) (*JobsService, *sql.DB) {
 	})
 
 	return jobsService, testDB
+}
+
+func insertRawJobRecord(t *testing.T, testDB *sql.DB, id, startedAt string, finishedAt *string) {
+	t.Helper()
+
+	createdAt := time.Now().UTC().Format(time.RFC3339)
+	_, err := testDB.Exec(
+		`INSERT INTO job_history (id, type, status, started_at, finished_at, triggered_by, summary, error, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		id,
+		model.JobTypeBackup,
+		model.JobStatusCompleted,
+		startedAt,
+		finishedAt,
+		"user_123",
+		"summary",
+		"",
+		createdAt,
+	)
+	if err != nil {
+		t.Fatalf("insert raw job record: %v", err)
+	}
 }
 
 func TestJobsServiceStart(t *testing.T) {
@@ -153,6 +176,21 @@ func TestJobsServiceGetByIDNotFound(t *testing.T) {
 	}
 }
 
+func TestJobsServiceGetByIDReturnsParseErrorForInvalidStartedAt(t *testing.T) {
+	t.Parallel()
+
+	jobsService, testDB := setupTestJobsService(t)
+	insertRawJobRecord(t, testDB, "job_invalid_started", "not-a-timestamp", nil)
+
+	_, err := jobsService.GetByID("job_invalid_started")
+	if err == nil {
+		t.Fatal("expected parse error for invalid started_at")
+	}
+	if !strings.Contains(err.Error(), "parse started_at") {
+		t.Fatalf("expected started_at parse error, got %v", err)
+	}
+}
+
 func TestJobsServiceGetWithTypeFilter(t *testing.T) {
 	t.Parallel()
 
@@ -178,6 +216,22 @@ func TestJobsServiceGetWithTypeFilter(t *testing.T) {
 		if job.Type != model.JobTypeBackup {
 			t.Errorf("expected type backup, got %s", job.Type)
 		}
+	}
+}
+
+func TestJobsServiceGetReturnsParseErrorForInvalidFinishedAt(t *testing.T) {
+	t.Parallel()
+
+	jobsService, testDB := setupTestJobsService(t)
+	finishedAt := "not-a-timestamp"
+	insertRawJobRecord(t, testDB, "job_invalid_finished", time.Now().UTC().Format(time.RFC3339), &finishedAt)
+
+	_, err := jobsService.Get(50, 0, "", "")
+	if err == nil {
+		t.Fatal("expected parse error for invalid finished_at")
+	}
+	if !strings.Contains(err.Error(), "parse finished_at") {
+		t.Fatalf("expected finished_at parse error, got %v", err)
 	}
 }
 

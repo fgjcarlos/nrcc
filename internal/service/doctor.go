@@ -88,15 +88,23 @@ func (d *DoctorService) Run(ctx context.Context) model.DoctorReport {
 	return report
 }
 
-// runCheckSafely executes a check and catches panics
-func runCheckSafely(ctx context.Context, checkFn func(context.Context) model.DoctorCheck) model.DoctorCheck {
+// runCheckSafely executes a check and catches panics.
+// On panic it returns a DoctorCheck with Status="fail" and the panic message
+// captured in Message so the caller always gets a meaningful entry.
+func runCheckSafely(ctx context.Context, checkFn func(context.Context) model.DoctorCheck) (result model.DoctorCheck) {
 	defer func() {
 		if r := recover(); r != nil {
-			// Panic recovery is handled via return
+			result = model.DoctorCheck{
+				ID:      "unknown",
+				Label:   "Unknown Check",
+				Status:  model.CheckStatusFail,
+				Message: fmt.Sprintf("check panicked: %v", r),
+			}
 		}
 	}()
 
-	return checkFn(ctx)
+	result = checkFn(ctx)
+	return
 }
 
 // Check 1: node-red-installed

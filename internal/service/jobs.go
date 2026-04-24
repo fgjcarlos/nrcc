@@ -9,9 +9,25 @@ import (
 	"nrcc/internal/model"
 )
 
+var jobTimeFormats = []string{
+	time.RFC3339,
+	"2006-01-02 15:04:05.999999999 -0700 MST",
+}
+
 // JobsService manages job history in SQLite
 type JobsService struct {
 	db *sql.DB
+}
+
+func parseJobTime(field, value string) (time.Time, error) {
+	for _, layout := range jobTimeFormats {
+		t, err := time.Parse(layout, value)
+		if err == nil {
+			return t, nil
+		}
+	}
+
+	return time.Time{}, fmt.Errorf("parse %s: unsupported timestamp %q", field, value)
 }
 
 // NewJobsService creates a new JobsService
@@ -30,7 +46,8 @@ func (js *JobsService) Start(jobType, triggeredBy, summary string) (string, erro
 		INSERT INTO job_history (id, type, status, started_at, triggered_by, summary, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
 	`
-	_, err := js.db.Exec(query, jobID, jobType, model.JobStatusRunning, startedAt, triggeredBy, summary, startedAt)
+	startedAtStr := startedAt.Format(time.RFC3339)
+	_, err := js.db.Exec(query, jobID, jobType, model.JobStatusRunning, startedAtStr, triggeredBy, summary, startedAtStr)
 	if err != nil {
 		return "", fmt.Errorf("insert job record: %w", err)
 	}
@@ -47,7 +64,7 @@ func (js *JobsService) Finish(jobID, status, summary, errMsg string) error {
 		SET status = ?, finished_at = ?, summary = ?, error = ?
 		WHERE id = ?
 	`
-	_, err := js.db.Exec(query, status, finishedAt, summary, errMsg, jobID)
+	_, err := js.db.Exec(query, status, finishedAt.Format(time.RFC3339), summary, errMsg, jobID)
 	if err != nil {
 		return fmt.Errorf("update job record: %w", err)
 	}
@@ -103,12 +120,18 @@ func (js *JobsService) Get(limit, offset int, jobType, status string) ([]model.J
 
 		// Parse StartedAt
 		if startedAtStr != "" {
-			t, _ := time.Parse(time.RFC3339, startedAtStr)
+			t, err := parseJobTime("started_at", startedAtStr)
+			if err != nil {
+				return nil, err
+			}
 			job.StartedAt = t
 		}
 
 		if finishedAtStr.Valid {
-			t, _ := time.Parse(time.RFC3339, finishedAtStr.String)
+			t, err := parseJobTime("finished_at", finishedAtStr.String)
+			if err != nil {
+				return nil, err
+			}
 			job.FinishedAt = &t
 		}
 
@@ -150,12 +173,18 @@ func (js *JobsService) GetByID(jobID string) (*model.JobRecord, error) {
 
 	// Parse StartedAt
 	if startedAtStr != "" {
-		t, _ := time.Parse(time.RFC3339, startedAtStr)
+		t, err := parseJobTime("started_at", startedAtStr)
+		if err != nil {
+			return nil, err
+		}
 		job.StartedAt = t
 	}
 
 	if finishedAtStr.Valid {
-		t, _ := time.Parse(time.RFC3339, finishedAtStr.String)
+		t, err := parseJobTime("finished_at", finishedAtStr.String)
+		if err != nil {
+			return nil, err
+		}
 		job.FinishedAt = &t
 	}
 

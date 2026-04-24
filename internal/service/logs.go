@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"nrcc/internal/model"
@@ -23,6 +24,7 @@ const (
 type LogService struct {
 	dataDir    string
 	buffer     *LogBuffer
+	mu         sync.Mutex
 	logFile    *os.File
 	db         *sql.DB
 	writeCount int
@@ -69,6 +71,9 @@ func (ls *LogService) Write(entry model.LogEntry) error {
 		return fmt.Errorf("marshal log entry: %w", err)
 	}
 
+	ls.mu.Lock()
+	defer ls.mu.Unlock()
+
 	if _, err := ls.logFile.Write(append(data, '\n')); err != nil {
 		return fmt.Errorf("write log file: %w", err)
 	}
@@ -77,7 +82,7 @@ func (ls *LogService) Write(entry model.LogEntry) error {
 	ls.writeCount++
 	if ls.writeCount >= logRotationCheckFreq {
 		ls.writeCount = 0
-		_ = ls.rotate() // Ignore rotation errors - logging shouldn't fail
+		_ = ls.rotateLocked() // Ignore rotation errors - logging shouldn't fail
 	}
 
 	return nil
@@ -90,14 +95,18 @@ func (ls *LogService) Get(limit int, level, source string) []model.LogEntry {
 
 // Close closes the log file
 func (ls *LogService) Close() error {
+	ls.mu.Lock()
+	defer ls.mu.Unlock()
+
 	if ls.logFile != nil {
 		return ls.logFile.Close()
 	}
 	return nil
 }
 
-// rotate performs log rotation when the file exceeds the threshold
-func (ls *LogService) rotate() error {
+// rotateLocked performs log rotation when the file exceeds the threshold.
+// Caller must hold ls.mu.
+func (ls *LogService) rotateLocked() error {
 	// Check file size
 	info, err := ls.logFile.Stat()
 	if err != nil {
@@ -180,7 +189,7 @@ func InitLogSchema(db *sql.DB) error {
 func randomID(length int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
 	result := make([]byte, length)
-	
+
 	// Generate random bytes using crypto/rand for secure entropy
 	randBytes := make([]byte, length)
 	if _, err := rand.Read(randBytes); err != nil {
@@ -190,7 +199,7 @@ func randomID(length int) string {
 		}
 		return string(result)
 	}
-	
+
 	// Map random bytes to charset
 	for i := 0; i < length; i++ {
 		result[i] = charset[randBytes[i]%byte(len(charset))]
