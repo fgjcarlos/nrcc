@@ -18,7 +18,7 @@ type runtimeController interface {
 
 type backupCoordinator interface {
 	Create(reason string) (model.BackupSummary, error)
-	Restore(id string, runtimeManager *ProcessManager) (model.BackupSummary, error)
+	Restore(id string, runtimeManager runtimeController) (model.BackupSummary, error)
 }
 
 type UpdateService struct {
@@ -214,8 +214,7 @@ func (s *UpdateService) availableVersion() (string, error) {
 }
 
 func (s *UpdateService) rollback(backupID string, runtime runtimeController) error {
-	processManager, _ := runtime.(*ProcessManager)
-	if _, err := s.backups.Restore(backupID, processManager); err != nil {
+	if _, err := s.backups.Restore(backupID, runtime); err != nil {
 		return fmt.Errorf("restore preventive backup: %w", err)
 	}
 	if runtime != nil {

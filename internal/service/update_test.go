@@ -17,7 +17,7 @@ func (f *fakeBackups) Create(reason string) (model.BackupSummary, error) {
 	return model.BackupSummary{ID: "bkp_test", Reason: reason}, nil
 }
 
-func (f *fakeBackups) Restore(id string, _ *ProcessManager) (model.BackupSummary, error) {
+func (f *fakeBackups) Restore(id string, _ runtimeController) (model.BackupSummary, error) {
 	f.restored = append(f.restored, id)
 	return model.BackupSummary{ID: id, Reason: "pre_restore"}, nil
 }

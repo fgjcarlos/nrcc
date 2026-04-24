@@ -20,6 +20,7 @@ import (
 )
 
 var ErrFlowNotFound = errors.New("flow not found")
+var ErrAtLeastOneFlowIDRequired = errors.New("at least one flow ID required")
 
 var builtInFlowNodeTypes = map[string]struct{}{
 	"catch":         {},
@@ -178,7 +179,7 @@ func (s FlowService) Get(id string) (model.FlowDetailResponse, error) {
 // Returns ErrFlowNotFound if any requested ID does not exist as a tab.
 func (s FlowService) Export(ids []string) ([]byte, error) {
 	if len(ids) == 0 {
-		return nil, fmt.Errorf("at least one flow ID required")
+		return nil, ErrAtLeastOneFlowIDRequired
 	}
 
 	path, _, err := s.resolveFlowPath()
@@ -206,7 +207,7 @@ func (s FlowService) Export(ids []string) ([]byte, error) {
 	// Check if all requested IDs exist as tabs
 	for id := range requestedTabIDs {
 		if _, ok := tabExists[id]; !ok {
-			return nil, fmt.Errorf("flow not found: %s", id)
+			return nil, fmt.Errorf("%w: %s", ErrFlowNotFound, id)
 		}
 		tabExists[id] = true
 	}

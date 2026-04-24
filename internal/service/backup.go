@@ -172,7 +172,7 @@ func (s *BackupService) Create(reason string) (model.BackupSummary, error) {
 	}, nil
 }
 
-func (s *BackupService) Restore(id string, runtimeManager *ProcessManager) (model.BackupSummary, error) {
+func (s *BackupService) Restore(id string, runtimeManager runtimeController) (model.BackupSummary, error) {
 	manifest, err := s.loadManifest(id)
 	if err != nil {
 		return model.BackupSummary{}, err

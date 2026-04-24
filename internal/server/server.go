@@ -525,8 +525,12 @@ func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager
 				return
 			}
 
-			currentJSON, _ := json.Marshal(currentCfg)
-			settingsJS := service.RenderSettingsJS(currentCfg)
+		currentJSON, err := json.Marshal(currentCfg)
+		if err != nil {
+			respondError(w, http.StatusInternalServerError, "CONFIG_MARSHAL_FAILED", "failed to encode current config")
+			return
+		}
+		settingsJS := service.RenderSettingsJS(currentCfg)
 
 			username := "unknown"
 			if authService != nil {
@@ -586,10 +590,18 @@ func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager
 				return
 			}
 
-			// Create preventive snapshot of current config
-			currentCfg, _ := configService.LoadFullConfig()
-			currentJSON, _ := json.Marshal(currentCfg)
-			currentSettingsJS := service.RenderSettingsJS(currentCfg)
+		// Create preventive snapshot of current config
+		currentCfg, err := configService.LoadFullConfig()
+		if err != nil {
+			respondError(w, http.StatusInternalServerError, "CONFIG_LOAD_FAILED", err.Error())
+			return
+		}
+		currentJSON, err := json.Marshal(currentCfg)
+		if err != nil {
+			respondError(w, http.StatusInternalServerError, "CONFIG_MARSHAL_FAILED", "failed to encode current config")
+			return
+		}
+		currentSettingsJS := service.RenderSettingsJS(currentCfg)
 
 			preventiveSnapshot, err := configService.CreateSnapshot(
 				"Pre-restore snapshot",
@@ -667,15 +679,16 @@ func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager
 				return
 			}
 
-			state, err := managedEnvService.Apply(payload.Variables)
-			if err != nil {
-				respondError(w, http.StatusInternalServerError, "ENV_APPLY_FAILED", err.Error())
-				return
-			}
-			if errors := managedEnvService.Validate(payload.Variables); len(errors) > 0 {
-				respondError(w, http.StatusBadRequest, "ENV_INVALID", strings.Join(errors, "; "))
-				return
-			}
+		if errors := managedEnvService.Validate(payload.Variables); len(errors) > 0 {
+			respondError(w, http.StatusBadRequest, "ENV_INVALID", strings.Join(errors, "; "))
+			return
+		}
+
+		state, err := managedEnvService.Apply(payload.Variables)
+		if err != nil {
+			respondError(w, http.StatusInternalServerError, "ENV_APPLY_FAILED", err.Error())
+			return
+		}
 
 			if authService != nil {
 				if claims, ok := middleware.AuthClaimsFromContext(r.Context()); ok {
@@ -816,16 +829,16 @@ func registerAPIRoutes(router chi.Router, runtimeManager *service.ProcessManager
 				return
 			}
 
-			flowBytes, err := flowService.Export(req.IDs)
-			if err != nil {
-				if errors.Is(err, service.ErrFlowNotFound) || strings.Contains(err.Error(), "flow not found") {
-					respondError(w, http.StatusNotFound, "FLOW_NOT_FOUND", err.Error())
-					return
-				}
-				if strings.Contains(err.Error(), "at least one flow ID required") {
-					respondError(w, http.StatusBadRequest, "INVALID_REQUEST", err.Error())
-					return
-				}
+		flowBytes, err := flowService.Export(req.IDs)
+		if err != nil {
+			if errors.Is(err, service.ErrFlowNotFound) {
+				respondError(w, http.StatusNotFound, "FLOW_NOT_FOUND", err.Error())
+				return
+			}
+			if errors.Is(err, service.ErrAtLeastOneFlowIDRequired) {
+				respondError(w, http.StatusBadRequest, "INVALID_REQUEST", err.Error())
+				return
+			}
 				respondError(w, http.StatusInternalServerError, "FLOWS_EXPORT_FAILED", err.Error())
 				return
 			}
