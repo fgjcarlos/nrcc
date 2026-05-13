@@ -1,0 +1,33 @@
+# ── Git ───────────────────────────────────────────────────────────────────────
+.git
+.gitignore
+.gitattributes
+
+# ── Build artifacts ───────────────────────────────────────────────────────────
+dist/
+# Exception: local dev build needs pre-compiled linux binary
+!dist/nrcc-linux-amd64
+nrcc
+nrcc-*
+*.exe
+
+# ── Frontend dev artifacts ────────────────────────────────────────────────────
+# node_modules excluded — Docker stages install their own deps
+frontend/node_modules/
+
+# ── Test & dev data ───────────────────────────────────────────────────────────
+data/
+*.log
+*.env
+.env*
+
+# ── IDE / OS ──────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.DS_Store
+Thumbs.db
+
+# ── Docs ──────────────────────────────────────────────────────────────────────
+*.md
+LICENSE
+docs/

@@ -1,0 +1,38 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  # Command to build the binary
+  cmd = "go build -o ./tmp/nrcc ."
+  # Binary to run after build
+  bin = "./tmp/nrcc"
+  # Arguments passed to the binary
+  args_bin = []
+  # Files that trigger a rebuild
+  include_ext = ["go", "tpl", "tmpl", "html"]
+  # Directories to exclude
+  exclude_dir = ["tmp", "frontend", "dist", "data", ".git"]
+  # Kill delay before restart (ms)
+  kill_delay = "500ms"
+  # Send interrupt signal before killing
+  send_interrupt = true
+  # Rerun on log writes
+  rerun = false
+  # Delay before rerun (ms)
+  rerun_delay = 500
+
+[log]
+  # Show timestamp
+  time = true
+  # Main log level: debug, info, warning, error
+  main_only = false
+
+[color]
+  main = "magenta"
+  watcher = "cyan"
+  build = "yellow"
+  runner = "green"
+
+[screen]
+  clear_on_rebuild = false
+  keep_scroll = true

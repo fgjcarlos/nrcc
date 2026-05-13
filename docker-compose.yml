@@ -1,0 +1,75 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# nrcc — Node-RED Control Center
+# Docker Compose: nrcc + Node-RED all-in-one
+#
+# Usage:
+#   docker compose up -d
+#   docker compose logs -f
+#   docker compose down
+#
+# Volumes:
+#   nrcc_data         → nrcc config + Node-RED userDir (flows, settings, lib)
+#   nrcc_backups      → nrcc backup archives (.zip) — persist separately
+#   nrcc_node_modules → Node-RED installed nodes (can grow large)
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  nrcc:
+    image: ghcr.io/composedof2/nrcc:latest
+    # Uncomment to build locally instead:
+    # build: .
+    container_name: nrcc
+    restart: unless-stopped
+
+    ports:
+      - "3001:3001"   # nrcc web UI + API
+      - "1880:1880"   # Node-RED editor
+
+    environment:
+      PORT: "3001"
+      DATA_DIR: /data
+      # CHANGE THIS — use a strong random secret in production:
+      JWT_SECRET: "change-me-in-production"
+      NODE_RED_CMD: node-red
+
+    volumes:
+      # Main data: nrcc config + Node-RED flows/settings/lib
+      - nrcc_data:/data
+      # Backups isolated: easier to bind-mount to NAS/S3 sync folder
+      - nrcc_backups:/data/backups
+      # Node modules isolated: avoids re-downloading nodes on data wipe
+      - nrcc_node_modules:/data/node_modules
+
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/auth/status"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Optional: add MQTT broker for IoT flows
+# Uncomment the block below to include Mosquitto
+# ─────────────────────────────────────────────────────────────────────────────
+#
+#  mosquitto:
+#    image: eclipse-mosquitto:2
+#    container_name: mosquitto
+#    restart: unless-stopped
+#    ports:
+#      - "1883:1883"   # MQTT
+#      - "9001:9001"   # MQTT over WebSocket
+#    volumes:
+#      - mosquitto_data:/mosquitto/data
+#      - mosquitto_logs:/mosquitto/log
+#      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+
+volumes:
+  nrcc_data:
+    driver: local
+  nrcc_backups:
+    driver: local
+  nrcc_node_modules:
+    driver: local
+  # mosquitto_data:
+  # mosquitto_logs:

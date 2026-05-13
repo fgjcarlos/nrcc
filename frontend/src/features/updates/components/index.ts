@@ -1,0 +1,1 @@
+export { UpdateNotificationChip } from './UpdateNotificationChip';

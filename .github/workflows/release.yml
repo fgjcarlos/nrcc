@@ -1,0 +1,126 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/nrcc
+
+jobs:
+  # ── Build & push multi-arch Docker image ────────────────────────────────────
+  docker:
+    name: Docker multi-arch build & push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU (for cross-arch emulation)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: nrcc
+          file: nrcc/Dockerfile
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── Cross-compile binaries & attach to GitHub Release ───────────────────────
+  binaries:
+    name: Release binaries
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache-dependency-path: nrcc/go.sum
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: nrcc/frontend/package-lock.json
+
+      - name: Build frontend
+        working-directory: nrcc/frontend
+        run: npm ci && npm run build
+
+      - name: Build binaries
+        working-directory: nrcc
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          mkdir -p dist
+          LDFLAGS="-s -w -X main.Version=${VERSION}"
+
+          # Linux (static — Alpine/glibc compatible)
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64  go build -tags netgo -ldflags="${LDFLAGS} -extldflags=-static" -o dist/nrcc-linux-amd64 .
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64  go build -tags netgo -ldflags="${LDFLAGS} -extldflags=-static" -o dist/nrcc-linux-arm64 .
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm    go build -tags netgo -ldflags="${LDFLAGS} -extldflags=-static" -o dist/nrcc-linux-armv7 .
+
+          # macOS
+          GOOS=darwin  GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o dist/nrcc-darwin-amd64 .
+          GOOS=darwin  GOARCH=arm64 go build -ldflags="${LDFLAGS}" -o dist/nrcc-darwin-arm64 .
+
+          # Windows
+          GOOS=windows GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o dist/nrcc-windows-amd64.exe .
+
+          ls -lh dist/
+
+      - name: Generate checksums
+        working-directory: nrcc/dist
+        run: |
+          # Generate combined SHA256SUMS file
+          sha256sum * > SHA256SUMS
+          
+          # Generate per-binary sidecar files with normalized filename
+          for binary in nrcc-*; do
+            sha256sum "$binary" | sed 's/nrcc-.*/nrcc/' > "$binary.sha256"
+          done
+          
+          ls -lh SHA256SUMS *.sha256
+
+      - name: Upload binaries to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: nrcc/dist/*
+          generate_release_notes: true

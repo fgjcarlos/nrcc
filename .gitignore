@@ -1,0 +1,26 @@
+bin/
+dist/
+data/
+node_modules/
+frontend/node_modules/
+frontend/dist/
+*.env
+!.env.example
+*.log
+.DS_Store
+*.swp
+*.swo
+
+# Binaries
+nrcc
+nrcc.exe
+nrcc-final
+nrcc-test
+
+# AI agent / IDE tool configs (local environment only)
+.claude/
+.cline/
+.codebuddy/
+.continue/
+.junie/
+.kiro/
