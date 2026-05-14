@@ -83,15 +83,15 @@ export function UserMenu({ user, onLogout, logoutBusy = false }: UserMenuProps) 
       </button>
 
       {/* Dropdown menu */}
-      {open && (
-        <div
-          role="menu"
-          className="absolute bottom-full left-0 mb-2 w-full rounded-xl border border-base-300/60 bg-base-200 shadow-lg transition-all duration-150 origin-bottom animate-slide-up"
-        >
-          <div className="border-b border-base-300/40 px-4 py-3">
-            <p className="text-xs text-base-content/50 uppercase tracking-widest">Signed in as</p>
-            <p className="mt-0.5 font-semibold text-base-content">{user.username}</p>
-          </div>
+       {open && (
+         <div
+           role="menu"
+           className="absolute bottom-full left-0 mb-2 w-full rounded-xl border border-base-300/60 bg-base-200 shadow-lg transition-all duration-150 origin-bottom animate-slide-up"
+         >
+           <div className="border-b border-base-300/50 px-4 py-3">
+             <p className="text-xs text-base-content/50 uppercase tracking-widest">Signed in as</p>
+             <p className="mt-0.5 font-semibold text-base-content">{user.username}</p>
+           </div>
            <div className="p-2 space-y-1">
              {/* Profile item (disabled for now) */}
              <button
