@@ -257,9 +257,9 @@ export function FlowDetailView() {
           )}
 
           {/* No Patterns Found */}
-          {patternResult && patternResult.patterns.length === 0 && (
-            <div className="surface-panel border border-amber-500/20 p-4">
-              <p className="text-sm text-amber-200">
+           {patternResult && patternResult.patterns.length === 0 && (
+             <div className="surface-panel border border-warning/20 p-4">
+               <p className="text-sm text-warning">
                 {patternResult.message ||
                   "No patterns detected in the selected flow(s). Try selecting flows with similar structures or data transformations."}
               </p>
