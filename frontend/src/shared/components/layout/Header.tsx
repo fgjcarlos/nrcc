@@ -7,31 +7,38 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 export function Header() {
 
   return (
-    <>
-      <div className="px-4 border-b navbar glass-panel ghost-divider sm:px-6">
-        <div className="navbar-start">
-          <label htmlFor="sidebar-drawer" className="mr-2 rounded-lg btn btn-ghost btn-square lg:hidden">
+    <header
+      data-testid="app-topbar"
+      className="app-topbar-shell sticky top-0 z-40 border-b px-3 py-3 sm:px-5"
+    >
+      <div className="flex min-h-14 items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <label
+            htmlFor="sidebar-drawer"
+            className="btn btn-ghost btn-square btn-sm rounded-xl border border-border/70 bg-base-300/45 text-base-content/80 lg:hidden"
+            aria-label="Abrir navegación principal"
+          >
             <Menu className="w-5 h-5" />
           </label>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 border rounded-lg border-accent/20 bg-accent/10 text-accent">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="topbar-signal-icon flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border text-accent">
               <RadioTower className="h-5 w-5 stroke-[1.8]" />
             </div>
-            <div className="leading-tight">
-              <span className="block text-xs uppercase tracking-[0.22em] text-base-content/55">Command Center</span>
-              <span className="block font-semibold text-base-content">Node-RED Control Center</span>
+            <div className="min-w-0 leading-tight">
+              <span className="block text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-base-content/55">Command Center</span>
+              <span className="block truncate text-sm font-semibold text-base-content sm:text-base">Node-RED Control Center</span>
             </div>
           </div>
         </div>
 
-        <div className="gap-2 navbar-end sm:gap-3">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           <UpdateNotificationChip />
           <ThemeToggle />
-          <span className="hidden px-3 py-1 text-xs font-medium border rounded-lg border-border bg-base-300/40 text-base-content/70 xl:inline">
+          <span className="api-status-chip hidden max-w-[18rem] truncate rounded-xl border px-3 py-2 text-xs font-medium text-base-content/70 xl:inline-flex">
             API: {API_URL}
           </span>
         </div>
       </div>
-    </>
+    </header>
   );
 }

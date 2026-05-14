@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { backupService } from './backupService';
 import * as api from '@/shared/lib';
 
-// Mock the api module
-vi.mock('@/services/api', () => ({
+// Mock the api barrel used by backupService
+vi.mock('@/shared/lib', () => ({
   default: {
     get: vi.fn(),
   },
