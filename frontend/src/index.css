@@ -837,7 +837,7 @@ aside.bg-base-100 {
 }
 
 .menu :where(li > a).active {
-  box-shadow: inset 3px 0 0 #d4472b;
+  box-shadow: inset 3px 0 0 var(--color-primary);
 }
 
 [data-theme="corporateLight"] .menu :where(li > a).active,

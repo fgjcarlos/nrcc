@@ -27,7 +27,7 @@ export function Header() {
         <div className="gap-2 navbar-end sm:gap-3">
           <UpdateNotificationChip />
           <ThemeToggle />
-          <span className="hidden px-3 py-1 text-xs font-medium border rounded-lg border-border bg-base-300/40 text-base-content/70 xl:inline">
+          <span className="hidden px-3 py-1 text-xs font-medium border rounded-lg border-border bg-base-300/50 text-base-content/70 xl:inline">
             API: {API_URL}
           </span>
         </div>

@@ -82,7 +82,7 @@ export function Sidebar() {
       )}>
         {(!collapsed || isMobile) && (
           <div className="flex items-center flex-1 gap-3">
-            <div className="grid w-10 h-10 border rounded-lg place-items-center border-primary/25 bg-primary/12 text-primary ">
+            <div className="grid w-10 h-10 border rounded-lg place-items-center border-primary/25 bg-primary/10 text-primary ">
               <Blocks className="w-5 h-5" />
             </div>
             <div>
@@ -93,7 +93,7 @@ export function Sidebar() {
           </div>
         )}
         {collapsed && !isMobile && (
-          <div className="grid w-10 h-10 border rounded-lg place-items-center border-primary/25 bg-primary/12 text-primary">
+          <div className="grid w-10 h-10 border rounded-lg place-items-center border-primary/25 bg-primary/10 text-primary">
             <Box className="w-5 h-5" />
           </div>
         )}
