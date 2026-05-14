@@ -9,10 +9,50 @@ export default {
   ],
   theme: {
     extend: {
-      boxShadow: {
-        'glow': '0 24px 60px rgba(0, 0, 0, 0.42), 0 0 0 1px rgba(148, 163, 184, 0.08)',
-        'glow-light': '0 24px 48px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(15, 23, 42, 0.04)',
+      colors: {
+        // Brand (Signal Prime Red)
+        'ds-brand-primary': '#d4472b',
+        'ds-brand-hover': '#f05a3d',
+        'ds-brand-dim': '#8f2f1f',
+
+        // Accent (Signal Prime Cyan)
+        'ds-accent-primary': '#0089b4',
+        'ds-accent-hover': '#22b4df',
+        'ds-accent-dim': '#075a73',
+
+        // Backgrounds (Dark Mode)
+        'ds-bg-void': '#07090d',
+        'ds-bg-base': '#0f1419',
+        'ds-bg-surface': '#141b23',
+        'ds-bg-elevated': '#1a2332',
+        'ds-bg-overlay': '#223044',
+
+        // Borders (Dark Mode)
+        'ds-border-subtle': '#263241',
+        'ds-border-default': '#39485c',
+        'ds-border-strong': '#4a5f7c',
+
+        // Text (Dark Mode)
+        'ds-text-primary': '#f5f7fa',
+        'ds-text-secondary': '#d8dee8',
+        'ds-text-tertiary': '#9aa7b8',
+        'ds-text-muted': '#6f7d90',
+
+        // Semantic Signals
+        'ds-success': '#16a36a',
+        'ds-warning': '#e8a811',
+        'ds-danger': '#e54233',
+        'ds-info': '#2c9edb',
       },
+      fontFamily: {
+         sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+         mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+       },
+      boxShadow: {
+         'glow': '0 24px 60px rgba(0, 0, 0, 0.42), 0 0 0 1px rgba(148, 163, 184, 0.08)',
+         'glow-light': '0 24px 48px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(15, 23, 42, 0.04)',
+         'glow-warning': '0 12px 30px rgba(224, 123, 32, 0.28), inset 0 1px rgba(255, 255, 255, 0.18)',
+       },
     },
   },
   plugins: [daisyui],
@@ -20,63 +60,64 @@ export default {
     themes: [
       {
         // ══════════════════════════════════════════════════════════
-        // DARK MODE — "Signal Console" (dark-first operations UI)
+        // DARK MODE — "Signal Prime Dark" (dark-first operations UI)
         // ══════════════════════════════════════════════════════════
         corporateDark: {
-          "primary": "#ff3b30",
+          "primary": "#d4472b",
           "primary-content": "#ffffff",
-          "primary-container": "#4f1110",
-          "on-primary-container": "#fff1f0",
 
-          "secondary": "#10242a",
-          "secondary-content": "#dff7f3",
+          "secondary": "#141b23",
+          "secondary-content": "#d8dee8",
 
-          "accent": "#38bdf8",
-          "accent-content": "#041016",
+          "accent": "#0089b4",
+          "accent-content": "#f5f7fa",
 
-          "base-100": "#06080a",
-          "base-200": "#0c1116",
-          "base-300": "#151c24",
-          "base-content": "#eef4f8",
+          "neutral": "#1a2332",
+          "neutral-content": "#f5f7fa",
 
-          "success": "#2dd4bf",
-          "success-content": "#031312",
-          "warning": "#fbbf24",
-          "warning-content": "#1f1300",
-          "error": "#ff3b30",
+          "base-100": "#07090d",
+          "base-200": "#0f1419",
+          "base-300": "#141b23",
+          "base-content": "#f5f7fa",
+
+          "info": "#2c9edb",
+          "info-content": "#ffffff",
+          "success": "#16a36a",
+          "success-content": "#ffffff",
+          "warning": "#e8a811",
+          "warning-content": "#07090d",
+          "error": "#e54233",
           "error-content": "#ffffff",
-          "info": "#38bdf8",
-          "info-content": "#041016",
         },
         // ══════════════════════════════════════════════════════════
-        // LIGHT MODE — "Signal Light"
-        // Light companion for the same dark-first palette
+        // LIGHT MODE — "Signal Prime Light"
         // ══════════════════════════════════════════════════════════
         corporateLight: {
-          "primary": "#d92d20",
+          "primary": "#bd3f27",
           "primary-content": "#ffffff",
-          "primary-container": "#fff1f0",
-          "on-primary-container": "#4f1110",
 
-          "secondary": "#e4f4f1",
-          "secondary-content": "#0f3d3a",
+          "secondary": "#eef3f7",
+          "secondary-content": "#263241",
 
-          "accent": "#0369a1",
+          "accent": "#007aa0",
           "accent-content": "#ffffff",
 
-          "base-100": "#f7f9fb",
-          "base-200": "#edf2f6",
-          "base-300": "#dce5ec",
-          "base-content": "#111827",
+          "neutral": "#536173",
+          "neutral-content": "#f6f7f9",
 
-          "success": "#0f766e",
-          "success-content": "#ffffff",
-          "warning": "#b45309",
-          "warning-content": "#ffffff",
-          "error": "#d92d20",
-          "error-content": "#ffffff",
-          "info": "#0284c7",
+          "base-100": "#f6f7f9",
+          "base-200": "#edf1f5",
+          "base-300": "#ffffff",
+          "base-content": "#10151c",
+
+          "info": "#1679b7",
           "info-content": "#ffffff",
+          "success": "#0f8f5f",
+          "success-content": "#ffffff",
+          "warning": "#c98905",
+          "warning-content": "#10151c",
+          "error": "#c93429",
+          "error-content": "#ffffff",
         },
       },
     ],

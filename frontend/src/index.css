@@ -19,35 +19,52 @@
      Custom themes must declare them explicitly here.
      ══════════════════════════════════════════════════════════════ */
 
-  /* ── Dark Mode (corporateDark) ───────────────────────────── */
-  [data-theme="corporateDark"] {
-    color-scheme: dark;
+   /* ── Dark Mode (corporateDark) ───────────────────────────── */
+   [data-theme="corporateDark"] {
+     color-scheme: dark;
 
-    --color-base-100:          #06080a;
-    --color-base-200:          #0c1116;
-    --color-base-300:          #151c24;
-    --color-base-content:      #eef4f8;
+     /* Signal Prime Dark Tokens */
+     --color-base-100:          #07090d;
+     --color-base-200:          #0f1419;
+     --color-base-300:          #141b23;
+     --color-base-content:      #f5f7fa;
 
-    --color-primary:           #ff3b30;
-    --color-primary-content:   #ffffff;
+     --color-primary:           #d4472b;
+     --color-primary-content:   #ffffff;
 
-    --color-secondary:         #10242a;
-    --color-secondary-content: #dff7f3;
+     --color-secondary:         #141b23;
+     --color-secondary-content: #d8dee8;
 
-    --color-accent:            #38bdf8;
-    --color-accent-content:    #041016;
+     --color-accent:            #0089b4;
+     --color-accent-content:    #f5f7fa;
 
-    --color-neutral:           #1a242d;
-    --color-neutral-content:   #eef4f8;
+     --color-neutral:           #1a2332;
+     --color-neutral-content:   #f5f7fa;
 
-    --color-info:              #38bdf8;
-    --color-info-content:      #041016;
-    --color-success:           #2dd4bf;
-    --color-success-content:   #031312;
-    --color-warning:           #fbbf24;
-    --color-warning-content:   #1f1300;
-    --color-error:             #ff3b30;
-    --color-error-content:     #ffffff;
+     --color-info:              #0089b4;
+     --color-info-content:      #ffffff;
+     --color-success:           #16a36a;
+     --color-success-content:   #ffffff;
+     --color-warning:           #e8a811;
+     --color-warning-content:   #07090d;
+     --color-error:             #e54233;
+     --color-error-content:     #ffffff;
+
+     /* Signal Prime Dark Custom Tokens */
+     --ds-bg-void:              #07090d;
+     --ds-bg-base:              #0f1419;
+     --ds-bg-surface:           #141b23;
+     --ds-bg-elevated:          #1a2332;
+     --ds-bg-overlay:           #223044;
+     --ds-border-subtle:        #1a2332;
+     --ds-border-default:       #263241;
+     --ds-border-strong:        #39485c;
+     --ds-text-primary:         #f5f7fa;
+     --ds-text-secondary:       #d8dee8;
+     --ds-text-muted:           #6f7d90;
+
+     /* Button Hover State Tokens */
+     --ds-brand-hover:          #f05a3d;
 
     --radius-selector: .375rem;
     --radius-field:    .25rem;
@@ -59,48 +76,64 @@
     --noise:           0;
   }
 
-  [data-theme="corporateDark"] body {
-    background-color: var(--color-base-100);
-    color: var(--color-base-content);
-    -webkit-font-smoothing: antialiased;
+   [data-theme="corporateDark"] body {
+     background-color: var(--color-base-100);
+     color: var(--color-base-content);
+     font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+     -webkit-font-smoothing: antialiased;
     background-image:
-      linear-gradient(90deg, rgba(56, 189, 248, 0.04) 1px, transparent 1px),
-      linear-gradient(180deg, rgba(56, 189, 248, 0.03) 1px, transparent 1px),
-      radial-gradient(circle at 8% 0%, rgba(255, 59, 48, 0.12), transparent 28%),
-      radial-gradient(circle at 92% 12%, rgba(45, 212, 191, 0.08), transparent 26%),
-      linear-gradient(180deg, #0a0d10 0%, #06080a 48%, #040607 100%);
-    background-size: 44px 44px, 44px 44px, auto, auto, auto;
+      radial-gradient(circle at top left, color-mix(in srgb, #d4472b 22%, transparent), transparent 34rem),
+      radial-gradient(circle at top right, color-mix(in srgb, #0089b4 24%, transparent), transparent 32rem),
+      linear-gradient(180deg, #07090d 0%, #07090d 100%);
+    background-size: auto, auto, auto;
   }
 
-  /* ── Light Mode (corporateLight) ─────────────────────────── */
-  [data-theme="corporateLight"] {
-    color-scheme: light;
+   /* ── Light Mode (corporateLight) ─────────────────────────── */
+   [data-theme="corporateLight"] {
+     color-scheme: light;
 
-    --color-base-100:          #f7f9fb;
-    --color-base-200:          #edf2f6;
-    --color-base-300:          #dce5ec;
-    --color-base-content:      #111827;
+     /* Signal Prime Light Tokens */
+     --color-base-100:          #f6f7f9;
+     --color-base-200:          #edf1f5;
+     --color-base-300:          #eef3f7;
+     --color-base-content:      #10151c;
 
-    --color-primary:           #d92d20;
-    --color-primary-content:   #ffffff;
+     --color-primary:           #bd3f27;
+     --color-primary-content:   #ffffff;
 
-    --color-secondary:         #e4f4f1;
-    --color-secondary-content: #0f3d3a;
+     --color-secondary:         #eef3f7;
+     --color-secondary-content: #263241;
 
-    --color-accent:            #0369a1;
-    --color-accent-content:    #ffffff;
+     --color-accent:            #007aa0;
+     --color-accent-content:    #ffffff;
 
-    --color-neutral:           #334155;
-    --color-neutral-content:   #f8fafc;
+     --color-neutral:           #536173;
+     --color-neutral-content:   #f6f7f9;
 
-    --color-info:              #0284c7;
-    --color-info-content:      #ffffff;
-    --color-success:           #0f766e;
-    --color-success-content:   #ffffff;
-    --color-warning:           #b45309;
-    --color-warning-content:   #ffffff;
-    --color-error:             #d92d20;
-    --color-error-content:     #ffffff;
+     --color-info:              #1679b7;
+     --color-info-content:      #ffffff;
+     --color-success:           #0f8f5f;
+     --color-success-content:   #ffffff;
+     --color-warning:           #c98905;
+     --color-warning-content:   #10151c;
+     --color-error:             #c93429;
+     --color-error-content:     #ffffff;
+
+     /* Signal Prime Light Custom Tokens */
+     --ds-bg-void:              #f6f7f9;
+     --ds-bg-base:              #edf1f5;
+     --ds-bg-surface:           #ffffff;
+     --ds-bg-elevated:          #f9fafb;
+     --ds-bg-overlay:           #f0f4fb;
+     --ds-border-subtle:        #d8e0ea;
+     --ds-border-default:       #d8e0ea;
+     --ds-border-strong:        #b7c3d1;
+     --ds-text-primary:         #10151c;
+     --ds-text-secondary:       #263241;
+     --ds-text-muted:           #6f7d90;
+
+     /* Button Hover State Tokens */
+     --ds-brand-hover:          #d4472b;
 
     --radius-selector: .5rem;
     --radius-field:    .25rem;
@@ -112,17 +145,16 @@
     --noise:           0;
   }
 
-  [data-theme="corporateLight"] body {
-    background-color: var(--color-base-100);
-    color: var(--color-base-content);
-    -webkit-font-smoothing: antialiased;
+   [data-theme="corporateLight"] body {
+     background-color: var(--color-base-100);
+     color: var(--color-base-content);
+     font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+     -webkit-font-smoothing: antialiased;
     background-image:
-      linear-gradient(90deg, rgba(15, 23, 42, 0.035) 1px, transparent 1px),
-      linear-gradient(180deg, rgba(15, 23, 42, 0.03) 1px, transparent 1px),
-      radial-gradient(circle at 8% 0%, rgba(217, 45, 32, 0.08), transparent 28%),
-      radial-gradient(circle at 92% 12%, rgba(15, 118, 110, 0.07), transparent 26%),
-      linear-gradient(180deg, #fbfcfd 0%, #f7f9fb 48%, #edf2f6 100%);
-    background-size: 44px 44px, 44px 44px, auto, auto, auto;
+      radial-gradient(circle at top left, color-mix(in srgb, #bd3f27 22%, transparent), transparent 34rem),
+      radial-gradient(circle at top right, color-mix(in srgb, #007aa0 24%, transparent), transparent 32rem),
+      linear-gradient(180deg, #f6f7f9 0%, #f6f7f9 100%);
+    background-size: auto, auto, auto;
   }
 }
 
@@ -135,31 +167,31 @@
   /* ── App Shell ───────────────────────────────────────────── */
   [data-theme="corporateDark"] .app-shell {
     background:
-      radial-gradient(circle at top left, rgba(255, 59, 48, 0.08), transparent 24%),
-      radial-gradient(circle at top right, rgba(56, 189, 248, 0.07), transparent 22%),
-      linear-gradient(180deg, rgba(6, 8, 10, 0.16), rgba(6, 8, 10, 0.92));
+      radial-gradient(circle at top left, color-mix(in srgb, #d4472b 22%, transparent), transparent 34rem),
+      radial-gradient(circle at top right, color-mix(in srgb, #0089b4 24%, transparent), transparent 32rem),
+      var(--color-base-100);
   }
 
   [data-theme="corporateLight"] .app-shell {
     background:
-      radial-gradient(circle at top left, rgba(217, 45, 32, 0.06), transparent 24%),
-      radial-gradient(circle at top right, rgba(3, 105, 161, 0.06), transparent 22%),
-      linear-gradient(180deg, rgba(247, 249, 251, 0.84), rgba(237, 242, 246, 0.96));
+      radial-gradient(circle at top left, color-mix(in srgb, #bd3f27 22%, transparent), transparent 34rem),
+      radial-gradient(circle at top right, color-mix(in srgb, #007aa0 24%, transparent), transparent 32rem),
+      var(--color-base-100);
   }
 
   /* ── Glass Panel (Glassmorphism) ─────────────────────────── */
   [data-theme="corporateDark"] .glass-panel {
     @apply shadow-glow;
-    background: linear-gradient(180deg, rgba(21, 28, 36, 0.78), rgba(12, 17, 22, 0.68));
-    border-color: rgba(148, 163, 184, 0.16);
+    background: linear-gradient(180deg, var(--ds-bg-elevated), var(--ds-bg-surface));
+    border: 1px solid var(--ds-border-default);
     backdrop-filter: blur(18px) saturate(140%);
     -webkit-backdrop-filter: blur(18px) saturate(140%);
   }
 
   [data-theme="corporateLight"] .glass-panel {
     @apply shadow-glow-light;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(247, 249, 251, 0.78));
-    border-color: rgba(15, 23, 42, 0.08);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(249, 250, 251, 0.92));
+    border: 1px solid var(--ds-border-default);
     backdrop-filter: blur(14px) saturate(140%);
     -webkit-backdrop-filter: blur(14px) saturate(140%);
   }
@@ -167,51 +199,51 @@
   /* ── Surface Panel ──────────────────────────────────────── */
   [data-theme="corporateDark"] .surface-panel {
     @apply rounded-lg shadow-glow;
-    background: linear-gradient(180deg, rgba(21, 28, 36, 0.92), rgba(12, 17, 22, 0.9));
-    border: 1px solid rgba(148, 163, 184, 0.14);
+    background: linear-gradient(180deg, var(--ds-bg-elevated), var(--ds-bg-surface));
+    border: 1px solid var(--ds-border-default);
   }
 
   [data-theme="corporateLight"] .surface-panel {
     @apply rounded-lg shadow-glow-light;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 249, 251, 0.94));
-    border: 1px solid rgba(15, 23, 42, 0.08);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(249, 250, 251, 0.94));
+    border: 1px solid var(--ds-border-default);
   }
 
   /* ── Surface Card ───────────────────────────────────────── */
   [data-theme="corporateDark"] .surface-card {
     @apply rounded-lg shadow-glow;
-    background: linear-gradient(180deg, rgba(21, 28, 36, 0.78), rgba(9, 13, 17, 0.78));
-    border: 1px solid rgba(148, 163, 184, 0.13);
+    background: linear-gradient(180deg, var(--ds-bg-elevated), var(--ds-bg-surface));
+    border: 1px solid var(--ds-border-default);
   }
 
   [data-theme="corporateLight"] .surface-card {
     @apply rounded-lg shadow-glow-light;
     background: rgba(255, 255, 255, 0.9);
-    border: 1px solid rgba(15, 23, 42, 0.08);
+    border: 1px solid var(--ds-border-default);
   }
 
   /* ── Auth Shell ─────────────────────────────────────────── */
   [data-theme="corporateDark"] .auth-shell {
     background:
-      radial-gradient(circle at top, rgba(255, 59, 48, 0.12), transparent 32%),
-      radial-gradient(circle at 80% 10%, rgba(56, 189, 248, 0.08), transparent 28%),
-      linear-gradient(180deg, rgba(6, 8, 10, 0.92), rgba(4, 6, 7, 0.98));
+      radial-gradient(circle at top, color-mix(in srgb, #d4472b 22%, transparent), transparent 32rem),
+      radial-gradient(circle at 80% 10%, color-mix(in srgb, #0089b4 24%, transparent), transparent 28rem),
+      var(--color-base-100);
   }
 
   [data-theme="corporateLight"] .auth-shell {
     background:
-      radial-gradient(circle at top, rgba(217, 45, 32, 0.08), transparent 32%),
-      radial-gradient(circle at 80% 10%, rgba(3, 105, 161, 0.08), transparent 28%),
-      linear-gradient(180deg, rgba(251, 252, 253, 0.95), rgba(237, 242, 246, 0.98));
+      radial-gradient(circle at top, color-mix(in srgb, #bd3f27 22%, transparent), transparent 32rem),
+      radial-gradient(circle at 80% 10%, color-mix(in srgb, #007aa0 24%, transparent), transparent 28rem),
+      var(--color-base-100);
   }
 
   /* ── Ghost Divider ──────────────────────────────────────── */
   .ghost-divider {
-    border-color: rgba(148, 163, 184, 0.16);
+    border-color: var(--ds-border-default);
   }
 
   [data-theme="corporateLight"] .ghost-divider {
-    border-color: rgba(15, 23, 42, 0.08);
+    border-color: var(--ds-border-default);
   }
 
   /* ═══════════════════════════════════════════════════════════════
@@ -238,19 +270,19 @@
   }
 
   [data-theme="corporateDark"] .action-btn-primary {
-    border: 1px solid rgba(255, 59, 48, 0.32);
+    border: 1px solid color-mix(in srgb, #d4472b 35%, transparent);
   }
 
   [data-theme="corporateDark"] .action-btn-primary:hover {
-    background-color: rgba(255, 59, 48, 0.14);
+    background-color: color-mix(in srgb, #d4472b 14%, transparent);
   }
 
   [data-theme="corporateLight"] .action-btn-primary {
-    border: 1px solid rgba(217, 45, 32, 0.18);
+    border: 1px solid color-mix(in srgb, #bd3f27 35%, transparent);
   }
 
   [data-theme="corporateLight"] .action-btn-primary:hover {
-    background-color: rgba(217, 45, 32, 0.08);
+    background-color: color-mix(in srgb, #bd3f27 10%, transparent);
   }
 
   .action-btn-secondary {
@@ -258,19 +290,19 @@
   }
 
   [data-theme="corporateDark"] .action-btn-secondary {
-    border: 1px solid rgba(148, 163, 184, 0.18);
+    border: 1px solid var(--ds-border-strong);
   }
 
   [data-theme="corporateDark"] .action-btn-secondary:hover {
-    background-color: rgba(56, 189, 248, 0.08);
+    background-color: color-mix(in srgb, #0089b4 14%, transparent);
   }
 
   [data-theme="corporateLight"] .action-btn-secondary {
-    border: 1px solid rgba(15, 23, 42, 0.1);
+    border: 1px solid var(--ds-border-default);
   }
 
   [data-theme="corporateLight"] .action-btn-secondary:hover {
-    background-color: rgba(3, 105, 161, 0.06);
+    background-color: color-mix(in srgb, #007aa0 10%, transparent);
   }
 
   .action-btn-danger {
@@ -278,19 +310,19 @@
   }
 
   [data-theme="corporateDark"] .action-btn-danger {
-    border: 1px solid rgba(255, 59, 48, 0.32);
+    border: 1px solid color-mix(in srgb, #e54233 35%, transparent);
   }
 
   [data-theme="corporateDark"] .action-btn-danger:hover {
-    background-color: rgba(255, 59, 48, 0.12);
+    background-color: color-mix(in srgb, #e54233 14%, transparent);
   }
 
   [data-theme="corporateLight"] .action-btn-danger {
-    border: 1px solid rgba(217, 45, 32, 0.22);
+    border: 1px solid color-mix(in srgb, #c93429 35%, transparent);
   }
 
   [data-theme="corporateLight"] .action-btn-danger:hover {
-    background-color: rgba(217, 45, 32, 0.07);
+    background-color: color-mix(in srgb, #c93429 10%, transparent);
   }
 
   .action-btn-ghost {
@@ -302,7 +334,7 @@
   }
 
   [data-theme="corporateDark"] .action-btn-ghost:hover {
-    background-color: rgba(148, 163, 184, 0.08);
+    background-color: color-mix(in srgb, var(--ds-text-muted) 10%, transparent);
   }
 
   [data-theme="corporateLight"] .action-btn-ghost {
@@ -310,7 +342,7 @@
   }
 
   [data-theme="corporateLight"] .action-btn-ghost:hover {
-    background-color: rgba(15, 23, 42, 0.04);
+    background-color: color-mix(in srgb, var(--ds-text-muted) 6%, transparent);
   }
 
   /* ── Table Row Hover ───────────────────────────────────────── */
@@ -319,11 +351,11 @@
   }
 
   [data-theme="corporateDark"] .table-row-hover:hover {
-    background-color: rgba(56, 189, 248, 0.06);
+    background-color: color-mix(in srgb, #0089b4 6%, transparent);
   }
 
   [data-theme="corporateLight"] .table-row-hover:hover {
-    background-color: rgba(3, 105, 161, 0.05);
+    background-color: color-mix(in srgb, #007aa0 4%, transparent);
   }
 
   /* ── Table Header Subtle ───────────────────────────────────── */
@@ -332,11 +364,11 @@
   }
 
   [data-theme="corporateDark"] .table-header-subtle {
-    background-color: rgba(148, 163, 184, 0.06);
+    background-color: color-mix(in srgb, var(--ds-text-muted) 6%, transparent);
   }
 
   [data-theme="corporateLight"] .table-header-subtle {
-    background-color: rgba(15, 23, 42, 0.03);
+    background-color: color-mix(in srgb, var(--ds-text-muted) 3%, transparent);
   }
 
   /* ── Skeleton Line ─────────────────────────────────────────── */
@@ -345,11 +377,11 @@
   }
 
   [data-theme="corporateDark"] .skeleton-dark {
-    background-color: rgba(148, 163, 184, 0.1);
+    background-color: color-mix(in srgb, var(--ds-text-muted) 10%, transparent);
   }
 
   [data-theme="corporateLight"] .skeleton-dark {
-    background-color: rgba(15, 23, 42, 0.06);
+    background-color: color-mix(in srgb, var(--ds-text-muted) 6%, transparent);
   }
 
   /* ── Modal Inner Panel (ConfirmationDialog) ────────────────── */
@@ -358,11 +390,11 @@
   }
 
   [data-theme="corporateDark"] .modal-inner {
-    background-color: rgba(148, 163, 184, 0.05);
+    background-color: color-mix(in srgb, var(--ds-text-muted) 5%, transparent);
   }
 
   [data-theme="corporateLight"] .modal-inner {
-    background-color: rgba(15, 23, 42, 0.03);
+    background-color: color-mix(in srgb, var(--ds-text-muted) 3%, transparent);
   }
 
   /* ── Code Block Background ─────────────────────────────────── */
@@ -371,11 +403,11 @@
   }
 
   [data-theme="corporateDark"] .code-block-bg {
-    background-color: rgba(3, 7, 10, 0.62);
+    background-color: color-mix(in srgb, var(--ds-bg-surface) 62%, transparent);
   }
 
   [data-theme="corporateLight"] .code-block-bg {
-    background-color: rgba(15, 23, 42, 0.04);
+    background-color: color-mix(in srgb, var(--ds-text-muted) 4%, transparent);
   }
 
   /* ── Image Overlay (ImageUpload hover) ─────────────────────── */
@@ -401,7 +433,7 @@
   }
 
   [data-theme="corporateDark"] .image-overlay-btn:hover {
-    background-color: rgba(56, 189, 248, 0.18);
+    background-color: rgba(0, 200, 180, 0.18);
   }
 
   [data-theme="corporateLight"] .image-overlay-btn {
@@ -415,27 +447,27 @@
 
   /* ── StatusStrip Theme-Aware Shadows ───────────────────────── */
   [data-theme="corporateDark"] .status-strip-success {
-    box-shadow: 0 0 12px rgba(45, 212, 191, 0.32);
+    box-shadow: 0 0 12px color-mix(in srgb, #16a36a 32%, transparent);
   }
 
   [data-theme="corporateLight"] .status-strip-success {
-    box-shadow: 0 0 12px rgba(15, 118, 110, 0.24);
+    box-shadow: 0 0 12px color-mix(in srgb, #0f8f5f 24%, transparent);
   }
 
   [data-theme="corporateDark"] .status-strip-error {
-    box-shadow: 0 0 12px rgba(255, 59, 48, 0.32);
+    box-shadow: 0 0 12px color-mix(in srgb, #e54233 32%, transparent);
   }
 
   [data-theme="corporateLight"] .status-strip-error {
-    box-shadow: 0 0 12px rgba(217, 45, 32, 0.24);
+    box-shadow: 0 0 12px color-mix(in srgb, #c93429 24%, transparent);
   }
 
   [data-theme="corporateDark"] .status-strip-warning {
-    box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+    box-shadow: 0 0 8px color-mix(in srgb, #e8a811 40%, transparent);
   }
 
   [data-theme="corporateLight"] .status-strip-warning {
-    box-shadow: 0 0 8px rgba(217, 119, 6, 0.3);
+    box-shadow: 0 0 8px color-mix(in srgb, #c98905 30%, transparent);
   }
 }
 
@@ -466,13 +498,12 @@
     line-height: 1.6;
   }
 
-  /* DESIGN_oscuro.md: on_surface_variant #c6c6cd */
   [data-theme="corporateDark"] .text-body-secondary {
-    color: #9aa8b5;
+    color: var(--ds-text-muted);
   }
 
   [data-theme="corporateLight"] .text-body-secondary {
-    color: rgba(17, 24, 39, 0.62);
+    color: var(--ds-text-muted);
   }
 
   .text-label {
@@ -485,48 +516,48 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   BUTTON OVERRIDES — Theme-aware
+   BUTTON OVERRIDES — Theme-aware Signal Prime
    ═══════════════════════════════════════════════════════════════ */
 
-/* ── DARK: Primary (red solid, no gradient) ────────────────── */
+/* ── DARK: Primary (Signal Prime red) ──────────────────────────── */
 [data-theme="corporateDark"] .btn-primary {
   @apply border-0 text-white font-semibold;
-  background: linear-gradient(180deg, #ff4b40, #d92d20);
-  box-shadow: 0 12px 30px rgba(255, 59, 48, 0.28), inset 0 1px rgba(255, 255, 255, 0.18);
+  background: var(--color-primary);
+  box-shadow: 0 14px 40px color-mix(in srgb, var(--color-primary) 32%, transparent);
 }
 
 [data-theme="corporateDark"] .btn-primary:hover {
-  background: linear-gradient(180deg, #ff5c52, #b42318);
+  background: var(--ds-brand-hover);
 }
 
-/* ── LIGHT: Primary (red solid) ───────────────────────────── */
+/* ── LIGHT: Primary (Signal Prime red) ─────────────────────────── */
 [data-theme="corporateLight"] .btn-primary {
   @apply border-0 text-white font-semibold;
-  background: linear-gradient(180deg, #e5483d, #b42318);
-  box-shadow: 0 12px 24px rgba(217, 45, 32, 0.18);
+  background: #bd3f27;
+  box-shadow: 0 12px 24px color-mix(in srgb, #bd3f27 24%, transparent);
 }
 
 [data-theme="corporateLight"] .btn-primary:hover {
-  background: linear-gradient(180deg, #d92d20, #991b1b);
+  background: var(--ds-brand-hover);
 }
 
 /* ── Secondary: Ghost border ───────────────────────────────── */
 [data-theme="corporateDark"] .btn-secondary {
   @apply bg-transparent text-base-content;
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  border: 1px solid var(--ds-border-strong);
 }
 
 [data-theme="corporateDark"] .btn-secondary:hover {
-  background-color: rgba(56, 189, 248, 0.08);
+  background-color: color-mix(in srgb, #0089b4 8%, transparent);
 }
 
 [data-theme="corporateLight"] .btn-secondary {
   @apply bg-transparent text-base-content;
-  border: 1px solid rgba(15, 23, 42, 0.12);
+  border: 1px solid var(--ds-border-default);
 }
 
 [data-theme="corporateLight"] .btn-secondary:hover {
-  background-color: rgba(3, 105, 161, 0.06);
+  background-color: color-mix(in srgb, #007aa0 6%, transparent);
 }
 
 /* ── Tertiary: Text-only accent ────────────────────────────── */
@@ -536,7 +567,7 @@
 }
 
 [data-theme="corporateDark"] .btn-tertiary:hover {
-  background-color: rgba(56, 189, 248, 0.08);
+  background-color: color-mix(in srgb, #0089b4 8%, transparent);
 }
 
 [data-theme="corporateLight"] .btn-tertiary {
@@ -545,93 +576,94 @@
 }
 
 [data-theme="corporateLight"] .btn-tertiary:hover {
-  background-color: rgba(3, 105, 161, 0.06);
+  background-color: color-mix(in srgb, #007aa0 6%, transparent);
 }
 
 /* ── Ghost hover ───────────────────────────────────────────── */
 [data-theme="corporateDark"] .btn-ghost:hover {
-  background-color: rgba(148, 163, 184, 0.1);
+  background-color: color-mix(in srgb, var(--ds-text-muted) 8%, transparent);
 }
 
 [data-theme="corporateLight"] .btn-ghost:hover {
-  background-color: rgba(15, 23, 42, 0.05);
+  background-color: color-mix(in srgb, var(--ds-text-muted) 4%, transparent);
 }
 
-/* ── Success: Semantic success/positive action (teal) ────────── */
-/* ── Success: Semantic success action (teal) ─────────────────── */
+/* ── Success: Semantic success/positive action ────────── */
 [data-theme="corporateDark"] .btn-success {
-  @apply border-0 text-teal-50 font-medium;
-  background-color: rgba(45, 212, 191, 0.28);
+  @apply border-0 text-white font-medium;
+  background-color: color-mix(in srgb, #16a36a 28%, transparent);
 }
 
 [data-theme="corporateDark"] .btn-success:hover:not(:disabled) {
-  background-color: rgba(45, 212, 191, 0.40);
+  background-color: color-mix(in srgb, #16a36a 40%, transparent);
 }
 
 [data-theme="corporateLight"] .btn-success {
   @apply border-0 text-white font-medium;
-  background-color: rgba(15, 118, 110, 0.88);
+  background-color: #0f8f5f;
 }
 
 [data-theme="corporateLight"] .btn-success:hover:not(:disabled) {
-  background-color: rgba(15, 118, 110, 1);
+  background-color: #0d7a52;
 }
 
-/* ── Warning: Semantic warning/caution action (amber) ────────── */
+/* ── Warning: Semantic warning/caution action ────────── */
 [data-theme="corporateDark"] .btn-warning {
-  @apply border-0 text-amber-950 font-medium;
-  background-color: rgba(251, 191, 36, 0.32);
+  @apply border-0 font-medium;
+  color: var(--ds-text-primary);
+  background-color: color-mix(in srgb, #e8a811 32%, transparent);
 }
 
 [data-theme="corporateDark"] .btn-warning:hover:not(:disabled) {
-  background-color: rgba(251, 191, 36, 0.44);
+  background-color: color-mix(in srgb, #e8a811 44%, transparent);
 }
 
 [data-theme="corporateLight"] .btn-warning {
-  @apply border-0 text-white font-medium;
-  background-color: rgba(180, 83, 9, 0.88);
+  @apply border-0 font-medium;
+  color: var(--color-warning-content); /* #10151c — dark text on amber: 6.16:1 */
+  background-color: #c98905;
 }
 
 [data-theme="corporateLight"] .btn-warning:hover:not(:disabled) {
-  background-color: rgba(146, 64, 14, 1);
+  background-color: #b07804;
 }
 
-/* ── Error: Semantic error/destructive action (red) ──────────── */
+/* ── Error: Semantic error/destructive action ────────── */
 [data-theme="corporateDark"] .btn-error {
-  @apply border-0 text-red-50 font-medium;
-  background-color: rgba(255, 59, 48, 0.28);
+  @apply border-0 text-white font-medium;
+  background-color: color-mix(in srgb, #e54233 28%, transparent);
 }
 
 [data-theme="corporateDark"] .btn-error:hover:not(:disabled) {
-  background-color: rgba(255, 59, 48, 0.40);
+  background-color: color-mix(in srgb, #e54233 40%, transparent);
 }
 
 [data-theme="corporateLight"] .btn-error {
   @apply border-0 text-white font-medium;
-  background-color: rgba(185, 28, 28, 0.88);
+  background-color: #c93429;
 }
 
 [data-theme="corporateLight"] .btn-error:hover:not(:disabled) {
-  background-color: rgba(153, 27, 27, 1);
+  background-color: #a52922;
 }
 
-/* ── Info: Semantic info action (sky blue) ────────────────────── */
+/* ── Info: Semantic info action ──────────────────────── */
 [data-theme="corporateDark"] .btn-info {
-  @apply border-0 text-sky-50 font-medium;
-  background-color: rgba(56, 189, 248, 0.28);
+  @apply border-0 text-white font-medium;
+  background-color: color-mix(in srgb, #0089b4 28%, transparent);
 }
 
 [data-theme="corporateDark"] .btn-info:hover:not(:disabled) {
-  background-color: rgba(56, 189, 248, 0.40);
+  background-color: color-mix(in srgb, #0089b4 40%, transparent);
 }
 
 [data-theme="corporateLight"] .btn-info {
   @apply border-0 text-white font-medium;
-  background-color: rgba(2, 132, 199, 0.88);
+  background-color: #1679b7;
 }
 
 [data-theme="corporateLight"] .btn-info:hover:not(:disabled) {
-  background-color: rgba(3, 102, 214, 1);
+  background-color: #135e99;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -675,13 +707,13 @@
 
 /* ── Secondary button: Clean hover state ────────────────────── */
 [data-theme="corporateDark"] .btn-secondary:hover:not(:disabled) {
-  background-color: rgba(56, 189, 248, 0.08);
-  border-color: rgba(56, 189, 248, 0.3);
+  background-color: color-mix(in srgb, #0089b4 8%, transparent);
+  border-color: color-mix(in srgb, #0089b4 30%, transparent);
 }
 
 [data-theme="corporateLight"] .btn-secondary:hover:not(:disabled) {
-  background-color: rgba(3, 105, 161, 0.06);
-  border-color: rgba(3, 105, 161, 0.3);
+  background-color: color-mix(in srgb, #007aa0 6%, transparent);
+  border-color: color-mix(in srgb, #007aa0 30%, transparent);
 }
 
 /* Secondary: Focus state */
@@ -748,31 +780,44 @@
 /* .border-border, .border-base-300 */
 .border-border,
 .border-base-300 {
-  border-color: rgba(148, 163, 184, 0.14) !important;
+  border-color: var(--ds-border-default) !important;
 }
 
 [data-theme="corporateLight"] .border-border,
 [data-theme="corporateLight"] .border-base-300 {
-  border-color: rgba(15, 23, 42, 0.08) !important;
+  border-color: var(--ds-border-default) !important;
 }
 
 /* .text-base-content — handled natively by daisyUI CSS variables (--bc).
    Do NOT override here; manual !important rules break the variable system. */
 
 
-/* Navbar, sidebar, card — dark */
+/* Navbar, sidebar — dark */
 .navbar,
-aside.bg-base-100,
-.card {
-  background-color: rgba(12, 17, 22, 0.86) !important;
-  border-color: rgba(148, 163, 184, 0.14) !important;
+aside.bg-base-100 {
+  background-color: color-mix(in srgb, var(--ds-bg-surface) 86%, transparent) !important;
+  border-color: var(--ds-border-default) !important;
 }
 
 [data-theme="corporateLight"] .navbar,
-[data-theme="corporateLight"] aside.bg-base-100,
+[data-theme="corporateLight"] aside.bg-base-100 {
+  background-color: color-mix(in srgb, white 95%, transparent) !important;
+  border-color: var(--ds-border-default) !important;
+}
+
+/* ── Card with Signal Prime styling (theme-aware) ────────────── */
+[data-theme="corporateDark"] .card {
+  @apply rounded-lg;
+  background: linear-gradient(180deg, var(--ds-bg-elevated), var(--ds-bg-surface));
+  border: 1px solid var(--ds-border-default) !important;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28), 0 0 0 1px color-mix(in srgb, var(--ds-border-default) 80%, transparent);
+}
+
 [data-theme="corporateLight"] .card {
-  background-color: rgba(250, 250, 250, 0.95) !important;
-  border-color: rgba(15, 23, 42, 0.07) !important;
+  @apply rounded-lg;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(249, 250, 251, 0.88));
+  border: 1px solid var(--ds-border-default) !important;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.12), 0 0 0 1px color-mix(in srgb, var(--ds-border-default) 80%, transparent);
 }
 
 /* Menu items */
@@ -787,30 +832,91 @@ aside.bg-base-100,
 .menu :where(li > a).active,
 .menu :where(li > a):hover,
 .menu :where(li > button):hover {
-  background-color: rgba(56, 189, 248, 0.08) !important;
+  background-color: color-mix(in srgb, #0089b4 8%, transparent) !important;
   color: var(--color-base-content) !important;
 }
 
 .menu :where(li > a).active {
-  box-shadow: inset 3px 0 0 var(--color-primary);
+  box-shadow: inset 3px 0 0 #d4472b;
 }
 
 [data-theme="corporateLight"] .menu :where(li > a).active,
 [data-theme="corporateLight"] .menu :where(li > a):hover,
 [data-theme="corporateLight"] .menu :where(li > button):hover {
-  background-color: rgba(3, 105, 161, 0.07) !important;
+  background-color: color-mix(in srgb, #007aa0 7%, transparent) !important;
 }
 
 .badge {
   border-color: transparent;
 }
 
+/* ── Badge theme-aware styling with Signal Prime colors ───── */
+[data-theme="corporateDark"] .badge {
+  background: linear-gradient(180deg, var(--ds-bg-elevated), var(--ds-bg-surface));
+  border: 1px solid color-mix(in srgb, #d4472b 35%, transparent);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.32);
+}
+
+[data-theme="corporateDark"] .badge-primary {
+  background: color-mix(in srgb, #d4472b 18%, transparent);
+  color: #f05a3d;
+  border: 1px solid color-mix(in srgb, #d4472b 35%, transparent);
+}
+
+[data-theme="corporateDark"] .badge-success {
+  background: color-mix(in srgb, #16a36a 18%, transparent);
+  color: #16a36a;
+  border: 1px solid color-mix(in srgb, #16a36a 35%, transparent);
+}
+
+[data-theme="corporateDark"] .badge-warning {
+  background: color-mix(in srgb, #e8a811 18%, transparent);
+  color: #e8a811;
+  border: 1px solid color-mix(in srgb, #e8a811 35%, transparent);
+}
+
+[data-theme="corporateDark"] .badge-error {
+  background: color-mix(in srgb, #e54233 18%, transparent);
+  color: #e54233;
+  border: 1px solid color-mix(in srgb, #e54233 35%, transparent);
+}
+
+[data-theme="corporateLight"] .badge {
+  background: linear-gradient(180deg, rgba(247, 249, 251, 0.92), rgba(237, 242, 246, 0.88));
+  border: 1px solid var(--ds-border-default);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+}
+
+[data-theme="corporateLight"] .badge-primary {
+  background: color-mix(in srgb, #bd3f27 18%, transparent);
+  color: #bd3f27;
+  border: 1px solid color-mix(in srgb, #bd3f27 35%, transparent);
+}
+
+[data-theme="corporateLight"] .badge-success {
+  background: color-mix(in srgb, #0f8f5f 18%, transparent);
+  color: #0f8f5f;
+  border: 1px solid color-mix(in srgb, #0f8f5f 35%, transparent);
+}
+
+[data-theme="corporateLight"] .badge-warning {
+  background: color-mix(in srgb, #c98905 18%, transparent);
+  color: #c98905;
+  border: 1px solid color-mix(in srgb, #c98905 35%, transparent);
+}
+
+[data-theme="corporateLight"] .badge-error {
+  background: color-mix(in srgb, #c93429 18%, transparent);
+  color: #c93429;
+  border: 1px solid color-mix(in srgb, #c93429 35%, transparent);
+}
+
 .divider {
-  border-color: rgba(148, 163, 184, 0.14) !important;
+  border-color: var(--ds-border-default) !important;
 }
 
 [data-theme="corporateLight"] .divider {
-  border-color: rgba(15, 23, 42, 0.08) !important;
+  border-color: var(--ds-border-default) !important;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -818,23 +924,112 @@ aside.bg-base-100,
    ═══════════════════════════════════════════════════════════════ */
 
 [data-theme="corporateDark"] .toggle {
-  border-color: rgba(56, 189, 248, 0.34) !important;
-  background-color: rgba(148, 163, 184, 0.18) !important;
+  border-color: color-mix(in srgb, #0089b4 34%, transparent) !important;
+  background-color: color-mix(in srgb, var(--ds-text-muted) 18%, transparent) !important;
 }
 
 [data-theme="corporateDark"] .toggle:checked {
-  background-color: #ff3b30 !important;
-  border-color: #ff3b30 !important;
+  background-color: #d4472b !important;
+  border-color: #d4472b !important;
 }
 
 [data-theme="corporateDark"] .toggle-primary {
-  --tglbg: rgba(148, 163, 184, 0.18);
-  --tgl-content-bg: #ff3b30;
+  --tglbg: color-mix(in srgb, var(--ds-text-muted) 18%, transparent);
+  --tgl-content-bg: #d4472b;
 }
 
 [data-theme="corporateDark"] .toggle-primary:checked {
-  --tglbg: #ff3b30;
+  --tglbg: #d4472b;
   --tgl-content-bg: #ffffff;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LOG PANELS & DATA TABLES — Terminal-style with Signal Prime
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Surface panel for log filters and controls */
+[data-theme="corporateDark"] .surface-panel {
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28), 0 0 0 1px color-mix(in srgb, var(--ds-border-default) 80%, transparent);
+}
+
+[data-theme="corporateLight"] .surface-panel {
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.12), 0 0 0 1px color-mix(in srgb, var(--ds-border-default) 80%, transparent);
+}
+
+/* Table-like panels with elevated backgrounds */
+[data-theme="corporateDark"] .surface-card {
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28), 0 0 0 1px color-mix(in srgb, var(--ds-border-default) 80%, transparent);
+}
+
+[data-theme="corporateLight"] .surface-card {
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.12), 0 0 0 1px color-mix(in srgb, var(--ds-border-default) 80%, transparent);
+}
+
+/* Data rows and terminal text with theme-aware hover */
+[data-theme="corporateDark"] tr,
+[data-theme="corporateDark"] .log-row {
+  @apply transition-colors;
+  color: var(--ds-text-secondary);
+}
+
+[data-theme="corporateDark"] tr:hover,
+[data-theme="corporateDark"] .log-row:hover {
+  background-color: color-mix(in srgb, #0089b4 5%, transparent);
+}
+
+[data-theme="corporateLight"] tr,
+[data-theme="corporateLight"] .log-row {
+  @apply transition-colors;
+  color: var(--ds-text-primary);
+}
+
+[data-theme="corporateLight"] tr:hover,
+[data-theme="corporateLight"] .log-row:hover {
+  background-color: color-mix(in srgb, #007aa0 4%, transparent);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   INPUT & SELECT ELEMENTS — Theme-aware Signal Prime styling
+   ═══════════════════════════════════════════════════════════════ */
+
+[data-theme="corporateDark"] input,
+[data-theme="corporateDark"] textarea,
+[data-theme="corporateDark"] select {
+  background-color: color-mix(in srgb, var(--ds-bg-surface) 92%, transparent) !important;
+  border-color: var(--ds-border-default) !important;
+  color: var(--ds-text-primary);
+}
+
+[data-theme="corporateDark"] input::placeholder,
+[data-theme="corporateDark"] textarea::placeholder {
+  color: var(--ds-text-muted);
+}
+
+[data-theme="corporateDark"] input:focus,
+[data-theme="corporateDark"] textarea:focus,
+[data-theme="corporateDark"] select:focus {
+  border-color: color-mix(in srgb, #d4472b 42%, transparent) !important;
+  background-color: color-mix(in srgb, var(--ds-bg-elevated) 86%, transparent) !important;
+}
+
+[data-theme="corporateLight"] input,
+[data-theme="corporateLight"] textarea,
+[data-theme="corporateLight"] select {
+  background-color: color-mix(in srgb, white 92%, transparent) !important;
+  border-color: var(--ds-border-default) !important;
+  color: var(--ds-text-primary);
+}
+
+[data-theme="corporateLight"] input::placeholder,
+[data-theme="corporateLight"] textarea::placeholder {
+  color: var(--ds-text-muted);
+}
+
+[data-theme="corporateLight"] input:focus,
+[data-theme="corporateLight"] textarea:focus,
+[data-theme="corporateLight"] select:focus {
+  border-color: color-mix(in srgb, #bd3f27 28%, transparent) !important;
+  background-color: rgba(255, 255, 255, 0.95) !important;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -842,27 +1037,103 @@ aside.bg-base-100,
    ═══════════════════════════════════════════════════════════════ */
 
 [data-theme="corporateDark"] .input-focus-glow:focus {
-  box-shadow: 0 0 0 4px rgba(255, 59, 48, 0.16);
+  box-shadow: 0 0 0 4px color-mix(in srgb, #d4472b 18%, transparent);
 }
 
 [data-theme="corporateLight"] .input-focus-glow:focus {
-  box-shadow: 0 0 0 4px rgba(217, 45, 32, 0.14);
+  box-shadow: 0 0 0 4px color-mix(in srgb, #bd3f27 14%, transparent);
 }
 
 /* Error glow */
 .input-error-glow {
-  box-shadow: 0 0 0 4px rgba(255, 59, 48, 0.16);
+  box-shadow: 0 0 0 4px color-mix(in srgb, #e54233 16%, transparent);
 }
 
 [data-theme="corporateLight"] .input-error-glow {
-  box-shadow: 0 0 0 4px rgba(217, 45, 32, 0.14);
+  box-shadow: 0 0 0 4px color-mix(in srgb, #c93429 14%, transparent);
 }
 
 /* StatusStrip info glow */
 [data-theme="corporateDark"] .status-strip-info-glow {
-  box-shadow: 0 0 12px rgba(56, 189, 248, 0.32);
+  box-shadow: 0 0 12px color-mix(in srgb, #0089b4 32%, transparent);
 }
 
 [data-theme="corporateLight"] .status-strip-info-glow {
-  box-shadow: 0 0 12px rgba(3, 105, 161, 0.24);
+  box-shadow: 0 0 12px color-mix(in srgb, #007aa0 24%, transparent);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TABLE & THEAD STYLING — Signal Prime theme-aware
+   ═══════════════════════════════════════════════════════════════ */
+
+[data-theme="corporateDark"] table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--ds-text-secondary);
+}
+
+[data-theme="corporateDark"] thead {
+  background: linear-gradient(180deg, var(--ds-bg-elevated), var(--ds-bg-surface));
+  border-bottom: 1px solid var(--ds-border-default);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.24);
+}
+
+[data-theme="corporateDark"] thead th {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ds-text-muted);
+}
+
+[data-theme="corporateDark"] tbody tr {
+  border-bottom: 1px solid var(--ds-border-default);
+  transition: background-color 150ms ease;
+}
+
+[data-theme="corporateDark"] tbody tr:hover {
+  background-color: color-mix(in srgb, #0089b4 6%, transparent);
+}
+
+[data-theme="corporateDark"] tbody td {
+  padding: 0.75rem 1rem;
+  color: var(--ds-text-secondary);
+}
+
+[data-theme="corporateLight"] table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--ds-text-primary);
+}
+
+[data-theme="corporateLight"] thead {
+  background: linear-gradient(180deg, rgba(240, 244, 250, 0.92), rgba(230, 238, 245, 0.88));
+  border-bottom: 1px solid var(--ds-border-default);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+}
+
+[data-theme="corporateLight"] thead th {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ds-text-muted);
+}
+
+[data-theme="corporateLight"] tbody tr {
+  border-bottom: 1px solid var(--ds-border-default);
+  transition: background-color 150ms ease;
+}
+
+[data-theme="corporateLight"] tbody tr:hover {
+  background-color: color-mix(in srgb, #007aa0 4%, transparent);
+}
+
+[data-theme="corporateLight"] tbody td {
+  padding: 0.75rem 1rem;
+  color: var(--ds-text-primary);
 }

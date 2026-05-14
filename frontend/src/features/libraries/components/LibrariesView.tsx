@@ -58,8 +58,8 @@ export function LibrariesView() {
 
   const getStatusIcon = (status: InstalledLibrary['status']) => {
     switch (status) {
-      case 'active':
-        return <span className="text-green-500">✓</span>;
+       case 'active':
+         return <span className="text-success">✓</span>;
       case 'missing':
         return <span className="text-body-secondary">✓</span>;
     }

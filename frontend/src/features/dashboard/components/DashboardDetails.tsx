@@ -69,50 +69,64 @@ function QuickActionsCard({
         <Activity className="w-5 h-5 text-body-secondary" />
         <span className="text-sm font-semibold tracking-wide uppercase opacity-90">Quick Actions</span>
       </div>
-       <div className="flex flex-col items-center gap-2.5">
-          {/* Restart: Warning action (caution/amber) */}
+      <div className="grid grid-cols-2 gap-2.5">
+        {/* Restart */}
+        <button
+          onClick={onRequestRestart}
+          disabled={isRestarting}
+          className="group action-btn-secondary flex items-center justify-center gap-3 rounded-xl p-4"
+        >
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-warning/10 text-warning transition-colors group-hover:bg-warning/20">
+            <RefreshCw className={cn('w-4 h-4', isRestarting && 'animate-spin')} />
+          </div>
+          <span className="text-base font-medium">
+            {isRestarting ? 'Reiniciando…' : 'Reiniciar'}
+          </span>
+        </button>
+
+        {/* Open Node-RED */}
+        <button
+          onClick={onOpenNodeRed}
+          className="group action-btn-secondary flex items-center justify-center gap-3 rounded-xl p-4"
+        >
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-info/10 text-info transition-colors group-hover:bg-info/20">
+            <ExternalLink className="w-4 h-4" />
+          </div>
+          <span className="text-base font-medium">Abrir</span>
+        </button>
+
+        {/* Start (solo cuando stopped) */}
+        {runtime?.status === 'stopped' && (
           <button
-            onClick={onRequestRestart}
-            disabled={isRestarting}
-            className="w-full max-w-xs gap-3 font-medium transition-colors duration-150 btn btn-warning btn-sm h-11 quick-action-btn"
+            onClick={onStartNodeRed}
+            disabled={isStartStopping}
+            className="group action-btn-secondary col-span-2 flex items-center justify-center gap-3 rounded-xl p-3.5"
           >
-            <RefreshCw className={cn('flex-shrink-0 w-4 h-4', isRestarting && 'animate-spin')} />
-            <span>{isRestarting ? 'Reiniciando…' : 'Reiniciar Node-RED'}</span>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10 text-accent transition-colors group-hover:bg-accent/20">
+              <Play className="w-4 h-4" />
+            </div>
+            <span className="text-sm font-medium">
+              {isStartStopping ? 'Iniciando…' : 'Arrancar Node-RED'}
+            </span>
           </button>
+        )}
 
-           {/* Open: Info action - navigation with background */}
-           <button 
-             onClick={onOpenNodeRed} 
-             className="w-full max-w-xs gap-3 font-medium transition-colors duration-150 btn btn-info btn-sm h-11 quick-action-btn"
-           >
-             <ExternalLink className="flex-shrink-0 w-4 h-4" />
-             <span>Abrir Node-RED</span>
-           </button>
-
-          {/* Start: Success action (positive/teal) */}
-          {runtime?.status === 'stopped' && (
-            <button
-              onClick={onStartNodeRed}
-              disabled={isStartStopping}
-              className="w-full gap-3 font-medium transition-colors duration-150 max-w-sx btn btn-success btn-sm h-11 quick-action-btn"
-            >
-              <Play className="flex-shrink-0 w-4 h-4" />
-              <span>{isStartStopping ? 'Iniciando…' : 'Arrancar'}</span>
-            </button>
-          )}
-
-          {/* Stop: Error action (destructive/red) */}
-          {runtime?.status === 'running' && (
-            <button
-              onClick={onStopNodeRed}
-              disabled={isStartStopping}
-              className="w-full max-w-xs gap-3 font-medium transition-colors duration-150 btn btn-error btn-sm h-11 quick-action-btn"
-            >
-              <Square className="flex-shrink-0 w-4 h-4" />
-              <span>{isStartStopping ? 'Deteniendo…' : 'Detener Node-RED'}</span>
-            </button>
-          )}
-       </div>
+        {/* Stop (solo cuando running) */}
+        {runtime?.status === 'running' && (
+          <button
+            onClick={onStopNodeRed}
+            disabled={isStartStopping}
+            className="group action-btn-secondary col-span-2 flex items-center justify-center gap-3 rounded-xl p-3.5"
+          >
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-error/10 text-error transition-colors group-hover:bg-error/20">
+              <Square className="w-4 h-4" />
+            </div>
+            <span className="text-sm font-medium">
+              {isStartStopping ? 'Deteniendo…' : 'Detener Node-RED'}
+            </span>
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -141,7 +155,7 @@ function BackupStatusCard({ backups }: Pick<DashboardDetailsProps, 'backups'>) {
         <div
           className={cn(
             'inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium',
-            healthy ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200' : 'border-border bg-base-200/30 text-base-content/70'
+            healthy ? 'border-success/30 bg-success/10 text-success' : 'border-border bg-base-200/30 text-base-content/70'
           )}
         >
           <CheckCircle2 className="w-3.5 h-3.5" />
@@ -167,7 +181,7 @@ function BackupStatusCard({ backups }: Pick<DashboardDetailsProps, 'backups'>) {
         </div>
       </div>
 
-      <div className="mt-5 rounded-2xl border border-border/70 bg-base-200/20 p-4">
+      <div className="mt-5 glass-panel rounded-2xl border border-border p-4">
         <div className="flex items-center justify-between gap-3">
           <span className="text-sm font-medium text-base-content">Actividad reciente</span>
           <span className="text-xs text-base-content/50">{recentEvent ? formatDate(recentEvent.occurredAt) : 'Sin eventos'}</span>

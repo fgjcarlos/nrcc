@@ -120,7 +120,7 @@ export function UsersView() {
                     {user.id !== currentUser?.id && (
                       <button
                         onClick={() => handleDelete(user.id)}
-                        className="text-sm text-rose-300 transition-colors hover:text-rose-200"
+                        className="text-sm text-error transition-colors hover:text-error/80"
                       >
                         Delete
                       </button>

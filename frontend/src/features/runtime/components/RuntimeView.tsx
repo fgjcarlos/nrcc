@@ -20,10 +20,10 @@ export function RuntimeView() {
       {/* Status */}
       <div className="surface-card p-6">
         <div className="flex items-center gap-4">
-          <div className={cn(
-            'w-4 h-4 rounded-full',
-            runtime?.status === 'running' ? 'bg-green-500' : 'bg-red-500'
-          )} />
+         <div className={cn(
+             'w-4 h-4 rounded-full',
+             runtime?.status === 'running' ? 'bg-success' : 'bg-error'
+           )} />
           <span className="text-lg font-medium capitalize text-base-content">{runtime?.status || 'unknown'}</span>
         </div>
 

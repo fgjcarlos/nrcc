@@ -9,12 +9,12 @@ export interface UserMenuProps {
 }
 
 const AVATAR_COLORS = [
-  { bg: 'bg-red-500/20', text: 'text-red-400' },
-  { bg: 'bg-violet-500/20', text: 'text-violet-400' },
-  { bg: 'bg-sky-500/20', text: 'text-sky-400' },
-  { bg: 'bg-emerald-500/20', text: 'text-emerald-400' },
-  { bg: 'bg-amber-500/20', text: 'text-amber-400' },
-  { bg: 'bg-rose-500/20', text: 'text-rose-400' },
+  { bg: 'bg-primary/20', text: 'text-primary' },
+  { bg: 'bg-accent/20', text: 'text-accent' },
+  { bg: 'bg-info/20', text: 'text-info' },
+  { bg: 'bg-success/20', text: 'text-success' },
+  { bg: 'bg-warning/20', text: 'text-warning' },
+  { bg: 'bg-error/20', text: 'text-error' },
 ];
 
 export function UserMenu({ user, onLogout, logoutBusy = false }: UserMenuProps) {

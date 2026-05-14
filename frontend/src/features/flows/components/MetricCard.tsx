@@ -14,7 +14,7 @@ export function MetricCard({ icon: Icon, label, value, warning }: MetricCardProp
         <Icon className="w-4 h-4" />
         <span className="text-sm">{label}</span>
       </div>
-      <p className={`text-2xl font-bold ${warning ? 'text-amber-300' : 'text-base-content'}`}>
+      <p className={`text-2xl font-bold ${warning ? 'text-warning' : 'text-base-content'}`}>
         {value}
       </p>
     </div>
