@@ -803,19 +803,32 @@
    Do NOT override here; manual !important rules break the variable system. */
 
 
-/* Navbar, sidebar, card — dark */
+/* Navbar, sidebar — dark */
 .navbar,
-aside.bg-base-100,
-.card {
+aside.bg-base-100 {
   background-color: rgba(12, 17, 22, 0.86) !important;
   border-color: rgba(148, 163, 184, 0.14) !important;
 }
 
 [data-theme="corporateLight"] .navbar,
-[data-theme="corporateLight"] aside.bg-base-100,
-[data-theme="corporateLight"] .card {
+[data-theme="corporateLight"] aside.bg-base-100 {
   background-color: rgba(250, 250, 250, 0.95) !important;
   border-color: rgba(15, 23, 42, 0.07) !important;
+}
+
+/* ── Card with Signal Prime styling (theme-aware) ────────────── */
+[data-theme="corporateDark"] .card {
+  @apply rounded-lg;
+  background: linear-gradient(180deg, rgba(21, 28, 36, 0.80), rgba(12, 17, 22, 0.75));
+  border: 1px solid rgba(148, 163, 184, 0.14) !important;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.42), 0 0 0 1px rgba(148, 163, 184, 0.08);
+}
+
+[data-theme="corporateLight"] .card {
+  @apply rounded-lg;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(250, 252, 254, 0.88));
+  border: 1px solid rgba(15, 23, 42, 0.08) !important;
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(15, 23, 42, 0.04);
 }
 
 /* Menu items */
@@ -846,6 +859,59 @@ aside.bg-base-100,
 
 .badge {
   border-color: transparent;
+}
+
+/* ── Badge theme-aware styling with Signal Prime colors ───── */
+[data-theme="corporateDark"] .badge {
+  background: linear-gradient(180deg, rgba(21, 28, 36, 0.72), rgba(12, 17, 22, 0.68));
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.32);
+}
+
+[data-theme="corporateDark"] .badge-primary {
+  background: linear-gradient(180deg, rgba(224, 123, 32, 0.18), rgba(224, 123, 32, 0.12));
+  color: #fda552;
+}
+
+[data-theme="corporateDark"] .badge-success {
+  background: linear-gradient(180deg, rgba(34, 197, 94, 0.16), rgba(34, 197, 94, 0.12));
+  color: #86efac;
+}
+
+[data-theme="corporateDark"] .badge-warning {
+  background: linear-gradient(180deg, rgba(245, 158, 11, 0.16), rgba(245, 158, 11, 0.12));
+  color: #fcd34d;
+}
+
+[data-theme="corporateDark"] .badge-error {
+  background: linear-gradient(180deg, rgba(244, 63, 94, 0.16), rgba(244, 63, 94, 0.12));
+  color: #ff6b9d;
+}
+
+[data-theme="corporateLight"] .badge {
+  background: linear-gradient(180deg, rgba(247, 249, 251, 0.92), rgba(237, 242, 246, 0.88));
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+}
+
+[data-theme="corporateLight"] .badge-primary {
+  background: linear-gradient(180deg, rgba(184, 94, 15, 0.12), rgba(184, 94, 15, 0.08));
+  color: #a85010;
+}
+
+[data-theme="corporateLight"] .badge-success {
+  background: linear-gradient(180deg, rgba(22, 163, 74, 0.12), rgba(22, 163, 74, 0.08));
+  color: #16a34a;
+}
+
+[data-theme="corporateLight"] .badge-warning {
+  background: linear-gradient(180deg, rgba(217, 119, 6, 0.12), rgba(217, 119, 6, 0.08));
+  color: #d97706;
+}
+
+[data-theme="corporateLight"] .badge-error {
+  background: linear-gradient(180deg, rgba(225, 29, 72, 0.12), rgba(225, 29, 72, 0.08));
+  color: #e11d48;
 }
 
 .divider {
@@ -881,6 +947,95 @@ aside.bg-base-100,
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   LOG PANELS & DATA TABLES — Terminal-style with Signal Prime
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Surface panel for log filters and controls */
+[data-theme="corporateDark"] .surface-panel {
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.42), 0 0 0 1px rgba(148, 163, 184, 0.08);
+}
+
+[data-theme="corporateLight"] .surface-panel {
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(15, 23, 42, 0.04);
+}
+
+/* Table-like panels with elevated backgrounds */
+[data-theme="corporateDark"] .surface-card {
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.42), 0 0 0 1px rgba(148, 163, 184, 0.08);
+}
+
+[data-theme="corporateLight"] .surface-card {
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(15, 23, 42, 0.04);
+}
+
+/* Data rows and terminal text with theme-aware hover */
+[data-theme="corporateDark"] tr,
+[data-theme="corporateDark"] .log-row {
+  @apply transition-colors;
+  color: #c6d9ef;
+}
+
+[data-theme="corporateDark"] tr:hover,
+[data-theme="corporateDark"] .log-row:hover {
+  background-color: rgba(0, 200, 180, 0.05);
+}
+
+[data-theme="corporateLight"] tr,
+[data-theme="corporateLight"] .log-row {
+  @apply transition-colors;
+  color: #0d1525;
+}
+
+[data-theme="corporateLight"] tr:hover,
+[data-theme="corporateLight"] .log-row:hover {
+  background-color: rgba(0, 153, 135, 0.04);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   INPUT & SELECT ELEMENTS — Theme-aware Signal Prime styling
+   ═══════════════════════════════════════════════════════════════ */
+
+[data-theme="corporateDark"] input,
+[data-theme="corporateDark"] textarea,
+[data-theme="corporateDark"] select {
+  background-color: rgba(12, 17, 22, 0.92) !important;
+  border-color: rgba(148, 163, 184, 0.16) !important;
+  color: #e8f0ff;
+}
+
+[data-theme="corporateDark"] input::placeholder,
+[data-theme="corporateDark"] textarea::placeholder {
+  color: rgba(148, 163, 184, 0.48);
+}
+
+[data-theme="corporateDark"] input:focus,
+[data-theme="corporateDark"] textarea:focus,
+[data-theme="corporateDark"] select:focus {
+  border-color: rgba(224, 123, 32, 0.42) !important;
+  background-color: rgba(21, 28, 36, 0.86) !important;
+}
+
+[data-theme="corporateLight"] input,
+[data-theme="corporateLight"] textarea,
+[data-theme="corporateLight"] select {
+  background-color: rgba(250, 252, 254, 0.92) !important;
+  border-color: rgba(15, 23, 42, 0.12) !important;
+  color: #0d1525;
+}
+
+[data-theme="corporateLight"] input::placeholder,
+[data-theme="corporateLight"] textarea::placeholder {
+  color: rgba(15, 23, 42, 0.48);
+}
+
+[data-theme="corporateLight"] input:focus,
+[data-theme="corporateLight"] textarea:focus,
+[data-theme="corporateLight"] select:focus {
+  border-color: rgba(184, 94, 15, 0.28) !important;
+  background-color: rgba(255, 255, 255, 0.95) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════
    INPUT GLOW — Theme-aware
    ═══════════════════════════════════════════════════════════════ */
 
@@ -912,4 +1067,80 @@ aside.bg-base-100,
 
 [data-theme="corporateLight"] .status-strip-info-glow {
   box-shadow: 0 0 12px rgba(0, 153, 135, 0.24);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TABLE & THEAD STYLING — Signal Prime theme-aware
+   ═══════════════════════════════════════════════════════════════ */
+
+[data-theme="corporateDark"] table {
+  width: 100%;
+  border-collapse: collapse;
+  color: #c6d9ef;
+}
+
+[data-theme="corporateDark"] thead {
+  background: linear-gradient(180deg, rgba(21, 28, 36, 0.72), rgba(12, 17, 22, 0.62));
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.24);
+}
+
+[data-theme="corporateDark"] thead th {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8fa8cc;
+}
+
+[data-theme="corporateDark"] tbody tr {
+  border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+  transition: background-color 150ms ease;
+}
+
+[data-theme="corporateDark"] tbody tr:hover {
+  background-color: rgba(0, 200, 180, 0.06);
+}
+
+[data-theme="corporateDark"] tbody td {
+  padding: 0.75rem 1rem;
+  color: #c6d9ef;
+}
+
+[data-theme="corporateLight"] table {
+  width: 100%;
+  border-collapse: collapse;
+  color: #0d1525;
+}
+
+[data-theme="corporateLight"] thead {
+  background: linear-gradient(180deg, rgba(240, 244, 250, 0.92), rgba(230, 238, 245, 0.88));
+  border-bottom: 1px solid rgba(15, 23, 42, 0.10);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+}
+
+[data-theme="corporateLight"] thead th {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #243860;
+}
+
+[data-theme="corporateLight"] tbody tr {
+  border-bottom: 1px solid rgba(15, 23, 42, 0.05);
+  transition: background-color 150ms ease;
+}
+
+[data-theme="corporateLight"] tbody tr:hover {
+  background-color: rgba(0, 153, 135, 0.04);
+}
+
+[data-theme="corporateLight"] tbody td {
+  padding: 0.75rem 1rem;
+  color: #0d1525;
 }
