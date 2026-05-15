@@ -179,6 +179,74 @@
       var(--color-base-100);
   }
 
+  /* ── Main Navigation Shell ───────────────────────────────── */
+  .app-sidebar-shell {
+    border-color: var(--ds-border-default);
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--ds-bg-elevated) 94%, transparent), color-mix(in srgb, var(--ds-bg-surface) 98%, transparent));
+    box-shadow: 18px 0 40px color-mix(in srgb, #000 18%, transparent);
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+  }
+
+  [data-theme="corporateLight"] .app-sidebar-shell {
+    box-shadow: 18px 0 36px rgba(15, 23, 42, 0.08);
+  }
+
+  .app-topbar-shell {
+    border-color: var(--ds-border-default);
+    background:
+      linear-gradient(90deg, color-mix(in srgb, var(--ds-bg-surface) 94%, transparent), color-mix(in srgb, var(--ds-bg-elevated) 90%, transparent));
+    box-shadow: 0 12px 36px color-mix(in srgb, #000 14%, transparent);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+  }
+
+  [data-theme="corporateLight"] .app-topbar-shell {
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.06);
+  }
+
+  .topbar-signal-icon,
+  .sidebar-brand-mark {
+    border-color: color-mix(in srgb, var(--color-primary) 30%, var(--ds-border-default));
+    background:
+      radial-gradient(circle at 30% 15%, color-mix(in srgb, var(--color-primary) 22%, transparent), transparent 60%),
+      color-mix(in srgb, var(--color-primary) 10%, var(--ds-bg-surface));
+  }
+
+  .api-status-chip,
+  .theme-toggle-shell,
+  .sidebar-collapse-button {
+    border-color: var(--ds-border-default);
+    background: color-mix(in srgb, var(--ds-bg-elevated) 74%, transparent);
+  }
+
+  .theme-toggle-shell:hover,
+  .sidebar-collapse-button:hover {
+    background: color-mix(in srgb, var(--color-accent) 10%, var(--ds-bg-elevated));
+    border-color: color-mix(in srgb, var(--color-accent) 34%, var(--ds-border-default));
+  }
+
+  .sidebar-nav-link {
+    border: 1px solid transparent;
+  }
+
+  .sidebar-nav-link:hover {
+    background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+    border-color: color-mix(in srgb, var(--color-accent) 18%, transparent);
+  }
+
+  .sidebar-nav-link-active {
+    background:
+      linear-gradient(90deg, color-mix(in srgb, var(--color-primary) 18%, transparent), color-mix(in srgb, var(--color-accent) 9%, transparent));
+    border-color: color-mix(in srgb, var(--color-primary) 34%, var(--ds-border-default));
+    box-shadow: inset 3px 0 0 var(--color-primary), 0 10px 24px color-mix(in srgb, var(--color-primary) 10%, transparent);
+  }
+
+  .sidebar-nav-link-active svg {
+    color: var(--color-primary);
+  }
+
   /* ── Glass Panel (Glassmorphism) ─────────────────────────── */
   [data-theme="corporateDark"] .glass-panel {
     @apply shadow-glow;

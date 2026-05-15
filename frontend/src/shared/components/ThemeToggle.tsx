@@ -19,11 +19,13 @@ export function ThemeToggle() {
   return (
     <button
       onClick={toggleTheme}
-      className="gap-2 px-2 py-4 border rounded-lg btn btn-ghost btn-sm border-border bg-base-300/30 w-[120px]"
+      className="theme-toggle-shell inline-flex h-11 items-center gap-2 rounded-xl border px-3 text-sm font-medium text-base-content/80 transition-colors hover:text-base-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
       title={`Tema: ${getLabel()}`}
       aria-label={`Tema: ${getLabel()}`}
     >
-      {getIcon()}
+      <span className="grid h-7 w-7 place-items-center rounded-lg bg-accent/10 text-accent">
+        {getIcon()}
+      </span>
       <span className="hidden sm:inline">{getLabel()}</span>
     </button>
   );
