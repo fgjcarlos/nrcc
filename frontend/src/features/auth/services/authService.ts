@@ -5,6 +5,7 @@ export interface User {
   username: string;
   role: 'admin' | 'viewer';
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface AuthResponse {
