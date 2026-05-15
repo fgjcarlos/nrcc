@@ -1,9 +1,10 @@
 export interface InstalledLibrary {
   name: string;
-  alias: string;
-  version?: string;
-  status: 'active' | 'missing';
-  installed: boolean;
+  version: string;
+  description?: string;
+  keywords?: string[];
+  homepage?: string;
+  repository?: string;
 }
 
 export interface NpmSearchResult {

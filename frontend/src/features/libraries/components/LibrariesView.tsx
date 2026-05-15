@@ -3,10 +3,12 @@ import { type InstalledLibrary } from '@/features/libraries/services';
 import { ConfirmationDialog } from '@/shared/components';
 import { useLibrariesData } from '@/features/libraries/hooks/useLibrariesData';
 import { useLibrariesActions } from '@/features/libraries/hooks/useLibrariesActions';
+import { ExternalLink, Trash2 } from 'lucide-react';
 
 export function LibrariesView() {
   const [searchQuery, setSearchQuery] = useState('');
-  
+  const [confirmingUninstall, setConfirmingUninstall] = useState<string | null>(null);
+
   // Confirmation dialog state
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
@@ -19,7 +21,7 @@ export function LibrariesView() {
 
   // Data hooks
   const { libraries, isLoading } = useLibrariesData();
-  
+
   // Actions hooks
   const {
     installMutation,
@@ -28,6 +30,7 @@ export function LibrariesView() {
     searching,
     handleSearch,
     handleInstall: handleInstallAction,
+    handleUninstall,
     handleClearSearch,
   } = useLibrariesActions();
 
@@ -42,7 +45,7 @@ export function LibrariesView() {
     }
   }, [installMutation.isSuccess, searchResults.length]);
 
-  const handleUninstall = (name: string) => {
+  const handleConfirmUninstall = (name: string) => {
     setConfirmConfig({
       isOpen: true,
       title: 'Desinstalar librería',
@@ -51,18 +54,22 @@ export function LibrariesView() {
       variant: 'danger',
       onConfirm: () => {
         setConfirmConfig(null);
-        uninstallMutation.mutate(name);
+        handleUninstall(name);
       },
     });
   };
 
-  const getStatusIcon = (status: InstalledLibrary['status']) => {
-    switch (status) {
-       case 'active':
-         return <span className="text-success">✓</span>;
-      case 'missing':
-        return <span className="text-body-secondary">✓</span>;
-    }
+  // Truncate long strings
+  const truncate = (text: string | undefined, maxLength: number = 60): string => {
+    if (!text) return '';
+    return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+  };
+
+  // Get keywords badges (first 2-3)
+  const getKeywordBadges = (keywords: string[] | undefined) => {
+    if (!keywords || keywords.length === 0) return null;
+    const maxBadges = 2;
+    return keywords.slice(0, maxBadges);
   };
 
   return (
@@ -93,16 +100,16 @@ export function LibrariesView() {
               Query npm packages and install them directly into the runtime.
             </p>
             <div className="mt-4">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                handleSearch(e.target.value);
-              }}
-              placeholder="Buscar paquetes npm..."
-              className="glass-panel w-full rounded-xl border border-border px-3 py-2 text-base-content transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50"
-            />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  handleSearch(e.target.value);
+                }}
+                placeholder="Buscar paquetes npm..."
+                className="glass-panel w-full rounded-xl border border-border px-3 py-2 text-base-content transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50"
+              />
             </div>
 
             {searching && (
@@ -118,7 +125,7 @@ export function LibrariesView() {
                   <div className="flex-1">
                     <div className="font-medium text-base-content">{result.name}</div>
                     <div className="text-sm text-base-content/65">
-                      v{result.version} • {result.description?.slice(0, 50)}...
+                      v{result.version} • {truncate(result.description, 50)}
                     </div>
                     <div className="text-xs text-base-content/55">
                       {result.downloads.toLocaleString()} descargas/semana
@@ -162,31 +169,92 @@ export function LibrariesView() {
                 <p className="mt-1 text-sm text-base-content/60">Instalá una desde la columna de búsqueda.</p>
               </div>
             ) : (
-              <div className="mt-4 space-y-2">
+              <div className="mt-4 space-y-3">
                 {libraries.map((lib) => (
                   <div
                     key={lib.name}
-                    className="surface-panel flex items-center justify-between gap-4 p-4"
+                    className="surface-panel rounded-lg p-4"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="text-lg">{getStatusIcon(lib.status)}</div>
-                      <div>
-                        <div className="font-medium text-base-content">
-                          {lib.alias}
-                          <span className="ml-2 text-sm text-base-content/60">({lib.name})</span>
+                    {/* Header row: name, version badge, uninstall button */}
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <code className="font-mono text-sm font-semibold text-base-content break-all">
+                            {lib.name}
+                          </code>
+                          {lib.version && (
+                            <span className="badge badge-sm badge-primary shrink-0">
+                              v{lib.version}
+                            </span>
+                          )}
                         </div>
-                        {lib.version && (
-                          <div className="text-sm text-base-content/60">v{lib.version}</div>
-                        )}
                       </div>
+                      <button
+                        onClick={() => handleConfirmUninstall(lib.name)}
+                        disabled={uninstallMutation.isPending}
+                        title="Uninstall"
+                        className="btn btn-ghost btn-xs shrink-0"
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => handleUninstall(lib.name)}
-                      disabled={uninstallMutation.isPending}
-                      className="action-btn-danger rounded-lg text-sm"
-                    >
-                      Eliminar
-                    </button>
+
+                    {/* Description */}
+                    {lib.description && (
+                      <p className="text-sm text-base-content/70 mb-2">
+                        {truncate(lib.description, 100)}
+                      </p>
+                    )}
+
+                    {/* Keywords badges */}
+                    {lib.keywords && lib.keywords.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {getKeywordBadges(lib.keywords)?.map((keyword) => (
+                          <span
+                            key={keyword}
+                            className="badge badge-outline badge-sm text-xs"
+                          >
+                            {keyword}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Links row */}
+                    <div className="flex gap-2 flex-wrap">
+                      {lib.homepage && (
+                        <a
+                          href={lib.homepage}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn btn-ghost btn-xs text-xs gap-1"
+                          title="Visit homepage"
+                        >
+                          <ExternalLink size={14} />
+                          Homepage
+                        </a>
+                      )}
+                      <a
+                        href={`https://www.npmjs.com/package/${encodeURIComponent(lib.name)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-ghost btn-xs text-xs gap-1"
+                        title="View on npm"
+                      >
+                        <ExternalLink size={14} />
+                        npm
+                      </a>
+                      <a
+                        href={`https://flows.nodered.org/node/${encodeURIComponent(lib.name)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-ghost btn-xs text-xs gap-1"
+                        title="View on Node-RED Flows"
+                      >
+                        <ExternalLink size={14} />
+                        Flows
+                      </a>
+                    </div>
                   </div>
                 ))}
               </div>

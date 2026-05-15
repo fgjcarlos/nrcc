@@ -8,6 +8,8 @@ type LibraryInfo struct {
 	Keywords    []string `json:"keywords,omitempty"`
 	Author      string   `json:"author,omitempty"`
 	License     string   `json:"license,omitempty"`
+	Homepage    string   `json:"homepage,omitempty"`
+	Repository  string   `json:"repository,omitempty"`
 }
 
 // UpdateStatus represents the update status for Node-RED
