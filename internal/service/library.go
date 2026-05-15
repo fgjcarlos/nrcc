@@ -136,6 +136,9 @@ func (s *LibraryService) Uninstall(pkg string) error {
 // searchRegistry represents the npm registry search response structure
 type searchRegistry struct {
 	Objects []struct {
+		Downloads struct {
+			Weekly int `json:"weekly"`
+		} `json:"downloads"`
 		Package struct {
 			Name        string `json:"name"`
 			Version     string `json:"version"`
@@ -158,13 +161,12 @@ func (s *LibraryService) Search(query string) ([]interface{}, error) {
 	// Make HTTP GET request to npm registry
 	resp, err := http.Get(fullURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to search npm registry: %w", err)
+		return []interface{}{}, nil
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("npm registry returned status %d: %s", resp.StatusCode, string(body))
+		return []interface{}{}, nil
 	}
 
 	// Read and parse response
@@ -186,6 +188,7 @@ func (s *LibraryService) Search(query string) ([]interface{}, error) {
 			"name":        obj.Package.Name,
 			"version":     obj.Package.Version,
 			"description": obj.Package.Description,
+			"downloads":   obj.Downloads.Weekly,
 			"date":        obj.Package.Date,
 		}
 	}
@@ -195,7 +198,15 @@ func (s *LibraryService) Search(query string) ([]interface{}, error) {
 
 // Check checks if a package is available using pnpm view
 func (s *LibraryService) Check(pkg string) (bool, error) {
-	cmd := exec.Command("pnpm", "view", pkg)
+	bin := "pnpm"
+	if pm, ok := s.pm.(*PnpmPackageManager); ok {
+		bin = pm.Bin
+	}
+	if err := ensureSupportedPnpm(bin); err != nil {
+		return false, nil
+	}
+
+	cmd := exec.Command(bin, "view", pkg)
 	cmd.Dir = s.dataDir
 	cmd.Stdout = nil
 	cmd.Stderr = nil

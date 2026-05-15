@@ -97,7 +97,9 @@ func (h *LibraryHandler) PostSearch(w http.ResponseWriter, r *http.Request) {
 
 	results, err := h.svc.Search(req.Query)
 	if err != nil {
-		model.RespondError(w, http.StatusInternalServerError, "SEARCH_ERROR", err.Error())
+		// Search is an external registry convenience feature. Do not turn registry
+		// failures into UI-breaking 500s; return an empty result set instead.
+		model.RespondJSON(w, http.StatusOK, []interface{}{})
 		return
 	}
 

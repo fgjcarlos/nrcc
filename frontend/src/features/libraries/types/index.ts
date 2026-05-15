@@ -11,7 +11,7 @@ export interface NpmSearchResult {
   name: string;
   version: string;
   description: string;
-  downloads: number;
+  downloads?: number;
 }
 
 export interface InstallResponse {

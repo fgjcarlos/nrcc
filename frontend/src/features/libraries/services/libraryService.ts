@@ -13,7 +13,7 @@ export interface NpmSearchResult {
   name: string;
   version: string;
   description: string;
-  downloads: number;
+  downloads?: number;
 }
 
 export interface InstallResponse {
@@ -24,12 +24,12 @@ export interface InstallResponse {
 export const libraryService = {
   getLibraries: async (): Promise<InstalledLibrary[]> => {
     const response = await api.get<{ data: InstalledLibrary[] }>('/libraries');
-    return response.data.data;
+    return Array.isArray(response.data.data) ? response.data.data : [];
   },
 
   searchLibraries: async (query: string): Promise<NpmSearchResult[]> => {
     const response = await api.post<{ data: NpmSearchResult[] }>('/libraries/search', { query });
-    return response.data.data;
+    return Array.isArray(response.data.data) ? response.data.data : [];
   },
 
   installLibrary: async (name: string, alias?: string): Promise<InstallResponse> => {

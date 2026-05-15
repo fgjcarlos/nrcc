@@ -7,7 +7,7 @@ export function useLibrariesActions() {
   const queryClient = useQueryClient();
   const [searchResults, setSearchResults] = useState<NpmSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
-  const debounceTimerRef = useRef<NodeJS.Timeout>();
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const installMutation = useMutation({
     mutationFn: ({ name, alias }: { name: string; alias?: string }) =>

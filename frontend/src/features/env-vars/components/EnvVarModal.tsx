@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { type EnvVar } from '@/features/env-vars/services/envService';
 
 export function EnvVarModal({
@@ -19,11 +20,17 @@ export function EnvVarModal({
   // Form-level validation state
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
-  // B3: Lock body overflow when modal is open
+  // Lock the real document scroll; the modal is portaled outside the page shell.
   useEffect(() => {
-    document.body.classList.add('overflow-hidden');
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+
     return () => {
-      document.body.classList.remove('overflow-hidden');
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
     };
   }, []);
 
@@ -89,14 +96,14 @@ export function EnvVarModal({
             value={formData.value}
             onChange={(e) => setFormData({ ...formData, value: e.target.value })}
             placeholder={editing ? '(leave empty to keep current)' : ''}
-            className="glass-panel w-full h-full rounded-xl border-0 px-3 py-2 text-base-content focus:outline-none"
+            className="glass-panel h-12 w-full rounded-xl border-0 px-3 text-base-content focus:outline-none"
             required={isRequired}
           />
         );
 
       case 'boolean':
         return (
-          <div className="flex w-full items-center justify-between gap-3 px-3 py-3">
+          <div className="flex h-12 w-full items-center justify-between gap-3 px-3">
             <span className="text-sm font-semibold text-base-content/70 uppercase tracking-wider">Value:</span>
             <div className="flex items-center gap-2">
               <input
@@ -119,7 +126,7 @@ export function EnvVarModal({
             value={formData.value}
             onChange={(e) => setFormData({ ...formData, value: e.target.value })}
             placeholder={editing ? '(leave empty to keep current)' : ''}
-            className="glass-panel w-full h-full rounded-xl border-0 px-3 py-2 text-base-content focus:outline-none"
+            className="glass-panel h-12 w-full rounded-xl border-0 px-3 text-base-content focus:outline-none"
             required={isRequired}
           />
         );
@@ -132,7 +139,7 @@ export function EnvVarModal({
             value={formData.value}
             onChange={(e) => setFormData({ ...formData, value: e.target.value })}
             placeholder={editing ? '(leave empty to keep current)' : ''}
-            className="glass-panel w-full h-full rounded-xl border-0 px-3 py-2 text-base-content focus:outline-none"
+            className="glass-panel h-12 w-full rounded-xl border-0 px-3 text-base-content focus:outline-none"
             required={isRequired}
           />
         );
@@ -142,9 +149,12 @@ export function EnvVarModal({
   // Check if form can be submitted
   const canSubmit = Object.keys(validationErrors).length === 0;
 
-  return (
+  return createPortal(
     <div className="modal-overlay" onClick={onCancel}>
-      <div className="surface-panel w-full max-w-md border border-border p-6 shadow-glow" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="surface-panel max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto border border-border p-6 shadow-glow"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="mb-4 flex items-start justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">Environment</p>
@@ -190,7 +200,7 @@ export function EnvVarModal({
           <div>
             <label className="mb-2 block text-xs font-semibold text-base-content/70 uppercase tracking-wider">Value</label>
             <div
-              className={`rounded-xl border min-h-[44px] flex items-center transition-all duration-150 ${
+              className={`h-12 rounded-xl border transition-colors duration-150 ${
                 validationErrors.value ? 'border-error' : 'border-border'
               }`}
             >
@@ -242,7 +252,8 @@ export function EnvVarModal({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
