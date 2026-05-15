@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
-  ActivitySquare,
   Blocks,
   Box,
   ChevronLeft,
@@ -26,7 +25,6 @@ const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: Gauge },
   { to: '/bootstrap', label: 'Bootstrap', icon: HardDrive },
   { to: '/configuration', label: 'Configuration', icon: Settings },
-  { to: '/runtime', label: 'Runtime', icon: ActivitySquare },
   { to: '/logs', label: 'Logs', icon: FileTerminal },
   { to: '/docker', label: 'Docker', icon: Container },
   { to: '/flows', label: 'Flows', icon: Workflow },

@@ -1,16 +1,4 @@
-import type { HostStatus, RuntimeStatus } from '@/shared/types';
-
-export function getStatusBadgeClass(status: RuntimeStatus | string) {
-  switch (status) {
-    case 'running':
-      return 'badge-success';
-    case 'stopped':
-    case 'error':
-      return 'badge-error';
-    default:
-      return 'badge-warning';
-  }
-}
+import type { HostStatus } from '@/shared/types';
 
 export function getHostWarningMessage(host: HostStatus) {
   return [

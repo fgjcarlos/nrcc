@@ -14,18 +14,6 @@ export const configService = {
     api.get<ApiResponse<NodeRedConfig>>('/config/default'),
 };
 
-export const runtimeService = {
-  getStatus: () => api.get<ApiResponse<{ status: string; uptime: number }>>('/runtime/status'),
-  
-  restart: () => api.post<ApiResponse<{ message: string; restartInitiated: boolean }>>('/runtime/restart'),
-  
-  start: () => api.post<ApiResponse<{ message: string }>>('/runtime/start'),
-  
-  stop: () => api.post<ApiResponse<{ message: string }>>('/runtime/stop'),
-  
-  getUptime: () => api.get<ApiResponse<{ uptime: number }>>('/runtime/uptime'),
-};
-
 export const fileService = {
   uploadImage: (type: 'favicon' | 'header' | 'login', file: File) => {
     const formData = new FormData();

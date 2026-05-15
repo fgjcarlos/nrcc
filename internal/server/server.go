@@ -22,7 +22,6 @@ type Server struct {
 	updateSvc      *service.UpdateService
 	envHandler     *handler.EnvHandler
 	dockerHandler  *handler.DockerHandler
-	runtimeHandler *handler.RuntimeHandler
 	ctx            context.Context
 	cancel         context.CancelFunc
 	shutdownCh     chan struct{}
@@ -48,7 +47,6 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string) *Server {
 	settingsHandler := handler.NewSettingsHandler(configSvc)
 	systemHandler := handler.NewSystemHandler()
 	bootstrapHandler := handler.NewBootstrapHandler(hostSvc)
-	runtimeHandler := handler.NewRuntimeHandler(nil, hostSvc)
 
 	// Phase 6 handlers
 	backupSvc := service.NewBackupService(dataDir)
@@ -208,7 +206,6 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string) *Server {
 		updateSvc:      updateSvc,
 		envHandler:     envHandler,
 		dockerHandler:  dockerHandler,
-		runtimeHandler: runtimeHandler,
 	}
 
 	// Create a cancellable context for the server lifecycle
@@ -247,7 +244,6 @@ func (s *Server) GetShutdownChannel() chan struct{} {
 // SetProcessManager sets the ProcessManager for runtime routes
 func (s *Server) SetProcessManager(pm *service.ProcessManager) {
 	s.processManager = pm
-	s.runtimeHandler.SetProcessManager(pm)
 	// Wire env vars into the process so they're injected on every node-red start
 	pm.SetEnvService(s.envSvc)
 	// Wire process manager into env handler so it restarts node-red on env changes
@@ -265,25 +261,13 @@ func (s *Server) SetLogBuffer(lb *service.LogBuffer) {
 	s.wireLogRoutes()
 }
 
-// wireRuntimeRoutes adds runtime routes to the existing router
-func (s *Server) wireRuntimeRoutes() {
-	s.router.Route("/api/runtime", func(r chi.Router) {
-		r.Use(middleware.Auth(s.authSvc))
-		r.Get("/status", s.runtimeHandler.GetStatus)
-		r.Get("/uptime", s.runtimeHandler.GetUptime)
-		r.Post("/restart", s.runtimeHandler.PostRestart)
-		r.Post("/start", s.runtimeHandler.StartNodeRed)
-		r.Post("/stop", s.runtimeHandler.StopNodeRed)
-	})
-}
-
 // wireLogRoutes adds log routes to the existing router
 func (s *Server) wireLogRoutes() {
 	if s.logBuffer == nil {
 		return
 	}
 	logHandler := handler.NewLogHandler(s.logBuffer)
-	s.router.Route("/api/runtime/logs", func(r chi.Router) {
+	s.router.Route("/api/logs", func(r chi.Router) {
 		r.Use(middleware.Auth(s.authSvc))
 		r.Get("/", logHandler.GetLogs)
 		r.Get("/stream", logHandler.StreamLogs)

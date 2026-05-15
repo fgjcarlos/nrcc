@@ -105,7 +105,7 @@ export function FlowsView() {
           <div>
             <p className="font-medium text-base-content">Node-RED no está disponible</p>
             <p className="mt-1 text-sm text-base-content/70">
-              Verificá que el contenedor de Node-RED esté corriendo. Podés reiniciarlo desde la sección Runtime.
+              Verificá que el contenedor de Node-RED esté corriendo.
             </p>
           </div>
         </div>

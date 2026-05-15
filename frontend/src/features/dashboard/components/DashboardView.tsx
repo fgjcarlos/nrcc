@@ -7,15 +7,13 @@ import { RestartConfirmationModal } from './RestartConfirmationModal';
 import { SystemHealthCard } from './SystemHealthCard';
 
 export function DashboardView() {
-  const { runtime, container, system, config, host, backups, dockerSuccess, dockerLoading, dockerError } = useDashboardData();
+  const { container, system, config, host, backups, dockerSuccess, dockerLoading, dockerError } = useDashboardData();
   const {
     pendingConfirm,
     isRestarting,
     isStartStopping,
     setPendingConfirm,
     handleRestartConfirm,
-    handleStartNodeRed,
-    handleStopNodeRed,
     handleOpenNodeRed,
   } = useDashboardActions({ uiPort: config?.uiPort });
 
@@ -26,7 +24,6 @@ export function DashboardView() {
     dockerSuccess &&
     !!container?.status &&
     container.status !== 'running';
-  const runtimeStatus = isRestarting ? 'reiniciando' : runtime?.status || 'unknown';
 
   return (
     <div className="space-y-8">
@@ -34,9 +31,6 @@ export function DashboardView() {
       <DashboardWarnings showDockerWarning={showDockerWarning} host={host} />
       <SystemHealthCard host={host} />
       <DashboardStatusCards
-        runtimeStatus={runtimeStatus}
-        isRestarting={isRestarting}
-        runtime={runtime}
         system={system}
         host={host}
         inDocker={inDocker}
@@ -46,10 +40,9 @@ export function DashboardView() {
         system={system}
         backups={backups}
         isStartStopping={isStartStopping}
-        onStartNodeRed={handleStartNodeRed}
-        onStopNodeRed={handleStopNodeRed}
+        onStartNodeRed={() => {}}
+        onStopNodeRed={() => {}}
         isRestarting={isRestarting}
-        runtime={runtime}
         onRequestRestart={() => setPendingConfirm(true)}
         onOpenNodeRed={handleOpenNodeRed}
       />

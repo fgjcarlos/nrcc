@@ -5,12 +5,11 @@ import {
   BasicSettings,
   AuthSettings,
   LoggingSettings,
-  RuntimeSettings,
   EditorThemeSettings,
 } from '.';
 import {
   Settings, Server, Lock, Activity, Palette,
-  Save, RotateCcw, FileText, Globe
+  Save, FileText, Globe
 } from 'lucide-react';
 import { useConfigurationData, useConfigurationActions } from '../hooks';
 
@@ -33,7 +32,6 @@ const SECTIONS: Section[] = [
   { id: 'basic', label: 'Basic', icon: Server, component: BasicSettings },
   { id: 'auth', label: 'Authentication', icon: Lock, component: AuthSettings },
   { id: 'logging', label: 'Logging', icon: Activity, component: LoggingSettings },
-  { id: 'runtime', label: 'Runtime & Files', icon: FileText, component: RuntimeSettings },
   { id: 'editor', label: 'Editor Theme', icon: Palette, component: EditorThemeSettings },
 ];
 
@@ -110,10 +108,6 @@ const INITIAL_FORM_DATA: NodeRedConfigFormData = {
 
   // Editor - Logout
   editorLogoutRedirect: '',
-
-  // Runtime
-  runtimeStateEnabled: false,
-  runtimeStateFile: '',
 
   // Language
   lang: 'en-US',
@@ -219,20 +213,6 @@ export function ConfigurationView() {
           >
             <Save className="w-4 h-4" />
             {actions.saveConfigMutation.isPending ? 'Saving...' : 'Save'}
-          </button>
-          <button
-            type="button"
-            onClick={handleSaveAndRestart}
-            disabled={!hasChanges || isSaving || data.hostStatus?.nodeRed.managedByNrcc === false}
-            className="action-btn-secondary"
-          >
-            <RotateCcw
-              className={cn(
-                'w-4 h-4',
-                actions.restartMutation.isPending && 'animate-spin'
-              )}
-            />
-            Save & Restart
           </button>
         </div>
       </div>

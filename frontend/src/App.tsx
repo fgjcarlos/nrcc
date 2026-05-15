@@ -10,7 +10,6 @@ import { LandingView, LoginView, SetupView } from '@/features/auth/components';
 // Feature views (protected routes with layout)
 import { DashboardView } from '@/features/dashboard';
 import { ConfigurationView } from '@/features/configuration/components/ConfigurationView';
-import { RuntimeView } from '@/features/runtime/components/RuntimeView';
 import { LogsView } from '@/features/logs/components/LogsView';
 import { DockerView } from '@/features/docker/components/DockerView';
 import { UsersView } from '@/features/auth/components/UsersView';
@@ -45,14 +44,6 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <ConfigurationView />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="runtime"
-          element={
-            <ProtectedRoute>
-              <RuntimeView />
             </ProtectedRoute>
           }
         />
