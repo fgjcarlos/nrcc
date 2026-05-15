@@ -1,2 +1,2 @@
 export { formatPercent } from './formatters';
-export { getStatusBadgeClass, getHostWarningMessage, getSystemHealthIssues, getDeploymentLabel } from './dashboardDisplay';
+export { getHostWarningMessage, getSystemHealthIssues, getDeploymentLabel } from './dashboardDisplay';

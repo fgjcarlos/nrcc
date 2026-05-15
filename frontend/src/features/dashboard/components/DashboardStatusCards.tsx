@@ -1,48 +1,15 @@
-import { formatBytes, formatUptime, cn } from '@/shared/lib';
+import { formatBytes, cn } from '@/shared/lib';
 import { formatPercent } from '@/features/dashboard/lib';
-import type { HostStatus, RuntimeInfo, SystemInfo } from '@/shared/types';
-import { Cpu, MemoryStick, RefreshCw, Server } from 'lucide-react';
+import type { HostStatus, SystemInfo } from '@/shared/types';
+import { Cpu, MemoryStick, Server } from 'lucide-react';
 import type { DashboardContainerStatus } from '../types';
-import { getDeploymentLabel, getStatusBadgeClass } from '../lib';
+import { getDeploymentLabel } from '../lib';
 
 interface DashboardStatusCardsProps {
   container?: DashboardContainerStatus | null;
   host?: HostStatus;
   inDocker: boolean;
-  isRestarting: boolean;
-  runtime?: RuntimeInfo;
-  runtimeStatus: string;
   system?: SystemInfo;
-}
-
-function RuntimeStatusCard({
-  isRestarting,
-  runtime,    
-  runtimeStatus,
-}: Pick<
-  DashboardStatusCardsProps,
-  'isRestarting' | 'runtime' | 'runtimeStatus'
->) {
-  return (
-    <div className="p-6 border card surface-card border-border">
-      <div className="flex items-center gap-3">
-        {isRestarting ? (
-          <RefreshCw className="w-5 h-5 animate-spin text-warning" />
-        ) : (
-          <span className={cn('badge badge-lg', getStatusBadgeClass(runtime?.status || 'unknown'))} />
-        )}
-        <span className="text-sm font-medium">Node-RED</span>
-      </div>
-      <p className={cn('mt-2 text-2xl font-bold capitalize', isRestarting && 'text-warning')}>{runtimeStatus}</p>
-      {isRestarting ? (
-        <p className="mt-1 text-sm text-body-secondary">Espera un momento…</p>
-      ) : runtime?.uptime ? (
-        <p className="mt-1 text-sm text-body-secondary">Uptime: {formatUptime(runtime.uptime)}</p>
-      ) : (
-        <p className="mt-1 text-sm text-body-secondary">—</p>
-      )}
-    </div>
-  );
 }
 
 function DeploymentCard({ container, host, inDocker }: Pick<DashboardStatusCardsProps, 'container' | 'host' | 'inDocker'>) {
@@ -99,8 +66,7 @@ function MemoryCard({ system }: Pick<DashboardStatusCardsProps, 'system'>) {
 
 export function DashboardStatusCards(props: DashboardStatusCardsProps) {
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-      <RuntimeStatusCard {...props} />
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
       <DeploymentCard container={props.container} host={props.host} inDocker={props.inDocker} />
       <CpuCard system={props.system} />
       <MemoryCard system={props.system} />

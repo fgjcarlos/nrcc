@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { configService, runtimeService, settingsService } from '../services';
+import { configService, settingsService } from '../services';
 import type { NodeRedConfigFormData } from '@/shared/types';
 import { formDataToConfigPayload } from '../lib/configTransformers';
 
@@ -17,17 +17,6 @@ export function useConfigurationActions() {
     },
     onError: (error) => {
       toast.error(`Failed to save: ${error}`);
-    },
-  });
-
-  // Restart mutation
-  const restartMutation = useMutation({
-    mutationFn: () => runtimeService.restart(),
-    onSuccess: () => {
-      toast.success('Node-RED restarted');
-    },
-    onError: (error) => {
-      toast.error(`Failed to restart: ${error}`);
     },
   });
 
@@ -114,14 +103,6 @@ export function useConfigurationActions() {
   };
 
   /**
-   * Handle save and restart
-   */
-  const handleSaveAndRestart = async (formData: NodeRedConfigFormData) => {
-    await handleSave(formData);
-    await restartMutation.mutateAsync();
-  };
-
-  /**
    * Handle raw settings save
    */
   const handleSaveRawSettings = (content: string) => {
@@ -131,12 +112,10 @@ export function useConfigurationActions() {
   return {
     // Mutations
     saveConfigMutation,
-    restartMutation,
     saveRawSettingsMutation,
 
     // Handlers
     handleSave,
-    handleSaveAndRestart,
     handleSaveRawSettings,
     validateAuthFields,
   };

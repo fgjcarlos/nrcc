@@ -19,6 +19,14 @@ export function EnvVarModal({
   // Form-level validation state
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
+  // B3: Lock body overflow when modal is open
+  useEffect(() => {
+    document.body.classList.add('overflow-hidden');
+    return () => {
+      document.body.classList.remove('overflow-hidden');
+    };
+  }, []);
+
   // Validate form on formData changes
   useEffect(() => {
     const errors: Record<string, string> = {};
@@ -95,9 +103,9 @@ export function EnvVarModal({
                 type="checkbox"
                 checked={formData.value === 'true'}
                 onChange={(e) => setFormData({ ...formData, value: e.target.checked ? 'true' : 'false' })}
-                className="toggle toggle-primary toggle-lg"
+                className="toggle toggle-primary toggle-md"
               />
-              <span className={`text-sm font-bold ${formData.value === 'true' ? 'text-primary' : 'text-base-content/50'}`}>
+              <span className={`badge badge-primary text-xs font-bold`}>
                 {formData.value === 'true' ? 'true' : 'false'}
               </span>
             </div>
@@ -135,8 +143,8 @@ export function EnvVarModal({
   const canSubmit = Object.keys(validationErrors).length === 0;
 
   return (
-    <div className="modal-overlay">
-      <div className="surface-panel w-full max-w-md border border-border p-6 shadow-glow">
+    <div className="modal-overlay" onClick={onCancel}>
+      <div className="surface-panel w-full max-w-md border border-border p-6 shadow-glow" onClick={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-start justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">Environment</p>
@@ -182,7 +190,7 @@ export function EnvVarModal({
           <div>
             <label className="mb-2 block text-xs font-semibold text-base-content/70 uppercase tracking-wider">Value</label>
             <div
-              className={`rounded-xl border min-h-[44px] flex items-center ${
+              className={`rounded-xl border min-h-[44px] flex items-center transition-all duration-150 ${
                 validationErrors.value ? 'border-error' : 'border-border'
               }`}
             >

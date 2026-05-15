@@ -4,12 +4,6 @@ import type { DashboardContainerStatus, DashboardData } from '../types';
 import type { HostStatus } from '@/shared/types';
 
 export function useDashboardData(): DashboardData {
-  const { data: runtimeData } = useQuery({
-    queryKey: ['runtime', 'status'],
-    queryFn: () => dashboardService.getRuntimeStatus(),
-    refetchInterval: 5000,
-  });
-
   const { data: dockerData, isLoading: dockerLoading, isError: dockerError } = useQuery({
     queryKey: ['docker', 'status'],
     queryFn: () => dashboardService.getDockerStatus(),
@@ -46,7 +40,6 @@ export function useDashboardData(): DashboardData {
   });
 
   return {
-    runtime: runtimeData?.data?.data,
     container: dockerData?.data?.data as DashboardContainerStatus | null | undefined,
     system: systemData?.data?.data,
     config: configData?.data?.data,

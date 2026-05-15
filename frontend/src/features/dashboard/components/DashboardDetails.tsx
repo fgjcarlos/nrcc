@@ -1,7 +1,7 @@
 import { formatBytes, cn } from '@/shared/lib';
 import { formatPercent } from '@/features/dashboard/lib';
 import type { BackupObservability } from '@/features/backups/services';
-import type { RuntimeInfo, SystemInfo } from '@/shared/types';
+import type { SystemInfo } from '@/shared/types';
 import { Activity, Archive, CheckCircle2, ExternalLink, HardDrive, Play, RefreshCw, Square } from 'lucide-react';
 
 interface DashboardDetailsProps {
@@ -12,7 +12,6 @@ interface DashboardDetailsProps {
   onOpenNodeRed: () => void;
   onRequestRestart: () => void;
   backups?: BackupObservability;
-  runtime?: RuntimeInfo;
   system?: SystemInfo;
 }
 
@@ -61,8 +60,7 @@ function QuickActionsCard({
   isStartStopping,
   onStartNodeRed,
   onStopNodeRed,
-  runtime,
-}: Omit<DashboardDetailsProps, 'system'>) {
+}: Omit<DashboardDetailsProps, 'system' | 'backups'>) {
   return (
     <div className="p-6 border card surface-card border-border">
       <div className="flex items-center gap-3 mb-5">
@@ -95,37 +93,7 @@ function QuickActionsCard({
           <span className="text-base font-medium">Abrir</span>
         </button>
 
-        {/* Start (solo cuando stopped) */}
-        {runtime?.status === 'stopped' && (
-          <button
-            onClick={onStartNodeRed}
-            disabled={isStartStopping}
-            className="group action-btn-secondary col-span-2 flex items-center justify-center gap-3 rounded-xl p-3.5"
-          >
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10 text-accent transition-colors group-hover:bg-accent/20">
-              <Play className="w-4 h-4" />
-            </div>
-            <span className="text-sm font-medium">
-              {isStartStopping ? 'Iniciando…' : 'Arrancar Node-RED'}
-            </span>
-          </button>
-        )}
-
-        {/* Stop (solo cuando running) */}
-        {runtime?.status === 'running' && (
-          <button
-            onClick={onStopNodeRed}
-            disabled={isStartStopping}
-            className="group action-btn-secondary col-span-2 flex items-center justify-center gap-3 rounded-xl p-3.5"
-          >
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-error/10 text-error transition-colors group-hover:bg-error/20">
-              <Square className="w-4 h-4" />
-            </div>
-            <span className="text-sm font-medium">
-              {isStartStopping ? 'Deteniendo…' : 'Detener Node-RED'}
-            </span>
-          </button>
-        )}
+        {/* Start / Stop disabled - no runtime management */}
       </div>
     </div>
   );
@@ -206,7 +174,6 @@ export function DashboardDetails(props: DashboardDetailsProps) {
         isStartStopping={props.isStartStopping}
         onStartNodeRed={props.onStartNodeRed}
         onStopNodeRed={props.onStopNodeRed}
-        runtime={props.runtime}
       />
       <BackupStatusCard backups={props.backups} />
     </div>
