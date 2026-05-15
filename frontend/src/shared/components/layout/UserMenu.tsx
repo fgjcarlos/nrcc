@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ChevronDown, LogOut } from 'lucide-react';
 import { User } from '@/features/auth/services/authService';
 
@@ -20,6 +21,7 @@ const AVATAR_COLORS = [
 export function UserMenu({ user, onLogout, logoutBusy = false }: UserMenuProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   // Get deterministic avatar color from username
   const avatarColorIndex = user.username.charCodeAt(0) % AVATAR_COLORS.length;
@@ -59,6 +61,11 @@ export function UserMenu({ user, onLogout, logoutBusy = false }: UserMenuProps) 
     setOpen(false);
   };
 
+  const handleProfile = () => {
+    navigate('/profile');
+    setOpen(false);
+  };
+
   return (
     <div ref={containerRef} className="relative">
       {/* Avatar trigger button */}
@@ -93,15 +100,13 @@ export function UserMenu({ user, onLogout, logoutBusy = false }: UserMenuProps) 
              <p className="mt-0.5 font-semibold text-base-content">{user.username}</p>
            </div>
            <div className="p-2 space-y-1">
-             {/* Profile item (disabled for now) */}
              <button
                type="button"
                role="menuitem"
-               disabled
-               className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-base-content/50 cursor-not-allowed transition-colors duration-150"
-               title="Profile page coming soon"
+               onClick={handleProfile}
+               className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-base-content/70 transition-colors duration-150 hover:bg-base-300/70 hover:text-base-content"
              >
-               Perfil
+               Profile
              </button>
              {/* Logout button */}
              <button
@@ -112,7 +117,7 @@ export function UserMenu({ user, onLogout, logoutBusy = false }: UserMenuProps) 
                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-base-content/70 transition-colors duration-150 hover:bg-error/15 hover:text-error/90 disabled:opacity-50 disabled:cursor-not-allowed"
              >
                <LogOut className="w-4 h-4 shrink-0" />
-               <span>{logoutBusy ? 'Signing out…' : 'Cerrar sesión'}</span>
+               <span>{logoutBusy ? 'Signing out…' : 'Sign out'}</span>
              </button>
            </div>
         </div>

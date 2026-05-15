@@ -5,7 +5,7 @@ import { ErrorBoundary } from '@/shared/components/layout/ErrorBoundary';
 import { ToastViewport } from './shared/components/ui/ToastViewport';
 
 // Public pages (no layout)
-import { LandingView, LoginView, SetupView } from '@/features/auth/components';
+import { LandingView, LoginView, ProfileView, SetupView } from '@/features/auth/components';
 
 // Feature views (protected routes with layout)
 import { DashboardView } from '@/features/dashboard';
@@ -60,6 +60,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <DockerView />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="profile"
+          element={
+            <ProtectedRoute>
+              <ProfileView />
             </ProtectedRoute>
           }
         />
