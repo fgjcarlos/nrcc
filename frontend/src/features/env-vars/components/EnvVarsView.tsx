@@ -74,8 +74,8 @@ export function EnvVarsView() {
   const handleDelete = (key: string) => {
     setConfirmConfig({
       isOpen: true,
-      title: 'Eliminar variable de entorno',
-      description: `¿Está seguro de que desea eliminar ${key}? Node-RED se reiniciará.`,
+      title: 'Delete environment variable',
+      description: `Are you sure you want to delete ${key}? Node-RED will restart.`,
       confirmText: key,
       variant: 'danger',
       onConfirm: () => {
@@ -98,7 +98,7 @@ export function EnvVarsView() {
             className="action-btn-primary"
           >
             <Plus className="w-4 h-4" />
-            Añadir
+            Add
           </button>
         )}
       </div>
@@ -109,13 +109,13 @@ export function EnvVarsView() {
           onClick={() => setActiveTab('table')}
           className={`tab ${activeTab === 'table' ? 'tab-active' : ''}`}
         >
-          Configuradas
+          Configured
         </button>
         <button
           onClick={() => setActiveTab('dotenv')}
           className={`tab ${activeTab === 'dotenv' ? 'tab-active' : ''}`}
         >
-          Archivo .env
+          .env file
         </button>
       </div>
 

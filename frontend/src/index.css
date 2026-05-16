@@ -321,7 +321,8 @@
 
   /* ── Modal Overlay ─────────────────────────────────────────── */
   .modal-overlay {
-    @apply fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-md;
+    @apply fixed inset-0 z-50 flex h-dvh w-screen items-center justify-center overflow-hidden p-4 backdrop-blur-md;
+    isolation: isolate;
   }
 
   [data-theme="corporateDark"] .modal-overlay {
