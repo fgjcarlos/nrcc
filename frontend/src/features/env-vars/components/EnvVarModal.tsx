@@ -103,9 +103,10 @@ export function EnvVarModal({
 
       case 'boolean':
         return (
-          <div className="flex h-12 w-full items-center justify-between gap-3 px-3">
+          <div className="flex min-h-12 w-full items-center justify-between gap-3 px-3">
             <span className="text-sm font-semibold text-base-content/70 uppercase tracking-wider">Value:</span>
-            <div className="flex items-center gap-2">
+            <label className="flex items-center gap-2">
+              <span className="sr-only">Boolean value</span>
               <input
                 type="checkbox"
                 checked={formData.value === 'true'}
@@ -115,7 +116,7 @@ export function EnvVarModal({
               <span className={`badge badge-primary text-xs font-bold`}>
                 {formData.value === 'true' ? 'true' : 'false'}
               </span>
-            </div>
+            </label>
           </div>
         );
 
@@ -200,7 +201,8 @@ export function EnvVarModal({
           <div>
             <label className="mb-2 block text-xs font-semibold text-base-content/70 uppercase tracking-wider">Value</label>
             <div
-              className={`h-12 rounded-xl border transition-colors duration-150 ${
+              data-testid="env-var-value-field"
+              className={`min-h-12 rounded-xl border transition-all duration-150 ${
                 validationErrors.value ? 'border-error' : 'border-border'
               }`}
             >
@@ -231,7 +233,7 @@ export function EnvVarModal({
               disabled={isPending}
               className="action-btn-secondary disabled:opacity-50"
             >
-              Cancelar
+              Cancel
             </button>
             <button
               type="submit"
@@ -240,13 +242,13 @@ export function EnvVarModal({
             >
               {isPending ? (
                 <>
-                  <span className="opacity-0">Guardar</span>
+                  <span className="opacity-0">Save</span>
                   <span className="absolute inset-0 flex items-center justify-center">
                     <span className="loading loading-spinner loading-sm"></span>
                   </span>
                 </>
               ) : (
-                'Guardar'
+                'Save'
               )}
             </button>
           </div>
