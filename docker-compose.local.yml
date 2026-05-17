@@ -1,0 +1,29 @@
+# Local all-in-one build for running NRCC on a developer PC.
+# Usage:
+#   docker compose -f docker-compose.local.yml up --build
+#   open http://localhost:3010 for NRCC and http://localhost:1881 for Node-RED
+services:
+  nrcc:
+    image: nrcc-local:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.server-local
+    container_name: nrcc-local
+    ports:
+      - "3010:3001"   # nrcc web UI + API (avoid clashing with dev server on 3001)
+      - "1881:1880"   # Node-RED editor (avoid existing local Node-RED on 1880)
+    environment:
+      PORT: "3001"
+      DATA_DIR: /data
+      JWT_SECRET: "${JWT_SECRET:-dev-secret-not-for-production}"
+      NODE_RED_CMD: node-red
+      NRCC_BOOTSTRAP_INTERACTIVE: "false"
+    volumes:
+      - nrcc_local_data:/data
+      - nrcc_local_backups:/data/backups
+      - nrcc_local_node_modules:/data/node_modules
+
+volumes:
+  nrcc_local_data:
+  nrcc_local_backups:
+  nrcc_local_node_modules:
