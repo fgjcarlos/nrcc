@@ -1,0 +1,35 @@
+# Local server build for NRCC using pnpm lockfile
+FROM node:20-slim AS frontend-builder
+WORKDIR /build/frontend
+RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
+COPY frontend/package.json frontend/pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+COPY frontend/ ./
+RUN pnpm build
+
+FROM golang:1.25-alpine AS go-builder
+WORKDIR /build
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+# Keep the freshly built frontend bundle after copying the repository context.
+# The repo may contain a stale frontend/dist from a previous local build.
+COPY --from=frontend-builder /build/frontend/dist ./frontend/dist
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o nrcc .
+
+FROM node:24-slim
+LABEL org.opencontainers.image.title="nrcc-local"
+# Runtime needs Node-RED plus pnpm >= 11 for NRCC package operations.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends wget \
+    && npm install -g --unsafe-perm node-red pnpm@^11 \
+    && npm cache clean --force \
+    && rm -rf /var/lib/apt/lists/*
+COPY --chmod=755 --from=go-builder /build/nrcc /usr/local/bin/nrcc
+VOLUME ["/data"]
+ENV DATA_DIR=/data \
+    NODE_RED_CMD=node-red \
+    PORT=3001
+USER node
+EXPOSE 3001 1880
+ENTRYPOINT ["/usr/local/bin/nrcc"]
