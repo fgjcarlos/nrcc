@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -14,6 +16,7 @@ import (
 // TestUpdateHandler_GetStatus_ReturnsOK tests that GET /api/updates/status returns 200
 func TestUpdateHandler_GetStatus_ReturnsOK(t *testing.T) {
 	tmpDir := t.TempDir()
+	installFakeNPM(t)
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
@@ -30,6 +33,7 @@ func TestUpdateHandler_GetStatus_ReturnsOK(t *testing.T) {
 // TestUpdateHandler_GetStatus_ContentType verifies correct Content-Type header
 func TestUpdateHandler_GetStatus_ContentType(t *testing.T) {
 	tmpDir := t.TempDir()
+	installFakeNPM(t)
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
@@ -47,6 +51,7 @@ func TestUpdateHandler_GetStatus_ContentType(t *testing.T) {
 // TestUpdateHandler_GetStatus_EmptyCache tests GetStatus with empty/zero cache
 func TestUpdateHandler_GetStatus_EmptyCache(t *testing.T) {
 	tmpDir := t.TempDir()
+	installFakeNPM(t)
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
@@ -77,6 +82,7 @@ func TestUpdateHandler_GetStatus_EmptyCache(t *testing.T) {
 // TestUpdateHandler_GetStatus_ValidJSON tests that response is valid JSON
 func TestUpdateHandler_GetStatus_ValidJSON(t *testing.T) {
 	tmpDir := t.TempDir()
+	installFakeNPM(t)
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
@@ -95,6 +101,7 @@ func TestUpdateHandler_GetStatus_ValidJSON(t *testing.T) {
 // TestUpdateHandler_GetCheck_ReturnsOK tests that GET /api/updates/check returns 200
 func TestUpdateHandler_GetCheck_ReturnsOK(t *testing.T) {
 	tmpDir := t.TempDir()
+	installFakeNPM(t)
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
@@ -112,6 +119,7 @@ func TestUpdateHandler_GetCheck_ReturnsOK(t *testing.T) {
 // TestUpdateHandler_GetCheck_ContentType verifies correct Content-Type header
 func TestUpdateHandler_GetCheck_ContentType(t *testing.T) {
 	tmpDir := t.TempDir()
+	installFakeNPM(t)
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
@@ -129,6 +137,7 @@ func TestUpdateHandler_GetCheck_ContentType(t *testing.T) {
 // TestUpdateHandler_GetCheck_ResponseStructure verifies response JSON structure
 func TestUpdateHandler_GetCheck_ResponseStructure(t *testing.T) {
 	tmpDir := t.TempDir()
+	installFakeNPM(t)
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
@@ -158,6 +167,7 @@ func TestUpdateHandler_GetCheck_ResponseStructure(t *testing.T) {
 // TestUpdateHandler_GetCheck_ValidJSON tests that response is valid JSON
 func TestUpdateHandler_GetCheck_ValidJSON(t *testing.T) {
 	tmpDir := t.TempDir()
+	installFakeNPM(t)
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
@@ -184,6 +194,7 @@ func TestUpdateHandler_GetCheck_ValidJSON(t *testing.T) {
 // TestUpdateHandler_PostApply_ReturnsOK tests that POST /api/updates/apply returns 200 on success
 func TestUpdateHandler_PostApply_ReturnsOK(t *testing.T) {
 	tmpDir := t.TempDir()
+	installFakeNPM(t)
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
@@ -191,9 +202,7 @@ func TestUpdateHandler_PostApply_ReturnsOK(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	handler.PostApply(w, req)
-	
-	// Small delay to allow background goroutine to start
-	time.Sleep(10 * time.Millisecond)
+	waitForUpdateFlowToSettle(t, svc)
 
 	// Expect 200 OK or 500 (if npm is not available), but not 4xx
 	if w.Code == http.StatusInternalServerError {
@@ -210,6 +219,7 @@ func TestUpdateHandler_PostApply_ReturnsOK(t *testing.T) {
 // TestUpdateHandler_PostApply_ResponseStructure verifies response includes fromVersion and toVersion
 func TestUpdateHandler_PostApply_ResponseStructure(t *testing.T) {
 	tmpDir := t.TempDir()
+	installFakeNPM(t)
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
@@ -217,9 +227,7 @@ func TestUpdateHandler_PostApply_ResponseStructure(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	handler.PostApply(w, req)
-	
-	// Small delay to allow background goroutine to start
-	time.Sleep(10 * time.Millisecond)
+	waitForUpdateFlowToSettle(t, svc)
 
 	// Only check on success (200 OK)
 	if w.Code == http.StatusOK {
@@ -258,6 +266,7 @@ func TestUpdateHandler_PostApply_ResponseStructure(t *testing.T) {
 // TestUpdateHandler_PostApply_ContentType verifies correct Content-Type header
 func TestUpdateHandler_PostApply_ContentType(t *testing.T) {
 	tmpDir := t.TempDir()
+	installFakeNPM(t)
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
@@ -265,6 +274,7 @@ func TestUpdateHandler_PostApply_ContentType(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	handler.PostApply(w, req)
+	waitForUpdateFlowToSettle(t, svc)
 
 	contentType := w.Header().Get("Content-Type")
 	if contentType != "application/json" {
@@ -277,6 +287,7 @@ func TestUpdateHandler_PostApply_ContentType(t *testing.T) {
 // TestUpdateHandler_GetState_ReturnsOK tests that GET /api/updates/state returns 200
 func TestUpdateHandler_GetState_ReturnsOK(t *testing.T) {
 	tmpDir := t.TempDir()
+	installFakeNPM(t)
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
@@ -293,6 +304,7 @@ func TestUpdateHandler_GetState_ReturnsOK(t *testing.T) {
 // TestUpdateHandler_GetState_ValidJSON tests that GET /api/updates/state returns valid JSON
 func TestUpdateHandler_GetState_ValidJSON(t *testing.T) {
 	tmpDir := t.TempDir()
+	installFakeNPM(t)
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
@@ -314,6 +326,7 @@ func TestUpdateHandler_GetState_ValidJSON(t *testing.T) {
 // TestUpdateHandler_GetState_InitialStateIdle tests that initial state is Idle
 func TestUpdateHandler_GetState_InitialStateIdle(t *testing.T) {
 	tmpDir := t.TempDir()
+	installFakeNPM(t)
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
@@ -357,6 +370,7 @@ func TestUpdateHandler_GetState_InitialStateIdle(t *testing.T) {
 // TestUpdateHandler_GetState_ContentType verifies correct Content-Type header
 func TestUpdateHandler_GetState_ContentType(t *testing.T) {
 	tmpDir := t.TempDir()
+	installFakeNPM(t)
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
@@ -374,6 +388,7 @@ func TestUpdateHandler_GetState_ContentType(t *testing.T) {
 // TestUpdateHandler_PostApply_StartsBackgroundFlow tests that PostApply launches async flow
 func TestUpdateHandler_PostApply_StartsBackgroundFlow(t *testing.T) {
 	tmpDir := t.TempDir()
+	installFakeNPM(t)
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
@@ -387,9 +402,7 @@ func TestUpdateHandler_PostApply_StartsBackgroundFlow(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	handler.PostApply(w, req)
-	
-	// Small delay to allow background goroutine to start
-	time.Sleep(10 * time.Millisecond)
+	waitForUpdateFlowToSettle(t, svc)
 
 	// PostApply should return 200 (not block on npm call)
 	if w.Code != http.StatusOK {
@@ -419,6 +432,7 @@ func TestUpdateHandler_PostApply_StartsBackgroundFlow(t *testing.T) {
 // TestUpdateHandler_PostApply_IncludesBackupId tests that PostApply response includes backupId
 func TestUpdateHandler_PostApply_IncludesBackupId(t *testing.T) {
 	tmpDir := t.TempDir()
+	installFakeNPM(t)
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
@@ -426,9 +440,7 @@ func TestUpdateHandler_PostApply_IncludesBackupId(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	handler.PostApply(w, req)
-	
-	// Small delay to allow background goroutine to start
-	time.Sleep(10 * time.Millisecond)
+	waitForUpdateFlowToSettle(t, svc)
 
 	if w.Code == http.StatusOK {
 		var apiResp map[string]interface{}
@@ -458,6 +470,7 @@ func TestUpdateHandler_PostApply_IncludesBackupId(t *testing.T) {
 // - If state != Idle, return 409 Conflict
 func TestUpdateHandler_PostApply_ConcurrencyLogic_DocumentedBehavior(t *testing.T) {
 	tmpDir := t.TempDir()
+	installFakeNPM(t)
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
@@ -471,9 +484,7 @@ func TestUpdateHandler_PostApply_ConcurrencyLogic_DocumentedBehavior(t *testing.
 	req := httptest.NewRequest("POST", "/api/updates/apply", nil)
 	w := httptest.NewRecorder()
 	handler.PostApply(w, req)
-	
-	// Small delay to allow background goroutine to start
-	time.Sleep(10 * time.Millisecond)
+	waitForUpdateFlowToSettle(t, svc)
 
 	if w.Code != http.StatusOK {
 		t.Logf("First POST returned %d (expected 200)", w.Code)
@@ -483,4 +494,31 @@ func TestUpdateHandler_PostApply_ConcurrencyLogic_DocumentedBehavior(t *testing.
 	// This is tested deterministically in the service layer via
 	// TestApplyUpdateWithBackup_ConcurrencyGuard (unit test that mocks execution)
 	t.Log("Concurrency behavior is verified at service layer; handler just checks state and returns 409")
+}
+
+func installFakeNPM(t *testing.T) {
+	t.Helper()
+	binDir := t.TempDir()
+	npmPath := filepath.Join(binDir, "npm")
+	if err := os.WriteFile(npmPath, []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
+		t.Fatalf("failed to write fake npm: %v", err)
+	}
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
+func waitForUpdateFlowToSettle(t *testing.T, svc *service.UpdateService) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	started := false
+	for time.Now().Before(deadline) {
+		state := svc.GetFlowState().State
+		if state == model.StateBackingUp || state == model.StateApplying {
+			started = true
+		} else if started || state == model.StateCompleted || state == model.StateFailed {
+			// The goroutine sets a terminal state as its last operation.
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("update flow did not settle before test cleanup; latest state=%+v", svc.GetFlowState())
 }

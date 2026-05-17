@@ -25,6 +25,12 @@ func NewConfigService(dataDir string) *ConfigService {
 	return NewConfigServiceWithHost(dataDir, NewHostService(dataDir))
 }
 
+// NewIsolatedConfigService creates a config service whose settings.js writes are
+// confined to dataDir. It is intended for hermetic tests.
+func NewIsolatedConfigService(dataDir string) *ConfigService {
+	return NewConfigServiceWithHost(dataDir, NewIsolatedHostService(dataDir))
+}
+
 // NewConfigServiceWithHost creates a config service with shared host detection.
 func NewConfigServiceWithHost(dataDir string, hostSvc *HostService) *ConfigService {
 	configPath := filepath.Join(dataDir, "config.json")

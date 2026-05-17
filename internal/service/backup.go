@@ -481,7 +481,7 @@ func (s *BackupService) createBackup(options createBackupOptions) (model.Backup,
 
 	backupID := uuid.New().String()
 	backupPath := filepath.Join(backupDir, backupID+".zip")
-	createdAt := time.Now().UTC().Format(time.RFC3339)
+	createdAt := time.Now().UTC().Format(time.RFC3339Nano)
 	name := strings.TrimSpace(options.Name)
 	if name == "" {
 		name = defaultBackupName(backupType, createdAt)
@@ -1061,8 +1061,8 @@ func (s *BackupService) GetSchedulerHistory(opts model.PaginationOpts) (model.Pa
 	// Filter to only scheduler-related events
 	var schedulerEvents []model.BackupEvent
 	for _, event := range allEvents {
-		if event.Type == model.BackupEventTypeSchedulerRun || 
-		   event.Type == model.BackupEventTypeSchedulerError {
+		if event.Type == model.BackupEventTypeSchedulerRun ||
+			event.Type == model.BackupEventTypeSchedulerError {
 			schedulerEvents = append(schedulerEvents, event)
 		}
 	}

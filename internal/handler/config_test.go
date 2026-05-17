@@ -15,7 +15,7 @@ import (
 
 func TestSaveConfigWithFrontendPayload(t *testing.T) {
 	// Create a temporary config service
-	configSvc := service.NewConfigService(t.TempDir())
+	configSvc := service.NewIsolatedConfigService(t.TempDir())
 	handler := NewConfigHandler(configSvc)
 
 	// Frontend payload from Configuration.tsx
@@ -75,7 +75,7 @@ func TestSaveConfigWithFrontendPayload(t *testing.T) {
 
 // TestSaveConfigWithAdminAuth verifies admin auth can be saved with valid credentials
 func TestSaveConfigWithAdminAuth(t *testing.T) {
-	configSvc := service.NewConfigService(t.TempDir())
+	configSvc := service.NewIsolatedConfigService(t.TempDir())
 	handler := NewConfigHandler(configSvc)
 
 	// Frontend payload with admin auth enabled
@@ -133,7 +133,7 @@ func TestSaveConfigWithAdminAuth(t *testing.T) {
 
 // TestSaveConfigAdminAuthRequiresUsername verifies that empty username is rejected
 func TestSaveConfigAdminAuthRequiresUsername(t *testing.T) {
-	configSvc := service.NewConfigService(t.TempDir())
+	configSvc := service.NewIsolatedConfigService(t.TempDir())
 	handler := NewConfigHandler(configSvc)
 
 	frontendPayload := map[string]interface{}{
@@ -173,7 +173,7 @@ func TestSaveConfigAdminAuthRequiresUsername(t *testing.T) {
 
 // TestSaveConfigAdminAuthRequiresPassword verifies that empty password is rejected when no existing config
 func TestSaveConfigAdminAuthRequiresPassword(t *testing.T) {
-	configSvc := service.NewConfigService(t.TempDir())
+	configSvc := service.NewIsolatedConfigService(t.TempDir())
 	handler := NewConfigHandler(configSvc)
 
 	frontendPayload := map[string]interface{}{
@@ -214,7 +214,7 @@ func TestSaveConfigAdminAuthRequiresPassword(t *testing.T) {
 // TestSaveConfigAdminAuthPreservePassword verifies that empty password preserves existing hash
 func TestSaveConfigAdminAuthPreservePassword(t *testing.T) {
 	tempDir := t.TempDir()
-	configSvc := service.NewConfigService(tempDir)
+	configSvc := service.NewIsolatedConfigService(tempDir)
 
 	// First, save an initial config with a password
 	initialCfg := model.NodeRedConfig{

@@ -98,7 +98,7 @@ func TestBootstrapHandler_GetStatus_NodeRedEnvironment(t *testing.T) {
 }
 
 func TestSettingsHandler_GetRaw_RequiresAuth(t *testing.T) {
-	configSvc := service.NewConfigService(t.TempDir())
+	configSvc := service.NewIsolatedConfigService(t.TempDir())
 	handler := NewSettingsHandler(configSvc)
 
 	req := httptest.NewRequest("GET", "/api/settings/raw", nil)
@@ -114,7 +114,7 @@ func TestSettingsHandler_GetRaw_RequiresAuth(t *testing.T) {
 
 func TestSettingsHandler_GetRaw_WithAuth_Returns200(t *testing.T) {
 	tempDir := t.TempDir()
-	configSvc := service.NewConfigService(tempDir)
+	configSvc := service.NewIsolatedConfigService(tempDir)
 	handler := NewSettingsHandler(configSvc)
 
 	req := httptest.NewRequest("GET", "/api/settings/raw", nil)
@@ -138,7 +138,7 @@ func TestSettingsHandler_GetRaw_WithAuth_Returns200(t *testing.T) {
 
 func TestSettingsHandler_GetRaw_ReturnsValidJSON(t *testing.T) {
 	tempDir := t.TempDir()
-	configSvc := service.NewConfigService(tempDir)
+	configSvc := service.NewIsolatedConfigService(tempDir)
 	handler := NewSettingsHandler(configSvc)
 
 	req := httptest.NewRequest("GET", "/api/settings/raw", nil)
@@ -167,7 +167,7 @@ func TestSettingsHandler_GetRaw_ReturnsValidJSON(t *testing.T) {
 }
 
 func TestSettingsHandler_SaveRaw_RequiresAuth(t *testing.T) {
-	configSvc := service.NewConfigService(t.TempDir())
+	configSvc := service.NewIsolatedConfigService(t.TempDir())
 	handler := NewSettingsHandler(configSvc)
 
 	payload := RawSettingsRequest{Content: "module.exports = {}"}
@@ -186,7 +186,7 @@ func TestSettingsHandler_SaveRaw_RequiresAuth(t *testing.T) {
 }
 
 func TestSettingsHandler_SaveRaw_RequiresAdminRole(t *testing.T) {
-	configSvc := service.NewConfigService(t.TempDir())
+	configSvc := service.NewIsolatedConfigService(t.TempDir())
 	handler := NewSettingsHandler(configSvc)
 
 	payload := RawSettingsRequest{Content: "module.exports = {}"}
@@ -214,7 +214,7 @@ func TestSettingsHandler_SaveRaw_RequiresAdminRole(t *testing.T) {
 
 func TestSettingsHandler_SaveRaw_WithAdmin_Returns200(t *testing.T) {
 	tempDir := t.TempDir()
-	configSvc := service.NewConfigService(tempDir)
+	configSvc := service.NewIsolatedConfigService(tempDir)
 	handler := NewSettingsHandler(configSvc)
 
 	payload := RawSettingsRequest{Content: "module.exports = { uiPort: 1880 }"}
@@ -241,7 +241,7 @@ func TestSettingsHandler_SaveRaw_WithAdmin_Returns200(t *testing.T) {
 }
 
 func TestSettingsHandler_SaveRaw_RejectsEmptyContent(t *testing.T) {
-	configSvc := service.NewConfigService(t.TempDir())
+	configSvc := service.NewIsolatedConfigService(t.TempDir())
 	handler := NewSettingsHandler(configSvc)
 
 	payload := RawSettingsRequest{Content: ""} // Empty
@@ -269,7 +269,7 @@ func TestSettingsHandler_SaveRaw_RejectsEmptyContent(t *testing.T) {
 
 func TestSettingsHandler_SaveRaw_ReturnsValidJSON(t *testing.T) {
 	tempDir := t.TempDir()
-	configSvc := service.NewConfigService(tempDir)
+	configSvc := service.NewIsolatedConfigService(tempDir)
 	handler := NewSettingsHandler(configSvc)
 
 	payload := RawSettingsRequest{Content: "module.exports = { uiPort: 1880 }"}
@@ -303,7 +303,7 @@ func TestSettingsHandler_SaveRaw_ReturnsValidJSON(t *testing.T) {
 }
 
 func TestSettingsHandler_SaveRaw_InvalidJSON_Body(t *testing.T) {
-	configSvc := service.NewConfigService(t.TempDir())
+	configSvc := service.NewIsolatedConfigService(t.TempDir())
 	handler := NewSettingsHandler(configSvc)
 
 	req := httptest.NewRequest("POST", "/api/settings/raw", bytes.NewReader([]byte("invalid json")))
@@ -327,7 +327,7 @@ func TestSettingsHandler_SaveRaw_InvalidJSON_Body(t *testing.T) {
 
 func TestSettingsHandler_GetRaw_WithEditor_Role(t *testing.T) {
 	tempDir := t.TempDir()
-	configSvc := service.NewConfigService(tempDir)
+	configSvc := service.NewIsolatedConfigService(tempDir)
 	handler := NewSettingsHandler(configSvc)
 
 	req := httptest.NewRequest("GET", "/api/settings/raw", nil)
@@ -351,7 +351,7 @@ func TestSettingsHandler_GetRaw_WithEditor_Role(t *testing.T) {
 }
 
 func TestSettingsHandler_SaveRaw_WithViewer_Role_Forbidden(t *testing.T) {
-	configSvc := service.NewConfigService(t.TempDir())
+	configSvc := service.NewIsolatedConfigService(t.TempDir())
 	handler := NewSettingsHandler(configSvc)
 
 	payload := RawSettingsRequest{Content: "module.exports = {}"}
@@ -379,7 +379,7 @@ func TestSettingsHandler_SaveRaw_WithViewer_Role_Forbidden(t *testing.T) {
 
 func TestSettingsHandler_SaveRaw_CreatesBackup(t *testing.T) {
 	tempDir := t.TempDir()
-	configSvc := service.NewConfigService(tempDir)
+	configSvc := service.NewIsolatedConfigService(tempDir)
 	handler := NewSettingsHandler(configSvc)
 
 	makeAdminCtx := func(r *http.Request) *http.Request {
