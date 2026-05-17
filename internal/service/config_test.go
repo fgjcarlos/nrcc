@@ -10,7 +10,7 @@ import (
 
 func TestConfigService_Get_DefaultsWhenNoConfig(t *testing.T) {
 	tempDir := t.TempDir()
-	svc := NewConfigService(tempDir)
+	svc := NewIsolatedConfigService(tempDir)
 
 	cfg, err := svc.Get()
 
@@ -29,7 +29,7 @@ func TestConfigService_Get_DefaultsWhenNoConfig(t *testing.T) {
 
 func TestConfigService_Save_CreatesConfigFile(t *testing.T) {
 	tempDir := t.TempDir()
-	svc := NewConfigService(tempDir)
+	svc := NewIsolatedConfigService(tempDir)
 
 	cfg := model.NodeRedConfig{
 		Port:          1880,
@@ -51,9 +51,35 @@ func TestConfigService_Save_CreatesConfigFile(t *testing.T) {
 	}
 }
 
+func TestConfigService_Save_UsesTempSettingsWhenNodeRedSettingsEnvIsExternal(t *testing.T) {
+	tempDir := t.TempDir()
+	externalDir := t.TempDir()
+	externalSettings := filepath.Join(externalDir, "settings.js")
+	t.Setenv("NODE_RED_SETTINGS", externalSettings)
+
+	svc := NewIsolatedConfigService(tempDir)
+	cfg := model.NodeRedConfig{
+		Port:          1880,
+		UIPort:        1880,
+		HTTPAdminRoot: "/admin",
+		HTTPNodeRoot:  "/node",
+	}
+
+	if err := svc.Save(cfg); err != nil {
+		t.Fatalf("Save should not error: %v", err)
+	}
+	if _, err := os.Stat(externalSettings); !os.IsNotExist(err) {
+		t.Fatalf("external NODE_RED_SETTINGS should not be written, stat err=%v", err)
+	}
+	settingsPath := filepath.Join(tempDir, "settings.js")
+	if _, err := os.Stat(settingsPath); err != nil {
+		t.Fatalf("settings.js should be written inside tempDir: %v", err)
+	}
+}
+
 func TestConfigService_SaveAndLoad_RoundTrip(t *testing.T) {
 	tempDir := t.TempDir()
-	svc := NewConfigService(tempDir)
+	svc := NewIsolatedConfigService(tempDir)
 
 	original := model.NodeRedConfig{
 		Port:          3000,
@@ -94,7 +120,7 @@ func TestConfigService_SaveAndLoad_RoundTrip(t *testing.T) {
 
 func TestConfigService_GetRawSettings_CreatesDefaultIfNotExists(t *testing.T) {
 	tempDir := t.TempDir()
-	hostSvc := NewHostService(tempDir)
+	hostSvc := NewIsolatedHostService(tempDir)
 	svc := NewConfigServiceWithHost(tempDir, hostSvc)
 
 	doc, err := svc.GetRawSettings()
@@ -116,7 +142,7 @@ func TestConfigService_GetRawSettings_CreatesDefaultIfNotExists(t *testing.T) {
 
 func TestConfigService_SaveRawSettings_CreatesBackup(t *testing.T) {
 	tempDir := t.TempDir()
-	hostSvc := NewHostService(tempDir)
+	hostSvc := NewIsolatedHostService(tempDir)
 	svc := NewConfigServiceWithHost(tempDir, hostSvc)
 
 	// First save — no backup expected (nothing to back up yet)
@@ -149,7 +175,7 @@ func TestConfigService_SaveRawSettings_CreatesBackup(t *testing.T) {
 
 func TestConfigService_SaveRawSettings_WritesContent(t *testing.T) {
 	tempDir := t.TempDir()
-	hostSvc := NewHostService(tempDir)
+	hostSvc := NewIsolatedHostService(tempDir)
 	svc := NewConfigServiceWithHost(tempDir, hostSvc)
 
 	content := "module.exports = { uiPort: 3000 }\n"
@@ -229,7 +255,7 @@ func TestConfigService_Validate_RequiredFields(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			svc := NewConfigService(t.TempDir())
+			svc := NewIsolatedConfigService(t.TempDir())
 			err := svc.Validate(tt.cfg)
 
 			if (err != nil) != tt.wantErr {
@@ -326,7 +352,7 @@ func TestConfigService_ValidateAdminAuth_InvalidPassword(t *testing.T) {
 }
 
 func TestConfigService_ParseConfigFromContent_ExtractsPort(t *testing.T) {
-	svc := NewConfigService(t.TempDir())
+	svc := NewIsolatedConfigService(t.TempDir())
 
 	content := `module.exports = {
   uiPort: 3000,
@@ -345,7 +371,7 @@ func TestConfigService_ParseConfigFromContent_ExtractsPort(t *testing.T) {
 }
 
 func TestConfigService_ParseConfigFromContent_WithLangAndFlowFile(t *testing.T) {
-	svc := NewConfigService(t.TempDir())
+	svc := NewIsolatedConfigService(t.TempDir())
 
 	content := `module.exports = {
   uiPort: 1880,
@@ -486,7 +512,7 @@ func TestParseBoolFromJS_False(t *testing.T) {
 }
 
 func TestConfigService_GetDefault_HasRequiredFields(t *testing.T) {
-	svc := NewConfigService(t.TempDir())
+	svc := NewIsolatedConfigService(t.TempDir())
 
 	cfg := svc.GetDefault()
 
@@ -503,7 +529,7 @@ func TestConfigService_GetDefault_HasRequiredFields(t *testing.T) {
 
 func TestConfigService_PreserveAdminAuthPasswords(t *testing.T) {
 	tempDir := t.TempDir()
-	svc := NewConfigService(tempDir)
+	svc := NewIsolatedConfigService(tempDir)
 
 	// Save initial config with password
 	initial := model.NodeRedConfig{
@@ -554,7 +580,7 @@ func TestConfigService_PreserveAdminAuthPasswords(t *testing.T) {
 
 func TestConfigService_DecorateConfig_SetsSettingsPath(t *testing.T) {
 	tempDir := t.TempDir()
-	hostSvc := NewHostService(tempDir)
+	hostSvc := NewIsolatedHostService(tempDir)
 	svc := NewConfigServiceWithHost(tempDir, hostSvc)
 
 	cfg := model.NodeRedConfig{
@@ -867,7 +893,7 @@ func TestParseAdminAuthFromJS_FromRawSettings(t *testing.T) {
 // is correctly synced to config.json (part of Fix 3)
 func TestConfigService_SaveRawSettings_SyncsAdminAuth(t *testing.T) {
 	tempDir := t.TempDir()
-	hostSvc := NewHostService(tempDir)
+	hostSvc := NewIsolatedHostService(tempDir)
 	svc := NewConfigServiceWithHost(tempDir, hostSvc)
 
 	// Raw settings with adminAuth

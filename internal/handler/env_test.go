@@ -234,7 +234,7 @@ func TestPostEnvValidationFlow(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup
-			configSvc := service.NewConfigService(t.TempDir())
+			configSvc := service.NewIsolatedConfigService(t.TempDir())
 			envSvc := service.NewEnvService(configSvc)
 			handler := NewEnvHandler(envSvc, t.TempDir())
 
@@ -311,7 +311,7 @@ func TestPostEnvValidationFlow(t *testing.T) {
 
 // TestPostEnvHandlerRoundTrip tests a complete cycle: POST and then GET
 func TestPostEnvHandlerRoundTrip(t *testing.T) {
-	configSvc := service.NewConfigService(t.TempDir())
+	configSvc := service.NewIsolatedConfigService(t.TempDir())
 	envSvc := service.NewEnvService(configSvc)
 	handler := NewEnvHandler(envSvc, t.TempDir())
 
@@ -492,7 +492,7 @@ func TestGetEnvLazyMigration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup
-			configSvc := service.NewConfigService(t.TempDir())
+			configSvc := service.NewIsolatedConfigService(t.TempDir())
 			if err := tt.setup(configSvc); err != nil {
 				t.Fatalf("Failed to setup test: %v", err)
 			}
@@ -547,7 +547,7 @@ func TestGetEnvLazyMigration(t *testing.T) {
 // after migration doesn't change the data or cause errors
 func TestGetEnvMigrationIdempotence(t *testing.T) {
 	// Setup config with legacy var
-	configSvc := service.NewConfigService(t.TempDir())
+	configSvc := service.NewIsolatedConfigService(t.TempDir())
 	cfg, _ := configSvc.Get()
 	cfg.EnvVars = []model.EnvVar{
 		{Key: "LEGACY_VAR", Value: "legacy_value", Type: ""},
@@ -610,7 +610,7 @@ func TestGetEnvMigrationIdempotence(t *testing.T) {
 // TestPostEnvUpdateExistingVariable tests updating an existing variable
 // with different type and description
 func TestPostEnvUpdateExistingVariable(t *testing.T) {
-	configSvc := service.NewConfigService(t.TempDir())
+	configSvc := service.NewIsolatedConfigService(t.TempDir())
 	envSvc := service.NewEnvService(configSvc)
 	handler := NewEnvHandler(envSvc, t.TempDir())
 
@@ -673,7 +673,7 @@ func TestPostEnvUpdateExistingVariable(t *testing.T) {
 
 // TestPostEnvSecretHandling tests special handling of secret type variables
 func TestPostEnvSecretHandling(t *testing.T) {
-	configSvc := service.NewConfigService(t.TempDir())
+	configSvc := service.NewIsolatedConfigService(t.TempDir())
 	envSvc := service.NewEnvService(configSvc)
 	handler := NewEnvHandler(envSvc, t.TempDir())
 

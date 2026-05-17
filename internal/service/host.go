@@ -37,6 +37,9 @@ type PortlessAlias struct {
 // HostService inspects the local environment and optionally performs guided installs.
 type HostService struct {
 	dataDir string
+	// IsolatedSettings forces settings.js resolution to stay inside dataDir.
+	// Tests use this to avoid reading or mutating a developer/server Node-RED install.
+	IsolatedSettings bool
 	// StartManaged is set to true by BootstrapCLI when the user opts to start
 	// Node-RED after a native install. main.go checks this after BootstrapCLI returns.
 	StartManaged bool
@@ -45,6 +48,12 @@ type HostService struct {
 // NewHostService creates a new host inspection service.
 func NewHostService(dataDir string) *HostService {
 	return &HostService{dataDir: dataDir}
+}
+
+// NewIsolatedHostService creates a host service that never resolves settings.js
+// from NODE_RED_SETTINGS, native Node-RED, or Docker; it always uses dataDir.
+func NewIsolatedHostService(dataDir string) *HostService {
+	return &HostService{dataDir: dataDir, IsolatedSettings: true}
 }
 
 // Detect returns a normalized view of the local Node-RED environment.
@@ -63,7 +72,9 @@ func (s *HostService) Detect() model.HostStatus {
 		},
 	}
 
-	status.NodeRed = s.inspectNodeRed(status)
+	if !s.IsolatedSettings {
+		status.NodeRed = s.inspectNodeRed(status)
+	}
 	status.Settings = s.resolveSettings(status)
 	status.Recommendations = s.buildRecommendations(status)
 	status.Ready = status.NodeRed.Detected && status.Settings.Path != ""
@@ -366,13 +377,18 @@ func (s *HostService) inspectDockerContainer(containerID string) (version, userD
 }
 
 func (s *HostService) resolveSettings(status model.HostStatus) model.SettingsDocument {
-	path := status.NodeRed.SettingsPath
-	source := "detected"
+	path := ""
+	source := "nrcc-data"
 
-	if path == "" {
-		if envPath := strings.TrimSpace(os.Getenv("NODE_RED_SETTINGS")); envPath != "" {
-			path = envPath
-			source = "env"
+	if !s.IsolatedSettings {
+		path = status.NodeRed.SettingsPath
+		source = "detected"
+
+		if path == "" {
+			if envPath := strings.TrimSpace(os.Getenv("NODE_RED_SETTINGS")); envPath != "" {
+				path = envPath
+				source = "env"
+			}
 		}
 	}
 	if path == "" {
