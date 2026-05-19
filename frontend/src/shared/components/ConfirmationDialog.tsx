@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
+import { UI_COPY } from '@/shared/constants/uiCopy';
 
 export type ConfirmationVariant = 'danger' | 'warning' | 'default';
 
@@ -27,6 +28,15 @@ export function ConfirmationDialog({
   const [inputValue, setInputValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Memoize canConfirm to prevent stale closures in useEffect dependency array
+  const canConfirm = useMemo(
+    () => () => {
+      if (!confirmText) return true;
+      return inputValue === confirmText;
+    },
+    [confirmText, inputValue]
+  );
+
   // Focus input when dialog opens
   useEffect(() => {
     if (isOpen && confirmText) {
@@ -48,14 +58,9 @@ export function ConfirmationDialog({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, isPending, onCancel, onConfirm]);
+  }, [isOpen, isPending, onCancel, onConfirm, canConfirm]);
 
   if (!isOpen) return null;
-
-  const canConfirm = () => {
-    if (!confirmText) return true;
-    return inputValue === confirmText;
-  };
 
   const getVariantStyles = () => {
     switch (variant) {
@@ -113,44 +118,44 @@ export function ConfirmationDialog({
         <div className="px-6 py-5">
           <p className="text-base-content/70">{description}</p>
 
-          {confirmText && (
-            <div className="mt-4">
-              <label className="block text-sm font-medium text-base-content mb-2">
-                Escriba <code className="bg-base-200 px-1 rounded text-base-content">{confirmText}</code> para confirmar
-              </label>
-              <input
-                ref={inputRef}
-                type="text"
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                placeholder={confirmText}
-                disabled={isPending}
-                className="glass-panel w-full rounded-xl border border-border px-3 py-2 text-base-content focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
-              />
-            </div>
-          )}
+           {confirmText && (
+             <div className="mt-4">
+               <label className="block text-sm font-medium text-base-content mb-2">
+                 {UI_COPY.typeToConfirmDelete(confirmText)}
+               </label>
+               <input
+                 ref={inputRef}
+                 type="text"
+                 value={inputValue}
+                 onChange={(e) => setInputValue(e.target.value)}
+                 placeholder={confirmText}
+                 disabled={isPending}
+                 className="glass-panel w-full rounded-xl border border-border px-3 py-2 text-base-content focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
+               />
+             </div>
+           )}
         </div>
 
-        {/* Footer */}
-        <div className="flex justify-end gap-3 border-t ghost-divider modal-inner px-6 py-4">
-          <button
-            onClick={onCancel}
-            disabled={isPending}
-            className="action-btn-secondary"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={!canConfirm() || isPending}
-            className={`px-4 py-2 rounded-xl ${styles.button} disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2`}
-          >
-            {isPending && (
-              <div className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent" />
-            )}
-            {isPending ? 'Procesando...' : 'Confirmar'}
-          </button>
-        </div>
+         {/* Footer */}
+         <div className="flex justify-end gap-3 border-t ghost-divider modal-inner px-6 py-4">
+           <button
+             onClick={onCancel}
+             disabled={isPending}
+             className="action-btn-secondary"
+           >
+             {UI_COPY.cancel}
+           </button>
+           <button
+             onClick={onConfirm}
+             disabled={!canConfirm() || isPending}
+             className={`px-4 py-2 rounded-xl ${styles.button} disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2`}
+           >
+             {isPending && (
+               <div className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent" />
+             )}
+             {isPending ? UI_COPY.processing : UI_COPY.confirm}
+           </button>
+         </div>
       </div>
     </div>
   );

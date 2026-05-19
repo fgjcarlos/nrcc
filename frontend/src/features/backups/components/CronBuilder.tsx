@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
+import { validateCron } from '@/features/backups/lib/cronUtils';
+import { UI_COPY } from '@/shared/constants/uiCopy';
 
 const PRESET_CRON: Record<string, string> = {
   hourly: '0 * * * *',
@@ -7,52 +9,6 @@ const PRESET_CRON: Record<string, string> = {
   daily: '0 2 * * *',
   weekly: '0 2 * * 0',
 };
-
-// Basic 5-field cron validation
-// Simplified: allows numbers, *, /, -, comma separators
-// Validates field ranges: min (0-59), hr (0-23), dom (1-31), mon (1-12), dow (0-6)
-export function validateCron(expr: string): boolean {
-  const trimmed = expr.trim();
-  
-  // Must be exactly 5 fields separated by spaces
-  const fields = trimmed.split(/\s+/);
-  if (fields.length !== 5) {
-    return false;
-  }
-
-  // Basic check: each field should only contain numbers, *, /, -, or comma
-  const validFieldRegex = /^[\d,*/-]+$/;
-  if (!fields.every(field => validFieldRegex.test(field))) {
-    return false;
-  }
-
-  // More strict: validate ranges for each field
-  // minute: 0-59, hour: 0-23, day: 1-31, month: 1-12, dow: 0-6
-  const [minute, hour, day, month, dow] = fields;
-  const ranges = [
-    { field: minute, min: 0, max: 59 },
-    { field: hour, min: 0, max: 23 },
-    { field: day, min: 1, max: 31 },
-    { field: month, min: 1, max: 12 },
-    { field: dow, min: 0, max: 6 },
-  ];
-
-  for (const { field, min, max } of ranges) {
-    if (field === '*') continue;
-
-    // Extract all numbers from the field
-    const numbers = field.split(/[,/-]/).filter(n => n.length > 0 && n !== '*');
-    
-    for (const numStr of numbers) {
-      const num = Number(numStr);
-      if (!Number.isInteger(num) || num < min || num > max) {
-        return false;
-      }
-    }
-  }
-
-  return true;
-}
 
 export type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 export type PresetType = 'hourly' | 'every6h' | 'daily' | 'weekly' | 'custom' | null;
@@ -196,39 +152,39 @@ export function CronBuilder({ value, onChange, onPresetChange, onSave, saveState
         </label>
       )}
 
-      {/* Save button + status indicator */}
-      {onSave && (
-        <div className="flex items-center justify-between gap-3 pt-2">
-          <div className="flex items-center gap-2">
-            {saveState === 'saving' && (
-              <div className="flex items-center gap-2 text-sm text-base-content/60">
-                <div className="h-3 w-3 rounded-full bg-primary/60 animate-pulse" />
-                Guardando...
-              </div>
-            )}
-            {saveState === 'saved' && (
-              <div className="flex items-center gap-2 text-sm text-success">
-                <span className="inline-block h-3 w-3 rounded-full bg-success" />
-                Guardado
-              </div>
-            )}
-            {saveState === 'error' && saveError && (
-              <div className="flex items-center gap-2 text-sm text-error">
-                <span className="inline-block h-3 w-3 rounded-full bg-error" />
-                {saveError}
-              </div>
-            )}
-          </div>
-          <button
-            onClick={onSave}
-            disabled={saveState === 'saving'}
-            className="action-btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-            data-testid="cron-save-button"
-          >
-            {saveState === 'saving' ? 'Saving...' : 'Save Schedule'}
-          </button>
-        </div>
-      )}
+       {/* Save button + status indicator */}
+       {onSave && (
+         <div className="flex items-center justify-between gap-3 pt-2">
+           <div className="flex items-center gap-2">
+             {saveState === 'saving' && (
+               <div className="flex items-center gap-2 text-sm text-base-content/60">
+                 <div className="h-3 w-3 rounded-full bg-primary/60 animate-pulse" />
+                 {UI_COPY.saving}
+               </div>
+             )}
+             {saveState === 'saved' && (
+               <div className="flex items-center gap-2 text-sm text-success">
+                 <span className="inline-block h-3 w-3 rounded-full bg-success" />
+                 {UI_COPY.saved}
+               </div>
+             )}
+             {saveState === 'error' && saveError && (
+               <div className="flex items-center gap-2 text-sm text-error">
+                 <span className="inline-block h-3 w-3 rounded-full bg-error" />
+                 {saveError}
+               </div>
+             )}
+           </div>
+           <button
+             onClick={onSave}
+             disabled={saveState === 'saving'}
+             className="action-btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+             data-testid="cron-save-button"
+           >
+             {saveState === 'saving' ? UI_COPY.saving : 'Save Schedule'}
+           </button>
+         </div>
+       )}
     </div>
   );
 }

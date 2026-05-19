@@ -12,6 +12,7 @@ import {
 import { useBackupsData } from '@/features/backups/hooks/useBackupsData';
 import { useBackupsActions } from '@/features/backups/hooks/useBackupsActions';
 import { backupService, defaultBackupConfig, type BackupConfig, type BackupSummary } from '@/features/backups/services';
+import { UI_COPY } from '@/shared/constants/uiCopy';
 import {
   getErrorMessage,
   getBackupFileLabel,
@@ -174,20 +175,20 @@ export function BackupsView() {
     });
   };
 
-  const handleDelete = (backup: BackupSummary) => {
-    const displayName = getBackupDisplayName(backup);
-    setConfirmConfig({
-      isOpen: true,
-      title: 'Eliminar backup',
-      description: `¿Querés eliminar ${displayName}? Esta acción no se puede deshacer.`,
-      confirmText: backup.id,
-      variant: 'danger',
-      onConfirm: () => {
-        setConfirmConfig(null);
-        actions.deleteMutation.mutate(backup.id);
-      },
-    });
-  };
+   const handleDelete = (backup: BackupSummary) => {
+     const displayName = getBackupDisplayName(backup);
+     setConfirmConfig({
+       isOpen: true,
+       title: UI_COPY.deleteBackup,
+       description: UI_COPY.deleteBackupDescription(displayName),
+       confirmText: backup.id,
+       variant: 'danger',
+       onConfirm: () => {
+         setConfirmConfig(null);
+         actions.deleteMutation.mutate(backup.id);
+       },
+     });
+   };
 
   return (
     <div className="p-6 space-y-6">

@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 import { useFlowsData } from '@/features/flows/hooks/useFlowsData';
 import { useFlowsActions } from '@/features/flows/hooks/useFlowsActions';
+import { StateContainer } from '@/shared/components/StateContainer';
+import { UI_COPY } from '@/shared/constants/uiCopy';
 
 export function FlowsView() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -63,59 +65,69 @@ export function FlowsView() {
     setAnalyzing(false);
   };
 
-  if (isLoading) {
-    return (
-      <div className="p-6 space-y-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">AI pipeline</p>
-          <h1 className="text-2xl font-bold text-base-content">Flows</h1>
-        </div>
-        <div className="space-y-3 animate-pulse">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="h-24 rounded-2xl skeleton-dark" />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="p-6">
-        <div>
-          <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">AI pipeline</p>
-          <h1 className="text-2xl font-bold text-base-content">Flows</h1>
-        </div>
-        <div className="mt-4 rounded-2xl border border-error/20 bg-error/10 p-4 shadow-glow">
-          <p className="text-error">Error loading flows: {error.message}</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!available) {
-    return (
-      <div className="p-6">
-        <div>
-          <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">AI pipeline</p>
-          <h1 className="text-2xl font-bold text-base-content">Flows</h1>
-        </div>
-        <div className="mt-4 flex items-start gap-3 rounded-2xl border border-warning/20 bg-warning/10 p-4 shadow-glow">
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
-          <div>
-            <p className="font-medium text-base-content">Node-RED no está disponible</p>
-            <p className="mt-1 text-sm text-base-content/70">
-              Verificá que el contenedor de Node-RED esté corriendo.
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   const allSelected = flows.length > 0 && selected.size === flows.length;
 
+  // Prepare StateContainer slots
+  const loadingSlot = (
+    <div className="space-y-4">
+      <div>
+        <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">AI pipeline</p>
+        <h1 className="text-2xl font-bold text-base-content">Flows</h1>
+      </div>
+      <div className="space-y-3 animate-pulse">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="h-24 rounded-2xl skeleton-dark" />
+        ))}
+      </div>
+    </div>
+  );
+
+  const errorSlot = (
+    <div>
+      <div>
+        <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">AI pipeline</p>
+        <h1 className="text-2xl font-bold text-base-content">Flows</h1>
+      </div>
+      <div className="mt-4 rounded-2xl border border-error/20 bg-error/10 p-4 shadow-glow">
+        <p className="text-error">Error loading flows: {error?.message}</p>
+      </div>
+    </div>
+  );
+
+  const unavailableSlot = (
+    <div>
+      <div>
+        <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">AI pipeline</p>
+        <h1 className="text-2xl font-bold text-base-content">Flows</h1>
+      </div>
+      <div className="mt-4 flex items-start gap-3 rounded-2xl border border-warning/20 bg-warning/10 p-4 shadow-glow">
+        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
+        <div>
+          <p className="font-medium text-base-content">{UI_COPY.nodeRedUnavailable}</p>
+          <p className="mt-1 text-sm text-base-content/70">
+            {UI_COPY.checkNodeRedContainer}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+
+  const emptySlot = (
+    <div className="py-12 text-center">
+      <Activity className="mx-auto mb-4 h-12 w-12 text-base-content/40" />
+      <p className="text-base-content/60">{UI_COPY.noFlowsFound}</p>
+    </div>
+  );
+
   return (
+    <StateContainer
+      isLoading={isLoading}
+      isError={!!error}
+      isEmpty={!available || flows.length === 0}
+      loadingSlot={loadingSlot}
+      errorSlot={errorSlot}
+      emptySlot={!available ? unavailableSlot : emptySlot}
+    >
     <div className="space-y-6 p-6 pb-32">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -135,43 +147,36 @@ export function FlowsView() {
             {allSelected
               ? <CheckSquare className="w-4 h-4" />
               : <Square className="w-4 h-4" />}
-            {allSelected ? 'Deseleccionar todos' : 'Seleccionar todos'}
+            {allSelected ? UI_COPY.deselectAll : UI_COPY.selectAll}
           </button>
         )}
       </div>
 
-      {flows.length === 0 ? (
-        <div className="py-12 text-center">
-          <Activity className="mx-auto mb-4 h-12 w-12 text-base-content/40" />
-          <p className="text-base-content/60">No se encontraron flows</p>
-        </div>
-      ) : (
-        <div className="grid gap-4">
-          {flows.map(flow => (
-            <div key={flow.id} className="space-y-0">
-              <FlowCard
-                flow={flow}
-                selected={selected.has(flow.id)}
-                onToggleSelect={() => toggleSelect(flow.id)}
+      <div className="grid gap-4">
+        {flows.map(flow => (
+          <div key={flow.id} className="space-y-0">
+            <FlowCard
+              flow={flow}
+              selected={selected.has(flow.id)}
+              onToggleSelect={() => toggleSelect(flow.id)}
+            />
+            {analysisResults[flow.id] && (
+              <AnalysisPanel
+                result={analysisResults[flow.id]}
+                expanded={expandedResults.has(flow.id)}
+                onToggle={() => toggleResultExpanded(flow.id)}
               />
-              {analysisResults[flow.id] && (
-                <AnalysisPanel
-                  result={analysisResults[flow.id]}
-                  expanded={expandedResults.has(flow.id)}
-                  onToggle={() => toggleResultExpanded(flow.id)}
-                />
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+            )}
+          </div>
+        ))}
+      </div>
 
-      {/* Barra flotante de análisis IA */}
+      {/* AI Analysis Floating Bar */}
       {selected.size > 0 && (
         <div className="fixed z-50 -translate-x-1/2 bottom-6 left-1/2">
           <div className="glass-panel flex items-center gap-4 rounded-full border border-border px-6 py-3 shadow-glow">
             <span className="text-sm text-base-content/65">
-              {selected.size} flow{selected.size !== 1 ? 's' : ''} seleccionado{selected.size !== 1 ? 's' : ''}
+              {UI_COPY.selected(selected.size)}
             </span>
             <button
               onClick={handleAnalyze}
@@ -181,12 +186,13 @@ export function FlowsView() {
               {analyzing
                 ? <Loader2 className="w-4 h-4 animate-spin" />
                 : <Sparkles className="w-4 h-4" />}
-              {analyzing ? 'Analizando...' : 'Analizar con IA'}
+              {analyzing ? UI_COPY.analyzing : UI_COPY.analyzeWithAI}
             </button>
           </div>
         </div>
       )}
     </div>
+    </StateContainer>
   );
 }
 
@@ -210,7 +216,7 @@ function FlowCard({
       <button
         onClick={onToggleSelect}
         className="mt-1 shrink-0 text-base-content/60 transition-colors hover:text-primary"
-        aria-label={selected ? 'Deseleccionar flow' : 'Seleccionar flow'}
+        aria-label={selected ? 'Deselect flow' : 'Select flow'}
       >
         {selected
           ? <CheckSquare className="w-5 h-5 text-primary" />
@@ -236,10 +242,10 @@ function FlowCard({
           {flow.label}
         </Link>
         <div className="mt-1 flex items-center gap-4 text-sm text-base-content/65">
-          <span>{flow.nodes} nodos</span>
-          <span>{flow.connections} conexiones</span>
+          <span>{flow.nodes} {UI_COPY.nodes}</span>
+          <span>{flow.connections} {UI_COPY.connections}</span>
           {flow.disabled && (
-            <span className="text-warning">Deshabilitado</span>
+            <span className="text-warning">{UI_COPY.disabled}</span>
           )}
         </div>
       </div>
@@ -264,7 +270,7 @@ function AnalysisPanel({
       >
         <span className="flex items-center gap-2 font-medium">
           <Sparkles className="w-4 h-4" />
-          Análisis IA
+          {UI_COPY.aiAnalysis}
         </span>
         {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
       </button>
@@ -277,7 +283,7 @@ function AnalysisPanel({
             <div>
               <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-success-content">
                 <ThumbsUp className="w-3.5 h-3.5" />
-                Puntos positivos
+                {UI_COPY.strengths}
               </div>
               <ul className="space-y-1">
                 {result.pros.map((item, i) => (
@@ -294,7 +300,7 @@ function AnalysisPanel({
             <div>
               <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-error-content">
                 <ThumbsDown className="w-3.5 h-3.5" />
-                Puntos a mejorar
+                {UI_COPY.improvements}
               </div>
               <ul className="space-y-1">
                 {result.cons.map((item, i) => (
@@ -311,7 +317,7 @@ function AnalysisPanel({
             <div>
               <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-info-content">
                 <Lightbulb className="w-3.5 h-3.5" />
-                Sugerencias
+                {UI_COPY.suggestions}
               </div>
               <ul className="space-y-1">
                 {result.suggestions.map((item, i) => (
@@ -325,7 +331,7 @@ function AnalysisPanel({
           )}
 
           <p className="text-xs text-base-content/50">
-            Analizado el {new Date(result.analyzedAt).toLocaleString('es-AR')}
+            {UI_COPY.analyzedAt(new Date(result.analyzedAt).toLocaleString())}
           </p>
         </div>
       )}

@@ -1,6 +1,7 @@
 export { BackupTable } from './BackupTable';
 export type { BackupTableProps } from './BackupTable';
-export { CronBuilder, validateCron } from './CronBuilder';
+export { CronBuilder } from './CronBuilder';
+export { validateCron } from '@/features/backups/lib/cronUtils';
 export type { CronBuilderProps, SaveState, PresetType } from './CronBuilder';
 export { RetentionEditor } from './RetentionEditor';
 export type { RetentionEditorProps } from './RetentionEditor';
