@@ -71,77 +71,77 @@
 **Target**: Phase 1 branch (or `feature/issue-112-backend` if auto-chaining)
 **Rationale**: Depends on Phase 1 API; unblocks Phase 3 tests.
 
-- [ ] 2.1 Add `updateUserRole()` method to `authService.ts` (~8 LOC)
-  - Signature: `updateUserRole(id: string, role: 'admin' | 'viewer'): Promise<User>`
-  - Calls `PATCH /auth/users/{id}` with body `{ role }`
-  - Returns typed `User` object from response `data.data`
+- [x] 2.1 Add `updateUserRole()` method to `authService.ts` (~8 LOC)
+   - Signature: `updateUserRole(id: string, role: 'admin' | 'viewer'): Promise<User>`
+   - Calls `PATCH /auth/users/{id}` with body `{ role }`
+   - Returns typed `User` object from response `data.data`
 
-- [ ] 2.2 Extend `useUsersActions` hook with update mutation (~15 LOC)
-  - Add `updateRoleMutation = useMutation({ mutationFn: (args: { id, role }) => authService.updateUserRole(...) })`
-  - Wire `onSuccess`: invalidate `['users']` cache (via `queryClient.invalidateQueries`)
-  - Wire `onError`: call `toast.error(error.message)` for both validation and last-admin 403
-  - Export mutation so `UserModal` can access `isPending` and `mutate`
+- [x] 2.2 Extend `useUsersActions` hook with update mutation (~15 LOC)
+   - Add `updateRoleMutation = useMutation({ mutationFn: (args: { id, role }) => authService.updateUserRole(...) })`
+   - Wire `onSuccess`: invalidate `['users']` cache (via `queryClient.invalidateQueries`)
+   - Wire `onError`: call `toast.error(error.message)` for both validation and last-admin 403
+   - Export mutation so `UserModal` can access `isPending` and `mutate`
 
-- [ ] 2.3 Add UI copy keys to `uiCopy.ts` (~12 LOC)
-  - `editUser: 'Edit User'`
-  - `changeRole: 'Change Role'`
-  - `changePassword: 'Change Password'`
-  - `createUser: 'Create User'`
-  - `roleLabel: 'Role'`
-  - `usernameLabel: 'Username'`
-  - `passwordLabel: 'Password'`
-  - `newPasswordLabel: 'New Password'`
-  - `cannotDemoteLastAdmin: 'Cannot demote the last admin user'`
-  - `noUsersYet: 'No users yet'`
-  - `addFirstUser: 'Add the first user to get started'`
+- [x] 2.3 Add UI copy keys to `uiCopy.ts` (~12 LOC)
+   - `editUser: 'Edit User'`
+   - `changeRole: 'Change Role'`
+   - `changePassword: 'Change Password'`
+   - `createUser: 'Create User'`
+   - `roleLabel: 'Role'`
+   - `usernameLabel: 'Username'`
+   - `passwordLabel: 'Password'`
+   - `newPasswordLabel: 'New Password'`
+   - `cannotDemoteLastAdmin: 'Cannot demote the last admin user'`
+   - `noUsersYet: 'No users yet'`
+   - `addFirstUser: 'Add the first user to get started'`
 
-- [ ] 2.4 Create `UserTable.tsx` presentational component (~35 LOC)
-  - Receives props: `users: User[]`, `onEdit: (user) => void`, `onDelete: (user) => void`, `onChangePassword: (user) => void`
-  - Renders responsive layout:
-    - **md+**: standard HTML table with thead/tbody, columns: Username, Role, Actions
-    - **mobile (< md)**: stacked card per user (use `div` with card styling, DaisyUI classes)
-  - Action buttons: "Edit", "Change Password", "Delete"
-    - Disable "Delete" if user is sole admin (pass `adminCount` prop or derive locally)
-    - All copy from `uiCopy`
+- [x] 2.4 Create `UserTable.tsx` presentational component (~35 LOC)
+   - Receives props: `users: User[]`, `onEdit: (user) => void`, `onDelete: (user) => void`, `onChangePassword: (user) => void`
+   - Renders responsive layout:
+     - **md+**: standard HTML table with thead/tbody, columns: Username, Role, Actions
+     - **mobile (< md)**: stacked card per user (use `div` with card styling, DaisyUI classes)
+   - Action buttons: "Edit", "Change Password", "Delete"
+     - Disable "Delete" if user is sole admin (pass `adminCount` prop or derive locally)
+     - All copy from `uiCopy`
 
-- [ ] 2.5 Create `UserModal.tsx` presentational component (~50 LOC)
-  - Receives props: `mode: 'create' | 'edit_full' | 'edit_password'`, `editingUser: User | null`, `isPending: boolean`, `onSubmit: (data) => void`, `onClose: () => void`
-  - Render form based on mode:
-    - **create**: username (editable, required), password (editable, required), role (select, required)
-    - **edit_full**: username (disabled), role (select, editable), password (text, optional for password reset)
-    - **edit_password**: password field only (required)
-  - Last-admin guard in `edit_full` mode:
-    - If editing sole admin, disable role selector and show warning: `uiCopy.cannotDemoteLastAdmin`
-    - Disable submit if role change to `viewer` for sole admin
-  - Submit button: disabled when `isPending`, show spinner via `<Spinner />` (or existing loading indicator)
-  - Close button: always enabled
-  - Modal closes on successful mutation (handled by parent `UsersView`; this component does not auto-close)
+- [x] 2.5 Create `UserModal.tsx` presentational component (~50 LOC)
+   - Receives props: `mode: 'create' | 'edit_full' | 'edit_password'`, `editingUser: User | null`, `isPending: boolean`, `onSubmit: (data) => void`, `onClose: () => void`
+   - Render form based on mode:
+     - **create**: username (editable, required), password (editable, required), role (select, required)
+     - **edit_full**: username (disabled), role (select, editable), password (text, optional for password reset)
+     - **edit_password**: password field only (required)
+   - Last-admin guard in `edit_full` mode:
+     - If editing sole admin, disable role selector and show warning: `uiCopy.cannotDemoteLastAdmin`
+     - Disable submit if role change to `viewer` for sole admin
+   - Submit button: disabled when `isPending`, show spinner via `<Spinner />` (or existing loading indicator)
+   - Close button: always enabled
+   - Modal closes on successful mutation (handled by parent `UsersView`; this component does not auto-close)
 
-- [ ] 2.6 Refactor `UsersView.tsx` to use new components (~25 LOC net delta)
-  - Create state: `modalState: null | { mode: ModalMode; editingUser: User | null }`
-  - Replace binary create/password logic with three-mode discriminated union
-  - Delegate table render to `<UserTable users={users} onEdit={...} onDelete={...} onChangePassword={...} />`
-  - Delegate modal render to `<UserModal mode={...} editingUser={...} isPending={...} onSubmit={...} onClose={...} />`
-  - Handler functions: `openCreateModal`, `openEditModal`, `openPasswordModal`, `closeModal`
-  - Wire mutations:
-    - Create: `createUserMutation.mutate(formData)`
-    - Edit role: `updateRoleMutation.mutate({ id, role })`
-    - Change password: `changePasswordMutation.mutate({ id, password })`
-    - Delete: show confirm dialog, call `deleteUserMutation.mutate(id)`
-  - Close modal only on mutation success (mutation's `onSuccess` calls `closeModal`)
-  - Render with access control: if not admin, show `<AccessDenied />`
+- [x] 2.6 Refactor `UsersView.tsx` to use new components (~25 LOC net delta)
+   - Create state: `modalState: null | { mode: ModalMode; editingUser: User | null }`
+   - Replace binary create/password logic with three-mode discriminated union
+   - Delegate table render to `<UserTable users={users} onEdit={...} onDelete={...} onChangePassword={...} />`
+   - Delegate modal render to `<UserModal mode={...} editingUser={...} isPending={...} onSubmit={...} onClose={...} />`
+   - Handler functions: `openCreateModal`, `openEditModal`, `openPasswordModal`, `closeModal`
+   - Wire mutations:
+     - Create: `createUserMutation.mutate(formData)`
+     - Edit role: `updateRoleMutation.mutate({ id, role })`
+     - Change password: `changePasswordMutation.mutate({ id, password })`
+     - Delete: show confirm dialog, call `deleteUserMutation.mutate(id)`
+   - Close modal only on mutation success (mutation's `onSuccess` calls `closeModal`)
+   - Render with access control: if not admin, show `<AccessDenied />`
 
-- [ ] 2.7 Add state container for loading/empty/error (~20 LOC in UsersView)
-  - Use existing `StateContainer` or create wrapper logic
-  - `isLoading` → show loading skeleton/spinner
-  - `data.length === 0` → show empty state with "No users yet" and "Add the first user" copy
-  - `isError` → show error state with error message
-  - Otherwise: render `<UserTable />`
+- [x] 2.7 Add state container for loading/empty/error (~20 LOC in UsersView)
+   - Use existing `StateContainer` or create wrapper logic
+   - `isLoading` → show loading skeleton/spinner
+   - `data.length === 0` → show empty state with "No users yet" and "Add the first user" copy
+   - `isError` → show error state with error message
+   - Otherwise: render `<UserTable />`
 
-- [ ] 2.8 Verify all action buttons have loading/disabled state
-  - "Add User" button: disabled when any mutation is `isPending`
-  - "Edit", "Change Password", "Delete" buttons in table: disabled when any mutation is `isPending` (or just their mutation is pending)
-  - Submit button in modal: disabled when `isPending`, shows spinner
+- [x] 2.8 Verify all action buttons have loading/disabled state
+   - "Add User" button: disabled when any mutation is `isPending`
+   - "Edit", "Change Password", "Delete" buttons in table: disabled when any mutation is `isPending` (or just their mutation is pending)
+   - Submit button in modal: disabled when `isPending`, shows spinner
 
 ---
 

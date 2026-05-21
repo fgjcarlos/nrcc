@@ -80,4 +80,9 @@ export const authService = {
   changePassword: async (id: string, password: string): Promise<void> => {
     await api.patch(`/auth/users/${id}/password`, { password });
   },
+
+  updateUserRole: async (id: string, role: 'admin' | 'viewer'): Promise<User> => {
+    const response = await api.patch<{ data: User }>(`/auth/users/${id}`, { role });
+    return response.data.data;
+  },
 };
