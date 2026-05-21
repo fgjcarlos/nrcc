@@ -85,6 +85,7 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string) *Server {
 			r.Get("/users", authHandler.GetUsers)
 			r.Post("/users", authHandler.CreateUser)
 			r.Delete("/users/{id}", authHandler.DeleteUser)
+			r.Patch("/users/{id}", authHandler.UpdateUser)
 			r.Patch("/users/{id}/password", authHandler.ChangePassword)
 		})
 	})
