@@ -61,6 +61,11 @@ type PasswordChangeRequest struct {
 	Password string `json:"password"`
 }
 
+// UpdateUserRequest represents update user request (role only)
+type UpdateUserRequest struct {
+	Role *model.UserRole `json:"role,omitempty"` // pointer: nil means "not provided"
+}
+
 // Setup handles POST /api/auth/setup - initial admin user creation
 // Only works when no users exist
 func (h *AuthHandler) Setup(w http.ResponseWriter, r *http.Request) {
@@ -417,4 +422,79 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	model.RespondJSON(w, http.StatusOK, map[string]bool{"success": true})
+}
+
+// UpdateUser handles PATCH /api/auth/users/:id - protected, admin only
+func (h *AuthHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.ClaimsFromContext(r)
+	if claims == nil || claims.Role != model.RoleAdmin {
+		model.RespondError(w, http.StatusForbidden, "FORBIDDEN", "Admin access required")
+		return
+	}
+
+	userID := r.PathValue("id")
+	if userID == "" {
+		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "User ID is required")
+		return
+	}
+
+	var req UpdateUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+		return
+	}
+
+	// Validate: at least one field must be provided
+	if req.Role == nil {
+		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "At least one field (role) must be provided")
+		return
+	}
+
+	// Validate role value
+	if *req.Role != model.RoleAdmin && *req.Role != model.RoleViewer {
+		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Role must be 'admin' or 'viewer'")
+		return
+	}
+
+	// Get user
+	user := h.authSvc.GetUserByID(userID)
+	if user == nil {
+		model.RespondError(w, http.StatusNotFound, "NOT_FOUND", "User not found")
+		return
+	}
+
+	// Last-admin guard: cannot demote the sole admin
+	if *req.Role == model.RoleViewer && user.Role == model.RoleAdmin {
+		users, _ := h.authSvc.GetAllUsers()
+		adminCount := 0
+		for _, u := range users {
+			if u.Role == model.RoleAdmin {
+				adminCount++
+			}
+		}
+		if adminCount <= 1 {
+			model.RespondError(w, http.StatusForbidden, "CANNOT_DEMOTE_LAST_ADMIN", "Cannot demote the last admin user")
+			return
+		}
+	}
+
+	// Update user role
+	user.Role = *req.Role
+	user.UpdatedAt = model.NowISO8601()
+
+	if err := h.authSvc.UpdateUser(user); err != nil {
+		model.RespondError(w, http.StatusInternalServerError, "UPDATE_ERROR", "Failed to update user")
+		return
+	}
+
+	// Return updated user
+	resp := model.CCUserPublic{
+		ID:        user.ID,
+		Username:  user.Username,
+		Role:      user.Role,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
+	}
+
+	model.RespondJSON(w, http.StatusOK, resp)
 }
