@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { backupService, type BackupConfig } from '@/features/backups/services';
 import { getErrorMessage } from '@/features/backups/lib/formatters';
+import { UI_COPY } from '@/shared/constants/uiCopy';
 
 export function useBackupsActions() {
   const queryClient = useQueryClient();
@@ -31,9 +32,9 @@ export function useBackupsActions() {
       await queryClient.invalidateQueries({ queryKey: ['backups-observability'] });
       toast.success('Backup creado correctamente');
     },
-    onError: (error) => {
-      toast.error(getErrorMessage(error, 'No se pudo crear el backup'));
-    },
+     onError: (error) => {
+       toast.error(getErrorMessage(error, UI_COPY.couldNotCreateBackup));
+     },
   });
 
   // Restore backup mutation
@@ -49,9 +50,9 @@ export function useBackupsActions() {
         toast.info(`Se creó un backup de seguridad: ${result.preRestoreId}`);
       }
     },
-    onError: (error) => {
-      toast.error(getErrorMessage(error, 'No se pudo restaurar el backup'));
-    },
+     onError: (error) => {
+       toast.error(getErrorMessage(error, UI_COPY.couldNotRestoreBackup));
+     },
   });
 
   // Delete backup mutation
@@ -64,9 +65,9 @@ export function useBackupsActions() {
       await queryClient.invalidateQueries({ queryKey: ['backups-observability'] });
       toast.success('Backup eliminado');
     },
-    onError: (error) => {
-      toast.error(getErrorMessage(error, 'No se pudo eliminar el backup'));
-    },
+     onError: (error) => {
+       toast.error(getErrorMessage(error, UI_COPY.couldNotDeleteBackup));
+     },
   });
 
   // Retention policy mutation
@@ -77,9 +78,9 @@ export function useBackupsActions() {
       await queryClient.invalidateQueries({ queryKey: ['backups-storage'] });
       toast.success('Política de retención guardada');
     },
-    onError: (error) => {
-      toast.error(getErrorMessage(error, 'No se pudo guardar la política de retención'));
-    },
+     onError: (error) => {
+       toast.error(getErrorMessage(error, UI_COPY.couldNotSaveRetentionPolicy));
+     },
   });
 
   return {

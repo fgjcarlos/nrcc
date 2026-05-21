@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { CronBuilder, validateCron } from './CronBuilder';
+import { CronBuilder } from './CronBuilder';
+import { validateCron } from '@/features/backups/lib/cronUtils';
 
 describe('validateCron', () => {
   it('should validate proper 5-field cron expressions', () => {

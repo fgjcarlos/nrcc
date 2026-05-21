@@ -3,6 +3,9 @@ import { type User } from '@/features/auth/services/authService';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useUsersData } from '@/features/auth/hooks/useUsersData';
 import { useUsersActions } from '@/features/auth/hooks/useUsersActions';
+import { ConfirmationDialog } from '@/shared/components/ConfirmationDialog';
+import { useConfirmationDialog } from '@/shared/hooks/useConfirmationDialog';
+import { UI_COPY } from '@/shared/constants/uiCopy';
 
 export function UsersView() {
   const { user: currentUser } = useAuth();
@@ -19,6 +22,7 @@ export function UsersView() {
   });
 
   const { createMutation, deleteMutation, changePasswordMutation } = useUsersActions();
+  const deleteDialog = useConfirmationDialog<User>();
 
   const openModal = (user?: User) => {
     if (user) {
@@ -50,9 +54,14 @@ export function UsersView() {
     }
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Are you sure you want to delete this user?')) {
-      deleteMutation.mutate(id);
+  const handleDelete = (user: User) => {
+    deleteDialog.open(user);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (deleteDialog.pendingItem) {
+      deleteMutation.mutate(deleteDialog.pendingItem.id);
+      deleteDialog.close();
     }
   };
 
@@ -118,13 +127,13 @@ export function UsersView() {
                       Change Password
                     </button>
                     {user.id !== currentUser?.id && (
-                      <button
-                        onClick={() => handleDelete(user.id)}
-                        className="text-sm text-error transition-colors hover:text-error/80"
-                      >
-                        Delete
-                      </button>
-                    )}
+                       <button
+                         onClick={() => handleDelete(user)}
+                         className="text-sm text-error transition-colors hover:text-error/80"
+                       >
+                         {UI_COPY.delete}
+                       </button>
+                     )}
                   </td>
                 </tr>
               ))}
@@ -132,6 +141,21 @@ export function UsersView() {
           </table>
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={deleteDialog.isOpen}
+        title={UI_COPY.deleteUser}
+        description={
+          deleteDialog.pendingItem
+            ? UI_COPY.deleteUserDescription(deleteDialog.pendingItem.username)
+            : ''
+        }
+        variant="danger"
+        isPending={deleteMutation.isPending}
+        onConfirm={handleDeleteConfirm}
+        onCancel={deleteDialog.close}
+      />
 
       {/* Modal */}
       {isModalOpen && (

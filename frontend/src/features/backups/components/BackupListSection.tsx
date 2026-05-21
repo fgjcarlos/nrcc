@@ -2,6 +2,8 @@ import { Archive, CircleAlert, HardDrive, LoaderCircle, Sparkles, Trash2, Downlo
 import type { BackupSummary } from '@/features/backups/services';
 import { formatBackupDate, formatBackupSize, getBackupDisplayName, getBackupSummary } from '@/features/backups/lib/formatters';
 import { cn } from '@/shared/lib';
+import { StateContainer } from '@/shared/components';
+import { UI_COPY } from '@/shared/constants/uiCopy';
 
 interface BackupListSectionProps {
   backups: BackupSummary[];
@@ -65,53 +67,56 @@ export function BackupListSection(props: BackupListSectionProps) {
     <div className="surface-card p-6">
       <div className="mb-4 flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold text-base-content">Backups disponibles</h2>
-          <p className="text-sm text-base-content/65">Descargar, restaurar o borrar snapshots locales</p>
+          <h2 className="text-lg font-semibold text-base-content">Available Backups</h2>
+          <p className="text-sm text-base-content/65">Download, restore or delete local snapshots</p>
         </div>
-        {isLoading && <span className="text-sm text-base-content/60">Actualizando...</span>}
+        {isLoading && <span className="text-sm text-base-content/60">{UI_COPY.loading}</span>}
       </div>
 
-      {/* Loading State */}
-      {isLoading ? (
-        <div className="glass-panel rounded-2xl border border-border p-10 text-center">
-          <LoaderCircle className="mx-auto mb-3 h-10 w-10 animate-spin text-base-content/40" />
-          <p className="font-medium text-base-content">Cargando backups</p>
-          <p className="text-sm text-base-content/65">Leyendo snapshots locales y metadata asociada.</p>
-        </div>
-      ) : isError ? (
-        /* Error State */
-        <div className="rounded-2xl border border-error/20 bg-error/8 p-6 text-sm text-base-content">
-          <div className="flex items-center gap-2 font-medium text-error">
-            <CircleAlert className="h-4 w-4" />
-            No se pudo cargar la lista de backups
+      <StateContainer
+        isLoading={isLoading}
+        isError={isError}
+        isEmpty={backups.length === 0}
+        loadingSlot={
+          <div className="glass-panel rounded-2xl border border-border p-10 text-center">
+            <LoaderCircle className="mx-auto mb-3 h-10 w-10 animate-spin text-base-content/40" />
+            <p className="font-medium text-base-content">{UI_COPY.loadingBackups}</p>
+            <p className="text-sm text-base-content/65">{UI_COPY.readingBackups}</p>
           </div>
-          <p className="mt-2 text-base-content/70">Reintentá la carga o revisá el estado del backend.</p>
-        </div>
-      ) : backups.length === 0 ? (
-        /* Empty State */
-        <div className="glass-panel rounded-2xl border border-dashed border-border p-10 text-center">
-          <HardDrive className="mx-auto mb-3 h-10 w-10 text-base-content/40" />
-          <p className="font-medium text-base-content">No hay backups todavía</p>
-          <p className="text-sm text-base-content/65">Creá uno manualmente o activá el scheduler automático</p>
-          <button onClick={onCreateBackup} disabled={isCreating} className="action-btn-primary mt-4">
-            {isCreating && <LoaderCircle className="h-4 w-4 animate-spin" />}
-            Crear primer backup
-          </button>
-        </div>
-      ) : (
-        /* Table State */
+        }
+        errorSlot={
+          <div className="rounded-2xl border border-error/20 bg-error/8 p-6 text-sm text-base-content">
+            <div className="flex items-center gap-2 font-medium text-error">
+              <CircleAlert className="h-4 w-4" />
+              {UI_COPY.failedToLoadBackups}
+            </div>
+            <p className="mt-2 text-base-content/70">{UI_COPY.retryLoadBackups}</p>
+          </div>
+        }
+        emptySlot={
+          <div className="glass-panel rounded-2xl border border-dashed border-border p-10 text-center">
+            <HardDrive className="mx-auto mb-3 h-10 w-10 text-base-content/40" />
+            <p className="font-medium text-base-content">{UI_COPY.noBackupsYet}</p>
+            <p className="text-sm text-base-content/65">{UI_COPY.createBackupDesc}</p>
+            <button onClick={onCreateBackup} disabled={isCreating} className="action-btn-primary mt-4">
+              {isCreating && <LoaderCircle className="h-4 w-4 animate-spin" />}
+              {UI_COPY.add} {UI_COPY.createFirstBackup}
+            </button>
+          </div>
+        }
+      >
         <div className="space-y-4">
           <div className="overflow-x-auto">
             <div className="surface-panel min-w-[760px] overflow-hidden">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border text-left text-sm text-base-content/60">
-                    <th className="py-3 pr-4">Tipo</th>
-                    <th className="py-3 pr-4">Nombre</th>
-                    <th className="py-3 pr-4">Fecha</th>
-                    <th className="py-3 pr-4">Archivos</th>
-                    <th className="py-3 pr-4">Tamaño</th>
-                    <th className="py-3 pr-4">Acciones</th>
+                    <th className="py-3 pr-4">{UI_COPY.type}</th>
+                    <th className="py-3 pr-4">{UI_COPY.name}</th>
+                    <th className="py-3 pr-4">{UI_COPY.date}</th>
+                    <th className="py-3 pr-4">{UI_COPY.files}</th>
+                    <th className="py-3 pr-4">{UI_COPY.size}</th>
+                    <th className="py-3 pr-4">{UI_COPY.actions}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -165,7 +170,7 @@ export function BackupListSection(props: BackupListSectionProps) {
                           <button
                             onClick={() => onDownload(backup)}
                             disabled={isActionPending && pendingActionId === backup.id}
-                            title="Descargar"
+                            title={UI_COPY.download}
                             className="icon-button"
                           >
                             {isActionPending && pendingActionId === backup.id ? (
@@ -177,7 +182,7 @@ export function BackupListSection(props: BackupListSectionProps) {
                           <button
                             onClick={() => onRestore(backup)}
                             disabled={isActionPending && pendingActionId === backup.id}
-                            title="Restaurar"
+                            title={UI_COPY.restore}
                             className="icon-button"
                           >
                             {isActionPending && pendingActionId === backup.id ? (
@@ -189,7 +194,7 @@ export function BackupListSection(props: BackupListSectionProps) {
                           <button
                             onClick={() => onDelete(backup)}
                             disabled={isActionPending && pendingActionId === backup.id}
-                            title="Eliminar"
+                            title={UI_COPY.delete}
                             className="icon-button text-error hover:text-error/80"
                           >
                             {isActionPending && pendingActionId === backup.id ? (
@@ -211,7 +216,7 @@ export function BackupListSection(props: BackupListSectionProps) {
           {totalPages > 1 && (
             <div className="flex items-center justify-between">
               <div className="text-sm text-base-content/60">
-                Página {page} de {totalPages}
+                {UI_COPY.pageOf(page, totalPages)}
               </div>
               <div className="flex gap-2">
                 <button
@@ -219,20 +224,20 @@ export function BackupListSection(props: BackupListSectionProps) {
                   disabled={!canPrev}
                   className="btn-secondary btn-sm"
                 >
-                  Anterior
+                  {UI_COPY.previousPage}
                 </button>
                 <button
                   onClick={() => onPageChange(page + 1)}
                   disabled={!canNext}
                   className="btn-secondary btn-sm"
                 >
-                  Siguiente
+                  {UI_COPY.nextPage}
                 </button>
               </div>
             </div>
           )}
         </div>
-      )}
+      </StateContainer>
     </div>
   );
 }
