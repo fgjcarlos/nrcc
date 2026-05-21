@@ -42,9 +42,23 @@ export function useUsersActions() {
     },
   });
 
+  const updateRoleMutation = useMutation({
+    mutationFn: ({ id, role }: { id: string; role: 'admin' | 'viewer' }) =>
+      authService.updateUserRole(id, role),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      toast.success('User role updated successfully');
+    },
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { error?: { message?: string } } } };
+      toast.error(err.response?.data?.error?.message || 'Failed to update user role');
+    },
+  });
+
   return {
     createMutation,
     deleteMutation,
     changePasswordMutation,
+    updateRoleMutation,
   };
 }
