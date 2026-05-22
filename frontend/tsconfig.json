@@ -28,6 +28,6 @@
       "shared/*": ["./src/shared/*"]
     }
   },
-  "include": ["src"],
+  "include": ["src", "vitest.setup.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

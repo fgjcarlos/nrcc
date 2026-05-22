@@ -1,0 +1,98 @@
+name: PR Validation
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Cancel previous runs on the same PR when new commits land
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend (Go ${{ matrix.go-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: ["1.25"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache-dependency-path: go.sum
+
+      - name: Download modules
+        run: go mod download
+
+      # `embed.go` declares `//go:embed frontend/dist` — the pattern needs at
+      # least one *embeddable* file or `go vet`/`build` fails. Go embed skips
+      # files starting with `.` or `_` by default, so a dotfile is not enough.
+      # A real frontend build isn't needed for backend validation either, so a
+      # plain placeholder satisfies the directive without wasting CI time.
+      - name: Stub frontend/dist for go:embed
+        run: |
+          mkdir -p frontend/dist
+          echo "ci placeholder" > frontend/dist/placeholder
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test (race detector)
+        run: go test -race ./...
+
+      - name: Build (all packages)
+        run: go build ./...
+
+  frontend:
+    name: Frontend (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: ["22"]
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      # Typecheck is temporarily non-blocking: the project carries ~28 pre-existing
+      # type errors (see issues filed as follow-ups to #134). Output stays visible
+      # in logs so we can track progress. Remove `continue-on-error` once the debt
+      # is cleared.
+      - name: Typecheck
+        run: pnpm typecheck
+        continue-on-error: true
+
+      - name: Test
+        run: pnpm test --run
+
+      - name: Build
+        run: pnpm build
