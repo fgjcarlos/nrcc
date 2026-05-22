@@ -34,11 +34,14 @@ jobs:
         run: go mod download
 
       # `embed.go` declares `//go:embed frontend/dist` — the pattern needs at
-      # least one file to match or `go vet`/`build` fails. We don't need a real
-      # frontend build for backend validation, so a single placeholder file is
-      # enough to satisfy the embed directive.
+      # least one *embeddable* file or `go vet`/`build` fails. Go embed skips
+      # files starting with `.` or `_` by default, so a dotfile is not enough.
+      # A real frontend build isn't needed for backend validation either, so a
+      # plain placeholder satisfies the directive without wasting CI time.
       - name: Stub frontend/dist for go:embed
-        run: mkdir -p frontend/dist && touch frontend/dist/.gitkeep
+        run: |
+          mkdir -p frontend/dist
+          echo "ci placeholder" > frontend/dist/placeholder
 
       - name: Vet
         run: go vet ./...
