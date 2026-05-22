@@ -7,6 +7,7 @@ import { UsersView } from './UsersView'
 import { authService, type User } from '../services/authService'
 import * as useAuthModule from '../hooks/useAuth'
 import * as useUsersDataModule from '../hooks/useUsersData'
+import { buildAuthMock, buildUserMock } from '../__test-utils__/authMock'
 import { UI_COPY } from '@/shared/constants/uiCopy'
 
 // Mock the auth service
@@ -84,16 +85,24 @@ describe('UsersView', () => {
     vi.clearAllMocks()
     localStorage.clear()
     // Setup default admin user
-    vi.mocked(useAuthModule.useAuth).mockReturnValue({
-      user: { id: 'admin-1', username: 'admin', role: 'admin' as const },
-    })
+    vi.mocked(useAuthModule.useAuth).mockReturnValue(
+      buildAuthMock({
+        isAuthenticated: true,
+        isInitialized: true,
+        user: buildUserMock({ id: 'admin-1', username: 'admin', role: 'admin' }),
+      })
+    )
   })
 
   describe('access control', () => {
     it('shows access denied message for non-admin user', () => {
-      vi.mocked(useAuthModule.useAuth).mockReturnValue({
-        user: { id: 'viewer-1', username: 'viewer', role: 'viewer' },
-      })
+      vi.mocked(useAuthModule.useAuth).mockReturnValue(
+        buildAuthMock({
+          isAuthenticated: true,
+          isInitialized: true,
+          user: buildUserMock({ id: 'viewer-1', username: 'viewer', role: 'viewer' }),
+        })
+      )
 
       renderWithProviders(<UsersView />)
 

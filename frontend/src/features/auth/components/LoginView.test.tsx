@@ -6,6 +6,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { LoginView } from './LoginView'
 import { authService } from '../services/authService'
 import * as useAuthModule from '../hooks/useAuth'
+import { buildAuthMock } from '../__test-utils__/authMock'
 
 vi.mock('../hooks/useAuth', () => ({
   useAuth: vi.fn(),
@@ -55,16 +56,14 @@ describe('LoginView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockAuthService.getStatus.mockResolvedValue({ initialized: true })
-    vi.mocked(useAuthModule.useAuth).mockReturnValue({
-      login: vi.fn(),
-    })
+    vi.mocked(useAuthModule.useAuth).mockReturnValue(buildAuthMock({ login: vi.fn() }))
   })
 
   it('logs in successfully and redirects to the requested route', async () => {
     const user = userEvent.setup()
     const login = vi.fn().mockResolvedValue(undefined)
 
-    vi.mocked(useAuthModule.useAuth).mockReturnValue({ login })
+    vi.mocked(useAuthModule.useAuth).mockReturnValue(buildAuthMock({ login }))
 
     renderLogin({
       pathname: '/login',
@@ -86,7 +85,7 @@ describe('LoginView', () => {
     const user = userEvent.setup()
     const login = vi.fn()
 
-    vi.mocked(useAuthModule.useAuth).mockReturnValue({ login })
+    vi.mocked(useAuthModule.useAuth).mockReturnValue(buildAuthMock({ login }))
 
     renderLogin()
 
@@ -109,7 +108,7 @@ describe('LoginView', () => {
       },
     })
 
-    vi.mocked(useAuthModule.useAuth).mockReturnValue({ login })
+    vi.mocked(useAuthModule.useAuth).mockReturnValue(buildAuthMock({ login }))
 
     renderLogin()
 
