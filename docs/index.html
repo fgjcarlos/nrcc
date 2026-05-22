@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="bg-slate-950 text-slate-100">
+<html lang="en" class="bg-sp-void text-sp-text">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -14,40 +14,95 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="nrcc — Node-RED Control Center">
   <meta name="twitter:description" content="A single-binary management UI for Node-RED. Auth + RBAC, backups, log streaming, configuration editor, library and environment management — without replacing Node-RED itself.">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Signal Prime design tokens — mirrors frontend/tailwind.config.js + frontend/src/index.css
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'sp-brand':         '#d4472b',
+            'sp-brand-hover':   '#f05a3d',
+            'sp-brand-dim':     '#8f2f1f',
+            'sp-accent':        '#0089b4',
+            'sp-accent-hover':  '#22b4df',
+            'sp-accent-dim':    '#075a73',
+            'sp-void':          '#07090d',
+            'sp-base':          '#0f1419',
+            'sp-surface':       '#141b23',
+            'sp-elevated':      '#1a2332',
+            'sp-overlay':       '#223044',
+            'sp-border-subtle': '#263241',
+            'sp-border':        '#39485c',
+            'sp-border-strong': '#4a5f7c',
+            'sp-text':          '#f5f7fa',
+            'sp-text-2':        '#d8dee8',
+            'sp-text-3':        '#9aa7b8',
+            'sp-muted':         '#6f7d90',
+            'sp-success':       '#16a36a',
+            'sp-warning':       '#e8a811',
+          },
+          fontFamily: {
+            sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+          },
+        },
+      },
+    }
+  </script>
+
+  <style>
+    /* "Signal Prime Dark" body gradient — same recipe used by the app shell.
+       Red flare top-left + cyan flare top-right over the near-black void. */
+    body {
+      background-color: #07090d;
+      background-image:
+        radial-gradient(circle at top left,  color-mix(in srgb, #d4472b 22%, transparent), transparent 34rem),
+        radial-gradient(circle at top right, color-mix(in srgb, #0089b4 24%, transparent), transparent 32rem),
+        linear-gradient(180deg, #07090d 0%, #07090d 100%);
+      font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    code, pre, .font-mono { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace; }
+  </style>
 </head>
-<body class="min-h-screen bg-[radial-gradient(circle_at_top,#1d4e89_0%,#0f172a_38%,#020617_100%)] antialiased">
+<body class="min-h-screen antialiased">
   <main class="mx-auto w-full max-w-6xl px-6 py-16 sm:py-24">
 
     <!-- Header / Hero -->
     <header class="flex flex-col gap-6">
       <div class="flex flex-wrap items-center gap-3">
-        <span class="rounded-full border border-cyan-300/30 bg-cyan-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-cyan-100">Beta</span>
-        <span class="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-medium text-slate-300">Apache 2.0</span>
-        <a class="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-medium text-slate-300 transition hover:border-white/30 hover:text-white" href="https://github.com/fgjcarlos/nrcc/actions/workflows/pr.yml" rel="noopener noreferrer" target="_blank">
+        <span class="rounded-full border border-sp-brand/40 bg-sp-brand/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-sp-brand-hover">Beta</span>
+        <span class="rounded-full border border-sp-border/60 bg-sp-surface/60 px-3 py-1 text-xs font-medium text-sp-text-2">Apache 2.0</span>
+        <a class="rounded-full border border-sp-border/60 bg-sp-surface/60 px-3 py-1 text-xs font-medium text-sp-text-2 transition hover:border-sp-accent/50 hover:text-sp-text" href="https://github.com/fgjcarlos/nrcc/actions/workflows/pr.yml" rel="noopener noreferrer" target="_blank">
           CI on every PR
         </a>
       </div>
       <div class="max-w-3xl space-y-5">
-        <p class="text-sm font-semibold uppercase tracking-[0.4em] text-cyan-300">Node-RED Control Center</p>
-        <h1 class="text-4xl font-semibold tracking-tight text-white sm:text-6xl">
+        <p class="text-sm font-semibold uppercase tracking-[0.4em] text-sp-accent-hover">Node-RED Control Center</p>
+        <h1 class="text-4xl font-semibold tracking-tight text-sp-text sm:text-6xl">
           The operations layer Node-RED was missing.
         </h1>
-        <p class="text-lg leading-relaxed text-slate-300 sm:text-xl">
+        <p class="text-lg leading-relaxed text-sp-text-2 sm:text-xl">
           A single Go binary with an embedded React dashboard. Run it alongside Node-RED to get
           authentication and RBAC, scheduled backups, live log streaming, configuration editor,
           npm library and environment management — without touching Node-RED itself.
         </p>
       </div>
       <div class="flex flex-wrap gap-3">
-        <a class="inline-flex items-center gap-2 rounded-full bg-cyan-400 px-5 py-3 text-sm font-semibold uppercase tracking-[0.18em] text-slate-950 transition hover:bg-cyan-300" href="https://github.com/fgjcarlos/nrcc" rel="noopener noreferrer" target="_blank">
+        <a class="inline-flex items-center gap-2 rounded-full bg-sp-brand px-5 py-3 text-sm font-semibold uppercase tracking-[0.18em] text-white shadow-[0_18px_40px_-12px_rgba(212,71,43,0.55)] transition hover:bg-sp-brand-hover" href="https://github.com/fgjcarlos/nrcc" rel="noopener noreferrer" target="_blank">
           View on GitHub
           <span aria-hidden="true">→</span>
         </a>
-        <a class="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.04] px-5 py-3 text-sm font-semibold uppercase tracking-[0.18em] text-slate-100 transition hover:border-white/40 hover:text-white" href="https://github.com/fgjcarlos/nrcc/releases" rel="noopener noreferrer" target="_blank">
+        <a class="inline-flex items-center gap-2 rounded-full border border-sp-border bg-sp-surface/60 px-5 py-3 text-sm font-semibold uppercase tracking-[0.18em] text-sp-text transition hover:border-sp-accent/60 hover:bg-sp-elevated/80" href="https://github.com/fgjcarlos/nrcc/releases" rel="noopener noreferrer" target="_blank">
           Releases
         </a>
-        <a class="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.04] px-5 py-3 text-sm font-semibold uppercase tracking-[0.18em] text-slate-100 transition hover:border-white/40 hover:text-white" href="https://github.com/fgjcarlos/nrcc/issues" rel="noopener noreferrer" target="_blank">
+        <a class="inline-flex items-center gap-2 rounded-full border border-sp-border bg-sp-surface/60 px-5 py-3 text-sm font-semibold uppercase tracking-[0.18em] text-sp-text transition hover:border-sp-accent/60 hover:bg-sp-elevated/80" href="https://github.com/fgjcarlos/nrcc/issues" rel="noopener noreferrer" target="_blank">
           Roadmap
         </a>
       </div>
@@ -55,38 +110,38 @@
 
     <!-- What nrcc is + Stack -->
     <section class="mt-20 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-      <article class="rounded-3xl border border-white/10 bg-slate-950/55 p-8 backdrop-blur">
-        <p class="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-300">What nrcc is</p>
-        <h2 class="mt-3 text-3xl font-semibold tracking-tight text-white">Operations, not a Node-RED replacement.</h2>
-        <p class="mt-5 leading-relaxed text-slate-300">
+      <article class="rounded-2xl border border-sp-border bg-gradient-to-b from-sp-elevated to-sp-surface p-8 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.55)]">
+        <p class="text-xs font-semibold uppercase tracking-[0.3em] text-sp-accent-hover">What nrcc is</p>
+        <h2 class="mt-3 text-3xl font-semibold tracking-tight text-sp-text">Operations, not a Node-RED replacement.</h2>
+        <p class="mt-5 leading-relaxed text-sp-text-2">
           Node-RED is brilliant for flows, but day-to-day operation usually means SSH-ing in,
-          editing <code class="rounded bg-slate-900/70 px-1.5 py-0.5 font-mono text-sm text-cyan-100">settings.js</code> by
+          editing <code class="rounded bg-sp-void/80 px-1.5 py-0.5 text-sm text-sp-accent-hover">settings.js</code> by
           hand, juggling tarballs for backups, and tailing log files. nrcc gives you a clean
           control plane: a single Go binary with an embedded React UI, JSON file storage, and
           a process manager that supervises Node-RED.
         </p>
-        <p class="mt-3 leading-relaxed text-slate-300">
+        <p class="mt-3 leading-relaxed text-sp-text-2">
           It connects to your existing Node-RED installation, never replaces it. Operators get
           visibility, an audit-friendly admin surface, and least-privilege access without
           changing the runtime.
         </p>
       </article>
-      <article class="rounded-3xl border border-cyan-300/20 bg-cyan-400/10 p-8 backdrop-blur">
-        <p class="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-100">Stack</p>
+      <article class="rounded-2xl border border-sp-brand/30 bg-sp-brand/[0.08] p-8 shadow-[0_24px_60px_-20px_rgba(212,71,43,0.35)]">
+        <p class="text-xs font-semibold uppercase tracking-[0.3em] text-sp-brand-hover">Stack</p>
         <ul class="mt-5 flex flex-wrap gap-2">
-          <li class="rounded-full border border-white/10 bg-slate-950/40 px-3 py-1 font-mono text-xs text-cyan-100">Go 1.25</li>
-          <li class="rounded-full border border-white/10 bg-slate-950/40 px-3 py-1 font-mono text-xs text-cyan-100">Chi router</li>
-          <li class="rounded-full border border-white/10 bg-slate-950/40 px-3 py-1 font-mono text-xs text-cyan-100">JWT + bcrypt</li>
-          <li class="rounded-full border border-white/10 bg-slate-950/40 px-3 py-1 font-mono text-xs text-cyan-100">Cobra CLI</li>
-          <li class="rounded-full border border-white/10 bg-slate-950/40 px-3 py-1 font-mono text-xs text-cyan-100">React 19</li>
-          <li class="rounded-full border border-white/10 bg-slate-950/40 px-3 py-1 font-mono text-xs text-cyan-100">Vite 8</li>
-          <li class="rounded-full border border-white/10 bg-slate-950/40 px-3 py-1 font-mono text-xs text-cyan-100">TanStack Query 5</li>
-          <li class="rounded-full border border-white/10 bg-slate-950/40 px-3 py-1 font-mono text-xs text-cyan-100">Zod</li>
-          <li class="rounded-full border border-white/10 bg-slate-950/40 px-3 py-1 font-mono text-xs text-cyan-100">Tailwind + daisyUI</li>
-          <li class="rounded-full border border-white/10 bg-slate-950/40 px-3 py-1 font-mono text-xs text-cyan-100">Vitest</li>
+          <li class="rounded-full border border-sp-border bg-sp-void/60 px-3 py-1 font-mono text-xs text-sp-accent-hover">Go 1.25</li>
+          <li class="rounded-full border border-sp-border bg-sp-void/60 px-3 py-1 font-mono text-xs text-sp-accent-hover">Chi router</li>
+          <li class="rounded-full border border-sp-border bg-sp-void/60 px-3 py-1 font-mono text-xs text-sp-accent-hover">JWT + bcrypt</li>
+          <li class="rounded-full border border-sp-border bg-sp-void/60 px-3 py-1 font-mono text-xs text-sp-accent-hover">Cobra CLI</li>
+          <li class="rounded-full border border-sp-border bg-sp-void/60 px-3 py-1 font-mono text-xs text-sp-accent-hover">React 19</li>
+          <li class="rounded-full border border-sp-border bg-sp-void/60 px-3 py-1 font-mono text-xs text-sp-accent-hover">Vite 8</li>
+          <li class="rounded-full border border-sp-border bg-sp-void/60 px-3 py-1 font-mono text-xs text-sp-accent-hover">TanStack Query 5</li>
+          <li class="rounded-full border border-sp-border bg-sp-void/60 px-3 py-1 font-mono text-xs text-sp-accent-hover">Zod</li>
+          <li class="rounded-full border border-sp-border bg-sp-void/60 px-3 py-1 font-mono text-xs text-sp-accent-hover">Tailwind + daisyUI</li>
+          <li class="rounded-full border border-sp-border bg-sp-void/60 px-3 py-1 font-mono text-xs text-sp-accent-hover">Vitest</li>
         </ul>
-        <p class="mt-6 text-sm leading-relaxed text-cyan-50/80">
-          One static binary with the React UI embedded via <code class="font-mono">//go:embed</code>.
+        <p class="mt-6 text-sm leading-relaxed text-sp-text-2">
+          One static binary with the React UI embedded via <code class="font-mono text-sp-accent-hover">//go:embed</code>.
           Cross-compiled on every tag to Linux amd64/arm64/armv7, macOS amd64/arm64, and Windows
           amd64 — plus a multi-arch Docker image.
         </p>
@@ -96,9 +151,9 @@
     <!-- Features -->
     <section class="mt-20 space-y-10">
       <div class="flex flex-col gap-3">
-        <p class="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-300">What works today</p>
-        <h2 class="text-3xl font-semibold tracking-tight text-white">A full operations surface in beta.</h2>
-        <p class="max-w-2xl text-slate-300">
+        <p class="text-xs font-semibold uppercase tracking-[0.3em] text-sp-accent-hover">What works today</p>
+        <h2 class="text-3xl font-semibold tracking-tight text-sp-text">A full operations surface in beta.</h2>
+        <p class="max-w-2xl text-sp-text-2">
           The MVP scope is feature-complete and nrcc is in a hardening phase. Every item below
           is shipped, runs in a 225-test Vitest suite, and is exercised by Go tests and the
           backend/frontend CI gates on every PR.
@@ -108,67 +163,67 @@
       <div class="space-y-8">
 
         <div>
-          <p class="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-300">Backend</p>
+          <p class="text-xs font-semibold uppercase tracking-[0.3em] text-sp-accent-hover">Backend</p>
           <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <article class="rounded-3xl border border-white/10 bg-white/[0.04] p-6 transition hover:border-cyan-300/30 hover:bg-white/[0.07]">
-              <h3 class="text-lg font-semibold text-white">Auth, RBAC, lockouts</h3>
-              <p class="mt-3 text-sm leading-relaxed text-slate-300">JWT login with bcrypt hashing, admin/viewer roles, and a last-admin guard so you can never lock yourself out.</p>
+            <article class="rounded-2xl border border-sp-border bg-sp-surface/70 p-6 transition hover:border-sp-accent/50 hover:bg-sp-elevated/80">
+              <h3 class="text-lg font-semibold text-sp-text">Auth, RBAC, lockouts</h3>
+              <p class="mt-3 text-sm leading-relaxed text-sp-text-2">JWT login with bcrypt hashing, admin/viewer roles, and a last-admin guard so you can never lock yourself out.</p>
             </article>
-            <article class="rounded-3xl border border-white/10 bg-white/[0.04] p-6 transition hover:border-cyan-300/30 hover:bg-white/[0.07]">
-              <h3 class="text-lg font-semibold text-white">Process manager</h3>
-              <p class="mt-3 text-sm leading-relaxed text-slate-300">Supervises Node-RED with restart, status, and uptime tracking. Native or Docker, decided at install time.</p>
+            <article class="rounded-2xl border border-sp-border bg-sp-surface/70 p-6 transition hover:border-sp-accent/50 hover:bg-sp-elevated/80">
+              <h3 class="text-lg font-semibold text-sp-text">Process manager</h3>
+              <p class="mt-3 text-sm leading-relaxed text-sp-text-2">Supervises Node-RED with restart, status, and uptime tracking. Native or Docker, decided at install time.</p>
             </article>
-            <article class="rounded-3xl border border-white/10 bg-white/[0.04] p-6 transition hover:border-cyan-300/30 hover:bg-white/[0.07]">
-              <h3 class="text-lg font-semibold text-white">Backups &amp; restore</h3>
-              <p class="mt-3 text-sm leading-relaxed text-slate-300">Manual + scheduled snapshots (cron), tar.gz archives, integrity checks, pre-restore safety backup, retention policies.</p>
+            <article class="rounded-2xl border border-sp-border bg-sp-surface/70 p-6 transition hover:border-sp-accent/50 hover:bg-sp-elevated/80">
+              <h3 class="text-lg font-semibold text-sp-text">Backups &amp; restore</h3>
+              <p class="mt-3 text-sm leading-relaxed text-sp-text-2">Manual + scheduled snapshots (cron), tar.gz archives, integrity checks, pre-restore safety backup, retention policies.</p>
             </article>
-            <article class="rounded-3xl border border-white/10 bg-white/[0.04] p-6 transition hover:border-cyan-300/30 hover:bg-white/[0.07]">
-              <h3 class="text-lg font-semibold text-white">Live log buffer</h3>
-              <p class="mt-3 text-sm leading-relaxed text-slate-300">Ring buffer of Node-RED stdout/stderr with level filtering, SSE streaming endpoint, and a clear/download path.</p>
+            <article class="rounded-2xl border border-sp-border bg-sp-surface/70 p-6 transition hover:border-sp-accent/50 hover:bg-sp-elevated/80">
+              <h3 class="text-lg font-semibold text-sp-text">Live log buffer</h3>
+              <p class="mt-3 text-sm leading-relaxed text-sp-text-2">Ring buffer of Node-RED stdout/stderr with level filtering, SSE streaming endpoint, and a clear/download path.</p>
             </article>
-            <article class="rounded-3xl border border-white/10 bg-white/[0.04] p-6 transition hover:border-cyan-300/30 hover:bg-white/[0.07]">
-              <h3 class="text-lg font-semibold text-white">Settings editor</h3>
-              <p class="mt-3 text-sm leading-relaxed text-slate-300">Validated config editor that round-trips through real <code class="font-mono text-cyan-100">settings.js</code> with automatic backup before save.</p>
+            <article class="rounded-2xl border border-sp-border bg-sp-surface/70 p-6 transition hover:border-sp-accent/50 hover:bg-sp-elevated/80">
+              <h3 class="text-lg font-semibold text-sp-text">Settings editor</h3>
+              <p class="mt-3 text-sm leading-relaxed text-sp-text-2">Validated config editor that round-trips through real <code class="font-mono text-sp-accent-hover">settings.js</code> with automatic backup before save.</p>
             </article>
-            <article class="rounded-3xl border border-white/10 bg-white/[0.04] p-6 transition hover:border-cyan-300/30 hover:bg-white/[0.07]">
-              <h3 class="text-lg font-semibold text-white">Self-update detection</h3>
-              <p class="mt-3 text-sm leading-relaxed text-slate-300">Polls GitHub Releases for new nrcc versions, surfaces the upgrade in the UI, and applies it with a guarded flow.</p>
+            <article class="rounded-2xl border border-sp-border bg-sp-surface/70 p-6 transition hover:border-sp-accent/50 hover:bg-sp-elevated/80">
+              <h3 class="text-lg font-semibold text-sp-text">Self-update detection</h3>
+              <p class="mt-3 text-sm leading-relaxed text-sp-text-2">Polls GitHub Releases for new nrcc versions, surfaces the upgrade in the UI, and applies it with a guarded flow.</p>
             </article>
           </div>
         </div>
 
         <div>
-          <p class="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-300">Frontend</p>
+          <p class="text-xs font-semibold uppercase tracking-[0.3em] text-sp-accent-hover">Frontend</p>
           <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <article class="rounded-3xl border border-white/10 bg-white/[0.04] p-6 transition hover:border-cyan-300/30 hover:bg-white/[0.07]">
-              <h3 class="text-lg font-semibold text-white">Dashboard</h3>
-              <p class="mt-3 text-sm leading-relaxed text-slate-300">CPU, memory, disk, uptime, host status, Docker status, plus quick actions for restart and "open Node-RED".</p>
+            <article class="rounded-2xl border border-sp-border bg-sp-surface/70 p-6 transition hover:border-sp-accent/50 hover:bg-sp-elevated/80">
+              <h3 class="text-lg font-semibold text-sp-text">Dashboard</h3>
+              <p class="mt-3 text-sm leading-relaxed text-sp-text-2">CPU, memory, disk, uptime, host status, Docker status, plus quick actions for restart and "open Node-RED".</p>
             </article>
-            <article class="rounded-3xl border border-white/10 bg-white/[0.04] p-6 transition hover:border-cyan-300/30 hover:bg-white/[0.07]">
-              <h3 class="text-lg font-semibold text-white">Flow viewer</h3>
-              <p class="mt-3 text-sm leading-relaxed text-slate-300">List, inspect, and export flows. Pattern analysis surfaces common smells without leaving the UI.</p>
+            <article class="rounded-2xl border border-sp-border bg-sp-surface/70 p-6 transition hover:border-sp-accent/50 hover:bg-sp-elevated/80">
+              <h3 class="text-lg font-semibold text-sp-text">Flow viewer</h3>
+              <p class="mt-3 text-sm leading-relaxed text-sp-text-2">List, inspect, and export flows. Pattern analysis surfaces common smells without leaving the UI.</p>
             </article>
-            <article class="rounded-3xl border border-white/10 bg-white/[0.04] p-6 transition hover:border-cyan-300/30 hover:bg-white/[0.07]">
-              <h3 class="text-lg font-semibold text-white">Library &amp; env management</h3>
-              <p class="mt-3 text-sm leading-relaxed text-slate-300">Install / search / remove npm packages and manage Node-RED environment variables with encryption at rest.</p>
+            <article class="rounded-2xl border border-sp-border bg-sp-surface/70 p-6 transition hover:border-sp-accent/50 hover:bg-sp-elevated/80">
+              <h3 class="text-lg font-semibold text-sp-text">Library &amp; env management</h3>
+              <p class="mt-3 text-sm leading-relaxed text-sp-text-2">Install / search / remove npm packages and manage Node-RED environment variables with encryption at rest.</p>
             </article>
           </div>
         </div>
 
         <div>
-          <p class="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-300">Operations</p>
+          <p class="text-xs font-semibold uppercase tracking-[0.3em] text-sp-accent-hover">Operations</p>
           <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <article class="rounded-3xl border border-white/10 bg-white/[0.04] p-6 transition hover:border-cyan-300/30 hover:bg-white/[0.07]">
-              <h3 class="text-lg font-semibold text-white">Single binary CLI</h3>
-              <p class="mt-3 text-sm leading-relaxed text-slate-300"><code class="font-mono text-cyan-100">nrcc install / uninstall / portless / version</code> — Cobra-powered CLI cross-compiled on every tag.</p>
+            <article class="rounded-2xl border border-sp-border bg-sp-surface/70 p-6 transition hover:border-sp-accent/50 hover:bg-sp-elevated/80">
+              <h3 class="text-lg font-semibold text-sp-text">Single binary CLI</h3>
+              <p class="mt-3 text-sm leading-relaxed text-sp-text-2"><code class="font-mono text-sp-accent-hover">nrcc install / uninstall / portless / version</code> — Cobra-powered CLI cross-compiled on every tag.</p>
             </article>
-            <article class="rounded-3xl border border-white/10 bg-white/[0.04] p-6 transition hover:border-cyan-300/30 hover:bg-white/[0.07]">
-              <h3 class="text-lg font-semibold text-white">systemd installer</h3>
-              <p class="mt-3 text-sm leading-relaxed text-slate-300"><code class="font-mono text-cyan-100">sudo nrcc install</code> creates the service, user, data dir, and starts it. Interactive prompts when running in a TTY, sane defaults otherwise.</p>
+            <article class="rounded-2xl border border-sp-border bg-sp-surface/70 p-6 transition hover:border-sp-accent/50 hover:bg-sp-elevated/80">
+              <h3 class="text-lg font-semibold text-sp-text">systemd installer</h3>
+              <p class="mt-3 text-sm leading-relaxed text-sp-text-2"><code class="font-mono text-sp-accent-hover">sudo nrcc install</code> creates the service, user, data dir, and starts it. Interactive prompts when running in a TTY, sane defaults otherwise.</p>
             </article>
-            <article class="rounded-3xl border border-white/10 bg-white/[0.04] p-6 transition hover:border-cyan-300/30 hover:bg-white/[0.07]">
-              <h3 class="text-lg font-semibold text-white">Portless integration</h3>
-              <p class="mt-3 text-sm leading-relaxed text-slate-300">Optional install hook for <a href="https://portless.sh" rel="noopener noreferrer" target="_blank" class="text-cyan-100 underline-offset-4 hover:underline">Portless</a> — replaces raw <code class="font-mono text-cyan-100">:3001</code> URLs with HTTPS <code class="font-mono text-cyan-100">.localhost</code> names and adds LAN / Tailscale sharing.</p>
+            <article class="rounded-2xl border border-sp-border bg-sp-surface/70 p-6 transition hover:border-sp-accent/50 hover:bg-sp-elevated/80">
+              <h3 class="text-lg font-semibold text-sp-text">Portless integration</h3>
+              <p class="mt-3 text-sm leading-relaxed text-sp-text-2">Optional install hook for <a href="https://portless.sh" rel="noopener noreferrer" target="_blank" class="text-sp-accent-hover underline-offset-4 hover:underline">Portless</a> — replaces raw <code class="font-mono text-sp-accent-hover">:3001</code> URLs with HTTPS <code class="font-mono text-sp-accent-hover">.localhost</code> names and adds LAN / Tailscale sharing.</p>
             </article>
           </div>
         </div>
@@ -177,52 +232,52 @@
     </section>
 
     <!-- Quick start -->
-    <section class="mt-20 rounded-3xl border border-white/10 bg-slate-950/55 p-8 backdrop-blur">
-      <p class="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-300">Quick start</p>
-      <h2 class="mt-3 text-3xl font-semibold tracking-tight text-white">Three commands to a local control plane.</h2>
+    <section class="mt-20 rounded-2xl border border-sp-border bg-gradient-to-b from-sp-elevated to-sp-surface p-8 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.55)]">
+      <p class="text-xs font-semibold uppercase tracking-[0.3em] text-sp-accent-hover">Quick start</p>
+      <h2 class="mt-3 text-3xl font-semibold tracking-tight text-sp-text">Three commands to a local control plane.</h2>
       <ol class="mt-8 space-y-4">
 
         <li class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-6">
-          <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-cyan-300/40 bg-cyan-400/10 font-mono text-sm font-semibold text-cyan-100">01</span>
+          <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-sp-brand/40 bg-sp-brand/15 font-mono text-sm font-semibold text-sp-brand-hover">01</span>
           <div class="flex w-full flex-col gap-1">
-            <span class="text-sm uppercase tracking-[0.22em] text-slate-400">Clone</span>
-            <code class="block w-full overflow-x-auto rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 font-mono text-sm text-cyan-100">git clone https://github.com/fgjcarlos/nrcc.git &amp;&amp; cd nrcc</code>
+            <span class="text-xs uppercase tracking-[0.22em] text-sp-muted">Clone</span>
+            <code class="block w-full overflow-x-auto rounded-xl border border-sp-border bg-sp-void/80 px-4 py-3 font-mono text-sm text-sp-accent-hover">git clone https://github.com/fgjcarlos/nrcc.git &amp;&amp; cd nrcc</code>
           </div>
         </li>
 
         <li class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-6">
-          <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-cyan-300/40 bg-cyan-400/10 font-mono text-sm font-semibold text-cyan-100">02</span>
+          <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-sp-brand/40 bg-sp-brand/15 font-mono text-sm font-semibold text-sp-brand-hover">02</span>
           <div class="flex w-full flex-col gap-1">
-            <span class="text-sm uppercase tracking-[0.22em] text-slate-400">Build the binary (frontend + Go)</span>
-            <code class="block w-full overflow-x-auto rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 font-mono text-sm text-cyan-100">make build</code>
+            <span class="text-xs uppercase tracking-[0.22em] text-sp-muted">Build the binary (frontend + Go)</span>
+            <code class="block w-full overflow-x-auto rounded-xl border border-sp-border bg-sp-void/80 px-4 py-3 font-mono text-sm text-sp-accent-hover">make build</code>
           </div>
         </li>
 
         <li class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-6">
-          <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-cyan-300/40 bg-cyan-400/10 font-mono text-sm font-semibold text-cyan-100">03</span>
+          <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-sp-brand/40 bg-sp-brand/15 font-mono text-sm font-semibold text-sp-brand-hover">03</span>
           <div class="flex w-full flex-col gap-1">
-            <span class="text-sm uppercase tracking-[0.22em] text-slate-400">Run it</span>
-            <code class="block w-full overflow-x-auto rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 font-mono text-sm text-cyan-100">./nrcc</code>
+            <span class="text-xs uppercase tracking-[0.22em] text-sp-muted">Run it</span>
+            <code class="block w-full overflow-x-auto rounded-xl border border-sp-border bg-sp-void/80 px-4 py-3 font-mono text-sm text-sp-accent-hover">./nrcc</code>
           </div>
         </li>
 
       </ol>
-      <p class="mt-6 text-sm text-slate-400">
+      <p class="mt-6 text-sm text-sp-muted">
         Prefer the one-liner installer with systemd integration?
-        <code class="font-mono text-cyan-100">curl -fsSL https://raw.githubusercontent.com/fgjcarlos/nrcc/main/scripts/install.sh | sh</code>
+        <code class="font-mono text-sp-accent-hover">curl -fsSL https://raw.githubusercontent.com/fgjcarlos/nrcc/main/scripts/install.sh | sh</code>
         — full options in the
-        <a class="text-cyan-100 underline-offset-4 hover:underline" href="https://github.com/fgjcarlos/nrcc#quick-install" rel="noopener noreferrer" target="_blank">README</a>.
+        <a class="text-sp-accent-hover underline-offset-4 hover:underline" href="https://github.com/fgjcarlos/nrcc#quick-install" rel="noopener noreferrer" target="_blank">README</a>.
       </p>
     </section>
 
     <!-- Footer -->
-    <footer class="mt-20 flex flex-col items-start justify-between gap-4 border-t border-white/10 pt-8 text-sm text-slate-400 sm:flex-row sm:items-center">
+    <footer class="mt-20 flex flex-col items-start justify-between gap-4 border-t border-sp-border pt-8 text-sm text-sp-muted sm:flex-row sm:items-center">
       <p>© 2026 Carlos Fontán García · Apache 2.0</p>
       <div class="flex flex-wrap gap-4">
-        <a class="hover:text-white" href="https://github.com/fgjcarlos/nrcc" rel="noopener noreferrer" target="_blank">GitHub</a>
-        <a class="hover:text-white" href="https://github.com/fgjcarlos/nrcc/issues" rel="noopener noreferrer" target="_blank">Issues</a>
-        <a class="hover:text-white" href="https://github.com/fgjcarlos/nrcc/releases" rel="noopener noreferrer" target="_blank">Releases</a>
-        <a class="hover:text-white" href="https://github.com/fgjcarlos/nrcc/blob/main/CONTRIBUTING.md" rel="noopener noreferrer" target="_blank">Contributing</a>
+        <a class="hover:text-sp-text" href="https://github.com/fgjcarlos/nrcc" rel="noopener noreferrer" target="_blank">GitHub</a>
+        <a class="hover:text-sp-text" href="https://github.com/fgjcarlos/nrcc/issues" rel="noopener noreferrer" target="_blank">Issues</a>
+        <a class="hover:text-sp-text" href="https://github.com/fgjcarlos/nrcc/releases" rel="noopener noreferrer" target="_blank">Releases</a>
+        <a class="hover:text-sp-text" href="https://github.com/fgjcarlos/nrcc/blob/main/CONTRIBUTING.md" rel="noopener noreferrer" target="_blank">Contributing</a>
       </div>
     </footer>
 
