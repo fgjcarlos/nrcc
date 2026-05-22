@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { LogsView } from './LogsView'
 import * as logsHooks from '../hooks'
+import type { LogLevel } from '@/shared/types'
 
 vi.mock('../hooks', () => ({
   useLogsData: vi.fn(),
@@ -14,7 +15,7 @@ const mockSetIsPaused = vi.fn()
 const mockRefetch = vi.fn()
 const mockHandleClear = vi.fn()
 const mockHandleDownload = vi.fn()
-const mockGetLevelColor = vi.fn(() => 'text-blue-500')
+const mockGetLevelColor = vi.fn((_level: LogLevel) => 'text-blue-500' as const)
 
 describe('LogsView', () => {
   beforeEach(() => {

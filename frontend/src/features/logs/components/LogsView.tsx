@@ -1,6 +1,7 @@
 import { cn } from '@/shared/lib';
 import { StateContainer } from '@/shared/components';
 import { Trash2, Download, Play, Pause } from 'lucide-react';
+import type { LogLevel } from '@/shared/types';
 import { useLogsData, useLogsActions } from '../hooks';
 
 export function LogsView() {
