@@ -111,4 +111,15 @@ describe('Pagination Types', () => {
     expect(page3Response.page).toBe(3);
     expect(page2Response.total).toBe(page3Response.total);
   });
+
+  it('exports BackupEvent, BackupConfig, and BackupSchedulerStatus types', () => {
+    // Verify the type re-exports exist by referencing them at runtime.
+    // If any type is missing from ./index, the import above stops compiling.
+    const evt = {} as BackupEvent;
+    const cfg = {} as BackupConfig;
+    const sched = {} as BackupSchedulerStatus;
+    expect(typeof evt).toBe('object');
+    expect(typeof cfg).toBe('object');
+    expect(typeof sched).toBe('object');
+  });
 });

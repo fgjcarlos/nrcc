@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { updateService, UpdateApplyResponse } from '../services/updateService';
+import { updateService } from '../services/updateService';
 import { UPDATE_STATUS_KEY } from './useUpdateStatus';
 import { UPDATE_FLOW_STATE_KEY } from './useUpdateFlowState';
 

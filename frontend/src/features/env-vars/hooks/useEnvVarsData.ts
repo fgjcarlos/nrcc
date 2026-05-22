@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { envService, type EnvVar } from '@/features/env-vars/services';
+import { envService } from '@/features/env-vars/services';
 
 export function useEnvVarsData() {
   // Query for all environment variables

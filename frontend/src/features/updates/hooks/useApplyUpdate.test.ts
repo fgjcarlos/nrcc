@@ -3,8 +3,6 @@ import { renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useApplyUpdate } from '@/features/updates/hooks/useApplyUpdate'
 import { updateService } from '@/features/updates/services/updateService'
-import { UPDATE_STATUS_KEY } from '@/features/updates/hooks/useUpdateStatus'
-import { UPDATE_FLOW_STATE_KEY } from '@/features/updates/hooks/useUpdateFlowState'
 import React from 'react'
 
 // Mock the update service

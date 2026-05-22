@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { ChevronDown } from 'lucide-react';
 import { validateCron } from '@/features/backups/lib/cronUtils';
 import { UI_COPY } from '@/shared/constants/uiCopy';
 

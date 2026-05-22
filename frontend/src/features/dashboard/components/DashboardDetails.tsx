@@ -2,13 +2,10 @@ import { formatBytes, cn } from '@/shared/lib';
 import { formatPercent } from '@/features/dashboard/lib';
 import type { BackupObservability } from '@/features/backups/services';
 import type { SystemInfo } from '@/shared/types';
-import { Activity, Archive, CheckCircle2, ExternalLink, HardDrive, Play, RefreshCw, Square } from 'lucide-react';
+import { Activity, Archive, CheckCircle2, ExternalLink, HardDrive, RefreshCw } from 'lucide-react';
 
 interface DashboardDetailsProps {
   isRestarting: boolean;
-  isStartStopping: boolean;
-  onStartNodeRed: () => void;
-  onStopNodeRed: () => void;
   onOpenNodeRed: () => void;
   onRequestRestart: () => void;
   backups?: BackupObservability;
@@ -57,9 +54,6 @@ function QuickActionsCard({
   isRestarting,
   onOpenNodeRed,
   onRequestRestart,
-  isStartStopping,
-  onStartNodeRed,
-  onStopNodeRed,
 }: Omit<DashboardDetailsProps, 'system' | 'backups'>) {
   return (
     <div className="p-6 border card surface-card border-border">
@@ -171,9 +165,6 @@ export function DashboardDetails(props: DashboardDetailsProps) {
         isRestarting={props.isRestarting}
         onOpenNodeRed={props.onOpenNodeRed}
         onRequestRestart={props.onRequestRestart}
-        isStartStopping={props.isStartStopping}
-        onStartNodeRed={props.onStartNodeRed}
-        onStopNodeRed={props.onStopNodeRed}
       />
       <BackupStatusCard backups={props.backups} />
     </div>

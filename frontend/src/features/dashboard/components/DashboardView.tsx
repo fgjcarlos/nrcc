@@ -11,7 +11,6 @@ export function DashboardView() {
   const {
     pendingConfirm,
     isRestarting,
-    isStartStopping,
     setPendingConfirm,
     handleRestartConfirm,
     handleOpenNodeRed,
@@ -39,9 +38,6 @@ export function DashboardView() {
       <DashboardDetails
         system={system}
         backups={backups}
-        isStartStopping={isStartStopping}
-        onStartNodeRed={() => {}}
-        onStopNodeRed={() => {}}
         isRestarting={isRestarting}
         onRequestRestart={() => setPendingConfirm(true)}
         onOpenNodeRed={handleOpenNodeRed}

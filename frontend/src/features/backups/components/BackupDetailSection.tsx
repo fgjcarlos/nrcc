@@ -1,6 +1,6 @@
 import { LoaderCircle, X } from 'lucide-react';
 import type { BackupSummary } from '@/features/backups/services';
-import { formatBackupSize, getBackupDisplayName, getBackupSummary } from '@/features/backups/lib/formatters';
+import { formatBackupSize, getBackupSummary } from '@/features/backups/lib/formatters';
 
 interface BackupDetail {
   files: Array<{

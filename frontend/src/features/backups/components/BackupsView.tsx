@@ -20,8 +20,6 @@ import {
 } from '@/features/backups/lib/formatters';
 import { cn } from '@/shared/lib';
 
-const EMPTY_BACKUP_EVENTS = [];
-
 function isConfigDirty(left: BackupConfig, right: BackupConfig | undefined): boolean {
   if (!right) {
     return false;
@@ -63,8 +61,8 @@ export function BackupsView() {
   const [selectedBackupId, setSelectedBackupId] = useState<string | null>(null);
   const [confirmConfig, setConfirmConfig] = useState<ConfirmConfig>(null);
   const [backupListPage, setBackupListPage] = useState(1);
-  const [backupListSort, setBackupListSort] = useState<'date' | 'size' | 'status'>('date');
-  const [backupListOrder, setBackupListOrder] = useState<'asc' | 'desc'>('desc');
+  const [backupListSort] = useState<'date' | 'size' | 'status'>('date');
+  const [backupListOrder] = useState<'asc' | 'desc'>('desc');
 
   const backupsData = useBackupsData({
     page: backupListPage,
@@ -108,7 +106,6 @@ export function BackupsView() {
 
   const effectiveStorage = backupsData.observability?.storage ?? backupsData.storage ?? storageSummary;
   const pendingActionId = actions.restoreMutation.variables ?? actions.deleteMutation.variables ?? null;
-  const selectedBackupName = selectedBackup ? getBackupDisplayName(selectedBackup) : null;
   const selectedDetailLoading = Boolean(selectedBackupId) && (backupsData.detailLoading || backupsData.detailFetching || backupsData.detail === undefined);
   const effectiveSchedulerStatus = backupsData.status ?? {
     enabled: configDraft.enabled,
@@ -125,10 +122,6 @@ export function BackupsView() {
   const schedulerTone = getSchedulerTone(effectiveSchedulerStatus);
   const schedulerLabel = getSchedulerLabel(effectiveSchedulerStatus);
   const configDirty = isConfigDirty(configDraft, backupsData.config);
-
-  const schedulerHistoryEvents = useMemo(() => {
-    return backupsData.observability?.recentEvents ?? EMPTY_BACKUP_EVENTS;
-  }, [backupsData.observability]);
 
   const downloadBackup = async (backup: BackupSummary) => {
     if (!backup.id) {

@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { backupService, type BackupConfig } from '@/features/backups/services';
+import { backupService } from '@/features/backups/services';
 import { getErrorMessage } from '@/features/backups/lib/formatters';
 import { UI_COPY } from '@/shared/constants/uiCopy';
 

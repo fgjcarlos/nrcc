@@ -235,7 +235,7 @@ describe('BackupTable', () => {
     const onPageChange = vi.fn();
     const onSort = vi.fn();
 
-    const { rerender } = render(
+    render(
       <BackupTable
         items={mockBackups}
         total={42}
