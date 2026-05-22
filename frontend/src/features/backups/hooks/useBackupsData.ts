@@ -39,15 +39,7 @@ export function useBackupsData({
   // Backup list query
   const backupListQuery = useQuery({
     queryKey: ['backup-list', page, limit, sort, order],
-    queryFn: async () => {
-      const response = await backupService.getList({
-        page,
-        limit,
-        sort,
-        order,
-      });
-      return response;
-    },
+    queryFn: () => backupService.listPaginated({ page, limit, sort, order }),
   });
 
   // Backup detail query
