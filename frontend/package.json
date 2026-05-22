@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "start": "serve -s dist -l 3010",
     "test": "vitest",
-    "test:ui": "vitest --ui"
+    "test:ui": "vitest --ui",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.0",
