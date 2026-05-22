@@ -17,7 +17,10 @@ export function useUpdateFlowState() {
     queryFn: updateService.getFlowState,
     // Aggressive polling while update is active; disabled otherwise
     refetchInterval: (query) => {
-      const state = query.state === 'success' ? query.data?.state : null;
+      // The `query` callback argument is a TanStack `Query` instance, not an
+      // observer result. The fetch status lives in `query.state.status` and
+      // the latest response lives in `query.state.data`.
+      const state = query.state.status === 'success' ? query.state.data?.state : null;
       // If state is Idle, Completed, or Failed, disable polling (return false)
       if (state === 'Idle' || state === 'Completed' || state === 'Failed') {
         return false;
