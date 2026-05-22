@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
@@ -583,6 +583,103 @@ describe('UsersView', () => {
 
       const addButton = screen.getByRole('button', { name: new RegExp(`${UI_COPY.add}.*${UI_COPY.createUser}`) })
       expect(addButton).toBeInTheDocument()
+    })
+  })
+
+  describe('mutation flows', () => {
+    it('creates a user from the create modal', async () => {
+      vi.mocked(useUsersDataModule.useUsersData).mockReturnValue({
+        users: [mockAdminUser],
+        isLoading: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      })
+      vi.mocked(authService.createUser).mockResolvedValue({
+        id: 'new-user-1',
+        username: 'newuser',
+        role: 'viewer',
+        createdAt: '2026-05-22T00:00:00Z',
+      })
+
+      const user = userEvent.setup()
+      renderWithProviders(<UsersView />)
+
+      await user.click(screen.getByRole('button', { name: new RegExp(`${UI_COPY.add}.*${UI_COPY.createUser}`) }))
+      await user.type(screen.getByRole('textbox'), 'newuser')
+
+      const passwordInputs = screen.getAllByDisplayValue('')
+      const passwordInput = passwordInputs.find(
+        (el) => el instanceof HTMLInputElement && el.type === 'password'
+      ) as HTMLInputElement | undefined
+
+      expect(passwordInput).toBeTruthy()
+      if (passwordInput) {
+        await user.type(passwordInput, 'securepass123')
+      }
+
+      await user.click(screen.getByRole('button', { name: UI_COPY.createUser }))
+
+      await waitFor(() => {
+        expect(authService.createUser).toHaveBeenCalledWith('newuser', 'securepass123', 'viewer')
+      })
+    })
+
+    it('changes a user password from the password modal', async () => {
+      vi.mocked(useUsersDataModule.useUsersData).mockReturnValue({
+        users: [mockAdminUser, mockViewerUser],
+        isLoading: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      })
+      vi.mocked(authService.changePassword).mockResolvedValue(undefined)
+
+      const user = userEvent.setup()
+      renderWithProviders(<UsersView />)
+
+      const changePasswordButtons = screen.getAllByRole('button', { name: UI_COPY.changePassword })
+      await user.click(changePasswordButtons[1])
+
+      const passwordInputs = screen.getAllByDisplayValue('')
+      const passwordInput = passwordInputs.find(
+        (el) => el instanceof HTMLInputElement && el.type === 'password'
+      ) as HTMLInputElement | undefined
+
+      expect(passwordInput).toBeTruthy()
+      if (passwordInput) {
+        await user.type(passwordInput, 'newpassword123')
+      }
+
+      await user.click(screen.getByRole('button', { name: UI_COPY.confirm }))
+
+      await waitFor(() => {
+        expect(authService.changePassword).toHaveBeenCalledWith(mockViewerUser.id, 'newpassword123')
+      })
+    })
+
+    it('deletes a user after confirmation', async () => {
+      vi.mocked(useUsersDataModule.useUsersData).mockReturnValue({
+        users: [mockAdminUser, mockViewerUser, mockAnotherAdminUser],
+        isLoading: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      })
+      vi.mocked(authService.deleteUser).mockResolvedValue(undefined)
+
+      const user = userEvent.setup()
+      renderWithProviders(<UsersView />)
+
+      const deleteButtons = screen.getAllByRole('button', { name: UI_COPY.delete })
+      await user.click(deleteButtons[1])
+      await user.click(screen.getByRole('button', { name: UI_COPY.confirm }))
+
+      await waitFor(() => {
+        expect(authService.deleteUser).toHaveBeenCalled()
+      })
+
+      expect(vi.mocked(authService.deleteUser).mock.calls[0]?.[0]).toBe(mockViewerUser.id)
     })
   })
 
