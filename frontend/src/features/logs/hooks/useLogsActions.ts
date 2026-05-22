@@ -1,5 +1,5 @@
 import { logService } from '@/features/logs/services';
-import type { LogLevel } from '@/shared/types';
+import type { LogEntry, LogLevel } from '@/shared/types';
 
 export function useLogsActions() {
   const handleClear = async (refetch: () => void) => {
@@ -7,7 +7,7 @@ export function useLogsActions() {
     refetch();
   };
 
-  const handleDownload = (logs: any[]) => {
+  const handleDownload = (logs: LogEntry[]) => {
     const content = logs.map(l => `${l.timestamp} [${l.level.toUpperCase()}] ${l.message}`).join('\n');
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
