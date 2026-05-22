@@ -1,5 +1,10 @@
 # Node-RED Control Center (nrcc)
 
+[![PR Validation](https://github.com/fgjcarlos/nrcc/actions/workflows/pr.yml/badge.svg)](https://github.com/fgjcarlos/nrcc/actions/workflows/pr.yml)
+[![Release](https://github.com/fgjcarlos/nrcc/actions/workflows/release.yml/badge.svg)](https://github.com/fgjcarlos/nrcc/actions/workflows/release.yml)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Go 1.25+](https://img.shields.io/badge/Go-1.25%2B-00ADD8?logo=go)](go.mod)
+
 A single-binary management UI for Node-RED. Run it alongside Node-RED to get a web dashboard for configuration, backups, logs, and more.
 
 ## Features
@@ -18,8 +23,8 @@ A single-binary management UI for Node-RED. Run it alongside Node-RED to get a w
 
 ## Requirements
 
-- Go 1.22+ (to build from source)
-- Node.js 18+ and npm (for frontend build)
+- Go 1.25+ (to build from source)
+- Node.js 22+ and pnpm 11+ (for frontend build)
 - Node-RED installed globally or in PATH (`npm install -g node-red`)
 
 ## Quick Install
@@ -34,7 +39,7 @@ The fastest way to get nrcc running as a system service:
 ### One-Liner Install
 
 ```bash
-curl -fsSL https://get.nrcc.dev/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/fgjcarlos/nrcc/main/scripts/install.sh | sh
 ```
 
 Then set up the system service:
@@ -50,7 +55,7 @@ Open **http://localhost:3001** in your browser and set up your admin user.
 Install a specific version:
 
 ```bash
-NRCC_VERSION=v0.1.0 curl -fsSL https://get.nrcc.dev/install.sh | sh
+NRCC_VERSION=v0.1.0 curl -fsSL https://raw.githubusercontent.com/fgjcarlos/nrcc/main/scripts/install.sh | sh
 ```
 
 ### Custom Install Directory
@@ -58,21 +63,13 @@ NRCC_VERSION=v0.1.0 curl -fsSL https://get.nrcc.dev/install.sh | sh
 Install to a non-root directory (no `sudo` needed):
 
 ```bash
-INSTALL_DIR=$HOME/.local/bin curl -fsSL https://get.nrcc.dev/install.sh | sh
+INSTALL_DIR=$HOME/.local/bin curl -fsSL https://raw.githubusercontent.com/fgjcarlos/nrcc/main/scripts/install.sh | sh
 ```
 
 Make sure `$HOME/.local/bin` is in your `$PATH`:
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
-```
-
-### Fallback URL (if GitHub Pages is unavailable)
-
-If `get.nrcc.dev` is not reachable, install from GitHub directly:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/composedof2/nrcc/main/scripts/install.sh | sh
 ```
 
 For the manual production rollout steps for GitHub Pages, DNS, and release validation, see [docs/production-install-launch-guide.md](docs/production-install-launch-guide.md).
@@ -91,7 +88,7 @@ sudo nrcc uninstall --purge  # Also remove config and data files
 ### Build from source
 
 ```bash
-git clone https://github.com/composedof2/nrcc.git
+git clone https://github.com/fgjcarlos/nrcc.git
 cd nrcc
 make build        # builds frontend + Go binary (~30s)
 ./nrcc            # starts on :3001
@@ -101,7 +98,7 @@ Visit **http://localhost:3001** → Set up admin user → Login
 
 ### Binary release
 
-Download the binary for your platform from [Releases](https://github.com/composedof2/nrcc/releases).
+Download the binary for your platform from [Releases](https://github.com/fgjcarlos/nrcc/releases).
 
 ```bash
 chmod +x nrcc-linux-amd64
@@ -284,17 +281,34 @@ nrcc/
 ├── README.md                    # This file
 ├── .env.example                 # Example environment config
 │
-├── frontend/                    # React + Vite SPA
+├── frontend/                    # React 19 + Vite + TS SPA (feature-folders layout)
 │   ├── src/
-│   │   ├── App.tsx              # Root component
-│   │   ├── pages/               # Page components
-│   │   ├── components/          # Reusable components
-│   │   ├── hooks/               # Custom React hooks
-│   │   ├── services/            # API client, utils
-│   │   └── types/               # TypeScript types
-│   ├── public/
+│   │   ├── App.tsx              # Root component, routing
+│   │   ├── main.tsx             # Entry point
+│   │   ├── features/            # One folder per domain
+│   │   │   ├── auth/            # login, setup, users, profile
+│   │   │   ├── backups/         # list, schedule, retention, restore
+│   │   │   ├── bootstrap/       # first-run wizard
+│   │   │   ├── configuration/   # Node-RED settings editor
+│   │   │   ├── dashboard/       # overview, host/system metrics
+│   │   │   ├── docker/          # container status & control
+│   │   │   ├── env-vars/        # environment variables editor
+│   │   │   ├── flows/           # flow viewer & export
+│   │   │   ├── libraries/       # npm package management
+│   │   │   ├── logs/            # streaming logs viewer
+│   │   │   ├── patterns/        # flow pattern analysis
+│   │   │   └── updates/         # self-update checker
+│   │   │       Each feature contains: components/, hooks/, services/, types/, lib/
+│   │   └── shared/              # Cross-feature primitives
+│   │       ├── components/      # ui/, layout/, ConfirmationDialog, StateContainer
+│   │       ├── hooks/           # shared React hooks
+│   │       ├── lib/             # api client, formatters
+│   │       ├── types/           # cross-feature TypeScript types
+│   │       └── constants/       # UI copy, defaults
 │   ├── package.json
+│   ├── pnpm-lock.yaml
 │   ├── vite.config.ts
+│   ├── vitest.config.ts
 │   └── dist/                    # Built SPA (embedded into binary)
 │
 ├── internal/
@@ -441,8 +455,6 @@ Authentication: `Authorization: Bearer <jwt-token>` header.
 |--------|------|-------------|
 | `GET` | `/api/health` | Server health check |
 
-See the full [specification](../openspec/changes/nrcc-new-project/spec.md) for detailed request/response schemas.
-
 ## Deployment
 
 ### Systemd service (Linux)
@@ -480,7 +492,7 @@ sudo systemctl start nrcc
 ### Docker (optional)
 
 ```dockerfile
-FROM golang:1.22 as builder
+FROM golang:1.25 as builder
 WORKDIR /build
 COPY . .
 RUN make release
@@ -515,8 +527,8 @@ CMD ["nrcc"]
 
 ## License
 
-See LICENSE file.
+Licensed under the [Apache License 2.0](LICENSE).
 
 ## Contributing
 
-See CONTRIBUTING.md for guidelines.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, the workflow we follow, and how to open an issue or a PR.
