@@ -1,4 +1,4 @@
-import { Activity, LucideIcon } from 'lucide-react';
+import { LucideIcon } from 'lucide-react';
 
 interface MetricCardProps {
   icon: LucideIcon;

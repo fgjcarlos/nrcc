@@ -182,7 +182,6 @@ export function UsersView() {
         <UserTable
           users={users}
           adminCount={adminCount}
-          currentUserId={currentUser?.id || ''}
           onEdit={openEditModal}
           onDelete={handleDelete}
           onChangePassword={openPasswordModal}

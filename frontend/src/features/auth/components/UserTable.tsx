@@ -4,7 +4,6 @@ import { UI_COPY } from '@/shared/constants/uiCopy';
 interface UserTableProps {
   users: User[];
   adminCount: number;
-  currentUserId: string;
   onEdit: (user: User) => void;
   onDelete: (user: User) => void;
   onChangePassword: (user: User) => void;
@@ -13,7 +12,6 @@ interface UserTableProps {
 export function UserTable({
   users,
   adminCount,
-  currentUserId,
   onEdit,
   onDelete,
   onChangePassword,

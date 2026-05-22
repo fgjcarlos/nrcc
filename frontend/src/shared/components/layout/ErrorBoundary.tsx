@@ -20,8 +20,7 @@ export class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    // Capture error details via lifecycle hook
+  componentDidCatch(error: Error, _errorInfo: React.ErrorInfo) {
     this.setState({ error });
   }
 

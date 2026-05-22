@@ -22,7 +22,7 @@ export function FlowDetailView() {
   const { id } = useParams<{ id: string }>();
 
   // Hooks for data and actions
-  const { flow, metrics, allFlows, isLoading, flowLoading } = useFlowDetailData({
+  const { flow, metrics, allFlows, isLoading } = useFlowDetailData({
     flowId: id,
   });
   const { analyzeFlowMutation, detectPatternsMutation } = useFlowDetailActions();

@@ -1,4 +1,3 @@
-import React from 'react';
 import { type EnvVar } from '@/features/env-vars/services/envService';
 import { Eye, EyeOff, Trash2, Pencil } from 'lucide-react';
 

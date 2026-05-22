@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { type InstalledLibrary } from '@/features/libraries/services';
 import { useLibrariesData } from '@/features/libraries/hooks/useLibrariesData';
 import { useLibrariesActions } from '@/features/libraries/hooks/useLibrariesActions';
 import { ChevronLeft, ChevronRight, ExternalLink, Trash2 } from 'lucide-react';
@@ -22,7 +21,6 @@ export function LibrariesView() {
     handleSearch,
     handleInstall: handleInstallAction,
     handleUninstall,
-    handleClearSearch,
   } = useLibrariesActions();
 
   const handleInstall = (name: string, alias?: string) => {

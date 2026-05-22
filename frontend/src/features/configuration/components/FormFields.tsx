@@ -1,4 +1,4 @@
-import type { NodeRedConfigFormData, LoggingLevel } from '@/shared/types';
+import type { LoggingLevel } from '@/shared/types';
 import { Input } from '@/shared/components/ui';
 
 interface InputFieldProps {

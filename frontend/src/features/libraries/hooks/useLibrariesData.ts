@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { libraryService, type InstalledLibrary } from '@/features/libraries/services';
+import { libraryService } from '@/features/libraries/services';
 
 export function useLibrariesData() {
   const librariesQuery = useQuery({

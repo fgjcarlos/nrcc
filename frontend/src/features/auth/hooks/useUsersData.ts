@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { authService, type User } from '@/features/auth/services/authService';
+import { authService } from '@/features/auth/services/authService';
 
 interface UseUsersDataParams {
   enabled?: boolean;

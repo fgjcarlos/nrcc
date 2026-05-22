@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { backupService, type BackupConfig, type BackupSummary } from '@/features/backups/services';
+import { backupService } from '@/features/backups/services';
 
 interface UseBackupsDataParams {
   page: number;

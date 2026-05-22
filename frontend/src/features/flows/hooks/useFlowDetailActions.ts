@@ -1,11 +1,9 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { flowService, type AnalysisResult } from '@/features/flows';
+import { flowService } from '@/features/flows';
 import { patternService, type PatternAnalysisResult } from '@/features/patterns/services';
 
 export function useFlowDetailActions() {
-  const queryClient = useQueryClient();
-
   // Analyze flow mutation
   const analyzeFlowMutation = useMutation({
     mutationFn: (flowId: string) => flowService.analyzeFlow(flowId),

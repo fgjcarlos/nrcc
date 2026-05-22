@@ -1,4 +1,4 @@
-import { formatBytes, cn } from '@/shared/lib';
+import { formatBytes } from '@/shared/lib';
 import { formatPercent } from '@/features/dashboard/lib';
 import type { HostStatus, SystemInfo } from '@/shared/types';
 import { Cpu, MemoryStick, Server } from 'lucide-react';

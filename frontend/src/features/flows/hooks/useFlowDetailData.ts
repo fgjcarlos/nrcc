@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { flowService, type FlowSummary, type FlowMetrics } from '@/features/flows';
+import { flowService } from '@/features/flows';
 
 interface UseFlowDetailDataParams {
   flowId: string | undefined;

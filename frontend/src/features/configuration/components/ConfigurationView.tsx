@@ -9,7 +9,7 @@ import {
 } from '.';
 import {
   Settings, Server, Lock, Activity, Palette,
-  Save, FileText, Globe
+  Save, Globe
 } from 'lucide-react';
 import { useConfigurationData, useConfigurationActions } from '../hooks';
 
@@ -154,11 +154,6 @@ export function ConfigurationView() {
 
   const handleSave = async () => {
     await actions.handleSave(formData);
-    setHasChanges(false);
-  };
-
-  const handleSaveAndRestart = async () => {
-    await actions.handleSaveAndRestart(formData);
     setHasChanges(false);
   };
 

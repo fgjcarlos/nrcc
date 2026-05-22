@@ -52,7 +52,6 @@ export function UpdatesView() {
   const isChecking = checkingNow || checkMutation.isPending;
   const hasError = status?.error;
   const hasUpdate = status?.updateAvailable && !hasError;
-  const isUpToDate = !hasUpdate && !hasError && !isLoading;
 
   const isUpdateActive = flowState?.state && ['BackingUp', 'Applying'].includes(flowState.state);
   const isUpdateCompleted = flowState?.state === 'Completed';

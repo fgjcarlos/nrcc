@@ -1,10 +1,8 @@
 import { useEnvironment } from '@/features/environment/hooks/useEnvironment';
-import { 
-  Server, 
-  Package, 
-  HardDrive, 
-  AlertCircle, 
-  CheckCircle2, 
+import {
+  Package,
+  AlertCircle,
+  CheckCircle2,
   AlertTriangle,
   Loader,
   FileText,
