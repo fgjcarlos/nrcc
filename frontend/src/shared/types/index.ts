@@ -160,7 +160,7 @@ export interface EditorMermaid {
 // ============================================
 
 export interface EditorTheme {
-  page?: EditorHeader;
+  page?: EditorPage;
   header?: EditorHeader;
   deployButton?: EditorDeployButton;
   menu?: EditorMenu;
