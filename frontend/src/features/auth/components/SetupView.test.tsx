@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { SetupView } from './SetupView'
 import { authService } from '../services/authService'
+import { buildAuthResponseMock } from '../__test-utils__/authMock'
 
 vi.mock('../services/authService', () => ({
   authService: {
@@ -36,7 +37,7 @@ describe('SetupView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockAuthService.getStatus.mockResolvedValue({ initialized: false })
-    mockAuthService.setup.mockResolvedValue(undefined)
+    mockAuthService.setup.mockResolvedValue(buildAuthResponseMock())
   })
 
   it('creates the initial admin account and redirects to the dashboard', async () => {

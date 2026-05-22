@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { ProtectedRoute } from './ProtectedRoute'
 import * as useAuthModule from 'features/auth/hooks/useAuth'
+import { buildAuthMock, buildUserMock } from 'features/auth/__test-utils__/authMock'
 
 vi.mock('features/auth/hooks/useAuth', () => ({
   useAuth: vi.fn(),
@@ -32,12 +33,9 @@ describe('ProtectedRoute', () => {
   })
 
   it('shows a loading spinner while auth is loading', () => {
-    vi.mocked(useAuthModule.useAuth).mockReturnValue({
-      isAuthenticated: false,
-      isInitialized: false,
-      isLoading: true,
-      user: null,
-    })
+    vi.mocked(useAuthModule.useAuth).mockReturnValue(
+      buildAuthMock({ isLoading: true })
+    )
 
     const { container } = renderProtectedRoute()
 
@@ -46,12 +44,9 @@ describe('ProtectedRoute', () => {
   })
 
   it('redirects unauthenticated users to login', async () => {
-    vi.mocked(useAuthModule.useAuth).mockReturnValue({
-      isAuthenticated: false,
-      isInitialized: true,
-      isLoading: false,
-      user: null,
-    })
+    vi.mocked(useAuthModule.useAuth).mockReturnValue(
+      buildAuthMock({ isInitialized: true })
+    )
 
     renderProtectedRoute()
 
@@ -59,17 +54,13 @@ describe('ProtectedRoute', () => {
   })
 
   it('redirects users without the required role to the dashboard', async () => {
-    vi.mocked(useAuthModule.useAuth).mockReturnValue({
-      isAuthenticated: true,
-      isInitialized: true,
-      isLoading: false,
-      user: {
-        id: 'viewer-1',
-        username: 'viewer',
-        role: 'viewer',
-        createdAt: '2026-05-22T00:00:00Z',
-      },
-    })
+    vi.mocked(useAuthModule.useAuth).mockReturnValue(
+      buildAuthMock({
+        isAuthenticated: true,
+        isInitialized: true,
+        user: buildUserMock({ id: 'viewer-1', username: 'viewer', role: 'viewer' }),
+      })
+    )
 
     renderProtectedRoute('admin')
 
@@ -77,17 +68,13 @@ describe('ProtectedRoute', () => {
   })
 
   it('renders the child content for authorized users', () => {
-    vi.mocked(useAuthModule.useAuth).mockReturnValue({
-      isAuthenticated: true,
-      isInitialized: true,
-      isLoading: false,
-      user: {
-        id: 'admin-1',
-        username: 'admin',
-        role: 'admin',
-        createdAt: '2026-05-22T00:00:00Z',
-      },
-    })
+    vi.mocked(useAuthModule.useAuth).mockReturnValue(
+      buildAuthMock({
+        isAuthenticated: true,
+        isInitialized: true,
+        user: buildUserMock({ id: 'admin-1', username: 'admin', role: 'admin' }),
+      })
+    )
 
     renderProtectedRoute('admin')
 
