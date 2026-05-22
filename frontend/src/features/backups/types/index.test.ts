@@ -1,7 +1,15 @@
 import { describe, it, expect } from 'vitest';
 
-// Type export verification - these will cause compile-time errors if types don't exist
-import type { PaginationParams, PaginatedResponse, SortOrder, BackupSummary, BackupEvent, BackupConfig, BackupSchedulerStatus } from './index';
+// Type export verification - these will cause compile-time errors if the types don't exist.
+// PaginationParams/PaginatedResponse/SortOrder live in ./index. The domain types
+// (BackupSummary/Event/Config/SchedulerStatus) live alongside the service that owns them.
+import type { PaginationParams, PaginatedResponse, SortOrder } from './index';
+import type {
+  BackupSummary,
+  BackupEvent,
+  BackupConfig,
+  BackupSchedulerStatus,
+} from '../services/backupService';
 
 describe('Pagination Types', () => {
   it('should export PaginationParams, PaginatedResponse, and SortOrder types', () => {
