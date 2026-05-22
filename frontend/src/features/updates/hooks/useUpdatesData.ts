@@ -21,7 +21,9 @@ export function useUpdatesData() {
     queryKey: UPDATE_FLOW_STATE_KEY,
     queryFn: updateService.getFlowState,
     refetchInterval: (query) => {
-      const state = query.state === 'success' ? query.data?.state : null;
+      // See useUpdateFlowState — `query.state` is an object whose `.status`
+      // field holds the fetch status, and `.data` holds the response.
+      const state = query.state.status === 'success' ? query.state.data?.state : null;
       if (state === 'Idle' || state === 'Completed' || state === 'Failed') {
         return false;
       }
