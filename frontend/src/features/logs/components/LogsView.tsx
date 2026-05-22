@@ -1,14 +1,11 @@
 import { cn } from '@/shared/lib';
+import { StateContainer } from '@/shared/components';
 import { Trash2, Download, Play, Pause } from 'lucide-react';
 import { useLogsData, useLogsActions } from '../hooks';
 
 export function LogsView() {
-  const { logs, isLoading, levelFilter, setLevelFilter, isPaused, setIsPaused, refetch } = useLogsData();
+  const { logs, isLoading, isError, levelFilter, setLevelFilter, isPaused, setIsPaused, refetch } = useLogsData();
   const { handleClear, handleDownload, getLevelColor } = useLogsActions();
-
-  if (isLoading) {
-    return <div className="p-6 text-base-content/70">Loading...</div>;
-  }
 
   return (
     <div className="flex h-full flex-col space-y-6 p-6">
@@ -62,11 +59,16 @@ export function LogsView() {
 
       {/* Log Viewer */}
       <div className="surface-card flex-1 overflow-auto border border-border p-4 font-mono text-sm">
-        {logs.length === 0 ? (
-          <div className="flex h-full min-h-48 items-center justify-center rounded-2xl border border-dashed border-border py-8 text-center text-base-content/60">
-            No logs available
-          </div>
-        ) : (
+        <StateContainer
+          isLoading={isLoading}
+          isError={isError}
+          isEmpty={logs.length === 0}
+          emptySlot={
+            <div className="flex h-full min-h-48 items-center justify-center rounded-2xl border border-dashed border-border py-8 text-center text-base-content/60">
+              No logs available
+            </div>
+          }
+        >
           <div className="space-y-1">
             {logs.map((log) => (
               <div key={log.id} className="flex gap-2 rounded-xl px-2 py-2 transition-colors hover:bg-base-300/50">
@@ -80,7 +82,7 @@ export function LogsView() {
               </div>
             ))}
           </div>
-        )}
+        </StateContainer>
       </div>
     </div>
   );
