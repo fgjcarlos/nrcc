@@ -47,8 +47,8 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: nrcc
-          file: nrcc/Dockerfile
+          context: .
+          file: ./Dockerfile
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -70,22 +70,28 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.22"
-          cache-dependency-path: nrcc/go.sum
+          go-version: "1.25"
+          cache-dependency-path: go.sum
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: nrcc/frontend/package-lock.json
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
 
       - name: Build frontend
-        working-directory: nrcc/frontend
-        run: npm ci && npm run build
+        working-directory: frontend
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
 
       - name: Build binaries
-        working-directory: nrcc
         env:
           VERSION: ${{ github.ref_name }}
         run: |
@@ -107,20 +113,20 @@ jobs:
           ls -lh dist/
 
       - name: Generate checksums
-        working-directory: nrcc/dist
+        working-directory: dist
         run: |
           # Generate combined SHA256SUMS file
           sha256sum * > SHA256SUMS
-          
+
           # Generate per-binary sidecar files with normalized filename
           for binary in nrcc-*; do
             sha256sum "$binary" | sed 's/nrcc-.*/nrcc/' > "$binary.sha256"
           done
-          
+
           ls -lh SHA256SUMS *.sha256
 
       - name: Upload binaries to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: nrcc/dist/*
+          files: dist/*
           generate_release_notes: true
