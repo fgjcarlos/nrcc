@@ -1,7 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useState, useRef, useEffect } from 'react';
-import { libraryService, type NpmSearchResult } from '@/features/libraries/services';
+import { libraryService } from '@/features/libraries/services';
+import type { NpmSearchResult } from '@/features/libraries/types';
 
 export function useLibrariesActions() {
   const queryClient = useQueryClient();

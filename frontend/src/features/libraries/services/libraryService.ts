@@ -1,25 +1,5 @@
 import { api } from 'shared/lib/api';
-
-export interface InstalledLibrary {
-  name: string;
-  version: string;
-  description?: string;
-  keywords?: string[];
-  homepage?: string;
-  repository?: string;
-}
-
-export interface NpmSearchResult {
-  name: string;
-  version: string;
-  description: string;
-  downloads?: number;
-}
-
-export interface InstallResponse {
-  jobId: string;
-  message: string;
-}
+import type { InstalledLibrary, NpmSearchResult, InstallResponse } from '../types';
 
 export const libraryService = {
   getLibraries: async (): Promise<InstalledLibrary[]> => {
