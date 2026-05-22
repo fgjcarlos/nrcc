@@ -7,7 +7,7 @@ export function useLogsData() {
   const [levelFilter, setLevelFilter] = useState<LogLevel[]>(['info', 'warn', 'error']);
   const [isPaused, setIsPaused] = useState(false);
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['logs', levelFilter.join(',')],
     queryFn: () => logService.getLogs(100, levelFilter.join(',')),
     refetchInterval: isPaused ? false : 3000,
@@ -18,6 +18,8 @@ export function useLogsData() {
   return {
     logs,
     isLoading,
+    isError,
+    error,
     levelFilter,
     setLevelFilter,
     isPaused,
