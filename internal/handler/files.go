@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/composedof2/nrcc/internal/audit"
 	"github.com/composedof2/nrcc/internal/model"
 	"github.com/go-chi/chi/v5"
 )
@@ -14,14 +15,16 @@ import (
 // FilesHandler handles file upload/management endpoints
 type FilesHandler struct {
 	dataDir string
+	audit   *audit.Service
 }
 
 // NewFilesHandler creates a new files handler
 func NewFilesHandler(dataDir string) *FilesHandler {
-	return &FilesHandler{
-		dataDir: dataDir,
-	}
+	return &FilesHandler{dataDir: dataDir}
 }
+
+// SetAuditService injects the audit logger.
+func (h *FilesHandler) SetAuditService(a *audit.Service) { h.audit = a }
 
 // PostUpload uploads a file
 // POST /api/files/upload
@@ -69,6 +72,7 @@ func (h *FilesHandler) PostUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.audit.Log(r, "", "FILE_UPLOAD", filename, "ok", nil)
 	model.RespondJSON(w, http.StatusCreated, map[string]interface{}{
 		"filename": filename,
 		"path":     "/uploads/" + filename,
@@ -93,6 +97,7 @@ func (h *FilesHandler) DeleteFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.audit.Log(r, "", "FILE_DELETE", name, "ok", nil)
 	w.WriteHeader(http.StatusNoContent)
 }
 

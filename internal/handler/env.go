@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/composedof2/nrcc/internal/audit"
 	"github.com/composedof2/nrcc/internal/model"
 	"github.com/composedof2/nrcc/internal/service"
 	"github.com/go-chi/chi/v5"
@@ -12,8 +13,9 @@ import (
 // EnvHandler handles environment variable endpoints
 type EnvHandler struct {
 	svc     *service.EnvService
-	pm      *service.ProcessManager // optional — used to restart node-red on changes
-	dataDir string                  // TAREA 2c: Path to data directory for .env file
+	pm      *service.ProcessManager
+	audit   *audit.Service
+	dataDir string
 }
 
 // NewEnvHandler creates a new environment handler
@@ -26,9 +28,10 @@ func NewEnvHandler(svc *service.EnvService, dataDir string) *EnvHandler {
 
 // SetProcessManager wires a ProcessManager so node-red is restarted automatically
 // whenever an env var is saved or deleted.
-func (h *EnvHandler) SetProcessManager(pm *service.ProcessManager) {
-	h.pm = pm
-}
+func (h *EnvHandler) SetProcessManager(pm *service.ProcessManager) { h.pm = pm }
+
+// SetAuditService injects the audit logger.
+func (h *EnvHandler) SetAuditService(a *audit.Service) { h.audit = a }
 
 // GetEnv lists all environment variables
 // GET /api/env
@@ -90,6 +93,7 @@ func (h *EnvHandler) PostEnv(w http.ResponseWriter, r *http.Request) {
 	}
 
 	restarted := h.restartIfRunning()
+	h.audit.Log(r, "", "ENV_SET", req.Key, "ok", map[string]string{"type": req.Type})
 	model.RespondJSON(w, http.StatusOK, map[string]interface{}{
 		"message":   "Environment variable set",
 		"restarted": restarted,
@@ -107,6 +111,7 @@ func (h *EnvHandler) DeleteEnv(w http.ResponseWriter, r *http.Request) {
 	}
 
 	restarted := h.restartIfRunning()
+	h.audit.Log(r, "", "ENV_DELETE", key, "ok", nil)
 	if restarted {
 		model.RespondJSON(w, http.StatusOK, map[string]interface{}{
 			"message":   "Environment variable deleted",
@@ -164,6 +169,7 @@ func (h *EnvHandler) PutDotenv(w http.ResponseWriter, r *http.Request) {
 	}
 
 	restarted := h.restartIfRunning()
+	h.audit.Log(r, "", "DOTENV_UPDATE", "", "ok", nil)
 	model.RespondJSON(w, http.StatusOK, map[string]interface{}{
 		"message":   "Archivo .env guardado",
 		"restarted": restarted,

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/composedof2/nrcc/internal/audit"
 	"github.com/composedof2/nrcc/internal/middleware"
 	"github.com/composedof2/nrcc/internal/model"
 	"github.com/composedof2/nrcc/internal/service"
@@ -16,12 +17,16 @@ const refreshCookieName = "nrcc_refresh"
 // AuthHandler handles authentication endpoints
 type AuthHandler struct {
 	authSvc *service.AuthService
+	audit   *audit.Service
 }
 
 // NewAuthHandler creates a new auth handler
 func NewAuthHandler(authSvc *service.AuthService) *AuthHandler {
 	return &AuthHandler{authSvc: authSvc}
 }
+
+// SetAuditService injects the audit logger.
+func (h *AuthHandler) SetAuditService(a *audit.Service) { h.audit = a }
 
 // SetupRequest represents the setup endpoint request
 type SetupRequest struct {
@@ -135,6 +140,7 @@ func (h *AuthHandler) Setup(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
+	h.audit.Log(r, req.Username, "SYSTEM_SETUP", "", "ok", nil)
 	model.RespondJSON(w, http.StatusCreated, resp)
 }
 
@@ -155,12 +161,14 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	// Find user
 	user := h.authSvc.GetUserByUsername(req.Username)
 	if user == nil {
+		h.audit.Log(r, req.Username, "LOGIN", "", "fail", map[string]string{"reason": "unknown_user"})
 		model.RespondError(w, http.StatusUnauthorized, "AUTH_FAILED", "Invalid username or password")
 		return
 	}
 
 	// Verify password
 	if !h.authSvc.VerifyPassword(user.PasswordHash, req.Password) {
+		h.audit.Log(r, req.Username, "LOGIN", "", "fail", map[string]string{"reason": "bad_password"})
 		model.RespondError(w, http.StatusUnauthorized, "AUTH_FAILED", "Invalid username or password")
 		return
 	}
@@ -186,6 +194,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
+	h.audit.Log(r, req.Username, "LOGIN", "", "ok", nil)
 	model.RespondJSON(w, http.StatusOK, resp)
 }
 
@@ -323,6 +332,7 @@ func (h *AuthHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt: newUser.UpdatedAt,
 	}
 
+	h.audit.Log(r, claims.Username, "USER_CREATE", req.Username, "ok", map[string]string{"role": string(req.Role)})
 	model.RespondJSON(w, http.StatusCreated, resp)
 }
 
@@ -373,6 +383,7 @@ func (h *AuthHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.audit.Log(r, claims.Username, "USER_DELETE", user.Username, "ok", nil)
 	model.RespondJSON(w, http.StatusOK, map[string]bool{"success": true})
 }
 
@@ -430,6 +441,7 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.audit.Log(r, claims.Username, "PASSWORD_CHANGE", user.Username, "ok", nil)
 	model.RespondJSON(w, http.StatusOK, map[string]bool{"success": true})
 }
 
@@ -495,6 +507,8 @@ func (h *AuthHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		model.RespondError(w, http.StatusInternalServerError, "UPDATE_ERROR", "Failed to update user")
 		return
 	}
+
+	h.audit.Log(r, claims.Username, "USER_UPDATE", user.Username, "ok", map[string]string{"role": string(user.Role)})
 
 	// Return updated user
 	resp := model.CCUserPublic{

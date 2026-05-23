@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/composedof2/nrcc/internal/audit"
 	"github.com/composedof2/nrcc/internal/middleware"
 	"github.com/composedof2/nrcc/internal/model"
 	"github.com/composedof2/nrcc/internal/service"
@@ -12,12 +13,16 @@ import (
 // ConfigHandler handles configuration endpoints
 type ConfigHandler struct {
 	configSvc *service.ConfigService
+	audit     *audit.Service
 }
 
 // NewConfigHandler creates a new config handler
 func NewConfigHandler(configSvc *service.ConfigService) *ConfigHandler {
 	return &ConfigHandler{configSvc: configSvc}
 }
+
+// SetAuditService injects the audit logger.
+func (h *ConfigHandler) SetAuditService(a *audit.Service) { h.audit = a }
 
 // GetConfig handles GET /api/config - protected
 func (h *ConfigHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
@@ -55,6 +60,7 @@ func (h *ConfigHandler) SaveConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.audit.Log(r, claims.Username, "CONFIG_SAVE", "", "ok", nil)
 	model.RespondJSON(w, http.StatusOK, cfg)
 }
 

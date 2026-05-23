@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/composedof2/nrcc/internal/audit"
 	"github.com/composedof2/nrcc/internal/model"
 	"github.com/composedof2/nrcc/internal/service"
 	"github.com/go-chi/chi/v5"
@@ -13,7 +14,8 @@ import (
 
 // BackupHandler handles backup endpoints
 type BackupHandler struct {
-	svc *service.BackupService
+	svc   *service.BackupService
+	audit *audit.Service
 }
 
 // GetBackupStatus returns runtime scheduler status.
@@ -38,6 +40,9 @@ func (h *BackupHandler) GetBackupObservability(w http.ResponseWriter, r *http.Re
 func NewBackupHandler(svc *service.BackupService) *BackupHandler {
 	return &BackupHandler{svc: svc}
 }
+
+// SetAuditService injects the audit logger.
+func (h *BackupHandler) SetAuditService(a *audit.Service) { h.audit = a }
 
 // GetBackups lists all backups with optional pagination, sorting, and filtering
 // GET /api/backups?page=1&limit=20&sort=date|size|status&order=asc|desc
@@ -105,6 +110,7 @@ func (h *BackupHandler) PostBackup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.audit.Log(r, "", "BACKUP_CREATE", backup.ID, "ok", map[string]string{"type": req.Type})
 	model.RespondJSON(w, http.StatusCreated, backup)
 }
 
@@ -133,6 +139,7 @@ func (h *BackupHandler) DeleteBackup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.audit.Log(r, "", "BACKUP_DELETE", id, "ok", nil)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -159,10 +166,12 @@ func (h *BackupHandler) RestoreBackup(w http.ResponseWriter, r *http.Request) {
 
 	preRestoreID, err := h.svc.RestoreWithSafetyBackup(id)
 	if err != nil {
+		h.audit.Log(r, "", "BACKUP_RESTORE", id, "fail", map[string]string{"error": err.Error()})
 		model.RespondError(w, http.StatusInternalServerError, "BACKUP_ERROR", err.Error())
 		return
 	}
 
+	h.audit.Log(r, "", "BACKUP_RESTORE", id, "ok", map[string]string{"pre_restore_id": preRestoreID})
 	model.RespondJSON(w, http.StatusOK, map[string]interface{}{
 		"success":      true,
 		"message":      "Backup restored successfully",
