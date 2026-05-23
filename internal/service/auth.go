@@ -1,6 +1,8 @@
 package service
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"time"
 
@@ -10,24 +12,31 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+const (
+	AccessTokenLifetime  = 15 * time.Minute
+	RefreshTokenLifetime = 7 * 24 * time.Hour
+)
+
 // AuthService handles authentication and user management
 type AuthService struct {
-	jwtSecret string
-	store     *store.JSONStore[model.CCUsers]
+	jwtSecret    string
+	store        *store.JSONStore[model.CCUsers]
+	sessionStore *store.JSONStore[model.RefreshSessions]
 }
 
 // NewAuthService creates a new auth service
-func NewAuthService(jwtSecret string, store *store.JSONStore[model.CCUsers]) *AuthService {
+func NewAuthService(jwtSecret string, userStore *store.JSONStore[model.CCUsers], sessionStore *store.JSONStore[model.RefreshSessions]) *AuthService {
 	return &AuthService{
-		jwtSecret: jwtSecret,
-		store:     store,
+		jwtSecret:    jwtSecret,
+		store:        userStore,
+		sessionStore: sessionStore,
 	}
 }
 
-// GenerateToken generates a JWT token for a user
+// GenerateToken generates a short-lived JWT access token for a user.
 func (s *AuthService) GenerateToken(user *model.CCUser) (string, error) {
 	now := time.Now()
-	expiry := now.Add(24 * time.Hour)
+	expiry := now.Add(AccessTokenLifetime)
 
 	claims := &model.Claims{
 		UserID:    user.ID,
@@ -188,4 +197,114 @@ func (s *AuthService) DeleteUser(id string) error {
 
 	users.Users = append(users.Users[:index], users.Users[index+1:]...)
 	return s.store.Write(users)
+}
+
+// CreateRefreshSession creates a new refresh session and returns its opaque token.
+func (s *AuthService) CreateRefreshSession(userID string) (string, error) {
+	tokenBytes := make([]byte, 32)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		return "", fmt.Errorf("generate refresh token: %w", err)
+	}
+	token := hex.EncodeToString(tokenBytes)
+
+	now := time.Now()
+	session := model.RefreshSession{
+		ID:        token,
+		UserID:    userID,
+		ExpiresAt: now.Add(RefreshTokenLifetime).Unix(),
+		CreatedAt: now.Unix(),
+	}
+
+	sessions, _ := s.sessionStore.Read()
+	sessions.Sessions = append(sessions.Sessions, session)
+	if err := s.sessionStore.Write(sessions); err != nil {
+		return "", fmt.Errorf("persist refresh session: %w", err)
+	}
+
+	return token, nil
+}
+
+// ValidateRefreshSession checks that a refresh token is valid, not expired, and not revoked.
+func (s *AuthService) ValidateRefreshSession(token string) (*model.RefreshSession, error) {
+	sessions, err := s.sessionStore.Read()
+	if err != nil {
+		return nil, fmt.Errorf("read sessions: %w", err)
+	}
+
+	for _, sess := range sessions.Sessions {
+		if sess.ID == token {
+			if sess.Revoked {
+				return nil, fmt.Errorf("refresh token revoked")
+			}
+			if time.Now().Unix() > sess.ExpiresAt {
+				return nil, fmt.Errorf("refresh token expired")
+			}
+			return &sess, nil
+		}
+	}
+
+	return nil, fmt.Errorf("refresh token not found")
+}
+
+// RevokeRefreshSession marks a refresh session as revoked.
+func (s *AuthService) RevokeRefreshSession(token string) error {
+	sessions, err := s.sessionStore.Read()
+	if err != nil {
+		return fmt.Errorf("read sessions: %w", err)
+	}
+
+	for i, sess := range sessions.Sessions {
+		if sess.ID == token {
+			sessions.Sessions[i].Revoked = true
+			return s.sessionStore.Write(sessions)
+		}
+	}
+
+	return fmt.Errorf("refresh token not found")
+}
+
+// RevokeUserSessions revokes all refresh sessions for a user.
+func (s *AuthService) RevokeUserSessions(userID string) error {
+	sessions, err := s.sessionStore.Read()
+	if err != nil {
+		return nil
+	}
+
+	changed := false
+	for i, sess := range sessions.Sessions {
+		if sess.UserID == userID && !sess.Revoked {
+			sessions.Sessions[i].Revoked = true
+			changed = true
+		}
+	}
+
+	if changed {
+		return s.sessionStore.Write(sessions)
+	}
+	return nil
+}
+
+// PruneSessions removes expired and revoked sessions older than 24h.
+func (s *AuthService) PruneSessions() {
+	sessions, err := s.sessionStore.Read()
+	if err != nil {
+		return
+	}
+
+	cutoff := time.Now().Add(-24 * time.Hour).Unix()
+	kept := make([]model.RefreshSession, 0, len(sessions.Sessions))
+	for _, sess := range sessions.Sessions {
+		if sess.Revoked && sess.ExpiresAt < cutoff {
+			continue
+		}
+		if !sess.Revoked && time.Now().Unix() > sess.ExpiresAt && sess.ExpiresAt < cutoff {
+			continue
+		}
+		kept = append(kept, sess)
+	}
+
+	if len(kept) < len(sessions.Sessions) {
+		sessions.Sessions = kept
+		_ = s.sessionStore.Write(sessions)
+	}
 }
