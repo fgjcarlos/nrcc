@@ -45,11 +45,15 @@ LABEL org.opencontainers.image.title="nrcc"
 LABEL org.opencontainers.image.description="Node-RED Control Center — all-in-one binary + Node-RED"
 LABEL org.opencontainers.image.source="https://github.com/composedof2/nrcc"
 
+USER root
+
 # Install pnpm 11+ (package manager used by nrcc library service)
 RUN npm install -g pnpm@^11
 
 # Copy nrcc binary from go-builder stage
 COPY --chmod=755 --from=go-builder /build/nrcc /usr/local/bin/nrcc
+
+USER node-red
 
 # ── Data volumes ──────────────────────────────────────────────────────────────
 # /data           → nrcc config (cc-users.json, cc-config.json)
