@@ -89,6 +89,11 @@ func (h *AuthHandler) Setup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := service.ValidatePassword(req.Password); err != nil {
+		model.RespondError(w, http.StatusBadRequest, "WEAK_PASSWORD", err.Error())
+		return
+	}
+
 	// Check if users already exist (setup only works once)
 	users, _ := h.authSvc.GetAllUsers()
 	if len(users) > 0 {
@@ -171,6 +176,14 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		h.audit.Log(r, req.Username, "LOGIN", "", "fail", map[string]string{"reason": "bad_password"})
 		model.RespondError(w, http.StatusUnauthorized, "AUTH_FAILED", "Invalid username or password")
 		return
+	}
+
+	// Rehash if stored with lower bcrypt cost
+	if service.NeedsRehash(user.PasswordHash) {
+		if newHash, err := h.authSvc.HashPassword(req.Password); err == nil {
+			user.PasswordHash = newHash
+			_ = h.authSvc.UpdateUser(user)
+		}
 	}
 
 	// Generate access token
@@ -295,6 +308,11 @@ func (h *AuthHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := service.ValidatePassword(req.Password); err != nil {
+		model.RespondError(w, http.StatusBadRequest, "WEAK_PASSWORD", err.Error())
+		return
+	}
+
 	// Check if username already exists
 	existing := h.authSvc.GetUserByUsername(req.Username)
 	if existing != nil {
@@ -415,6 +433,11 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 
 	if req.Password == "" {
 		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Password is required")
+		return
+	}
+
+	if err := service.ValidatePassword(req.Password); err != nil {
+		model.RespondError(w, http.StatusBadRequest, "WEAK_PASSWORD", err.Error())
 		return
 	}
 
