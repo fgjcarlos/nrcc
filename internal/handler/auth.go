@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/composedof2/nrcc/internal/audit"
-	"github.com/composedof2/nrcc/internal/middleware"
+	mw "github.com/composedof2/nrcc/internal/middleware"
 	"github.com/composedof2/nrcc/internal/model"
 	"github.com/composedof2/nrcc/internal/service"
 	"github.com/google/uuid"
@@ -18,6 +18,7 @@ const refreshCookieName = "nrcc_refresh"
 type AuthHandler struct {
 	authSvc *service.AuthService
 	audit   *audit.Service
+	limiter *mw.RateLimiter
 }
 
 // NewAuthHandler creates a new auth handler
@@ -27,6 +28,9 @@ func NewAuthHandler(authSvc *service.AuthService) *AuthHandler {
 
 // SetAuditService injects the audit logger.
 func (h *AuthHandler) SetAuditService(a *audit.Service) { h.audit = a }
+
+// SetRateLimiter injects the rate limiter.
+func (h *AuthHandler) SetRateLimiter(rl *mw.RateLimiter) { h.limiter = rl }
 
 // SetupRequest represents the setup endpoint request
 type SetupRequest struct {
@@ -76,6 +80,14 @@ type UpdateUserRequest struct {
 // Setup handles POST /api/auth/setup - initial admin user creation
 // Only works when no users exist
 func (h *AuthHandler) Setup(w http.ResponseWriter, r *http.Request) {
+	if h.limiter != nil {
+		ip := mw.ExtractIP(r)
+		if blocked, retry := h.limiter.Check("setup-ip:" + ip); blocked {
+			mw.RespondTooManyRequests(w, retry)
+			return
+		}
+	}
+
 	var req SetupRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
@@ -96,6 +108,9 @@ func (h *AuthHandler) Setup(w http.ResponseWriter, r *http.Request) {
 	// Check if users already exist (setup only works once)
 	users, _ := h.authSvc.GetAllUsers()
 	if len(users) > 0 {
+		if h.limiter != nil {
+			h.limiter.Record("setup-ip:" + mw.ExtractIP(r))
+		}
 		model.RespondError(w, http.StatusConflict, "ALREADY_CONFIGURED", "System already configured with users")
 		return
 	}
@@ -150,6 +165,15 @@ func (h *AuthHandler) Setup(w http.ResponseWriter, r *http.Request) {
 
 // Login handles POST /api/auth/login
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
+	ip := mw.ExtractIP(r)
+
+	if h.limiter != nil {
+		if blocked, retry := h.limiter.Check("ip:" + ip); blocked {
+			mw.RespondTooManyRequests(w, retry)
+			return
+		}
+	}
+
 	var req LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
@@ -162,9 +186,20 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.limiter != nil {
+		if blocked, retry := h.limiter.Check("user:" + req.Username); blocked {
+			mw.RespondTooManyRequests(w, retry)
+			return
+		}
+	}
+
 	// Find user
 	user := h.authSvc.GetUserByUsername(req.Username)
 	if user == nil {
+		if h.limiter != nil {
+			h.limiter.Record("ip:" + ip)
+			h.limiter.Record("user:" + req.Username)
+		}
 		h.audit.Log(r, req.Username, "LOGIN", "", "fail", map[string]string{"reason": "unknown_user"})
 		model.RespondError(w, http.StatusUnauthorized, "AUTH_FAILED", "Invalid username or password")
 		return
@@ -172,9 +207,19 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	// Verify password
 	if !h.authSvc.VerifyPassword(user.PasswordHash, req.Password) {
+		if h.limiter != nil {
+			h.limiter.Record("ip:" + ip)
+			h.limiter.Record("user:" + req.Username)
+		}
 		h.audit.Log(r, req.Username, "LOGIN", "", "fail", map[string]string{"reason": "bad_password"})
 		model.RespondError(w, http.StatusUnauthorized, "AUTH_FAILED", "Invalid username or password")
 		return
+	}
+
+	// Successful login — reset rate limit counters
+	if h.limiter != nil {
+		h.limiter.Reset("ip:" + ip)
+		h.limiter.Reset("user:" + req.Username)
 	}
 
 	// Rehash if stored with lower bcrypt cost
@@ -222,7 +267,7 @@ func (h *AuthHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 
 // GetMe handles GET /api/auth/me - protected endpoint
 func (h *AuthHandler) GetMe(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.ClaimsFromContext(r)
+	claims := mw.ClaimsFromContext(r)
 	if claims == nil {
 		model.RespondError(w, http.StatusUnauthorized, "UNAUTHORIZED", "User not found in context")
 		return
@@ -253,7 +298,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 
 // GetUsers handles GET /api/auth/users - protected, admin only
 func (h *AuthHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.ClaimsFromContext(r)
+	claims := mw.ClaimsFromContext(r)
 	if claims == nil || claims.Role != model.RoleAdmin {
 		model.RespondError(w, http.StatusForbidden, "FORBIDDEN", "Admin access required")
 		return
@@ -283,7 +328,7 @@ func (h *AuthHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
 
 // CreateUser handles POST /api/auth/users - protected, admin only
 func (h *AuthHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.ClaimsFromContext(r)
+	claims := mw.ClaimsFromContext(r)
 	if claims == nil || claims.Role != model.RoleAdmin {
 		model.RespondError(w, http.StatusForbidden, "FORBIDDEN", "Admin access required")
 		return
@@ -354,7 +399,7 @@ func (h *AuthHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 
 // DeleteUser handles DELETE /api/auth/users/:id - protected, admin only
 func (h *AuthHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.ClaimsFromContext(r)
+	claims := mw.ClaimsFromContext(r)
 	if claims == nil || claims.Role != model.RoleAdmin {
 		model.RespondError(w, http.StatusForbidden, "FORBIDDEN", "Admin access required")
 		return
@@ -405,7 +450,7 @@ func (h *AuthHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 
 // ChangePassword handles PATCH /api/auth/users/:id/password - protected, admin or self
 func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.ClaimsFromContext(r)
+	claims := mw.ClaimsFromContext(r)
 	if claims == nil {
 		model.RespondError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authentication required")
 		return
@@ -468,7 +513,7 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 
 // UpdateUser handles PATCH /api/auth/users/:id - protected, admin only
 func (h *AuthHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.ClaimsFromContext(r)
+	claims := mw.ClaimsFromContext(r)
 	if claims == nil || claims.Role != model.RoleAdmin {
 		model.RespondError(w, http.StatusForbidden, "FORBIDDEN", "Admin access required")
 		return

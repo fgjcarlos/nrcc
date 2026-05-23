@@ -81,6 +81,7 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 	filesHandler.SetAuditService(auditSvc)
 	dockerHandler.SetAuditService(auditSvc)
 	flowHandler.SetAuditService(auditSvc)
+	authHandler.SetRateLimiter(middleware.NewRateLimiter(dataDir))
 
 	// Public routes (no auth required)
 	r.Get("/api/health", func(w http.ResponseWriter, r *http.Request) {

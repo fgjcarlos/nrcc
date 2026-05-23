@@ -1,4 +1,4 @@
-import { api } from '@/shared/lib';
+import { api, registerTokenAccessors } from '@/shared/lib/api';
 
 export interface User {
   id: string;
@@ -17,7 +17,12 @@ export interface AuthStatus {
   initialized: boolean;
 }
 
-const AUTH_KEY = 'cc-token';
+let accessToken: string | null = null;
+
+registerTokenAccessors(
+  () => accessToken,
+  (token: string) => { accessToken = token; },
+);
 
 export const authService = {
   getStatus: async (): Promise<AuthStatus> => {
@@ -32,7 +37,7 @@ export const authService = {
       confirmPassword: password,
     });
     const { token, user } = response.data.data;
-    localStorage.setItem(AUTH_KEY, token);
+    accessToken = token;
     return { token, user };
   },
 
@@ -42,16 +47,25 @@ export const authService = {
       password,
     });
     const { token, user } = response.data.data;
-    localStorage.setItem(AUTH_KEY, token);
+    accessToken = token;
     return { token, user };
   },
 
-  logout: () => {
-    localStorage.removeItem(AUTH_KEY);
+  logout: async () => {
+    accessToken = null;
+    try {
+      await api.post('/auth/logout');
+    } catch {
+      // best-effort server-side revocation
+    }
   },
 
   getToken: (): string | null => {
-    return localStorage.getItem(AUTH_KEY);
+    return accessToken;
+  },
+
+  setToken: (token: string) => {
+    accessToken = token;
   },
 
   getMe: async (): Promise<User> => {
