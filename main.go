@@ -92,7 +92,7 @@ func runServer() {
 	}
 	pm := service.NewProcessManager(nodeRedCmd, dataDir, logBuffer)
 	configSvc := service.NewConfigServiceWithHost(dataDir, hostSvc)
-	pm.SetEnvService(service.NewEnvService(configSvc))
+	pm.SetEnvService(service.NewEnvService(configSvc, os.Getenv("NRCC_ENCRYPTION_KEY")))
 
 	// Node-RED managed mode is ON by default.
 	// Set NRCC_MANAGE_NODE_RED=false to disable.

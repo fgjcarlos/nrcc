@@ -44,7 +44,7 @@ func (s *JSONStore[T]) Write(val T) error {
 
 	// Write to temp file first (atomic on POSIX)
 	tmpPath := s.path + ".tmp"
-	if err := os.WriteFile(tmpPath, data, 0644); err != nil {
+	if err := os.WriteFile(tmpPath, data, 0600); err != nil {
 		return err
 	}
 
