@@ -109,9 +109,9 @@ func (s *AuthService) VerifyPassword(hash, password string) bool {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
 }
 
-// HashPassword hashes a password using bcrypt
+// HashPassword hashes a password using bcrypt with explicit cost.
 func (s *AuthService) HashPassword(password string) (string, error) {
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), BcryptCost)
 	return string(hash), err
 }
 

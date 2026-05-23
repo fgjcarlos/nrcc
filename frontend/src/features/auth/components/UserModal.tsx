@@ -30,6 +30,7 @@ export function UserModal({
     password: '',
     role: 'viewer' as 'admin' | 'viewer',
   });
+  const [passwordError, setPasswordError] = useState('');
 
   // Pre-fill form data when modal opens
   useEffect(() => {
@@ -54,9 +55,23 @@ export function UserModal({
       : formData.password.trim() // edit_password requires password
   ) && (mode !== 'edit_full' || canDemote);
 
+  const validatePassword = (pw: string): boolean => {
+    if (pw.length < 8) {
+      setPasswordError('Password must be at least 8 characters');
+      return false;
+    }
+    setPasswordError('');
+    return true;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
+    const pw = formData.password.trim();
+    if ((mode === 'create' || mode === 'edit_password' || (mode === 'edit_full' && pw)) && !validatePassword(pw)) {
+      return;
+    }
+
     const submitData: {
       username?: string;
       password?: string;
@@ -149,12 +164,18 @@ export function UserModal({
             <input
               type="password"
               value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              onChange={(e) => {
+                setFormData({ ...formData, password: e.target.value });
+                if (passwordError) setPasswordError('');
+              }}
               className="glass-panel w-full rounded-xl border border-border px-3 py-2 text-base-content focus:outline-none focus:ring-2 focus:ring-primary/50"
               required={mode === 'create' || mode === 'edit_password'}
               minLength={8}
               placeholder={mode === 'edit_full' ? 'Leave empty to keep current password' : undefined}
             />
+            {passwordError && (
+              <p className="mt-1 text-sm text-error">{passwordError}</p>
+            )}
           </div>
 
           <div className="flex justify-end space-x-2 pt-4">
