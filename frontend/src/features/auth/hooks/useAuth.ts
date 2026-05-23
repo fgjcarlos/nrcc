@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { authService, type User } from '../services/authService';
+import { api } from '@/shared/lib';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -18,15 +19,9 @@ export function useAuth() {
 
   const checkAuth = useCallback(async () => {
     try {
-      const token = authService.getToken();
-      if (!token) {
-        setState({
-          isAuthenticated: false,
-          isInitialized: true,
-          isLoading: false,
-          user: null,
-        });
-        return;
+      if (!authService.getToken()) {
+        const refreshRes = await api.post<{ data: { token: string } }>('/auth/refresh', null);
+        authService.setToken(refreshRes.data.data.token);
       }
 
       const user = await authService.getMe();
@@ -37,7 +32,6 @@ export function useAuth() {
         user,
       });
     } catch {
-      authService.logout();
       setState({
         isAuthenticated: false,
         isInitialized: true,
@@ -58,8 +52,8 @@ export function useAuth() {
     return response;
   }, []);
 
-  const logout = useCallback(() => {
-    authService.logout();
+  const logout = useCallback(async () => {
+    await authService.logout();
     setState({
       isAuthenticated: false,
       isInitialized: true,

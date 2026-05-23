@@ -1,4 +1,5 @@
 import { api } from 'shared/lib/api';
+import { authService } from '@/features/auth/services/authService';
 import type { DetectedPattern, PatternAnalysisResult, NodeProperty } from '../stores/patternStore';
 
 export type { DetectedPattern, PatternAnalysisResult, NodeProperty };
@@ -38,7 +39,7 @@ export const patternService = {
    * Download README as a file
    */
   downloadReadme: async (analysisId: string, patternId: string): Promise<void> => {
-    const token = localStorage.getItem('cc-token');
+    const token = authService.getToken();
     const response = await fetch(`/api/patterns/${analysisId}/download?patternId=${patternId}`, {
       method: 'GET',
       headers: {

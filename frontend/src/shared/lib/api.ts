@@ -1,4 +1,4 @@
-import axios, { AxiosError } from 'axios';
+import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import type { ApiResponse } from 'shared/types';
 
 const api = axios.create({
@@ -9,12 +9,34 @@ const api = axios.create({
   },
 });
 
-const AUTH_KEY = 'cc-token';
+let tokenGetter: (() => string | null) | null = null;
+let tokenSetter: ((token: string) => void) | null = null;
+let refreshPromise: Promise<string | null> | null = null;
 
-// Interceptor para agregar JWT a las requests
+export function registerTokenAccessors(
+  getter: () => string | null,
+  setter: (token: string) => void,
+) {
+  tokenGetter = getter;
+  tokenSetter = setter;
+}
+
+async function refreshAccessToken(): Promise<string | null> {
+  try {
+    const response = await axios.post<{ data: { token: string } }>('/api/auth/refresh', null, {
+      withCredentials: true,
+    });
+    const token = response.data.data.token;
+    tokenSetter?.(token);
+    return token;
+  } catch {
+    return null;
+  }
+}
+
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem(AUTH_KEY);
+    const token = tokenGetter?.();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -23,28 +45,42 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Interceptor para (error) => manejar errores
 api.interceptors.response.use(
   (response) => response,
-  (error: AxiosError<ApiResponse<unknown>>) => {
-    if (error.response?.status === 401) {
-      // Token expirado o inválido - clear y redirigir
-      localStorage.removeItem(AUTH_KEY);
-      // Solo redirigir si no estamos ya en login/setup
-      if (!window.location.pathname.includes('/login') && 
+  async (error: AxiosError<ApiResponse<unknown>>) => {
+    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      const url = originalRequest.url ?? '';
+      if (url.includes('/auth/login') || url.includes('/auth/setup') || url.includes('/auth/refresh')) {
+        return Promise.reject(error);
+      }
+
+      originalRequest._retry = true;
+
+      if (!refreshPromise) {
+        refreshPromise = refreshAccessToken().finally(() => {
+          refreshPromise = null;
+        });
+      }
+
+      const newToken = await refreshPromise;
+      if (newToken) {
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        return api(originalRequest);
+      }
+
+      if (!window.location.pathname.includes('/login') &&
           !window.location.pathname.includes('/setup')) {
         window.location.href = '/login';
       }
     }
-    
+
     if (error.response) {
-      // El servidor respondió con un error
       console.error('API Error:', error.response.data);
     } else if (error.request) {
-      // La petición se hizo pero no hubo respuesta
       console.error('Network Error:', error.message);
     } else {
-      // Error al hacer la petición
       console.error('Error:', error.message);
     }
     return Promise.reject(error);
