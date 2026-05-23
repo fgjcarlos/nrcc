@@ -412,9 +412,10 @@ func (s *UpdateService) ApplyUpdateWithBackup(ctx context.Context) error {
 	
 	// Step 2: Applying
 	s.setFlowState(model.UpdateFlowState{
-		State:    model.StateApplying,
-		Phase:    "applying",
-		BackupID: backupEntry.ID,
+		State:            model.StateApplying,
+		Phase:            "applying",
+		BackupID:         backupEntry.ID,
+		AvailableVersion: preApplyStatus.LatestVersion,
 	})
 	
 	// Execute npm update
@@ -439,20 +440,47 @@ func (s *UpdateService) ApplyUpdateWithBackup(ctx context.Context) error {
 	return nil
 }
 
-// ApplyUpdate applies the latest Node-RED update
+// ApplyUpdate installs the pinned target version of Node-RED and runs a
+// post-install vulnerability audit. If no resolved version is cached, the
+// update is rejected so we never run an unpinned "latest" install.
 func (s *UpdateService) ApplyUpdate() error {
-	// Use the runner interface for better testability
+	cached := s.GetCachedStatus()
+	if cached.LatestVersion == "" {
+		return fmt.Errorf("no resolved target version — run a version check first")
+	}
+	target := "node-red@" + cached.LatestVersion
+
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
-	
-	_, err := s.runner.Run(ctx, "npm", "install", "-g", "node-red@latest")
+
+	_, err := s.runner.Run(ctx, "npm", "install", "-g", target)
 	if err != nil {
-		// Sanitize the error before returning it
 		sanitized := s.sanitizeErrorMessage(err)
 		return fmt.Errorf("%s", sanitized)
 	}
 
+	if err := s.postInstallAudit(ctx); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+// postInstallAudit runs npm audit after install and blocks on CRITICAL findings.
+func (s *UpdateService) postInstallAudit(ctx context.Context) error {
+	output, err := s.runner.Run(ctx, "npm", "audit", "--omit=dev", "--audit-level=critical", "-g")
+	if err != nil {
+		return fmt.Errorf("post-install audit found critical vulnerabilities — update blocked: %s", truncateOutput(output, 200))
+	}
+	return nil
+}
+
+func truncateOutput(b []byte, max int) string {
+	s := strings.TrimSpace(string(b))
+	if len(s) > max {
+		return s[:max] + "..."
+	}
+	return s
 }
 
 // Helper functions

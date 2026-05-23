@@ -618,3 +618,121 @@ func TestApplyUpdateWithBackup_NpmFailure(t *testing.T) {
 	}
 }
 
+// sequenceRunner returns different results per call index.
+type sequenceRunner struct {
+	results []struct {
+		output []byte
+		err    error
+	}
+	calls []struct {
+		name string
+		args []string
+	}
+}
+
+func (s *sequenceRunner) Run(ctx context.Context, name string, args ...string) ([]byte, error) {
+	idx := len(s.calls)
+	s.calls = append(s.calls, struct {
+		name string
+		args []string
+	}{name, args})
+	if idx < len(s.results) {
+		return s.results[idx].output, s.results[idx].err
+	}
+	return nil, nil
+}
+
+func TestApplyUpdate_PinsResolvedVersion(t *testing.T) {
+	tmpDir := t.TempDir()
+	svc := NewUpdateService(tmpDir)
+
+	svc.getInstalledVersionFn = func(ctx context.Context) string { return "4.0.1" }
+	svc.getLatestVersionFn = func(ctx context.Context) (string, error) { return "4.0.2", nil }
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	_, _ = svc.ForceCheck(ctx)
+	cancel()
+
+	runner := &sequenceRunner{
+		results: []struct {
+			output []byte
+			err    error
+		}{
+			{[]byte("installed"), nil}, // npm install
+			{[]byte("ok"), nil},        // npm audit
+		},
+	}
+	svc.runner = runner
+
+	err := svc.ApplyUpdate()
+	if err != nil {
+		t.Fatalf("ApplyUpdate should succeed: %v", err)
+	}
+
+	if len(runner.calls) < 1 {
+		t.Fatal("expected at least one call")
+	}
+
+	installArgs := runner.calls[0].args
+	found := false
+	for _, arg := range installArgs {
+		if arg == "node-red@4.0.2" {
+			found = true
+		}
+		if arg == "node-red@latest" {
+			t.Fatal("ApplyUpdate must not use unpinned @latest")
+		}
+	}
+	if !found {
+		t.Fatalf("expected pinned specifier node-red@4.0.2, got args: %v", installArgs)
+	}
+}
+
+func TestApplyUpdate_RejectsWithoutResolvedVersion(t *testing.T) {
+	tmpDir := t.TempDir()
+	svc := NewUpdateService(tmpDir)
+
+	// Clear cache so LatestVersion is empty
+	svc.cacheMu.Lock()
+	svc.cache = model.UpdateCacheEntry{}
+	svc.cacheMu.Unlock()
+
+	svc.runner = &mockRunner{output: nil, err: nil}
+
+	err := svc.ApplyUpdate()
+	if err == nil {
+		t.Fatal("expected error when no resolved version is cached")
+	}
+}
+
+func TestApplyUpdate_BlocksOnAuditFailure(t *testing.T) {
+	tmpDir := t.TempDir()
+	svc := NewUpdateService(tmpDir)
+
+	svc.getInstalledVersionFn = func(ctx context.Context) string { return "4.0.1" }
+	svc.getLatestVersionFn = func(ctx context.Context) (string, error) { return "4.0.2", nil }
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	_, _ = svc.ForceCheck(ctx)
+	cancel()
+
+	runner := &sequenceRunner{
+		results: []struct {
+			output []byte
+			err    error
+		}{
+			{[]byte("installed"), nil},                                  // npm install succeeds
+			{[]byte("critical vuln found"), fmt.Errorf("exit status 1")}, // npm audit fails
+		},
+	}
+	svc.runner = runner
+
+	err := svc.ApplyUpdate()
+	if err == nil {
+		t.Fatal("expected error when post-install audit finds critical vulnerabilities")
+	}
+	if len(runner.calls) != 2 {
+		t.Fatalf("expected 2 runner calls (install + audit), got %d", len(runner.calls))
+	}
+}
+
