@@ -17,7 +17,7 @@ RUN pnpm build
 # Stage 2: Build Go binary
 # Needs frontend/dist for go:embed
 # ─────────────────────────────────────────────────────────────────────────────
-FROM golang:1.25-alpine AS go-builder
+FROM golang:1.26-alpine AS go-builder
 
 WORKDIR /build
 
