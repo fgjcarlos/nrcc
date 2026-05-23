@@ -1,10 +1,12 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -87,8 +89,44 @@ func resolvePnpmBin() string {
 	return "pnpm"
 }
 
+var (
+	ErrInvalidPackageName = errors.New("invalid package name")
+
+	// Matches: pkg, @scope/pkg, pkg@version, @scope/pkg@^1.2.3
+	validPackageRe = regexp.MustCompile(`^(@[a-z0-9][\w.\-]*/)?[a-z0-9][\w.\-]*(@[^\s]+)?$`)
+)
+
+// ValidatePackageName checks that a string is a safe npm package specifier.
+func ValidatePackageName(pkg string) error {
+	if pkg == "" {
+		return fmt.Errorf("%w: empty name", ErrInvalidPackageName)
+	}
+	if len(pkg) > 214 {
+		return fmt.Errorf("%w: exceeds max length", ErrInvalidPackageName)
+	}
+	if strings.ContainsAny(pkg, ";|&$`(){}!'\"\\") {
+		return fmt.Errorf("%w: contains shell metacharacters", ErrInvalidPackageName)
+	}
+	if strings.Contains(pkg, "..") || strings.HasPrefix(pkg, "/") || strings.HasPrefix(pkg, ".") {
+		return fmt.Errorf("%w: path-like specifier not allowed", ErrInvalidPackageName)
+	}
+	if strings.Contains(pkg, "://") {
+		return fmt.Errorf("%w: URL specifier not allowed", ErrInvalidPackageName)
+	}
+	if strings.ContainsAny(pkg, " \t\n\r") {
+		return fmt.Errorf("%w: contains whitespace", ErrInvalidPackageName)
+	}
+	if !validPackageRe.MatchString(pkg) {
+		return fmt.Errorf("%w: %q does not match npm naming rules", ErrInvalidPackageName, pkg)
+	}
+	return nil
+}
+
 // Install installs a package using pnpm add
 func (p *PnpmPackageManager) Install(pkg string) error {
+	if err := ValidatePackageName(pkg); err != nil {
+		return err
+	}
 	if err := ensureSupportedPnpm(p.Bin); err != nil {
 		return err
 	}
@@ -107,6 +145,9 @@ func (p *PnpmPackageManager) Install(pkg string) error {
 
 // Uninstall uninstalls a package using pnpm remove
 func (p *PnpmPackageManager) Uninstall(pkg string) error {
+	if err := ValidatePackageName(pkg); err != nil {
+		return err
+	}
 	if err := ensureSupportedPnpm(p.Bin); err != nil {
 		return err
 	}
