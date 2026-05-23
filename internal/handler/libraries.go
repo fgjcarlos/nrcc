@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/composedof2/nrcc/internal/model"
@@ -54,6 +55,10 @@ func (h *LibraryHandler) PostInstall(w http.ResponseWriter, r *http.Request) {
 
 	err := h.svc.Install(req.Name)
 	if err != nil {
+		if errors.Is(err, service.ErrInvalidPackageName) {
+			model.RespondError(w, http.StatusBadRequest, "INVALID_PACKAGE_NAME", err.Error())
+			return
+		}
 		model.RespondError(w, http.StatusInternalServerError, "INSTALL_ERROR", err.Error())
 		return
 	}
@@ -71,6 +76,10 @@ func (h *LibraryHandler) DeleteLibrary(w http.ResponseWriter, r *http.Request) {
 
 	err := h.svc.Uninstall(name)
 	if err != nil {
+		if errors.Is(err, service.ErrInvalidPackageName) {
+			model.RespondError(w, http.StatusBadRequest, "INVALID_PACKAGE_NAME", err.Error())
+			return
+		}
 		model.RespondError(w, http.StatusInternalServerError, "UNINSTALL_ERROR", err.Error())
 		return
 	}
