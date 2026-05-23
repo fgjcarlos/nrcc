@@ -43,7 +43,7 @@ services:
       - nrcc_node_modules:/data/node_modules
 
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/auth/status"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/healthz"]
       interval: 30s
       timeout: 5s
       retries: 3
