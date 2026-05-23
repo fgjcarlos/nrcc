@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/composedof2/nrcc/internal/audit"
 	"github.com/composedof2/nrcc/internal/handler"
 	"github.com/composedof2/nrcc/internal/middleware"
 	"github.com/composedof2/nrcc/internal/model"
@@ -65,6 +66,17 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 	filesHandler := handler.NewFilesHandler(dataDir)
 	dockerHandler := handler.NewDockerHandler()
 	aiHandler := handler.NewAIHandler()
+
+	// Initialize audit service
+	auditSvc, _ := audit.NewService(dataDir)
+	authHandler.SetAuditService(auditSvc)
+	configHandler.SetAuditService(auditSvc)
+	settingsHandler.SetAuditService(auditSvc)
+	backupHandler.SetAuditService(auditSvc)
+	envHandler.SetAuditService(auditSvc)
+	updateHandler.SetAuditService(auditSvc)
+	filesHandler.SetAuditService(auditSvc)
+	dockerHandler.SetAuditService(auditSvc)
 
 	// Public routes (no auth required)
 	r.Get("/api/health", func(w http.ResponseWriter, r *http.Request) {

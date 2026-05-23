@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/composedof2/nrcc/internal/audit"
 	"github.com/composedof2/nrcc/internal/model"
 	"github.com/composedof2/nrcc/internal/service"
 )
@@ -15,12 +16,16 @@ import (
 type DockerHandler struct {
 	pm         *service.ProcessManager
 	shutdownCh chan struct{}
+	audit      *audit.Service
 }
 
 // NewDockerHandler creates a new docker handler.
 func NewDockerHandler() *DockerHandler {
 	return &DockerHandler{}
 }
+
+// SetAuditService injects the audit logger.
+func (h *DockerHandler) SetAuditService(a *audit.Service) { h.audit = a }
 
 // SetProcessManager injects the process manager so container restarts can
 // stop Node-RED gracefully before exiting.
@@ -93,6 +98,7 @@ func (h *DockerHandler) PostRestart(w http.ResponseWriter, r *http.Request) {
 			"Not running inside a Docker container")
 		return
 	}
+	h.audit.Log(r, "", "CONTAINER_RESTART", "", "ok", nil)
 	model.RespondJSON(w, http.StatusOK, map[string]string{"message": "Container restarting…"})
 	go func() {
 		if h.pm != nil {
@@ -113,6 +119,7 @@ func (h *DockerHandler) PostStop(w http.ResponseWriter, r *http.Request) {
 			"Not running inside a Docker container")
 		return
 	}
+	h.audit.Log(r, "", "CONTAINER_STOP", "", "ok", nil)
 	model.RespondJSON(w, http.StatusOK, map[string]string{"message": "Container stopping…"})
 	go func() {
 		if h.pm != nil {

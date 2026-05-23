@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/composedof2/nrcc/internal/audit"
 	"github.com/composedof2/nrcc/internal/middleware"
 	"github.com/composedof2/nrcc/internal/model"
 	"github.com/composedof2/nrcc/internal/service"
@@ -12,6 +13,7 @@ import (
 // SettingsHandler exposes the raw settings.js editor.
 type SettingsHandler struct {
 	configSvc *service.ConfigService
+	audit     *audit.Service
 }
 
 // RawSettingsRequest is the payload for raw settings updates.
@@ -23,6 +25,9 @@ type RawSettingsRequest struct {
 func NewSettingsHandler(configSvc *service.ConfigService) *SettingsHandler {
 	return &SettingsHandler{configSvc: configSvc}
 }
+
+// SetAuditService injects the audit logger.
+func (h *SettingsHandler) SetAuditService(a *audit.Service) { h.audit = a }
 
 // GetRaw handles GET /api/settings/raw.
 func (h *SettingsHandler) GetRaw(w http.ResponseWriter, r *http.Request) {
@@ -63,5 +68,6 @@ func (h *SettingsHandler) SaveRaw(w http.ResponseWriter, r *http.Request) {
 		model.RespondError(w, http.StatusInternalServerError, "SETTINGS_WRITE_ERROR", err.Error())
 		return
 	}
+	h.audit.Log(r, claims.Username, "SETTINGS_UPDATE", "", "ok", nil)
 	model.RespondJSON(w, http.StatusOK, doc)
 }

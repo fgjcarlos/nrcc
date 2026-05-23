@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/composedof2/nrcc/internal/audit"
 	"github.com/composedof2/nrcc/internal/model"
 	"github.com/composedof2/nrcc/internal/service"
 )
@@ -30,13 +31,17 @@ import (
 // - checkedAt: RFC3339 timestamp (when the check was last performed)
 // - error: string (optional, present if npm call failed)
 type UpdateHandler struct {
-	svc *service.UpdateService
+	svc   *service.UpdateService
+	audit *audit.Service
 }
 
 // NewUpdateHandler creates a new update handler
 func NewUpdateHandler(svc *service.UpdateService) *UpdateHandler {
 	return &UpdateHandler{svc: svc}
 }
+
+// SetAuditService injects the audit logger.
+func (h *UpdateHandler) SetAuditService(a *audit.Service) { h.audit = a }
 
 // GetStatus returns the cached update status.
 // GET /api/updates/status
@@ -117,6 +122,8 @@ func (h *UpdateHandler) PostApply(w http.ResponseWriter, r *http.Request) {
 	if toVersion == "" {
 		toVersion = "latest"
 	}
+
+	h.audit.Log(r, "", "UPDATE_APPLY", "", "ok", map[string]string{"from": fromVersion, "to": toVersion})
 
 	// Return 200 OK with current state
 	model.RespondJSON(w, http.StatusOK, map[string]interface{}{
