@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"net/http"
+	"os"
 
 	"github.com/composedof2/nrcc/internal/handler"
 	"github.com/composedof2/nrcc/internal/middleware"
@@ -53,7 +54,7 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 	// Phase 6 handlers
 	backupSvc := service.NewBackupService(dataDir)
 	backupHandler := handler.NewBackupHandler(backupSvc)
-	envSvc := service.NewEnvService(configSvc)
+	envSvc := service.NewEnvService(configSvc, os.Getenv("NRCC_ENCRYPTION_KEY"))
 	envHandler := handler.NewEnvHandler(envSvc, dataDir) // TAREA 2c: Pass dataDir
 	flowSvc := service.NewFlowService(dataDir)
 	flowHandler := handler.NewFlowHandler(flowSvc)

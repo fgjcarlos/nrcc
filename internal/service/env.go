@@ -14,13 +14,20 @@ import (
 
 // EnvService handles environment variable operations
 type EnvService struct {
-	configSvc *ConfigService
+	configSvc     *ConfigService
+	encryptionKey string
 }
 
-// NewEnvService creates a new environment variable service
-func NewEnvService(configSvc *ConfigService) *EnvService {
+// NewEnvService creates a new environment variable service.
+// If encryptionKey is non-empty, secret values are encrypted at rest with AES-256-GCM.
+func NewEnvService(configSvc *ConfigService, encryptionKey ...string) *EnvService {
+	key := ""
+	if len(encryptionKey) > 0 {
+		key = encryptionKey[0]
+	}
 	return &EnvService{
-		configSvc: configSvc,
+		configSvc:     configSvc,
+		encryptionKey: key,
 	}
 }
 
@@ -111,23 +118,30 @@ func (s *EnvService) List() ([]model.EnvVar, error) {
 		return []model.EnvVar{}, nil
 	}
 
-	// Check if any migration is needed
+	// Check if any migration is needed (type migration or plaintext→encrypted)
 	migrationNeeded := false
 	for _, ev := range config.EnvVars {
 		if ev.Type == "" || ev.Type == "plain" {
 			migrationNeeded = true
 			break
 		}
+		if ev.Encrypted && s.encryptionKey != "" && !IsEncrypted(ev.Value) {
+			migrationNeeded = true
+			break
+		}
 	}
 
-	// Phase 2.4: Apply lazy migration and persist if needed
 	if migrationNeeded {
 		for i, ev := range config.EnvVars {
 			config.EnvVars[i] = MigrateEnvTypes(ev)
+			if config.EnvVars[i].Encrypted && s.encryptionKey != "" && !IsEncrypted(config.EnvVars[i].Value) {
+				encrypted, err := Encrypt(config.EnvVars[i].Value, s.encryptionKey)
+				if err == nil {
+					config.EnvVars[i].Value = encrypted
+				}
+			}
 		}
-		// Save the migrated state (idempotent — already-migrated vars are unchanged)
 		if err := s.configSvc.Save(config); err != nil {
-			// Log but don't fail — migration failure shouldn't break the List() response
 			fmt.Printf("Warning: failed to save migrated config: %v\n", err)
 		}
 	}
@@ -163,11 +177,13 @@ func (s *EnvService) Set(key, value string, typ string, description string, encr
 	found := false
 	for i, ev := range config.EnvVars {
 		if ev.Key == key {
-			// TAREA 1 FIX: If value is empty and the var is already encrypted,
-			// preserve the existing value. This prevents the frontend from
-			// overwriting encrypted values with empty strings when editing.
 			if value == "" && ev.Encrypted {
 				value = ev.Value
+			} else if encrypted && s.encryptionKey != "" {
+				value, err = Encrypt(value, s.encryptionKey)
+				if err != nil {
+					return fmt.Errorf("encrypt value: %w", err)
+				}
 			}
 			config.EnvVars[i].Value = value
 			config.EnvVars[i].Type = typ
@@ -179,6 +195,12 @@ func (s *EnvService) Set(key, value string, typ string, description string, encr
 	}
 
 	if !found {
+		if encrypted && s.encryptionKey != "" {
+			value, err = Encrypt(value, s.encryptionKey)
+			if err != nil {
+				return fmt.Errorf("encrypt value: %w", err)
+			}
+		}
 		config.EnvVars = append(config.EnvVars, model.EnvVar{
 			Key:         key,
 			Value:       value,
@@ -219,7 +241,15 @@ func (s *EnvService) GetAll() (map[string]string, error) {
 
 	result := make(map[string]string)
 	for _, ev := range config.EnvVars {
-		result[ev.Key] = ev.Value
+		val := ev.Value
+		if ev.Encrypted && s.encryptionKey != "" && IsEncrypted(val) {
+			decrypted, err := Decrypt(val, s.encryptionKey)
+			if err != nil {
+				return nil, fmt.Errorf("decrypt %s: %w", ev.Key, err)
+			}
+			val = decrypted
+		}
+		result[ev.Key] = val
 	}
 
 	return result, nil
@@ -308,7 +338,7 @@ func ReadDotenv(dataDir string) (string, error) {
 // WriteDotenv writes content to the .env file
 func WriteDotenv(dataDir string, content string) error {
 	dotenvPath := filepath.Join(dataDir, ".env")
-	if err := os.WriteFile(dotenvPath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(dotenvPath, []byte(content), 0600); err != nil {
 		return fmt.Errorf("failed to write .env file: %w", err)
 	}
 	return nil
