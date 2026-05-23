@@ -1,7 +1,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 1: Build React frontend
 # ─────────────────────────────────────────────────────────────────────────────
-FROM node:22-slim AS frontend-builder
+FROM node:26-slim AS frontend-builder
 
 RUN npm install -g pnpm@^11
 

@@ -6,7 +6,7 @@
 #
 # Built once with: docker compose -f docker-compose.dev.yml build
 # ─────────────────────────────────────────────────────────────────────────────
-FROM node:20
+FROM node:26
 
 # ── Install Go ────────────────────────────────────────────────────────────────
 ARG GO_VERSION=1.22.12

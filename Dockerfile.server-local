@@ -1,5 +1,5 @@
 # Local server build for NRCC using pnpm lockfile
-FROM node:20-slim AS frontend-builder
+FROM node:26-slim AS frontend-builder
 WORKDIR /build/frontend
 RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
 COPY frontend/package.json frontend/pnpm-lock.yaml ./
@@ -17,7 +17,7 @@ COPY . .
 COPY --from=frontend-builder /build/frontend/dist ./frontend/dist
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o nrcc .
 
-FROM node:24-slim
+FROM node:26-slim
 LABEL org.opencontainers.image.title="nrcc-local"
 # Runtime needs Node-RED plus pnpm >= 11 for NRCC package operations.
 RUN apt-get update \
