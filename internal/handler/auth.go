@@ -3,12 +3,15 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/composedof2/nrcc/internal/middleware"
 	"github.com/composedof2/nrcc/internal/model"
 	"github.com/composedof2/nrcc/internal/service"
 	"github.com/google/uuid"
 )
+
+const refreshCookieName = "nrcc_refresh"
 
 // AuthHandler handles authentication endpoints
 type AuthHandler struct {
@@ -111,12 +114,15 @@ func (h *AuthHandler) Setup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate token
+	// Generate access token
 	token, err := h.authSvc.GenerateToken(user)
 	if err != nil {
 		model.RespondError(w, http.StatusInternalServerError, "TOKEN_ERROR", "Failed to generate token")
 		return
 	}
+
+	// Issue refresh cookie
+	h.setRefreshCookie(w, user.ID)
 
 	resp := AuthResponse{
 		Token: token,
@@ -159,12 +165,15 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate token
+	// Generate access token
 	token, err := h.authSvc.GenerateToken(user)
 	if err != nil {
 		model.RespondError(w, http.StatusInternalServerError, "TOKEN_ERROR", "Failed to generate token")
 		return
 	}
+
+	// Issue refresh cookie
+	h.setRefreshCookie(w, user.ID)
 
 	resp := AuthResponse{
 		Token: token,
@@ -497,4 +506,79 @@ func (h *AuthHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	model.RespondJSON(w, http.StatusOK, resp)
+}
+
+// Refresh handles POST /api/auth/refresh — public endpoint.
+// Reads the httpOnly refresh cookie, validates the session, rotates
+// the refresh token, and returns a new short-lived access token.
+func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
+	cookie, err := r.Cookie(refreshCookieName)
+	if err != nil || cookie.Value == "" {
+		model.RespondError(w, http.StatusUnauthorized, "NO_REFRESH_TOKEN", "Refresh token missing")
+		return
+	}
+
+	sess, err := h.authSvc.ValidateRefreshSession(cookie.Value)
+	if err != nil {
+		clearRefreshCookie(w)
+		model.RespondError(w, http.StatusUnauthorized, "INVALID_REFRESH", "Refresh token invalid or expired")
+		return
+	}
+
+	// Rotate: revoke old, issue new.
+	_ = h.authSvc.RevokeRefreshSession(cookie.Value)
+
+	user := h.authSvc.GetUserByID(sess.UserID)
+	if user == nil {
+		clearRefreshCookie(w)
+		model.RespondError(w, http.StatusUnauthorized, "USER_NOT_FOUND", "User no longer exists")
+		return
+	}
+
+	token, err := h.authSvc.GenerateToken(user)
+	if err != nil {
+		model.RespondError(w, http.StatusInternalServerError, "TOKEN_ERROR", "Failed to generate token")
+		return
+	}
+
+	h.setRefreshCookie(w, user.ID)
+
+	model.RespondJSON(w, http.StatusOK, AuthResponse{
+		Token: token,
+		User: model.CCUserPublic{
+			ID:        user.ID,
+			Username:  user.Username,
+			Role:      user.Role,
+			CreatedAt: user.CreatedAt,
+			UpdatedAt: user.UpdatedAt,
+		},
+	})
+}
+
+func (h *AuthHandler) setRefreshCookie(w http.ResponseWriter, userID string) {
+	refreshToken, err := h.authSvc.CreateRefreshSession(userID)
+	if err != nil {
+		return
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     refreshCookieName,
+		Value:    refreshToken,
+		Path:     "/api/auth",
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+		MaxAge:   int(service.RefreshTokenLifetime / time.Second),
+	})
+}
+
+func clearRefreshCookie(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     refreshCookieName,
+		Value:    "",
+		Path:     "/api/auth",
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+		MaxAge:   -1,
+	})
 }

@@ -76,6 +76,7 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string) *Server {
 		r.Get("/status", authHandler.GetStatus)
 		r.Post("/setup", authHandler.Setup)
 		r.Post("/login", authHandler.Login)
+		r.Post("/refresh", authHandler.Refresh)
 
 		// Protected auth endpoints
 		r.Group(func(r chi.Router) {
