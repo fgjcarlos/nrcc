@@ -14,8 +14,9 @@ import (
 
 func TestAuth_MissingAuthorizationHeader(t *testing.T) {
 	tempDir := t.TempDir()
-	store := store.NewJSONStore[model.CCUsers](tempDir + "/users.json")
-	authSvc := service.NewAuthService("test-secret", store)
+	userStore := store.NewJSONStore[model.CCUsers](tempDir + "/users.json")
+	sessionStore := store.NewJSONStore[model.RefreshSessions](tempDir + "/sessions.json")
+	authSvc := service.NewAuthService("test-secret", userStore, sessionStore)
 
 	authMiddleware := Auth(authSvc)
 
@@ -42,8 +43,9 @@ func TestAuth_MissingAuthorizationHeader(t *testing.T) {
 
 func TestAuth_MissingBearerPrefix(t *testing.T) {
 	tempDir := t.TempDir()
-	store := store.NewJSONStore[model.CCUsers](tempDir + "/users.json")
-	authSvc := service.NewAuthService("test-secret", store)
+	userStore := store.NewJSONStore[model.CCUsers](tempDir + "/users.json")
+	sessionStore := store.NewJSONStore[model.RefreshSessions](tempDir + "/sessions.json")
+	authSvc := service.NewAuthService("test-secret", userStore, sessionStore)
 
 	authMiddleware := Auth(authSvc)
 
@@ -69,8 +71,9 @@ func TestAuth_MissingBearerPrefix(t *testing.T) {
 
 func TestAuth_InvalidToken(t *testing.T) {
 	tempDir := t.TempDir()
-	store := store.NewJSONStore[model.CCUsers](tempDir + "/users.json")
-	authSvc := service.NewAuthService("test-secret", store)
+	userStore := store.NewJSONStore[model.CCUsers](tempDir + "/users.json")
+	sessionStore := store.NewJSONStore[model.RefreshSessions](tempDir + "/sessions.json")
+	authSvc := service.NewAuthService("test-secret", userStore, sessionStore)
 
 	authMiddleware := Auth(authSvc)
 
@@ -96,8 +99,9 @@ func TestAuth_InvalidToken(t *testing.T) {
 
 func TestAuth_ValidToken(t *testing.T) {
 	tempDir := t.TempDir()
-	store := store.NewJSONStore[model.CCUsers](tempDir + "/users.json")
-	authSvc := service.NewAuthService("test-secret", store)
+	userStore := store.NewJSONStore[model.CCUsers](tempDir + "/users.json")
+	sessionStore := store.NewJSONStore[model.RefreshSessions](tempDir + "/sessions.json")
+	authSvc := service.NewAuthService("test-secret", userStore, sessionStore)
 
 	// Create a test user
 	user := &model.CCUser{
@@ -198,8 +202,9 @@ func TestClaimsFromContext_WithWrongType(t *testing.T) {
 
 func TestAuth_InjectsClaimsIntoContext(t *testing.T) {
 	tempDir := t.TempDir()
-	store := store.NewJSONStore[model.CCUsers](tempDir + "/users.json")
-	authSvc := service.NewAuthService("test-secret", store)
+	userStore := store.NewJSONStore[model.CCUsers](tempDir + "/users.json")
+	sessionStore := store.NewJSONStore[model.RefreshSessions](tempDir + "/sessions.json")
+	authSvc := service.NewAuthService("test-secret", userStore, sessionStore)
 
 	user := &model.CCUser{
 		ID:           "user-id",
@@ -240,8 +245,9 @@ func TestAuth_InjectsClaimsIntoContext(t *testing.T) {
 
 func TestAuth_MultipleRequests_IndependentContexts(t *testing.T) {
 	tempDir := t.TempDir()
-	store := store.NewJSONStore[model.CCUsers](tempDir + "/users.json")
-	authSvc := service.NewAuthService("test-secret", store)
+	userStore := store.NewJSONStore[model.CCUsers](tempDir + "/users.json")
+	sessionStore := store.NewJSONStore[model.RefreshSessions](tempDir + "/sessions.json")
+	authSvc := service.NewAuthService("test-secret", userStore, sessionStore)
 
 	user1 := &model.CCUser{
 		ID:           "id1",

@@ -66,12 +66,14 @@ func runServer() {
 		log.Fatalf("Failed to create data directory: %v", err)
 	}
 
-	// Initialize JSON store for users
+	// Initialize JSON stores
 	usersPath := filepath.Join(dataDir, "cc-users.json")
 	usersStore := store.NewJSONStore[model.CCUsers](usersPath)
+	sessionsPath := filepath.Join(dataDir, "refresh_sessions.json")
+	sessionStore := store.NewJSONStore[model.RefreshSessions](sessionsPath)
 
 	// Initialize auth service
-	authSvc := service.NewAuthService(jwtSecret, usersStore)
+	authSvc := service.NewAuthService(jwtSecret, usersStore, sessionStore)
 
 	// Initialize log buffer (1000 max entries)
 	logBuffer := service.NewLogBuffer(1000)

@@ -40,3 +40,17 @@ type Claims struct {
 	ExpiresAt int64    `json:"exp"`
 	IssuedAt  int64    `json:"iat"`
 }
+
+// RefreshSession represents a server-side refresh session.
+type RefreshSession struct {
+	ID        string `json:"id"`
+	UserID    string `json:"userId"`
+	ExpiresAt int64  `json:"expiresAt"`
+	Revoked   bool   `json:"revoked"`
+	CreatedAt int64  `json:"createdAt"`
+}
+
+// RefreshSessions is the root structure for refresh_sessions.json.
+type RefreshSessions struct {
+	Sessions []RefreshSession `json:"sessions"`
+}
