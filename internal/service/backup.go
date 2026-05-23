@@ -826,17 +826,22 @@ func (s *BackupService) addFileToZip(zipWriter *zip.Writer, srcPath, dstPath str
 }
 
 func (s *BackupService) extractFileFromZip(file *zip.File, destDir string) error {
-	if strings.Contains(file.Name, "..") {
+	if file.FileInfo().IsDir() || file.Name == "backup-metadata.json" {
 		return nil
 	}
 
-	destPath := filepath.Join(destDir, file.Name)
-	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+	// Reject symlinks and hardlinks.
+	if file.FileInfo().Mode()&(os.ModeSymlink|os.ModeNamedPipe|os.ModeDevice) != 0 {
+		return fmt.Errorf("unsafe archive entry type: %s", file.Name)
+	}
+
+	destPath, err := sanitizeArchivePath(destDir, file.Name)
+	if err != nil {
 		return err
 	}
 
-	if file.FileInfo().IsDir() || file.Name == "backup-metadata.json" {
-		return nil
+	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+		return err
 	}
 
 	reader, err := file.Open()
@@ -853,6 +858,30 @@ func (s *BackupService) extractFileFromZip(file *zip.File, destDir string) error
 
 	_, err = io.Copy(writer, reader)
 	return err
+}
+
+// sanitizeArchivePath validates that a zip entry resolves within destDir.
+func sanitizeArchivePath(destDir, entryName string) (string, error) {
+	if filepath.IsAbs(entryName) {
+		return "", fmt.Errorf("absolute path not allowed: %s", entryName)
+	}
+
+	destPath := filepath.Join(destDir, filepath.Clean(entryName))
+
+	absDestDir, err := filepath.Abs(destDir)
+	if err != nil {
+		return "", err
+	}
+	absDestPath, err := filepath.Abs(destPath)
+	if err != nil {
+		return "", err
+	}
+
+	if !strings.HasPrefix(absDestPath, absDestDir+string(os.PathSeparator)) {
+		return "", fmt.Errorf("path traversal detected: %s", entryName)
+	}
+
+	return destPath, nil
 }
 
 func normalizeBackupConfig(cfg model.BackupConfig) model.BackupConfig {
