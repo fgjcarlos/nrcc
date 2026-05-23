@@ -17,6 +17,7 @@ import { UpdatesView } from '@/features/updates/components/UpdatesView';
 import { LibrariesView } from '@/features/libraries/components/LibrariesView';
 import { FlowsView } from '@/features/flows/components/FlowsView';
 import { FlowDetailView } from '@/features/flows/components/FlowDetailView';
+import { FlowVersionsView } from '@/features/flows/components/FlowVersionsView';
 import { EnvVarsView } from '@/features/env-vars/components/EnvVarsView';
 import { BackupsView } from '@/features/backups/components/BackupsView';
 import { BootstrapView } from '@/features/bootstrap/components/BootstrapView';
@@ -100,6 +101,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <FlowsView />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="flows/versions"
+          element={
+            <ProtectedRoute>
+              <FlowVersionsView />
             </ProtectedRoute>
           }
         />

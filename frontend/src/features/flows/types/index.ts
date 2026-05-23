@@ -40,3 +40,30 @@ export interface AnalysisResult {
   suggestions: string[];
   analyzedAt: string;
 }
+
+export interface FlowVersionEntry {
+  id: string;
+  timestamp: string;
+  hash: string;
+  nodeCount: number;
+  size: number;
+}
+
+export interface FlowDiffEntry {
+  id: string;
+  type: string;
+  label?: string;
+}
+
+export interface FlowDiffMod {
+  id: string;
+  type: string;
+  label?: string;
+  changed: string[];
+}
+
+export interface FlowDiff {
+  added?: FlowDiffEntry[];
+  removed?: FlowDiffEntry[];
+  modified?: FlowDiffMod[];
+}
