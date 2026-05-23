@@ -20,7 +20,7 @@ const defaultActions = {
 describe('DockerView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(dockerHooks.useDockerActions).mockReturnValue(defaultActions)
+    vi.mocked(dockerHooks.useDockerActions).mockReturnValue(defaultActions as unknown as ReturnType<typeof dockerHooks.useDockerActions>)
   })
 
   it('shows a loading state while container status is loading', () => {
@@ -51,7 +51,7 @@ describe('DockerView', () => {
 
   it('shows an empty state when no container data is available', () => {
     vi.mocked(dockerHooks.useDockerData).mockReturnValue({
-      container: null,
+      container: undefined,
       isLoading: false,
       isError: false,
       error: null,

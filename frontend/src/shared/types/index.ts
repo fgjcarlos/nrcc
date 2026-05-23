@@ -248,10 +248,10 @@ export const DEFAULT_CONFIG: NodeRedConfig = {
   httpNodeRoot: '/',
   disableEditor: false,
   projectsEnabled: false,
-  loggingConsoleLevel: 'info',
-  loggingConsoleMetrics: false,
-  loggingInternalLevel: 'info',
-  loggingInternalMetrics: false,
+  logging: {
+    console: { level: 'info', metrics: false },
+    internal: { level: 'info', metrics: false },
+  },
   flowFile: 'flows.json',
 };
 
@@ -314,14 +314,17 @@ export function configToFormData(config: NodeRedConfig): NodeRedConfigFormData {
     httpNodeRoot: typeof config.httpNodeRoot === 'string' ? config.httpNodeRoot : '/',
     disableEditor: config.disableEditor || false,
     projectsEnabled: config.projectsEnabled,
-    loggingLevel: config.loggingLevel,
+    loggingConsoleLevel: config.logging?.console?.level || config.loggingLevel || 'info',
+    loggingConsoleMetrics: config.logging?.console?.metrics || false,
+    loggingInternalLevel: config.logging?.internal?.level || 'info',
+    loggingInternalMetrics: config.logging?.internal?.metrics || false,
     flowFile: config.flowFile || 'flows.json',
     userDir: config.userDir || '',
     nodesDir: config.nodesDir || '',
     editorPageTitle: config.editorTheme?.page?.title || 'Node-RED',
     editorPageFavicon: config.editorTheme?.page?.favicon || '',
-    editorPageCss: Array.isArray(config.editorTheme?.page?.css) 
-      ? config.editorTheme.page.css.join('\n') 
+    editorPageCss: Array.isArray(config.editorTheme?.page?.css)
+      ? config.editorTheme.page.css.join('\n')
       : config.editorTheme?.page?.css || '',
     editorHeaderTitle: config.editorTheme?.header?.title || 'Node-RED',
     editorHeaderImage: config.editorTheme?.header?.image || '',
@@ -342,6 +345,15 @@ export function configToFormData(config: NodeRedConfig): NodeRedConfigFormData {
     runtimeStateEnabled: config.runtimeState?.enabled || false,
     runtimeStateFile: config.runtimeState?.file || '',
     lang: config.lang || 'en-US',
+    authEnabled: !!config.adminAuth,
+    authAdminUser: config.adminAuth?.user || '',
+    authAdminPassword: '',
+    authNodeHttpEnabled: !!config.nodeHttpAuth && typeof config.nodeHttpAuth === 'object',
+    authNodeHttpUser: typeof config.nodeHttpAuth === 'object' ? config.nodeHttpAuth?.user || '' : '',
+    authNodeHttpPassword: '',
+    authStaticEnabled: !!config.staticAuth && typeof config.staticAuth === 'object',
+    authStaticUser: typeof config.staticAuth === 'object' ? config.staticAuth?.user || '' : '',
+    authStaticPassword: '',
   };
 }
 
@@ -353,7 +365,16 @@ export function formDataToConfig(formData: NodeRedConfigFormData): Partial<NodeR
     httpNodeRoot: formData.httpNodeRoot || '/',
     disableEditor: formData.disableEditor || undefined,
     projectsEnabled: formData.projectsEnabled,
-    loggingLevel: formData.loggingLevel,
+    logging: {
+      console: {
+        level: formData.loggingConsoleLevel,
+        metrics: formData.loggingConsoleMetrics || undefined,
+      },
+      internal: {
+        level: formData.loggingInternalLevel,
+        metrics: formData.loggingInternalMetrics || undefined,
+      },
+    },
     flowFile: formData.flowFile || undefined,
     userDir: formData.userDir || undefined,
     nodesDir: formData.nodesDir || undefined,

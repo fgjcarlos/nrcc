@@ -42,10 +42,10 @@ export function useDashboardData(): DashboardData {
   return {
     container: dockerData?.data?.data as DashboardContainerStatus | null | undefined,
     system: systemData?.data?.data,
-    config: configData?.data?.data,
+    config: configData?.data?.data as unknown as Record<string, unknown> | undefined,
     host: hostData,
     backups: backupObservability,
-    dockerSuccess: dockerData?.success === true,
+    dockerSuccess: dockerData?.data?.success === true,
     dockerLoading,
     dockerError,
   };

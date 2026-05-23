@@ -49,7 +49,7 @@ export function SchedulerHistory({
                 {event.error && (
                   <div className="mt-1 text-xs text-error">{event.error}</div>
                 )}
-                {event.prunedCount > 0 && (
+                {(event.prunedCount ?? 0) > 0 && (
                   <div className="mt-1 text-xs text-base-content/60">
                     Pruned {event.prunedCount} backups
                   </div>

@@ -25,6 +25,8 @@ describe('DashboardView', () => {
       isStartStopping: false,
       setPendingConfirm: vi.fn(),
       handleRestartConfirm: vi.fn(),
+      handleStartNodeRed: vi.fn(),
+      handleStopNodeRed: vi.fn(),
       handleOpenNodeRed: vi.fn(),
     })
   })

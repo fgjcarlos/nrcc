@@ -1,7 +1,7 @@
 // Re-export dashboard-specific types from shared
 // These were originally in shared/types but are only used by dashboard
 export type { SystemInfo } from '@/shared/types';
-import type { HostStatus } from '@/shared/types';
+import type { SystemInfo, HostStatus } from '@/shared/types';
 import type { BackupObservability } from '@/features/backups/services';
 
 export interface DashboardContainerStatus {

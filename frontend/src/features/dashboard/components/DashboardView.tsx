@@ -14,7 +14,7 @@ export function DashboardView() {
     setPendingConfirm,
     handleRestartConfirm,
     handleOpenNodeRed,
-  } = useDashboardActions({ uiPort: config?.uiPort });
+  } = useDashboardActions({ uiPort: config?.uiPort as number | undefined });
 
   const inDocker = !!container?.inDocker;
   const showDockerWarning =

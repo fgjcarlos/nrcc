@@ -29,7 +29,7 @@ export function useConfigurationData() {
   // Helper: derive loaded config from query result
   const loadedConfig = configQuery.data?.data?.data;
   const initialFormData: NodeRedConfigFormData | null = loadedConfig
-    ? configToFormData(loadedConfig as Record<string, unknown>)
+    ? configToFormData(loadedConfig as unknown as Record<string, unknown>)
     : null;
 
   // Helper: derive raw settings content

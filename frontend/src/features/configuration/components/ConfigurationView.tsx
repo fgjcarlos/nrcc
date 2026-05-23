@@ -109,6 +109,10 @@ const INITIAL_FORM_DATA: NodeRedConfigFormData = {
   // Editor - Logout
   editorLogoutRedirect: '',
 
+  // Runtime State
+  runtimeStateEnabled: false,
+  runtimeStateFile: '',
+
   // Language
   lang: 'en-US',
 };
@@ -169,7 +173,7 @@ export function ConfigurationView() {
   // Derived state
   const ActiveComponent = SECTIONS.find(s => s.id === activeTab)?.component || BasicSettings;
   const isLoading = data.configLoading;
-  const isSaving = actions.saveConfigMutation.isPending || actions.restartMutation.isPending;
+  const isSaving = actions.saveConfigMutation.isPending;
 
   if (isLoading) {
     return (

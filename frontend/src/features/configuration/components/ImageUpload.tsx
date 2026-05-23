@@ -55,7 +55,7 @@ export function ImageUpload({ label, value, onChange, type, help }: ImageUploadP
         onChange(url);
         toast.success(`Uploaded ${filename}`);
       } else {
-        const errorMsg = response.data.error?.message || response.data.message || 'Failed to upload image';
+        const errorMsg = response.data.error?.message || 'Failed to upload image';
         toast.error(errorMsg);
       }
     } catch (error: unknown) {
