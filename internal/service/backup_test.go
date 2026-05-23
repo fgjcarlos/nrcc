@@ -698,3 +698,142 @@ func TestListPaginatedSortOrder(t *testing.T) {
 			resultAsc.Items[0].CreatedAt, resultAsc.Items[len(resultAsc.Items)-1].CreatedAt)
 	}
 }
+
+func TestSanitizeArchivePathRejectsTraversal(t *testing.T) {
+	destDir := t.TempDir()
+
+	tests := []struct {
+		name  string
+		entry string
+	}{
+		{"dot-dot prefix", "../etc/passwd"},
+		{"nested dot-dot", "subdir/../../etc/passwd"},
+		{"absolute path", "/etc/passwd"},
+		{"dot-dot only", ".."},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := sanitizeArchivePath(destDir, tc.entry)
+			if err == nil {
+				t.Fatalf("expected error for entry %q, got nil", tc.entry)
+			}
+		})
+	}
+}
+
+func TestSanitizeArchivePathAllowsValidEntries(t *testing.T) {
+	destDir := t.TempDir()
+
+	valid := []string{
+		"flows.json",
+		"subdir/settings.js",
+		"deep/nested/file.txt",
+	}
+
+	for _, entry := range valid {
+		t.Run(entry, func(t *testing.T) {
+			got, err := sanitizeArchivePath(destDir, entry)
+			if err != nil {
+				t.Fatalf("unexpected error for %q: %v", entry, err)
+			}
+			expected := filepath.Join(destDir, filepath.Clean(entry))
+			if got != expected {
+				t.Fatalf("expected %q, got %q", expected, got)
+			}
+		})
+	}
+}
+
+func TestExtractFileFromZipRejectsMaliciousEntries(t *testing.T) {
+	restoreDir := t.TempDir()
+	outsideFile := filepath.Join(t.TempDir(), "should-not-exist.txt")
+
+	maliciousNames := []string{
+		"../should-not-exist.txt",
+		"/tmp/should-not-exist.txt",
+	}
+
+	for _, name := range maliciousNames {
+		t.Run(name, func(t *testing.T) {
+			zipPath := filepath.Join(t.TempDir(), "evil.zip")
+			createZipWithEntry(t, zipPath, name, "pwned")
+
+			reader, err := zip.OpenReader(zipPath)
+			if err != nil {
+				t.Fatalf("open zip: %v", err)
+			}
+			defer reader.Close()
+
+			svc := NewBackupService(restoreDir)
+			for _, f := range reader.File {
+				if f.Name == "backup-metadata.json" {
+					continue
+				}
+				err := svc.extractFileFromZip(f, restoreDir)
+				if err == nil {
+					t.Fatalf("expected error extracting %q, got nil", f.Name)
+				}
+			}
+
+			if _, err := os.Stat(outsideFile); err == nil {
+				t.Fatal("malicious file was written outside restore dir")
+			}
+		})
+	}
+}
+
+func TestExtractFileFromZipRestoresValidArchive(t *testing.T) {
+	restoreDir := t.TempDir()
+	zipPath := filepath.Join(t.TempDir(), "valid.zip")
+	createZipWithEntry(t, zipPath, "flows.json", `[{"id":"1"}]`)
+
+	reader, err := zip.OpenReader(zipPath)
+	if err != nil {
+		t.Fatalf("open zip: %v", err)
+	}
+	defer reader.Close()
+
+	svc := NewBackupService(restoreDir)
+	for _, f := range reader.File {
+		if f.Name == "backup-metadata.json" {
+			continue
+		}
+		if err := svc.extractFileFromZip(f, restoreDir); err != nil {
+			t.Fatalf("extract valid file: %v", err)
+		}
+	}
+
+	content, err := os.ReadFile(filepath.Join(restoreDir, "flows.json"))
+	if err != nil {
+		t.Fatalf("read restored file: %v", err)
+	}
+	if string(content) != `[{"id":"1"}]` {
+		t.Fatalf("unexpected content: %s", content)
+	}
+}
+
+func createZipWithEntry(t *testing.T, zipPath, entryName, content string) {
+	t.Helper()
+	f, err := os.Create(zipPath)
+	if err != nil {
+		t.Fatalf("create zip file: %v", err)
+	}
+	w := zip.NewWriter(f)
+
+	meta, _ := w.Create("backup-metadata.json")
+	meta.Write([]byte(`{"id":"test","name":"test","type":"manual","createdAt":"2026-01-01T00:00:00Z","triggeredBy":"test"}`))
+
+	entry, err := w.Create(entryName)
+	if err != nil {
+		t.Fatalf("create entry: %v", err)
+	}
+	entry.Write([]byte(content))
+
+	if err := w.Close(); err != nil {
+		t.Fatalf("close zip writer: %v", err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatalf("close file: %v", err)
+	}
+}
