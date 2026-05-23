@@ -29,14 +29,16 @@ type Server struct {
 
 // NewServer creates and configures a new server
 func NewServer(authSvc *service.AuthService) *Server {
-	return NewServerWithConfig(authSvc, "./data")
+	return NewServerWithConfig(authSvc, "./data", middleware.CORSConfig{})
 }
 
 // NewServerWithConfig creates and configures a new server with config directory
-func NewServerWithConfig(authSvc *service.AuthService, dataDir string) *Server {
+func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg middleware.CORSConfig) *Server {
 	r := chi.NewRouter()
 
 	// Global middleware
+	r.Use(middleware.SecurityHeaders)
+	r.Use(middleware.CORS(corsCfg))
 	r.Use(middleware.Logger)
 
 	// Initialize handlers
