@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/composedof2/nrcc/cmd"
+	"github.com/composedof2/nrcc/internal/middleware"
 	"github.com/composedof2/nrcc/internal/model"
 	"github.com/composedof2/nrcc/internal/server"
 	"github.com/composedof2/nrcc/internal/service"
@@ -109,11 +110,23 @@ func runServer() {
 		}
 	}
 
+	// Parse CORS configuration from environment
+	corsCfg := middleware.CORSConfig{
+		AllowUnsafeWildcard: os.Getenv("NRCC_CORS_UNSAFE_WILDCARD") == "true",
+	}
+	if origins := os.Getenv("NRCC_CORS_ORIGINS"); origins != "" {
+		for _, o := range strings.Split(origins, ",") {
+			if trimmed := strings.TrimSpace(o); trimmed != "" {
+				corsCfg.AllowedOrigins = append(corsCfg.AllowedOrigins, trimmed)
+			}
+		}
+	}
+
 	// Set embedded filesystem in server package
 	server.SetEmbedFS(frontendFS)
 
 	// Create and configure server
-	srv := server.NewServerWithConfig(authSvc, dataDir)
+	srv := server.NewServerWithConfig(authSvc, dataDir, corsCfg)
 	if manageRuntime {
 		srv.SetProcessManager(pm)
 	}
