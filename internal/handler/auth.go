@@ -48,8 +48,7 @@ type AuthResponse struct {
 
 // StatusResponse represents the status endpoint response
 type StatusResponse struct {
-	Initialized  bool `json:"initialized"`
-	AuthRequired bool `json:"authRequired"`
+	Initialized bool `json:"initialized"`
 }
 
 // UserListResponse represents the users list response
@@ -215,8 +214,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 func (h *AuthHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 	users, _ := h.authSvc.GetAllUsers()
 	resp := StatusResponse{
-		Initialized:  len(users) > 0,
-		AuthRequired: true, // Auth is always required once system is configured
+		Initialized: len(users) > 0,
 	}
 
 	model.RespondJSON(w, http.StatusOK, resp)

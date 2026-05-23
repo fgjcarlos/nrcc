@@ -84,6 +84,9 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 			"status": "ok",
 		})
 	})
+	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
 
 	// Auth routes (public and protected mixed)
 	r.Route("/api/auth", func(r chi.Router) {
