@@ -1,10 +1,49 @@
-import type { NodeRedConfigFormData } from '@/shared/types';
+import type { NodeRedConfigFormData, LoggingLevel, EditorTheme, RuntimeStateSettings } from '@/shared/types';
+
+/**
+ * API payload shape for admin/node-http/static auth
+ */
+export interface AuthPayloadUser {
+  username: string;
+  password: string;
+  permissions?: string;
+}
+
+export interface AuthPayload {
+  type: string;
+  users: AuthPayloadUser[];
+}
+
+/**
+ * Typed payload returned by formDataToConfigPayload
+ */
+export interface ConfigPayload {
+  uiPort: number;
+  uiHost: string;
+  httpAdminRoot: string;
+  httpNodeRoot: string;
+  disableEditor?: boolean;
+  projectsEnabled: boolean;
+  logging?: {
+    console?: { level: LoggingLevel; metrics?: boolean };
+    internal?: { level: LoggingLevel; metrics?: boolean };
+  };
+  flowFile: string;
+  userDir?: string;
+  nodesDir?: string;
+  editorTheme?: EditorTheme;
+  runtimeState?: RuntimeStateSettings;
+  lang: string;
+  adminAuth?: AuthPayload;
+  nodeHttpAuth?: AuthPayload;
+  staticAuth?: AuthPayload;
+}
 
 /**
  * Convert form data to API payload
  * Pure function with no React dependencies
  */
-export function formDataToConfigPayload(formData: NodeRedConfigFormData) {
+export function formDataToConfigPayload(formData: NodeRedConfigFormData): ConfigPayload {
   const config: Record<string, unknown> = {};
 
   // Basic
@@ -126,7 +165,7 @@ export function formDataToConfigPayload(formData: NodeRedConfigFormData) {
   // Language
   config.lang = formData.lang || 'en-US';
 
-  return config;
+  return config as unknown as ConfigPayload;
 }
 
 /**

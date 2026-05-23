@@ -1,3 +1,5 @@
+import api from '@/shared/lib';
+import type { ApiResponse } from '@/shared/types';
 import { bootstrapService } from '@/features/bootstrap/services';
 import { dockerService } from '@/features/docker/services';
 import { systemService } from './systemService';
@@ -10,4 +12,7 @@ export const dashboardService = {
   getConfig: () => configService.getConfig(),
   getHostStatus: () => bootstrapService.getStatus(),
   getBackupObservability: () => backupService.getObservability(),
+  restartNodeRed: () => api.post<ApiResponse<{ message: string }>>('/runtime/restart'),
+  startNodeRed: () => api.post<ApiResponse<{ message: string }>>('/runtime/start'),
+  stopNodeRed: () => api.post<ApiResponse<{ message: string }>>('/runtime/stop'),
 };

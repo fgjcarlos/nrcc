@@ -1,10 +1,10 @@
 import api from '@/shared/lib';
-import type { NodeRedConfig, ApiResponse } from '@/shared/types';
+import type { NodeRedConfig, ApiResponse, SettingsDocument } from '@/shared/types';
 
 export const configService = {
   getConfig: () => api.get<ApiResponse<NodeRedConfig>>('/config'),
   
-  updateConfig: (config: Partial<NodeRedConfig>) => 
+  updateConfig: (config: Record<string, unknown>) =>
     api.post<ApiResponse<NodeRedConfig>>('/config', config),
   
   validateConfig: (config: Partial<NodeRedConfig>) => 
@@ -36,6 +36,6 @@ export const fileService = {
 };
 
 export const settingsService = {
-  getRaw: () => api.get<ApiResponse<{ content: string }>>('/settings/raw'),
+  getRaw: () => api.get<ApiResponse<SettingsDocument>>('/settings/raw'),
   saveRaw: (content: string) => api.post<ApiResponse<{ message: string }>>('/settings/raw', { content }),
 };

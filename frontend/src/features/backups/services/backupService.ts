@@ -474,7 +474,7 @@ export const backupService = {
   getStorage: async (): Promise<BackupStorageInfo> => {
     try {
       const response = await api.get<ApiEnvelope<BackupStorageInfo> | BackupStorageInfo>('/backups/storage');
-      return normalizeStorage(unwrapData(response.data));
+      return normalizeStorage(unwrapData(response.data) as unknown as Record<string, unknown>);
     } catch {
       const backups = await backupService.list();
       return buildStorage(backups);

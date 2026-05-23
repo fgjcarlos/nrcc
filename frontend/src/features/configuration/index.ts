@@ -1,3 +1,31 @@
 export * from './components';
 export * from './services';
-export * from './types';
+export {
+  type NodeRedConfigFormData,
+  type LoggingLevel,
+  type NodeRedConfig,
+  type LoggingSettings as LoggingSettingsType,
+  type EditorTheme,
+  type EditorPage,
+  type EditorHeader,
+  type EditorDeployButton,
+  type EditorMenuItem,
+  type EditorMenu,
+  type EditorPaletteCatalogue,
+  type EditorPaletteThemeItem,
+  type EditorPalette,
+  type EditorProjects,
+  type EditorCodeEditorOptions,
+  type EditorCodeEditor,
+  type EditorLogin,
+  type EditorLogout,
+  type EditorMermaid,
+  type AdminAuthSettings,
+  type NodeHttpAuthSettings,
+  type StaticAuthSettings,
+  type AuthSettings as AuthSettingsType,
+  type RuntimeStateSettings,
+  configToFormData,
+  formDataToConfig,
+  DEFAULT_CONFIG,
+} from './types';
