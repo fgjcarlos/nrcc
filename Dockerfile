@@ -1,21 +1,23 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 1: Build React frontend
 # ─────────────────────────────────────────────────────────────────────────────
-FROM node:20-slim AS frontend-builder
+FROM node:22-slim AS frontend-builder
+
+RUN npm install -g pnpm@^11
 
 WORKDIR /build/frontend
 
-COPY frontend/package*.json ./
-RUN npm ci
+COPY frontend/package.json frontend/pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
 
 COPY frontend/ ./
-RUN npm run build
+RUN pnpm build
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 2: Build Go binary
 # Needs frontend/dist for go:embed
 # ─────────────────────────────────────────────────────────────────────────────
-FROM golang:1.22-alpine AS go-builder
+FROM golang:1.25-alpine AS go-builder
 
 WORKDIR /build
 
