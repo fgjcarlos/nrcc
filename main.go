@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -52,10 +53,9 @@ func runServer() {
 		dataDir = "./data"
 	}
 
-	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		ui.Warn("JWT_SECRET not set, using insecure default. Set JWT_SECRET in production.")
-		jwtSecret = "cc-secret-change-in-production"
+	jwtSecret, err := resolveJWTSecret(dataDir)
+	if err != nil {
+		log.Fatalf("JWT secret error: %v", err)
 	}
 
 	// Print startup banner
@@ -165,4 +165,50 @@ func runServer() {
 	}
 
 	ui.Info("Shutdown complete")
+}
+
+var placeholderSecrets = []string{
+	"cc-secret-change-in-production",
+	"change-me-in-production",
+	"dev-secret-not-for-production",
+}
+
+func resolveJWTSecret(dataDir string) (string, error) {
+	secret := os.Getenv("JWT_SECRET")
+
+	if secret != "" {
+		for _, placeholder := range placeholderSecrets {
+			if strings.EqualFold(secret, placeholder) {
+				return "", fmt.Errorf(
+					"JWT_SECRET is set to a known placeholder (%q) — provide a real secret",
+					secret,
+				)
+			}
+		}
+		return secret, nil
+	}
+
+	// No env var: generate and persist a local secret.
+	secretPath := filepath.Join(dataDir, "jwt_secret")
+	if data, err := os.ReadFile(secretPath); err == nil {
+		if s := strings.TrimSpace(string(data)); len(s) >= 32 {
+			ui.Info("Using persisted JWT secret from " + secretPath)
+			return s, nil
+		}
+	}
+
+	generated, err := service.GenerateJWTSecret()
+	if err != nil {
+		return "", fmt.Errorf("failed to auto-generate JWT secret: %w", err)
+	}
+
+	if err := os.MkdirAll(dataDir, 0755); err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(secretPath, []byte(generated+"\n"), 0600); err != nil {
+		return "", fmt.Errorf("failed to persist JWT secret: %w", err)
+	}
+
+	ui.Warn("JWT_SECRET not set — generated a random secret at " + secretPath)
+	return generated, nil
 }
