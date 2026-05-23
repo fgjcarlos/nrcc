@@ -58,7 +58,10 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 	envSvc := service.NewEnvService(configSvc, os.Getenv("NRCC_ENCRYPTION_KEY"))
 	envHandler := handler.NewEnvHandler(envSvc, dataDir) // TAREA 2c: Pass dataDir
 	flowSvc := service.NewFlowService(dataDir)
+	flowVersionSvc := service.NewFlowVersionService(dataDir)
+	flowVersionSvc.StartPolling()
 	flowHandler := handler.NewFlowHandler(flowSvc)
+	flowHandler.SetVersionService(flowVersionSvc)
 	librarySvc := service.NewLibraryService(dataDir)
 	libraryHandler := handler.NewLibraryHandler(librarySvc)
 	updateSvc := service.NewUpdateService(dataDir)
@@ -77,6 +80,7 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 	updateHandler.SetAuditService(auditSvc)
 	filesHandler.SetAuditService(auditSvc)
 	dockerHandler.SetAuditService(auditSvc)
+	flowHandler.SetAuditService(auditSvc)
 
 	// Public routes (no auth required)
 	r.Get("/api/health", func(w http.ResponseWriter, r *http.Request) {
@@ -173,6 +177,10 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 			r.Get("/", flowHandler.GetFlows)
 			r.Get("/export", flowHandler.ExportFlows)
 			r.Post("/analyze", flowHandler.AnalyzeFlows)
+			r.Get("/versions", flowHandler.GetVersions)
+			r.Post("/versions", flowHandler.PostSnapshot)
+			r.Get("/versions/{from}/diff/{to}", flowHandler.GetVersionDiff)
+			r.Post("/versions/{id}/revert", flowHandler.PostRevert)
 			r.Get("/{id}", flowHandler.GetFlow)
 		})
 

@@ -139,6 +139,12 @@ export function FlowsView() {
             {flows.length} flow{flows.length !== 1 ? 's' : ''}
           </span>
         </div>
+        <Link
+          to="/flows/versions"
+          className="action-btn-secondary text-sm"
+        >
+          Version History
+        </Link>
         {flows.length > 0 && (
           <button
             onClick={toggleSelectAll}
