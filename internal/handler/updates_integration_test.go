@@ -613,4 +613,14 @@ func TestIntegration_ErrorRecovery(t *testing.T) {
 	if applyW.Code == http.StatusOK {
 		t.Log("✓ System recovered from failed state and can retry")
 	}
+
+	// Wait for the async update goroutine to finish so TempDir cleanup succeeds.
+	deadline := time.Now().Add(30 * time.Second)
+	for time.Now().Before(deadline) {
+		s := svc.GetFlowState().State
+		if s == model.StateCompleted || s == model.StateFailed || s == model.StateIdle {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
 }
