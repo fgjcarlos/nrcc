@@ -5,6 +5,7 @@ type RuntimeStatus struct {
 	Status           string           `json:"status"` // running, stopped, error, detected
 	PID              int              `json:"pid,omitempty"`
 	Uptime           int64            `json:"uptime"` // seconds
+	RestartCount     int              `json:"restartCount"`
 	Memory           *ProcessMemory   `json:"memory,omitempty"`
 	Version          string           `json:"version,omitempty"`
 	StartedAt        string           `json:"startedAt,omitempty"`
