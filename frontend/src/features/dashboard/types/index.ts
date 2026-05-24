@@ -1,6 +1,7 @@
 // Re-export dashboard-specific types from shared
 // These were originally in shared/types but are only used by dashboard
 export type { SystemInfo } from '@/shared/types';
+export type { MetricsSnapshot, RestartEvent } from './history';
 import type { SystemInfo, HostStatus } from '@/shared/types';
 import type { BackupObservability } from '@/features/backups/services';
 

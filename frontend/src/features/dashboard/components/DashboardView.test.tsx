@@ -7,6 +7,21 @@ import * as dashboardHooks from '../hooks'
 vi.mock('../hooks', () => ({
   useDashboardData: vi.fn(),
   useDashboardActions: vi.fn(),
+  useSystemHistory: vi.fn().mockReturnValue({ data: [], isLoading: false, isError: false }),
+}))
+
+vi.mock('../hooks/useSystemHistory', () => ({
+  useSystemHistory: vi.fn().mockReturnValue({ data: [], isLoading: false, isError: false }),
+}))
+
+vi.mock('recharts', () => ({
+  ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AreaChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  Area: () => null,
+  XAxis: () => null,
+  YAxis: () => null,
+  CartesianGrid: () => null,
+  Tooltip: () => null,
 }))
 
 const renderDashboard = () =>
