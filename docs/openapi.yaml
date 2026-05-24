@@ -1,0 +1,3811 @@
+openapi: 3.1.0
+info:
+  title: NRCC — Node-RED Control Center API
+  version: 1.0.0
+  description: |
+    REST API for the Node-RED Control Center (NRCC).
+
+    ## Authentication
+
+    Most endpoints require a short-lived Bearer JWT (≈15 min) obtained from
+    `/api/auth/login` or `/api/auth/setup`. Refresh tokens are managed via an
+    httpOnly cookie (`nrcc_refresh`) and rotated automatically on each call to
+    `/api/auth/refresh`.
+
+    ## Response Envelope
+
+    Every JSON endpoint wraps its payload in a standard envelope:
+
+    **Success:**
+    ```json
+    { "success": true, "data": <T>, "timestamp": "<RFC3339>" }
+    ```
+
+    **Error:**
+    ```json
+    { "success": false, "error": { "code": "ERROR_CODE", "message": "..." }, "timestamp": "<RFC3339>" }
+    ```
+  license:
+    name: MIT
+  contact:
+    name: NRCC Team
+
+servers:
+  - url: /
+    description: Same-origin (default deployment)
+
+tags:
+  - name: Health
+    description: Health and readiness checks
+  - name: Auth
+    description: Authentication and user management
+  - name: Config
+    description: Node-RED configuration management
+  - name: System
+    description: Host and system information
+  - name: Backups
+    description: Backup creation, restore, and scheduler management
+  - name: Environment
+    description: Environment variable management
+  - name: Flows
+    description: Node-RED flow management and versioning
+  - name: Libraries
+    description: npm package (library) management
+  - name: Updates
+    description: Node-RED update management
+  - name: Files
+    description: File upload and management
+  - name: Docker
+    description: Docker container control
+  - name: Logs
+    description: Node-RED runtime logs
+  - name: AI
+    description: AI-assisted flow analysis (stubs — not yet implemented)
+
+security: []
+
+paths:
+  # ─── Health ──────────────────────────────────────────────────────────────────
+
+  /api/health:
+    get:
+      tags: [Health]
+      operationId: getHealth
+      summary: API health check
+      description: Returns a simple status object to confirm the API is reachable.
+      security: []
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_HealthStatus"
+
+  /healthz:
+    get:
+      tags: [Health]
+      operationId: getHealthz
+      summary: Kubernetes-style liveness probe
+      description: Returns HTTP 200 with an empty body when the process is alive.
+      security: []
+      responses:
+        "200":
+          description: Process is alive
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: ""
+
+  /metrics:
+    get:
+      tags: [Health]
+      operationId: getMetrics
+      summary: Prometheus metrics
+      description: Exposes Prometheus-format metrics. Not a JSON endpoint.
+      security: []
+      responses:
+        "200":
+          description: Prometheus text exposition format
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  # ─── Auth — Public ────────────────────────────────────────────────────────────
+
+  /api/auth/status:
+    get:
+      tags: [Auth]
+      operationId: getAuthStatus
+      summary: Check initialization status
+      description: Returns whether the system has been initialized with at least one user.
+      security: []
+      responses:
+        "200":
+          description: Initialization status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_StatusResponse"
+
+  /api/auth/setup:
+    post:
+      tags: [Auth]
+      operationId: postAuthSetup
+      summary: Initial admin setup
+      description: |
+        Creates the first admin user. Only works when no users exist yet.
+        Sets an httpOnly refresh cookie on success.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetupRequest"
+      responses:
+        "201":
+          description: Admin user created and access token returned
+          headers:
+            Set-Cookie:
+              description: httpOnly refresh cookie (`nrcc_refresh`)
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_AuthResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      operationId: postAuthLogin
+      summary: Log in
+      description: |
+        Authenticates with username and password. Returns a short-lived JWT and
+        sets an httpOnly refresh cookie.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Successful login
+          headers:
+            Set-Cookie:
+              description: httpOnly refresh cookie (`nrcc_refresh`)
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_AuthResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /api/auth/refresh:
+    post:
+      tags: [Auth]
+      operationId: postAuthRefresh
+      summary: Refresh access token
+      description: |
+        Reads the `nrcc_refresh` httpOnly cookie, validates the session, rotates
+        the refresh token, and issues a new short-lived access JWT. No request
+        body required.
+      security: []
+      parameters:
+        - in: cookie
+          name: nrcc_refresh
+          required: true
+          schema:
+            type: string
+          description: httpOnly refresh token cookie
+      responses:
+        "200":
+          description: New access token issued
+          headers:
+            Set-Cookie:
+              description: Rotated httpOnly refresh cookie
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_AuthResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ─── Auth — Protected ─────────────────────────────────────────────────────────
+
+  /api/auth/me:
+    get:
+      tags: [Auth]
+      operationId: getAuthMe
+      summary: Get current user
+      description: Returns the profile of the authenticated user.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_CCUserPublic"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/auth/logout:
+    post:
+      tags: [Auth]
+      operationId: postAuthLogout
+      summary: Log out
+      description: |
+        Invalidates the client-side token. JWT logout is stateless; the client
+        must discard the token. The refresh cookie should be cleared by the client.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Logged out successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_BoolSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/auth/users:
+    get:
+      tags: [Auth]
+      operationId: getAuthUsers
+      summary: List all users
+      description: "**Admin only.** Returns all registered users."
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_UserListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [Auth]
+      operationId: postAuthUsers
+      summary: Create a user
+      description: "**Admin only.** Creates a new user with the given username, password, and role."
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_CCUserPublic"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /api/auth/users/{id}:
+    delete:
+      tags: [Auth]
+      operationId: deleteAuthUser
+      summary: Delete a user
+      description: "**Admin only.** Deletes a user by ID. Cannot delete self or the last admin."
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: User deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_BoolSuccess"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Auth]
+      operationId: patchAuthUser
+      summary: Update a user's role
+      description: "**Admin only.** Updates the role of a user. Cannot demote the last admin."
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRequest"
+      responses:
+        "200":
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_CCUserPublic"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/auth/users/{id}/password:
+    patch:
+      tags: [Auth]
+      operationId: patchAuthUserPassword
+      summary: Change a user's password
+      description: |
+        Changes the password for the specified user.
+        Admins can change any user's password; non-admins can only change their own.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasswordChangeRequest"
+      responses:
+        "200":
+          description: Password changed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_BoolSuccess"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ─── Config ────────────────────────────────────────────────────────────────────
+
+  /api/config:
+    get:
+      tags: [Config]
+      operationId: getConfig
+      summary: Get Node-RED configuration
+      description: Returns the current Node-RED `settings.js` configuration as a structured object.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_NodeRedConfig"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Config]
+      operationId: postConfig
+      summary: Save Node-RED configuration
+      description: "**Admin only.** Overwrites the Node-RED configuration."
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NodeRedConfig"
+      responses:
+        "200":
+          description: Saved configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_NodeRedConfig"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/config/default:
+    get:
+      tags: [Config]
+      operationId: getConfigDefault
+      summary: Get default configuration
+      description: Returns the built-in default Node-RED configuration values.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Default configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_NodeRedConfig"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/config/validate:
+    post:
+      tags: [Config]
+      operationId: postConfigValidate
+      summary: Validate a configuration object
+      description: Validates a Node-RED configuration without persisting it.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NodeRedConfig"
+      responses:
+        "200":
+          description: Configuration is valid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_ValidResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/settings/raw:
+    get:
+      tags: [Config]
+      operationId: getSettingsRaw
+      summary: Get raw settings.js content
+      description: Returns the raw text content of the Node-RED `settings.js` file.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Raw settings document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_SettingsDocument"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Config]
+      operationId: postSettingsRaw
+      summary: Save raw settings.js content
+      description: "**Admin only.** Overwrites the `settings.js` file with the supplied content."
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RawSettingsRequest"
+      responses:
+        "200":
+          description: Updated settings document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_SettingsDocument"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  # ─── System ────────────────────────────────────────────────────────────────────
+
+  /api/bootstrap/status:
+    get:
+      tags: [System]
+      operationId: getBootstrapStatus
+      summary: Get host bootstrap status
+      description: |
+        Returns a detailed snapshot of the host environment including Node.js, npm,
+        Node-RED binary, Docker, and installation mode detection.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Host status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_HostStatus"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/system/info:
+    get:
+      tags: [System]
+      operationId: getSystemInfo
+      summary: Get system resource information
+      description: Returns real-time CPU, memory, and disk statistics for the host.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: System information
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_SystemInfo"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ─── Backups ───────────────────────────────────────────────────────────────────
+
+  /api/backups:
+    get:
+      tags: [Backups]
+      operationId: getBackups
+      summary: List backups
+      description: Returns a paginated list of available backups with optional sorting.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - name: sort
+          in: query
+          description: Field to sort by
+          schema:
+            type: string
+            enum: [date, size, status]
+            default: date
+        - name: order
+          in: query
+          description: Sort direction
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        "200":
+          description: Paginated backup list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_PaginatedBackups"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Backups]
+      operationId: postBackup
+      summary: Create a backup
+      description: Triggers an immediate manual backup.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBackupRequest"
+      responses:
+        "200":
+          description: Created backup
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_Backup"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/backups/status:
+    get:
+      tags: [Backups]
+      operationId: getBackupStatus
+      summary: Get scheduler status
+      description: Returns the runtime state of the backup scheduler.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Backup scheduler status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_BackupSchedulerStatus"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/backups/observability:
+    get:
+      tags: [Backups]
+      operationId: getBackupObservability
+      summary: Get backup observability details
+      description: Returns scheduler status, storage summary, latest backup, and recent events.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Observability dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_BackupObservability"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/backups/storage:
+    get:
+      tags: [Backups]
+      operationId: getBackupStorage
+      summary: Get backup storage info
+      description: Returns aggregate storage statistics for all stored backups.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Storage statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_BackupStorageInfo"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/backups/config:
+    get:
+      tags: [Backups]
+      operationId: getBackupConfig
+      summary: Get backup configuration
+      description: Returns scheduler and retention settings.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Backup configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_BackupConfig"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Backups]
+      operationId: postBackupConfig
+      summary: Update backup configuration
+      description: "**Admin only.** Updates scheduler and retention settings."
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BackupConfig"
+      responses:
+        "200":
+          description: Updated backup configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_BackupConfig"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/backups/{id}:
+    get:
+      tags: [Backups]
+      operationId: getBackupById
+      summary: Get backup manifest
+      description: Returns the full manifest of a single backup including file list.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/BackupId"
+      responses:
+        "200":
+          description: Backup manifest
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_BackupManifest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Backups]
+      operationId: deleteBackup
+      summary: Delete a backup
+      description: Permanently deletes a backup archive.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/BackupId"
+      responses:
+        "204":
+          description: Backup deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/backups/{id}/download:
+    get:
+      tags: [Backups]
+      operationId: downloadBackup
+      summary: Download backup archive
+      description: Streams the backup as a binary ZIP file.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/BackupId"
+      responses:
+        "200":
+          description: ZIP archive stream
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/backups/{id}/restore:
+    post:
+      tags: [Backups]
+      operationId: restoreBackup
+      summary: Restore a backup
+      description: |
+        Restores Node-RED data from the specified backup. A pre-restore backup is
+        created automatically before restoring. Returns the ID of that pre-restore backup.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/BackupId"
+      responses:
+        "200":
+          description: Restore initiated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_RestoreResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/scheduler/config:
+    post:
+      tags: [Backups]
+      operationId: postSchedulerConfig
+      summary: Validate and apply a cron expression
+      description: Validates a cron expression and applies it to the backup scheduler.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SchedulerConfigRequest"
+      responses:
+        "200":
+          description: Cron validated and applied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_SchedulerConfigResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/scheduler/history:
+    get:
+      tags: [Backups]
+      operationId: getSchedulerHistory
+      summary: Get scheduler run history
+      description: Returns paginated scheduler execution history.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Paginated scheduler history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_PaginatedSchedulerHistory"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/storage/retention:
+    patch:
+      tags: [Backups]
+      operationId: patchStorageRetention
+      summary: Update retention policy
+      description: Sets the number of days to retain backups before automatic pruning.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RetentionConfigRequest"
+      responses:
+        "200":
+          description: Retention policy updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_RetentionConfigResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ─── Environment Variables ──────────────────────────────────────────────────────
+
+  /api/env:
+    get:
+      tags: [Environment]
+      operationId: getEnv
+      summary: List environment variables
+      description: Returns all defined environment variables including their type and metadata.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Environment variable list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_EnvVarList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Environment]
+      operationId: postEnv
+      summary: Set an environment variable
+      description: |
+        Creates or updates an environment variable. If Node-RED is currently running,
+        it is restarted automatically. The `restarted` field in the response indicates
+        whether a restart was triggered.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetEnvRequest"
+      responses:
+        "200":
+          description: Variable set
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_EnvSetResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/env/{key}:
+    delete:
+      tags: [Environment]
+      operationId: deleteEnv
+      summary: Delete an environment variable
+      description: |
+        Deletes the specified environment variable. If Node-RED is running it is
+        restarted automatically. Returns 204 if no restart occurred, or 200 with
+        a restart confirmation if one did.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: key
+          in: path
+          required: true
+          description: Environment variable key
+          schema:
+            type: string
+            example: MY_VAR
+      responses:
+        "204":
+          description: Variable deleted (no restart triggered)
+        "200":
+          description: Variable deleted and Node-RED restarted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_EnvSetResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/env/dotenv:
+    get:
+      tags: [Environment]
+      operationId: getDotenv
+      summary: Get .env file content
+      description: Returns the raw text content of the `data/.env` file.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: .env file content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_DotenvContent"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    put:
+      tags: [Environment]
+      operationId: putDotenv
+      summary: Save .env file content
+      description: |
+        Replaces the entire `data/.env` file. If Node-RED is running it is
+        restarted automatically.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DotenvWriteRequest"
+      responses:
+        "200":
+          description: File saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_EnvSetResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ─── Flows ─────────────────────────────────────────────────────────────────────
+
+  /api/flows:
+    get:
+      tags: [Flows]
+      operationId: getFlows
+      summary: List all flows
+      description: Returns all Node-RED flows.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Flow list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_FlowList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/flows/export:
+    get:
+      tags: [Flows]
+      operationId: exportFlows
+      summary: Export flows as JSON file
+      description: Downloads the Node-RED `flows.json` as an attachment.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: flows.json file download
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+                example: 'attachment; filename="flows.json"'
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {}
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/flows/analyze:
+    post:
+      tags: [Flows]
+      operationId: analyzeFlows
+      summary: Analyze flows
+      description: Analyzes the current flows. Returns analysis results (stub implementation).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Analysis result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_AnyObject"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/flows/versions:
+    get:
+      tags: [Flows]
+      operationId: getFlowVersions
+      summary: List flow versions
+      description: Returns the version history of captured flow snapshots.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Flow version list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_FlowVersionList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Flows]
+      operationId: postFlowSnapshot
+      summary: Capture a manual snapshot
+      description: Captures the current state of all flows as a new version snapshot.
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Snapshot captured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_MessageResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/flows/versions/{from}/diff/{to}:
+    get:
+      tags: [Flows]
+      operationId: getFlowVersionDiff
+      summary: Diff two flow versions
+      description: Returns the structural diff between two flow snapshots.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: path
+          required: true
+          description: Source version ID
+          schema:
+            type: string
+        - name: to
+          in: path
+          required: true
+          description: Target version ID
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Flow diff
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_FlowDiff"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/flows/versions/{id}/revert:
+    post:
+      tags: [Flows]
+      operationId: revertFlowVersion
+      summary: Revert to a flow version
+      description: |
+        Reverts all flows to the specified snapshot. A pre-revert snapshot is
+        captured automatically before overwriting.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Version ID to revert to
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Flows reverted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_RevertResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/flows/{id}:
+    get:
+      tags: [Flows]
+      operationId: getFlowById
+      summary: Get a single flow
+      description: Returns a single flow by its ID.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Flow ID
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Flow object
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_Flow"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ─── Libraries ─────────────────────────────────────────────────────────────────
+
+  /api/libraries:
+    get:
+      tags: [Libraries]
+      operationId: getLibraries
+      summary: List installed libraries
+      description: Returns all npm packages currently installed in the Node-RED user directory.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Library list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_LibraryList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/libraries/install:
+    post:
+      tags: [Libraries]
+      operationId: installLibrary
+      summary: Install a library
+      description: Installs an npm package into the Node-RED user directory via pnpm.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InstallLibraryRequest"
+      responses:
+        "200":
+          description: Package installed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_LibraryInstallResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/libraries/search:
+    post:
+      tags: [Libraries]
+      operationId: searchLibraries
+      summary: Search npm registry
+      description: |
+        Searches the npm registry for packages matching the query. Returns at most
+        10 results. On registry errors an empty array is returned (non-fatal).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SearchLibraryRequest"
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_LibrarySearchResultList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/libraries/{name}:
+    delete:
+      tags: [Libraries]
+      operationId: deleteLibrary
+      summary: Uninstall a library
+      description: Uninstalls the specified npm package from the Node-RED user directory.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/LibraryName"
+      responses:
+        "204":
+          description: Package uninstalled
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/libraries/{name}/check:
+    get:
+      tags: [Libraries]
+      operationId: checkLibrary
+      summary: Check library availability
+      description: Checks whether a package name exists in the npm registry.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/LibraryName"
+      responses:
+        "200":
+          description: Availability result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_LibraryAvailability"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ─── Updates ───────────────────────────────────────────────────────────────────
+
+  /api/updates/status:
+    get:
+      tags: [Updates]
+      operationId: getUpdatesStatus
+      summary: Get cached update status
+      description: |
+        Returns the last known update status from cache (in-memory + persisted to
+        `data/update_cache.json`). This is a fast, non-blocking read — no npm call
+        is made.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Cached update status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_UpdateCacheEntry"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/updates/check:
+    get:
+      tags: [Updates]
+      operationId: getUpdatesCheck
+      summary: Force update check
+      description: |
+        Performs a fresh npm version check (may take up to 10–35 seconds). Concurrent
+        calls are deduplicated. Use this for manual "Check Now" actions.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Fresh update status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_UpdateCacheEntry"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/updates/apply:
+    post:
+      tags: [Updates]
+      operationId: postUpdatesApply
+      summary: Apply pending update
+      description: |
+        Starts an asynchronous update flow: BackingUp → Applying → Completed/Failed.
+        Returns immediately with the current flow state. Poll `GET /api/updates/state`
+        every 500 ms to track progress.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Update flow started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_UpdateApplyResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /api/updates/state:
+    get:
+      tags: [Updates]
+      operationId: getUpdatesState
+      summary: Get current update flow state
+      description: |
+        Returns the current state of an ongoing (or last completed) update flow.
+        Poll every 500 ms while state is not `Idle`, `Completed`, or `Failed`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Update flow state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_UpdateFlowState"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/updates/history:
+    get:
+      tags: [Updates]
+      operationId: getUpdatesHistory
+      summary: Get update history
+      description: Returns past update applications. Currently returns an empty list (stub).
+      x-status: stub
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Update history (currently empty)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_EmptyList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ─── Files ─────────────────────────────────────────────────────────────────────
+
+  /api/files:
+    get:
+      tags: [Files]
+      operationId: getFiles
+      summary: List uploaded files
+      description: Returns metadata for all files in the uploads directory.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: File list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_FileList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/files/upload:
+    post:
+      tags: [Files]
+      operationId: uploadFile
+      summary: Upload a file
+      description: |
+        Accepts a multipart form upload. Maximum file size is 100 MB.
+        The form field name must be `file`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: File to upload (max 100 MB)
+      responses:
+        "201":
+          description: File uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_UploadResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/files/{name}:
+    delete:
+      tags: [Files]
+      operationId: deleteFile
+      summary: Delete a file
+      description: Permanently deletes the specified file from the uploads directory.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Filename (no path components)
+          schema:
+            type: string
+            example: report.csv
+      responses:
+        "204":
+          description: File deleted
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ─── Docker ────────────────────────────────────────────────────────────────────
+
+  /api/docker/status:
+    get:
+      tags: [Docker]
+      operationId: getDockerStatus
+      summary: Get container status
+      description: |
+        Returns container runtime information when running inside Docker.
+        Returns `{available: false}` with HTTP 200 when not in Docker mode.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Docker status (in Docker or not-in-Docker)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_DockerStatusResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/docker/info:
+    get:
+      tags: [Docker]
+      operationId: getDockerInfo
+      summary: Get Docker engine info
+      description: "Returns extended Docker information (stub — currently returns `{inDocker: true}` or not-available)."
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Docker info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_AnyObject"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/docker/restart:
+    post:
+      tags: [Docker]
+      operationId: postDockerRestart
+      summary: Restart container
+      description: |
+        Gracefully stops Node-RED and signals process exit, allowing Docker's
+        restart policy to bring the container back up.
+        Returns 503 when not running inside Docker.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Container restarting
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_MessageResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/docker/stop:
+    post:
+      tags: [Docker]
+      operationId: postDockerStop
+      summary: Stop container
+      description: |
+        Gracefully stops Node-RED and signals process exit.
+        Returns 503 when not running inside Docker.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Container stopping
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_MessageResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  # ─── Logs ──────────────────────────────────────────────────────────────────────
+
+  /api/logs:
+    get:
+      tags: [Logs]
+      operationId: getLogs
+      summary: Get recent log entries
+      description: Returns recent Node-RED runtime log entries from the in-memory buffer.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tail
+          in: query
+          description: Number of recent entries to return (max 1000)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+      responses:
+        "200":
+          description: Log entries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_LogEntryList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    delete:
+      tags: [Logs]
+      operationId: deleteLogs
+      summary: Clear log buffer
+      description: Clears all entries from the in-memory log buffer.
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Log buffer cleared
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/logs/stream:
+    get:
+      tags: [Logs]
+      operationId: streamLogs
+      summary: Stream logs via SSE
+      description: |
+        Opens a Server-Sent Events stream for live log tailing.
+
+        **Event types:**
+        - `connected` — sent once on connection; payload `{"bufferedCount": N}`
+        - `log` — one per log entry; payload is a `LogEntry` object
+        - `: ping` — keepalive comment every 15 seconds
+
+        The `replay` parameter controls how many buffered entries are replayed
+        on connect before live streaming begins.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: replay
+          in: query
+          description: Number of buffered entries to replay on connect (max 1000)
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 1000
+            default: 100
+      responses:
+        "200":
+          description: SSE stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: Newline-delimited SSE events
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ─── AI (stubs) ───────────────────────────────────────────────────────────────
+
+  /api/ai/analyze/flow:
+    post:
+      tags: [AI]
+      operationId: aiAnalyzeFlow
+      summary: Analyze a flow with AI
+      description: AI-powered flow analysis. Not yet implemented.
+      x-status: stub
+      deprecated: false
+      security:
+        - bearerAuth: []
+      responses:
+        "501":
+          description: Not implemented
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/ai/analyze/patterns:
+    post:
+      tags: [AI]
+      operationId: aiAnalyzePatterns
+      summary: Analyze flow patterns with AI
+      description: AI-powered pattern analysis. Not yet implemented.
+      x-status: stub
+      security:
+        - bearerAuth: []
+      responses:
+        "501":
+          description: Not implemented
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/ai/patterns/{id}/readme:
+    get:
+      tags: [AI]
+      operationId: aiGetPatternReadme
+      summary: Get pattern documentation
+      description: Returns documentation for an AI-detected pattern. Not yet implemented.
+      x-status: stub
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "501":
+          description: Not implemented
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/ai/patterns/{id}/download:
+    get:
+      tags: [AI]
+      operationId: aiDownloadPattern
+      summary: Download a pattern
+      description: Downloads an AI-detected pattern. Not yet implemented.
+      x-status: stub
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "501":
+          description: Not implemented
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+# ─── Components ──────────────────────────────────────────────────────────────────
+
+components:
+
+  # ── Security Schemes ────────────────────────────────────────────────────────────
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Short-lived JWT obtained from `/api/auth/login` or `/api/auth/setup`.
+        Lifetime: ~15 minutes. Refresh using `POST /api/auth/refresh` (httpOnly
+        cookie `nrcc_refresh`).
+
+  # ── Parameters ──────────────────────────────────────────────────────────────────
+
+  parameters:
+    UserId:
+      name: id
+      in: path
+      required: true
+      description: User UUID
+      schema:
+        type: string
+        format: uuid
+        example: 550e8400-e29b-41d4-a716-446655440000
+
+    BackupId:
+      name: id
+      in: path
+      required: true
+      description: Backup ID
+      schema:
+        type: string
+        example: backup-20260524-142301
+
+    LibraryName:
+      name: name
+      in: path
+      required: true
+      description: npm package name
+      schema:
+        type: string
+        example: node-red-contrib-http-request
+
+    Page:
+      name: page
+      in: query
+      description: Page number (1-based)
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+
+    Limit:
+      name: limit
+      in: query
+      description: Items per page (max 100)
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+  # ── Shared Response Schemas ─────────────────────────────────────────────────────
+
+  schemas:
+
+    # ── Envelope helpers ──────────────────────────────────────────────────────────
+
+    ApiError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Machine-readable error code
+          enum:
+            - INVALID_REQUEST
+            - UNAUTHORIZED
+            - FORBIDDEN
+            - NOT_FOUND
+            - WEAK_PASSWORD
+            - USERNAME_EXISTS
+            - UPDATE_IN_PROGRESS
+            - BACKUP_ERROR
+            - FLOW_ERROR
+            - ENV_ERROR
+            - AUTH_FAILED
+            - RATE_LIMITED
+            - SETUP_REQUIRED
+            - ALREADY_INITIALIZED
+          example: INVALID_REQUEST
+        message:
+          type: string
+          description: Human-readable error description
+          example: Username and password are required
+
+    ErrorEnvelope:
+      type: object
+      required: [success, error, timestamp]
+      properties:
+        success:
+          type: boolean
+          enum: [false]
+        error:
+          $ref: "#/components/schemas/ApiError"
+        timestamp:
+          type: string
+          format: date-time
+          description: RFC3339 UTC timestamp
+
+    # ── Domain Models ──────────────────────────────────────────────────────────────
+
+    UserRole:
+      type: string
+      enum: [admin, viewer]
+      description: User role
+
+    CCUserPublic:
+      type: object
+      required: [id, username, role, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        role:
+          $ref: "#/components/schemas/UserRole"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    AuthResponse:
+      type: object
+      required: [token, user]
+      properties:
+        token:
+          type: string
+          description: Short-lived JWT access token (~15 min)
+        user:
+          $ref: "#/components/schemas/CCUserPublic"
+
+    StatusResponse:
+      type: object
+      required: [initialized]
+      properties:
+        initialized:
+          type: boolean
+          description: True when at least one user exists
+
+    UserListResponse:
+      type: object
+      required: [users]
+      properties:
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/CCUserPublic"
+
+    SetupRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          minLength: 1
+        password:
+          type: string
+          minLength: 8
+          description: Must meet minimum strength requirements
+
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+
+    CreateUserRequest:
+      type: object
+      required: [username, password, role]
+      properties:
+        username:
+          type: string
+          minLength: 1
+        password:
+          type: string
+          minLength: 8
+        role:
+          $ref: "#/components/schemas/UserRole"
+
+    UpdateUserRequest:
+      type: object
+      required: [role]
+      properties:
+        role:
+          $ref: "#/components/schemas/UserRole"
+
+    PasswordChangeRequest:
+      type: object
+      required: [password]
+      properties:
+        password:
+          type: string
+          minLength: 8
+
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          example: ok
+
+    BoolSuccess:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+          example: true
+
+    NodeRedConfig:
+      type: object
+      description: Node-RED settings.js configuration
+      properties:
+        port:
+          type: integer
+          description: HTTP listener port
+          example: 1880
+        uiPort:
+          type: integer
+          description: Alias for port (used by frontend)
+          example: 1880
+        uiHost:
+          type: string
+        httpAdminRoot:
+          type: string
+          example: /
+        httpNodeRoot:
+          type: string
+          example: /
+        flowFile:
+          type: string
+          example: flows.json
+        userDir:
+          type: string
+          example: ./data
+        nodesDir:
+          type: string
+        credentialSecret:
+          type: string
+          description: Encryption secret for Node-RED credentials
+        disableEditor:
+          type: boolean
+        adminAuth:
+          $ref: "#/components/schemas/AdminAuth"
+        projectsEnabled:
+          type: boolean
+        lang:
+          type: string
+          example: en-US
+        functionLibraries:
+          type: array
+          items:
+            $ref: "#/components/schemas/FunctionLibrary"
+        envVars:
+          type: array
+          items:
+            $ref: "#/components/schemas/EnvVar"
+
+    AdminAuth:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          example: credentials
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminAuthUser"
+
+    AdminAuthUser:
+      type: object
+      required: [username, password, permissions]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        permissions:
+          type: string
+
+    FunctionLibrary:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        alias:
+          type: string
+        version:
+          type: string
+
+    EnvVar:
+      type: object
+      required: [key, value, type]
+      properties:
+        key:
+          type: string
+        value:
+          type: string
+        type:
+          type: string
+          enum: [string, number, boolean, secret]
+          description: Variable type; `secret` values are stored encrypted
+        description:
+          type: string
+        encrypted:
+          type: boolean
+
+    SettingsDocument:
+      type: object
+      required: [path, source, writable]
+      properties:
+        path:
+          type: string
+          description: Absolute path to settings.js on the host
+        source:
+          type: string
+          description: How the file was located (e.g. "detected", "default")
+        writable:
+          type: boolean
+        backupPath:
+          type: string
+        content:
+          type: string
+          description: Raw text content of settings.js
+
+    RawSettingsRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          minLength: 1
+          description: Full text content to write to settings.js
+
+    ValidResult:
+      type: object
+      required: [valid]
+      properties:
+        valid:
+          type: boolean
+          example: true
+
+    # ── System ─────────────────────────────────────────────────────────────────────
+
+    DependencyStatus:
+      type: object
+      required: [name, installed]
+      properties:
+        name:
+          type: string
+        installed:
+          type: boolean
+        version:
+          type: string
+        command:
+          type: string
+        details:
+          type: string
+
+    NodeRedEnvironment:
+      type: object
+      required: [detected, mode, managedByNrcc, running]
+      properties:
+        detected:
+          type: boolean
+        mode:
+          type: string
+          enum: [none, native, docker, unknown]
+        managedByNrcc:
+          type: boolean
+        running:
+          type: boolean
+        version:
+          type: string
+        executable:
+          type: string
+        containerName:
+          type: string
+        containerId:
+          type: string
+        userDir:
+          type: string
+        settingsPath:
+          type: string
+
+    HostStatus:
+      type: object
+      required: [platform, ready, interactive, nodejs, npm, nodeRedBinary, portless, docker, dockerCompose, nodeRed, settings]
+      properties:
+        platform:
+          type: string
+          example: linux
+        ready:
+          type: boolean
+        interactive:
+          type: boolean
+        nodejs:
+          $ref: "#/components/schemas/DependencyStatus"
+        npm:
+          $ref: "#/components/schemas/DependencyStatus"
+        nodeRedBinary:
+          $ref: "#/components/schemas/DependencyStatus"
+        portless:
+          $ref: "#/components/schemas/DependencyStatus"
+        docker:
+          $ref: "#/components/schemas/DependencyStatus"
+        dockerCompose:
+          $ref: "#/components/schemas/DependencyStatus"
+        nodeRed:
+          $ref: "#/components/schemas/NodeRedEnvironment"
+        settings:
+          $ref: "#/components/schemas/SettingsDocument"
+        recommendations:
+          type: array
+          items:
+            type: string
+
+    CpuInfo:
+      type: object
+      required: [usage, cores]
+      properties:
+        usage:
+          type: number
+          format: double
+          description: CPU usage percentage (0–100)
+        cores:
+          type: integer
+
+    MemoryInfo:
+      type: object
+      required: [total, free, used, usagePercent]
+      properties:
+        total:
+          type: integer
+          format: int64
+          description: Total memory in bytes
+        free:
+          type: integer
+          format: int64
+        used:
+          type: integer
+          format: int64
+        usagePercent:
+          type: number
+          format: double
+
+    DiskInfo:
+      type: object
+      required: [total, free, used, usagePercent]
+      properties:
+        total:
+          type: integer
+          format: int64
+          description: Total disk space in bytes
+        free:
+          type: integer
+          format: int64
+        used:
+          type: integer
+          format: int64
+        usagePercent:
+          type: number
+          format: double
+
+    SystemInfo:
+      type: object
+      required: [platform, arch, nodeVersion, hostname, uptime, cpu, memory, disk, nodeRedVersion]
+      properties:
+        platform:
+          type: string
+          example: linux
+        arch:
+          type: string
+          example: amd64
+        nodeVersion:
+          type: string
+          example: v20.11.0
+        hostname:
+          type: string
+        uptime:
+          type: integer
+          format: int64
+          description: Host uptime in seconds
+        cpu:
+          $ref: "#/components/schemas/CpuInfo"
+        memory:
+          $ref: "#/components/schemas/MemoryInfo"
+        disk:
+          $ref: "#/components/schemas/DiskInfo"
+        nodeRedVersion:
+          type: string
+          example: 4.0.2
+
+    # ── Backups ────────────────────────────────────────────────────────────────────
+
+    BackupType:
+      type: string
+      enum: [manual, auto, pre-restore]
+
+    Backup:
+      type: object
+      required: [id, name, type, createdAt, triggeredBy, fileCount, sizeBytes]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          $ref: "#/components/schemas/BackupType"
+        createdAt:
+          type: string
+          format: date-time
+        triggeredBy:
+          type: string
+          description: Who or what triggered the backup (user, scheduler, etc.)
+        fileCount:
+          type: integer
+        sizeBytes:
+          type: integer
+          format: int64
+
+    BackupFileEntry:
+      type: object
+      required: [path, size, checksum]
+      properties:
+        path:
+          type: string
+        size:
+          type: integer
+          format: int64
+        checksum:
+          type: string
+
+    BackupManifest:
+      type: object
+      required: [id, name, type, createdAt, triggeredBy, files, totalSize]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          $ref: "#/components/schemas/BackupType"
+        createdAt:
+          type: string
+          format: date-time
+        triggeredBy:
+          type: string
+        files:
+          type: array
+          items:
+            $ref: "#/components/schemas/BackupFileEntry"
+        totalSize:
+          type: integer
+          format: int64
+
+    PaginatedBackups:
+      type: object
+      required: [items, total, page, limit]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Backup"
+        total:
+          type: integer
+          description: Total number of backups matching the query
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    BackupStorageInfo:
+      type: object
+      required: [totalBackups, totalSize, manualCount, autoCount, preRestoreCount]
+      properties:
+        totalBackups:
+          type: integer
+        totalSize:
+          type: integer
+          format: int64
+          description: Aggregate size of all stored backups in bytes
+        manualCount:
+          type: integer
+        autoCount:
+          type: integer
+        preRestoreCount:
+          type: integer
+
+    BackupConfig:
+      type: object
+      required: [enabled, schedule, retentionManual, retentionAuto, retentionPreRestore, includeConfig, includeSettings, includeFlowsCred, includePackageJson]
+      properties:
+        enabled:
+          type: boolean
+        schedule:
+          type: string
+          description: Named schedule preset or "custom"
+          example: daily
+        customSchedule:
+          type: string
+          description: Cron expression (only used when schedule is "custom")
+          example: "0 3 * * *"
+        retentionManual:
+          type: integer
+          description: Days to keep manual backups
+        retentionAuto:
+          type: integer
+          description: Days to keep automatic backups
+        retentionPreRestore:
+          type: integer
+          description: Days to keep pre-restore backups
+        includeConfig:
+          type: boolean
+        includeSettings:
+          type: boolean
+        includeFlowsCred:
+          type: boolean
+        includePackageJson:
+          type: boolean
+
+    BackupSchedulerStatus:
+      type: object
+      required: [enabled, scheduled, schedule]
+      properties:
+        enabled:
+          type: boolean
+        scheduled:
+          type: boolean
+        schedule:
+          type: string
+        customSchedule:
+          type: string
+        activeSpec:
+          type: string
+          description: The resolved cron expression currently in use
+        nextRunAt:
+          type: string
+          format: date-time
+        lastRunAt:
+          type: string
+          format: date-time
+        lastSuccessAt:
+          type: string
+          format: date-time
+        lastBackupId:
+          type: string
+        lastError:
+          type: string
+
+    BackupEventType:
+      type: string
+      enum:
+        - manual-create
+        - auto-create
+        - pre-restore-create
+        - restore
+        - delete
+        - prune
+        - scheduler-config
+        - scheduler-run
+        - scheduler-error
+
+    BackupEvent:
+      type: object
+      required: [id, type, status, occurredAt]
+      properties:
+        id:
+          type: string
+        type:
+          $ref: "#/components/schemas/BackupEventType"
+        status:
+          type: string
+          example: success
+        occurredAt:
+          type: string
+          format: date-time
+        backupId:
+          type: string
+        backupName:
+          type: string
+        backupType:
+          $ref: "#/components/schemas/BackupType"
+        message:
+          type: string
+        schedule:
+          type: string
+        activeSpec:
+          type: string
+        trigger:
+          type: string
+        prunedCount:
+          type: integer
+        prunedIds:
+          type: array
+          items:
+            type: string
+        error:
+          type: string
+
+    BackupObservability:
+      type: object
+      required: [scheduler, storage, recentEvents]
+      properties:
+        scheduler:
+          $ref: "#/components/schemas/BackupSchedulerStatus"
+        storage:
+          $ref: "#/components/schemas/BackupStorageInfo"
+        latestBackup:
+          $ref: "#/components/schemas/Backup"
+        recentEvents:
+          type: array
+          items:
+            $ref: "#/components/schemas/BackupEvent"
+
+    CreateBackupRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Optional backup name
+        type:
+          $ref: "#/components/schemas/BackupType"
+
+    RestoreResult:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+        preRestoreId:
+          type: string
+          description: ID of the pre-restore backup that was automatically created
+
+    SchedulerConfigRequest:
+      type: object
+      required: [cron]
+      properties:
+        cron:
+          type: string
+          description: Cron expression to validate and apply
+          example: "0 2 * * *"
+
+    SchedulerConfigResponse:
+      type: object
+      required: [cron, valid]
+      properties:
+        cron:
+          type: string
+        valid:
+          type: boolean
+
+    SchedulerHistoryEntry:
+      type: object
+      required: [timestamp, status]
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [success, failure, skipped]
+        error:
+          type: string
+
+    PaginatedSchedulerHistory:
+      type: object
+      required: [entries, total, page, limit]
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/SchedulerHistoryEntry"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    RetentionConfigRequest:
+      type: object
+      required: [retentionDays]
+      properties:
+        retentionDays:
+          type: integer
+          minimum: 1
+          maximum: 3650
+          description: Number of days to retain backups
+
+    RetentionConfigResponse:
+      type: object
+      required: [retentionDays]
+      properties:
+        retentionDays:
+          type: integer
+
+    # ── Environment Variables ───────────────────────────────────────────────────────
+
+    SetEnvRequest:
+      type: object
+      required: [key, value]
+      properties:
+        key:
+          type: string
+          minLength: 1
+        value:
+          type: string
+        type:
+          type: string
+          enum: [string, number, boolean, secret]
+          default: string
+        description:
+          type: string
+        encrypted:
+          type: boolean
+
+    EnvSetResult:
+      type: object
+      required: [message, restarted]
+      properties:
+        message:
+          type: string
+        restarted:
+          type: boolean
+          description: True if Node-RED was restarted after the change
+
+    DotenvContent:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          description: Raw .env file text
+
+    DotenvWriteRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          description: Full .env file content to write
+
+    # ── Flows ──────────────────────────────────────────────────────────────────────
+
+    FlowNode:
+      type: object
+      required: [id, type]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        label:
+          type: string
+        pos:
+          type: array
+          items:
+            type: integer
+          maxItems: 2
+        size:
+          type: array
+          items:
+            type: integer
+          maxItems: 2
+        props:
+          type: object
+          additionalProperties: true
+
+    Flow:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        nodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/FlowNode"
+
+    FlowVersion:
+      type: object
+      required: [id, timestamp, hash, nodeCount, size]
+      properties:
+        id:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        hash:
+          type: string
+          description: SHA-256 hash of the flow content
+        nodeCount:
+          type: integer
+        size:
+          type: integer
+          description: File size in bytes
+
+    FlowDiffEntry:
+      type: object
+      required: [id, type]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        label:
+          type: string
+
+    FlowDiffMod:
+      type: object
+      required: [id, type, changed]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        label:
+          type: string
+        changed:
+          type: array
+          items:
+            type: string
+          description: List of changed property names
+
+    FlowDiff:
+      type: object
+      properties:
+        added:
+          type: array
+          items:
+            $ref: "#/components/schemas/FlowDiffEntry"
+        removed:
+          type: array
+          items:
+            $ref: "#/components/schemas/FlowDiffEntry"
+        modified:
+          type: array
+          items:
+            $ref: "#/components/schemas/FlowDiffMod"
+
+    RevertResult:
+      type: object
+      required: [message, versionId]
+      properties:
+        message:
+          type: string
+        versionId:
+          type: string
+
+    MessageResult:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+
+    # ── Libraries ──────────────────────────────────────────────────────────────────
+
+    LibraryInfo:
+      type: object
+      required: [name, version]
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        description:
+          type: string
+        keywords:
+          type: array
+          items:
+            type: string
+        author:
+          type: string
+        license:
+          type: string
+        homepage:
+          type: string
+        repository:
+          type: string
+
+    InstallLibraryRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          description: npm package name to install
+
+    LibraryInstallResult:
+      type: object
+      required: [success, message]
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+
+    SearchLibraryRequest:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+          minLength: 1
+
+    LibrarySearchResult:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        description:
+          type: string
+        downloads:
+          type: integer
+          description: Weekly download count from npm registry
+        date:
+          type: string
+          description: Last publish date
+
+    LibraryAvailability:
+      type: object
+      required: [name, available]
+      properties:
+        name:
+          type: string
+        available:
+          type: boolean
+
+    # ── Updates ────────────────────────────────────────────────────────────────────
+
+    UpdateCacheEntry:
+      type: object
+      required: [currentVersion, latestVersion, updateAvailable, checkedAt]
+      properties:
+        currentVersion:
+          type: string
+          example: 4.0.1
+        latestVersion:
+          type: string
+          example: 4.0.2
+        updateAvailable:
+          type: boolean
+        checkedAt:
+          type: string
+          format: date-time
+        error:
+          type: string
+          description: Last check error; empty if the check succeeded
+
+    UpdateState:
+      type: string
+      enum: [Idle, BackingUp, Applying, Completed, Failed]
+
+    UpdateFlowState:
+      type: object
+      required: [state, phase]
+      properties:
+        state:
+          $ref: "#/components/schemas/UpdateState"
+        phase:
+          type: string
+          description: Human-readable description of the current phase
+        backupId:
+          type: string
+          description: ID of the pre-update backup (set after BackingUp)
+        error:
+          type: string
+          description: Error message if state is Failed
+        availableVersion:
+          type: string
+
+    UpdateApplyResult:
+      type: object
+      required: [success, state]
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        state:
+          $ref: "#/components/schemas/UpdateState"
+        backupId:
+          type: string
+        fromVersion:
+          type: string
+        toVersion:
+          type: string
+
+    # ── Files ──────────────────────────────────────────────────────────────────────
+
+    FileEntry:
+      type: object
+      required: [name, size, modTime]
+      properties:
+        name:
+          type: string
+        size:
+          type: integer
+          format: int64
+          description: File size in bytes
+        modTime:
+          type: integer
+          format: int64
+          description: Unix timestamp of last modification
+
+    UploadResult:
+      type: object
+      required: [filename, path]
+      properties:
+        filename:
+          type: string
+        path:
+          type: string
+          description: Server-relative path to the uploaded file
+          example: /uploads/report.csv
+
+    # ── Docker ─────────────────────────────────────────────────────────────────────
+
+    ContainerInfo:
+      type: object
+      required: [status, inDocker]
+      properties:
+        status:
+          type: string
+          example: running
+        image:
+          type: string
+          example: nrcc
+        inDocker:
+          type: boolean
+
+    DockerStatusResult:
+      oneOf:
+        - $ref: "#/components/schemas/ContainerInfo"
+        - type: object
+          required: [available, message]
+          properties:
+            available:
+              type: boolean
+              enum: [false]
+            message:
+              type: string
+              example: Docker mode not available — binary manages Node-RED directly
+
+    # ── Logs ───────────────────────────────────────────────────────────────────────
+
+    LogEntry:
+      type: object
+      required: [id, timestamp, level, source, message]
+      properties:
+        id:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+          description: ISO-8601 timestamp
+        level:
+          type: string
+          enum: [info, warn, error, debug]
+        source:
+          type: string
+          enum: [stdout, stderr]
+        message:
+          type: string
+
+    # ── Generic utility types ──────────────────────────────────────────────────────
+
+    AnyObject:
+      type: object
+      additionalProperties: true
+      description: Arbitrary JSON object
+
+    EmptyList:
+      type: array
+      items: {}
+      maxItems: 0
+      description: Always empty (stub endpoint)
+
+    # ── Typed success envelopes ────────────────────────────────────────────────────
+    # Each envelope wraps a specific data type inside the standard { success, data, timestamp }
+
+    SuccessEnvelope_HealthStatus:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/HealthStatus"
+
+    SuccessEnvelope_StatusResponse:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/StatusResponse"
+
+    SuccessEnvelope_AuthResponse:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/AuthResponse"
+
+    SuccessEnvelope_CCUserPublic:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/CCUserPublic"
+
+    SuccessEnvelope_UserListResponse:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/UserListResponse"
+
+    SuccessEnvelope_BoolSuccess:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/BoolSuccess"
+
+    SuccessEnvelope_NodeRedConfig:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/NodeRedConfig"
+
+    SuccessEnvelope_ValidResult:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/ValidResult"
+
+    SuccessEnvelope_SettingsDocument:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/SettingsDocument"
+
+    SuccessEnvelope_HostStatus:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/HostStatus"
+
+    SuccessEnvelope_SystemInfo:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/SystemInfo"
+
+    SuccessEnvelope_Backup:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/Backup"
+
+    SuccessEnvelope_PaginatedBackups:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/PaginatedBackups"
+
+    SuccessEnvelope_BackupManifest:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/BackupManifest"
+
+    SuccessEnvelope_BackupSchedulerStatus:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/BackupSchedulerStatus"
+
+    SuccessEnvelope_BackupObservability:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/BackupObservability"
+
+    SuccessEnvelope_BackupStorageInfo:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/BackupStorageInfo"
+
+    SuccessEnvelope_BackupConfig:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/BackupConfig"
+
+    SuccessEnvelope_RestoreResult:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/RestoreResult"
+
+    SuccessEnvelope_SchedulerConfigResponse:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/SchedulerConfigResponse"
+
+    SuccessEnvelope_PaginatedSchedulerHistory:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/PaginatedSchedulerHistory"
+
+    SuccessEnvelope_RetentionConfigResponse:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/RetentionConfigResponse"
+
+    SuccessEnvelope_EnvVarList:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/EnvVar"
+
+    SuccessEnvelope_EnvSetResult:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/EnvSetResult"
+
+    SuccessEnvelope_DotenvContent:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/DotenvContent"
+
+    SuccessEnvelope_FlowList:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/Flow"
+
+    SuccessEnvelope_Flow:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/Flow"
+
+    SuccessEnvelope_FlowVersionList:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/FlowVersion"
+
+    SuccessEnvelope_FlowDiff:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/FlowDiff"
+
+    SuccessEnvelope_RevertResult:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/RevertResult"
+
+    SuccessEnvelope_MessageResult:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/MessageResult"
+
+    SuccessEnvelope_LibraryList:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/LibraryInfo"
+
+    SuccessEnvelope_LibraryInstallResult:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/LibraryInstallResult"
+
+    SuccessEnvelope_LibrarySearchResultList:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/LibrarySearchResult"
+
+    SuccessEnvelope_LibraryAvailability:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/LibraryAvailability"
+
+    SuccessEnvelope_UpdateCacheEntry:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/UpdateCacheEntry"
+
+    SuccessEnvelope_UpdateFlowState:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/UpdateFlowState"
+
+    SuccessEnvelope_UpdateApplyResult:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/UpdateApplyResult"
+
+    SuccessEnvelope_EmptyList:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/EmptyList"
+
+    SuccessEnvelope_FileList:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/FileEntry"
+
+    SuccessEnvelope_UploadResult:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/UploadResult"
+
+    SuccessEnvelope_DockerStatusResult:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/DockerStatusResult"
+
+    SuccessEnvelope_LogEntryList:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/LogEntry"
+
+    SuccessEnvelope_AnyObject:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/AnyObject"
+
+  # ── Reusable Responses ──────────────────────────────────────────────────────────
+
+  responses:
+    BadRequest:
+      description: Bad request — invalid input or missing required fields
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+          example:
+            success: false
+            error:
+              code: INVALID_REQUEST
+              message: Username and password are required
+            timestamp: "2026-05-24T14:00:00Z"
+
+    Unauthorized:
+      description: Missing or invalid authentication token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+          example:
+            success: false
+            error:
+              code: UNAUTHORIZED
+              message: Authentication required
+            timestamp: "2026-05-24T14:00:00Z"
+
+    Forbidden:
+      description: Authenticated but insufficient permissions (admin required)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+          example:
+            success: false
+            error:
+              code: FORBIDDEN
+              message: Admin access required
+            timestamp: "2026-05-24T14:00:00Z"
+
+    NotFound:
+      description: The requested resource was not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+          example:
+            success: false
+            error:
+              code: NOT_FOUND
+              message: User not found
+            timestamp: "2026-05-24T14:00:00Z"
+
+    Conflict:
+      description: Conflict — resource already exists or a concurrent operation is in progress
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+          example:
+            success: false
+            error:
+              code: ALREADY_INITIALIZED
+              message: System already configured with users
+            timestamp: "2026-05-24T14:00:00Z"
+
+    TooManyRequests:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+          example:
+            success: false
+            error:
+              code: RATE_LIMITED
+              message: Too many requests, please try again later
+            timestamp: "2026-05-24T14:00:00Z"
+
+    InternalError:
+      description: Unexpected server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+          example:
+            success: false
+            error:
+              code: BACKUP_ERROR
+              message: Failed to create backup
+            timestamp: "2026-05-24T14:00:00Z"
+
+    ServiceUnavailable:
+      description: Feature not available in this deployment (e.g., Docker endpoints when not in Docker)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+          example:
+            success: false
+            error:
+              code: DOCKER_NOT_AVAILABLE
+              message: Not running inside a Docker container
+            timestamp: "2026-05-24T14:00:00Z"
