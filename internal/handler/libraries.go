@@ -10,15 +10,26 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// libraryMetricsRecorder is the narrow interface for recording library operation metrics.
+// Using an interface instead of *metrics.MetricsCollector keeps LibraryHandler
+// testable with simple stubs and avoids a direct dependency on the metrics package.
+type libraryMetricsRecorder interface {
+	RecordLibraryOperation(operation string, success bool)
+}
+
 // LibraryHandler handles library/npm package endpoints
 type LibraryHandler struct {
-	svc *service.LibraryService
+	svc            *service.LibraryService
+	libraryMetrics libraryMetricsRecorder
 }
 
 // NewLibraryHandler creates a new library handler
 func NewLibraryHandler(svc *service.LibraryService) *LibraryHandler {
 	return &LibraryHandler{svc: svc}
 }
+
+// SetLibraryMetrics injects the metrics recorder for library operations.
+func (h *LibraryHandler) SetLibraryMetrics(m libraryMetricsRecorder) { h.libraryMetrics = m }
 
 // GetLibraries lists installed packages
 // GET /api/libraries
@@ -55,6 +66,9 @@ func (h *LibraryHandler) PostInstall(w http.ResponseWriter, r *http.Request) {
 
 	err := h.svc.Install(req.Name)
 	if err != nil {
+		if h.libraryMetrics != nil {
+			h.libraryMetrics.RecordLibraryOperation("install", false)
+		}
 		if errors.Is(err, service.ErrInvalidPackageName) {
 			model.RespondError(w, http.StatusBadRequest, "INVALID_PACKAGE_NAME", err.Error())
 			return
@@ -63,6 +77,9 @@ func (h *LibraryHandler) PostInstall(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.libraryMetrics != nil {
+		h.libraryMetrics.RecordLibraryOperation("install", true)
+	}
 	model.RespondJSON(w, http.StatusOK, map[string]interface{}{
 		"success": true,
 		"message": "Package installed",
@@ -76,6 +93,9 @@ func (h *LibraryHandler) DeleteLibrary(w http.ResponseWriter, r *http.Request) {
 
 	err := h.svc.Uninstall(name)
 	if err != nil {
+		if h.libraryMetrics != nil {
+			h.libraryMetrics.RecordLibraryOperation("uninstall", false)
+		}
 		if errors.Is(err, service.ErrInvalidPackageName) {
 			model.RespondError(w, http.StatusBadRequest, "INVALID_PACKAGE_NAME", err.Error())
 			return
@@ -84,6 +104,9 @@ func (h *LibraryHandler) DeleteLibrary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.libraryMetrics != nil {
+		h.libraryMetrics.RecordLibraryOperation("uninstall", true)
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 

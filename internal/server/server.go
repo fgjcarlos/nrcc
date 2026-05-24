@@ -7,6 +7,7 @@ import (
 
 	"github.com/composedof2/nrcc/internal/audit"
 	"github.com/composedof2/nrcc/internal/handler"
+	"github.com/composedof2/nrcc/internal/metrics"
 	"github.com/composedof2/nrcc/internal/middleware"
 	"github.com/composedof2/nrcc/internal/model"
 	"github.com/composedof2/nrcc/internal/service"
@@ -24,6 +25,7 @@ type Server struct {
 	updateSvc      *service.UpdateService
 	envHandler     *handler.EnvHandler
 	dockerHandler  *handler.DockerHandler
+	metricsCollector *metrics.MetricsCollector
 	ctx            context.Context
 	cancel         context.CancelFunc
 	shutdownCh     chan struct{}
@@ -83,6 +85,13 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 	flowHandler.SetAuditService(auditSvc)
 	authHandler.SetRateLimiter(middleware.NewRateLimiter(dataDir))
 
+	// Initialize metrics collector and wire into handlers
+	metricsCollector := metrics.NewCollector()
+	authHandler.SetLoginMetrics(metricsCollector)
+	backupHandler.SetBackupMetrics(metricsCollector)
+	libraryHandler.SetLibraryMetrics(metricsCollector)
+	updateHandler.SetUpdateMetrics(metricsCollector)
+
 	// Public routes (no auth required)
 	r.Get("/api/health", func(w http.ResponseWriter, r *http.Request) {
 		model.RespondJSON(w, http.StatusOK, map[string]interface{}{
@@ -92,6 +101,7 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
+	r.Get("/metrics", metricsCollector.Handler().ServeHTTP)
 
 	// Auth routes (public and protected mixed)
 	r.Route("/api/auth", func(r chi.Router) {
@@ -228,13 +238,14 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 	})
 
 	server := &Server{
-		router:         r,
-		authSvc:        authSvc,
-		hostSvc:        hostSvc,
-		envSvc:         envSvc,
-		updateSvc:      updateSvc,
-		envHandler:     envHandler,
-		dockerHandler:  dockerHandler,
+		router:           r,
+		authSvc:          authSvc,
+		hostSvc:          hostSvc,
+		envSvc:           envSvc,
+		updateSvc:        updateSvc,
+		envHandler:       envHandler,
+		dockerHandler:    dockerHandler,
+		metricsCollector: metricsCollector,
 	}
 
 	// Create a cancellable context for the server lifecycle
@@ -281,6 +292,10 @@ func (s *Server) SetProcessManager(pm *service.ProcessManager) {
 	s.dockerHandler.SetProcessManager(pm)
 	// Wire shutdown channel into docker handler for graceful shutdown signaling
 	s.dockerHandler.SetShutdownChannel(s.shutdownCh)
+	// Wire process manager into metrics collector for runtime status gauges
+	if s.metricsCollector != nil {
+		s.metricsCollector.SetProcessManager(pm)
+	}
 }
 
 // SetLogBuffer sets the LogBuffer for log streaming routes

@@ -12,10 +12,19 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// backupMetricsRecorder is the narrow interface for recording backup/restore metrics.
+// Using an interface instead of *metrics.MetricsCollector keeps BackupHandler
+// testable with simple stubs and avoids a direct dependency on the metrics package.
+type backupMetricsRecorder interface {
+	RecordBackupCreated(backupType string)
+	RecordRestoreAttempt(success bool)
+}
+
 // BackupHandler handles backup endpoints
 type BackupHandler struct {
-	svc   *service.BackupService
-	audit *audit.Service
+	svc           *service.BackupService
+	audit         *audit.Service
+	backupMetrics backupMetricsRecorder
 }
 
 // GetBackupStatus returns runtime scheduler status.
@@ -43,6 +52,9 @@ func NewBackupHandler(svc *service.BackupService) *BackupHandler {
 
 // SetAuditService injects the audit logger.
 func (h *BackupHandler) SetAuditService(a *audit.Service) { h.audit = a }
+
+// SetBackupMetrics injects the metrics recorder for backup/restore operations.
+func (h *BackupHandler) SetBackupMetrics(m backupMetricsRecorder) { h.backupMetrics = m }
 
 // GetBackups lists all backups with optional pagination, sorting, and filtering
 // GET /api/backups?page=1&limit=20&sort=date|size|status&order=asc|desc
@@ -110,6 +122,9 @@ func (h *BackupHandler) PostBackup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.backupMetrics != nil {
+		h.backupMetrics.RecordBackupCreated(string(backup.Type))
+	}
 	h.audit.Log(r, "", "BACKUP_CREATE", backup.ID, "ok", map[string]string{"type": req.Type})
 	model.RespondJSON(w, http.StatusCreated, backup)
 }
@@ -166,11 +181,17 @@ func (h *BackupHandler) RestoreBackup(w http.ResponseWriter, r *http.Request) {
 
 	preRestoreID, err := h.svc.RestoreWithSafetyBackup(id)
 	if err != nil {
+		if h.backupMetrics != nil {
+			h.backupMetrics.RecordRestoreAttempt(false)
+		}
 		h.audit.Log(r, "", "BACKUP_RESTORE", id, "fail", map[string]string{"error": err.Error()})
 		model.RespondError(w, http.StatusInternalServerError, "BACKUP_ERROR", err.Error())
 		return
 	}
 
+	if h.backupMetrics != nil {
+		h.backupMetrics.RecordRestoreAttempt(true)
+	}
 	h.audit.Log(r, "", "BACKUP_RESTORE", id, "ok", map[string]string{"pre_restore_id": preRestoreID})
 	model.RespondJSON(w, http.StatusOK, map[string]interface{}{
 		"success":      true,
