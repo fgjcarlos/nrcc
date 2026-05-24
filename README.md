@@ -358,102 +358,30 @@ nrcc/
 
 ## API Reference
 
-All API responses use this envelope:
+The complete API is documented in [docs/openapi.yaml](docs/openapi.yaml) (OpenAPI 3.1). To browse it interactively, paste the file into [Swagger Editor](https://editor.swagger.io) or run a local viewer:
 
-```json
-{
-  "success": true,
-  "data": {},
-  "error": null,
-  "timestamp": "2026-04-24T10:00:00Z"
-}
+```bash
+npx @redocly/cli preview-docs docs/openapi.yaml
 ```
 
-Authentication: `Authorization: Bearer <jwt-token>` header.
+All responses use a standard envelope:
 
-### Auth Endpoints
+```json
+{"success": true, "data": {}, "timestamp": "2026-05-24T10:00:00Z"}
+{"success": false, "error": {"code": "ERROR_CODE", "message": "..."}, "timestamp": "..."}
+```
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/auth/status` | Check if system is initialized |
-| `POST` | `/api/auth/setup` | Create first admin user |
-| `POST` | `/api/auth/login` | Login with credentials |
-| `GET` | `/api/auth/me` | Get current user profile |
-| `GET` | `/api/auth/users` | List users (admin only) |
-| `POST` | `/api/auth/users` | Create user (admin only) |
-| `DELETE` | `/api/auth/users/{id}` | Delete user (admin only) |
-| `PATCH` | `/api/auth/users/{id}/password` | Change password (admin only) |
+Authentication: `Authorization: Bearer <jwt-token>` header (short-lived JWT, refreshed via httpOnly cookie).
 
-### Configuration Endpoints
+### Generated TypeScript Client (future)
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/config` | Get Node-RED config |
-| `POST` | `/api/config` | Save config |
-| `POST` | `/api/config/validate` | Validate config |
-| `GET` | `/api/config/default` | Get default config template |
+The OpenAPI spec enables generating a type-safe frontend client via [orval](https://orval.dev) or [openapi-typescript](https://github.com/openapi-ts/openapi-typescript). Adoption path:
 
-### Runtime / Process Endpoints
+1. `pnpm add -D @openapitools/openapi-generator-cli` or `pnpm add -D orval`
+2. Generate client from `docs/openapi.yaml`
+3. Replace manual Axios calls in `frontend/src/shared/lib/api.ts` incrementally
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/runtime/status` | Node-RED process status |
-| `GET` | `/api/runtime/uptime` | Process uptime (seconds) |
-| `POST` | `/api/runtime/restart` | Restart Node-RED |
-| `GET` | `/api/runtime/logs` | Get recent logs (query: `tail=100`) |
-| `GET` | `/api/runtime/logs/stream` | SSE log stream |
-| `DELETE` | `/api/runtime/logs` | Clear log buffer |
-
-### Backup Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/backups` | List backups |
-| `POST` | `/api/backups` | Create backup |
-| `GET` | `/api/backups/config` | Get backup schedule config |
-| `POST` | `/api/backups/config` | Set backup schedule |
-| `DELETE` | `/api/backups/{id}` | Delete backup |
-| `GET` | `/api/backups/{id}/download` | Download backup file |
-| `POST` | `/api/backups/{id}/restore` | Restore from backup |
-
-### Environment Variable Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/env` | Get all env vars |
-| `POST` | `/api/env` | Set env var |
-| `DELETE` | `/api/env/{key}` | Delete env var |
-
-### Flow Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/flows` | Get all flows |
-| `GET` | `/api/flows/export` | Export flows as JSON |
-| `POST` | `/api/flows/analyze` | Analyze flows for issues |
-| `GET` | `/api/flows/{id}` | Get single flow |
-
-### Library (npm) Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/libraries` | List installed libraries |
-| `POST` | `/api/libraries/install` | Install npm package |
-| `POST` | `/api/libraries/search` | Search npm registry |
-| `DELETE` | `/api/libraries/{name}` | Remove npm package |
-| `GET` | `/api/libraries/{name}/check` | Check package version |
-
-### System Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/system/info` | CPU, memory, disk, uptime |
-
-### Health & Misc
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/health` | Server health check |
+This is tracked but not yet adopted — the current frontend uses hand-written Axios services per feature.
 
 ## Deployment
 
