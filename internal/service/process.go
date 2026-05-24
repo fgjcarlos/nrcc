@@ -307,11 +307,12 @@ func (pm *ProcessManager) Status() model.RuntimeStatus {
 	}
 
 	return model.RuntimeStatus{
-		Status:    status,
-		PID:       pid,
-		Uptime:    uptime,
-		Version:   pm.version,
-		StartedAt: startedAt,
+		Status:       status,
+		PID:          pid,
+		Uptime:       uptime,
+		RestartCount: pm.restartCount,
+		Version:      pm.version,
+		StartedAt:    startedAt,
 	}
 }
 
