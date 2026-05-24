@@ -3,19 +3,49 @@ package handler
 import (
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/composedof2/nrcc/internal/model"
 	"github.com/composedof2/nrcc/internal/service"
 )
 
-// stubUpdateMetrics is a test double for updateMetricsRecorder.
 type stubUpdateMetrics struct {
+	mu   sync.Mutex
 	calls []bool
+	done  chan struct{}
+}
+
+func newStubUpdateMetrics() *stubUpdateMetrics {
+	return &stubUpdateMetrics{done: make(chan struct{}, 1)}
 }
 
 func (s *stubUpdateMetrics) RecordUpdateAttempt(success bool) {
+	s.mu.Lock()
 	s.calls = append(s.calls, success)
+	s.mu.Unlock()
+	select {
+	case s.done <- struct{}{}:
+	default:
+	}
+}
+
+func (s *stubUpdateMetrics) waitForCall(t *testing.T) {
+	t.Helper()
+	select {
+	case <-s.done:
+	case <-time.After(30 * time.Second):
+		t.Fatal("timed out waiting for RecordUpdateAttempt call")
+	}
+}
+
+func (s *stubUpdateMetrics) getCalls() []bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	result := make([]bool, len(s.calls))
+	copy(result, s.calls)
+	return result
 }
 
 // TestPostApply_RecordsUpdateAttempt verifies that PostApply records a metric call
@@ -25,18 +55,18 @@ func TestPostApply_RecordsUpdateAttempt(t *testing.T) {
 	installFakeNPM(t)
 	svc := service.NewUpdateService(tmpDir)
 	h := NewUpdateHandler(svc)
-	stub := &stubUpdateMetrics{}
+	stub := newStubUpdateMetrics()
 	h.SetUpdateMetrics(stub)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/updates/apply", nil)
 	rec := httptest.NewRecorder()
 
 	h.PostApply(rec, req)
-	waitForUpdateFlowToSettle(t, svc)
+	stub.waitForCall(t)
 
-	// The metric must be recorded exactly once after the flow settles.
-	if len(stub.calls) != 1 {
-		t.Fatalf("expected 1 RecordUpdateAttempt call, got %d", len(stub.calls))
+	calls := stub.getCalls()
+	if len(calls) != 1 {
+		t.Fatalf("expected 1 RecordUpdateAttempt call, got %d", len(calls))
 	}
 }
 
@@ -47,24 +77,24 @@ func TestPostApply_RecordsCorrectSuccessFlag(t *testing.T) {
 	installFakeNPM(t)
 	svc := service.NewUpdateService(tmpDir)
 	h := NewUpdateHandler(svc)
-	stub := &stubUpdateMetrics{}
+	stub := newStubUpdateMetrics()
 	h.SetUpdateMetrics(stub)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/updates/apply", nil)
 	rec := httptest.NewRecorder()
 
 	h.PostApply(rec, req)
-	waitForUpdateFlowToSettle(t, svc)
+	stub.waitForCall(t)
 
-	if len(stub.calls) != 1 {
-		t.Fatalf("expected 1 RecordUpdateAttempt call, got %d", len(stub.calls))
+	calls := stub.getCalls()
+	if len(calls) != 1 {
+		t.Fatalf("expected 1 RecordUpdateAttempt call, got %d", len(calls))
 	}
 
-	// The recorded success flag must match the actual final flow state.
 	finalState := svc.GetFlowState()
 	expectedSuccess := finalState.State == model.StateCompleted
-	if stub.calls[0] != expectedSuccess {
-		t.Fatalf("RecordUpdateAttempt(%v) but flow state is %s", stub.calls[0], finalState.State)
+	if calls[0] != expectedSuccess {
+		t.Fatalf("RecordUpdateAttempt(%v) but flow state is %s", calls[0], finalState.State)
 	}
 }
 
