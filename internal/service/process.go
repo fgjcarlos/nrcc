@@ -47,6 +47,9 @@ type ProcessManager struct {
 	stopCh       chan struct{} // closed to signal intentional stop to waitForExit
 	doneCh       chan struct{} // closed by waitForExit when the process fully exits
 
+	// restart history (ring buffer, capacity 50)
+	tracker *restartTracker
+
 	// version fetched once
 	version     string
 	versionOnce sync.Once
@@ -65,6 +68,7 @@ func NewProcessManager(cmd, dataDir string, logBuffer *LogBuffer) *ProcessManage
 		maxRestarts:  10,
 		restartDelay: 2 * time.Second,
 		doneCh:       closedChan(), // sentinel so Stop() doesn't block when nothing is running
+		tracker:      newRestartTracker(50),
 	}
 }
 
@@ -380,6 +384,18 @@ func (pm *ProcessManager) waitForExit(cmd *exec.Cmd, stopCh, doneCh chan struct{
 	default:
 	}
 
+	// Record the unexpected exit in the restart history.
+	exitCode := -1
+	if cmd.ProcessState != nil {
+		exitCode = cmd.ProcessState.ExitCode()
+	}
+	pm.tracker.push(model.RestartEvent{
+		Timestamp:   time.Now().UTC().Format(time.RFC3339),
+		ExitCode:    exitCode,
+		Attempt:     restartCount + 1,
+		MaxAttempts: pm.maxRestarts,
+	})
+
 	// Unexpected crash — attempt auto-restart with exponential backoff.
 	if restartCount >= pm.maxRestarts {
 		pm.logBuffer.Push(model.LogEntry{
@@ -436,6 +452,12 @@ func (pm *ProcessManager) GetLogs(limit int) []string {
 		result[i] = entry.Message
 	}
 	return result
+}
+
+// RestartEvents returns the recorded unexpected-exit events in chronological
+// order (oldest first), up to the tracker's capacity of 50.
+func (pm *ProcessManager) RestartEvents() []model.RestartEvent {
+	return pm.tracker.restartEvents()
 }
 
 // ensureSettings creates a minimal settings.js if one doesn't already exist.

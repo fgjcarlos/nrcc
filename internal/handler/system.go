@@ -5,15 +5,31 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/composedof2/nrcc/internal/middleware"
 	"github.com/composedof2/nrcc/internal/model"
+	"github.com/composedof2/nrcc/internal/service"
 )
 
 // SystemHandler handles system information endpoints
 type SystemHandler struct {
-	nodeVersion string
+	nodeVersion    string
+	metricsBuffer  *service.MetricsBuffer
+	processManager *service.ProcessManager
+}
+
+// SetMetricsBuffer wires the MetricsBuffer into the SystemHandler so it can
+// serve the /api/system/history endpoint.
+func (h *SystemHandler) SetMetricsBuffer(buf *service.MetricsBuffer) {
+	h.metricsBuffer = buf
+}
+
+// SetProcessManager wires the ProcessManager into the SystemHandler so it can
+// serve the /api/runtime/history endpoint.
+func (h *SystemHandler) SetProcessManager(pm *service.ProcessManager) {
+	h.processManager = pm
 }
 
 // NewSystemHandler creates a new system handler
@@ -112,6 +128,59 @@ func (h *SystemHandler) GetSystemInfo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	model.RespondJSON(w, http.StatusOK, info)
+}
+
+// GetSystemHistory handles GET /api/system/history — returns recent MetricsSnapshot entries.
+// Query param ?n=120 (default 120, max 120) controls how many entries are returned.
+func (h *SystemHandler) GetSystemHistory(w http.ResponseWriter, r *http.Request) {
+	const defaultN = 120
+	const maxN = 120
+
+	n := defaultN
+	if nStr := r.URL.Query().Get("n"); nStr != "" {
+		if parsed, err := strconv.Atoi(nStr); err == nil && parsed > 0 {
+			n = parsed
+		}
+	}
+	if n > maxN {
+		n = maxN
+	}
+
+	snapshots := make([]model.MetricsSnapshot, 0)
+	if h.metricsBuffer != nil {
+		if recent := h.metricsBuffer.Recent(n); recent != nil {
+			snapshots = recent
+		}
+	}
+
+	model.RespondJSON(w, http.StatusOK, snapshots)
+}
+
+// runtimeHistoryPayload is the JSON body returned by GetRuntimeHistory.
+type runtimeHistoryPayload struct {
+	Events []model.RestartEvent `json:"events"`
+	Status model.RuntimeStatus  `json:"status"`
+}
+
+// GetRuntimeHistory handles GET /api/runtime/history — returns restart events
+// and current runtime status from the ProcessManager.
+func (h *SystemHandler) GetRuntimeHistory(w http.ResponseWriter, r *http.Request) {
+	events := make([]model.RestartEvent, 0)
+	var status model.RuntimeStatus
+
+	if h.processManager != nil {
+		if raw := h.processManager.RestartEvents(); raw != nil {
+			events = raw
+		}
+		status = h.processManager.Status()
+	}
+
+	payload := runtimeHistoryPayload{
+		Events: events,
+		Status: status,
+	}
+
+	model.RespondJSON(w, http.StatusOK, payload)
 }
 
 // getNodeVersion retrieves the Node.js version

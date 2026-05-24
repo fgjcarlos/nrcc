@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/composedof2/nrcc/internal/audit"
 	"github.com/composedof2/nrcc/internal/handler"
@@ -16,19 +17,22 @@ import (
 
 // Server represents the HTTP server configuration
 type Server struct {
-	router         *chi.Mux
-	authSvc        *service.AuthService
-	processManager *service.ProcessManager
-	logBuffer      *service.LogBuffer
-	hostSvc        *service.HostService
-	envSvc         *service.EnvService
-	updateSvc      *service.UpdateService
-	envHandler     *handler.EnvHandler
-	dockerHandler  *handler.DockerHandler
+	router           *chi.Mux
+	authSvc          *service.AuthService
+	processManager   *service.ProcessManager
+	logBuffer        *service.LogBuffer
+	hostSvc          *service.HostService
+	envSvc           *service.EnvService
+	updateSvc        *service.UpdateService
+	envHandler       *handler.EnvHandler
+	dockerHandler    *handler.DockerHandler
+	systemHandler    *handler.SystemHandler
 	metricsCollector *metrics.MetricsCollector
-	ctx            context.Context
-	cancel         context.CancelFunc
-	shutdownCh     chan struct{}
+	metricsBuffer    *service.MetricsBuffer
+	metricsSampler   *service.MetricsSampler
+	ctx              context.Context
+	cancel           context.CancelFunc
+	shutdownCh       chan struct{}
 }
 
 // NewServer creates and configures a new server
@@ -53,6 +57,11 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 	settingsHandler := handler.NewSettingsHandler(configSvc)
 	systemHandler := handler.NewSystemHandler()
 	bootstrapHandler := handler.NewBootstrapHandler(hostSvc)
+
+	// Initialize MetricsBuffer (120-entry ring buffer) and sampler (30s interval)
+	metricsBuffer := service.NewMetricsBuffer(120)
+	metricsSampler := service.NewMetricsSampler(metricsBuffer, 30*time.Second)
+	systemHandler.SetMetricsBuffer(metricsBuffer)
 
 	// Phase 6 handlers
 	backupSvc := service.NewBackupService(dataDir)
@@ -147,6 +156,8 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 
 		// System routes
 		r.Get("/api/system/info", systemHandler.GetSystemInfo)
+		r.Get("/api/system/history", systemHandler.GetSystemHistory)
+		r.Get("/api/runtime/history", systemHandler.GetRuntimeHistory)
 
 		// Backup routes
 		r.Route("/api/backups", func(r chi.Router) {
@@ -245,7 +256,10 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 		updateSvc:        updateSvc,
 		envHandler:       envHandler,
 		dockerHandler:    dockerHandler,
+		systemHandler:    systemHandler,
 		metricsCollector: metricsCollector,
+		metricsBuffer:    metricsBuffer,
+		metricsSampler:   metricsSampler,
 	}
 
 	// Create a cancellable context for the server lifecycle
@@ -259,6 +273,9 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 
 	// Start the update service polling goroutine
 	server.updateSvc.Start(server.ctx)
+
+	// Start the metrics sampler goroutine (samples CPU/mem/disk every 30s)
+	go server.metricsSampler.Start(server.ctx)
 
 	// SPA fallback (must be last)
 	r.Handle("/*", SPAHandler(embedFS))
@@ -295,6 +312,10 @@ func (s *Server) SetProcessManager(pm *service.ProcessManager) {
 	// Wire process manager into metrics collector for runtime status gauges
 	if s.metricsCollector != nil {
 		s.metricsCollector.SetProcessManager(pm)
+	}
+	// Wire process manager into system handler for runtime history endpoint
+	if s.systemHandler != nil {
+		s.systemHandler.SetProcessManager(pm)
 	}
 }
 
