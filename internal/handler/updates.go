@@ -10,6 +10,13 @@ import (
 	"github.com/composedof2/nrcc/internal/service"
 )
 
+// updateMetricsRecorder is the narrow interface for recording update attempt metrics.
+// Using an interface instead of *metrics.MetricsCollector keeps UpdateHandler
+// testable with simple stubs and avoids a direct dependency on the metrics package.
+type updateMetricsRecorder interface {
+	RecordUpdateAttempt(success bool)
+}
+
 // UpdateHandler handles Node-RED update endpoints.
 //
 // API Overview:
@@ -31,8 +38,9 @@ import (
 // - checkedAt: RFC3339 timestamp (when the check was last performed)
 // - error: string (optional, present if npm call failed)
 type UpdateHandler struct {
-	svc   *service.UpdateService
-	audit *audit.Service
+	svc           *service.UpdateService
+	audit         *audit.Service
+	updateMetrics updateMetricsRecorder
 }
 
 // NewUpdateHandler creates a new update handler
@@ -42,6 +50,9 @@ func NewUpdateHandler(svc *service.UpdateService) *UpdateHandler {
 
 // SetAuditService injects the audit logger.
 func (h *UpdateHandler) SetAuditService(a *audit.Service) { h.audit = a }
+
+// SetUpdateMetrics injects the metrics recorder for update attempts.
+func (h *UpdateHandler) SetUpdateMetrics(m updateMetricsRecorder) { h.updateMetrics = m }
 
 // GetStatus returns the cached update status.
 // GET /api/updates/status
@@ -104,11 +115,20 @@ func (h *UpdateHandler) PostApply(w http.ResponseWriter, r *http.Request) {
 	preApplyStatus := h.svc.GetCachedStatus()
 	fromVersion := preApplyStatus.CurrentVersion
 
+	// Capture fields needed in the goroutine to avoid capturing the handler receiver.
+	svc := h.svc
+	updateMetrics := h.updateMetrics
+
 	// Launch the update flow asynchronously.
 	// This does NOT block the HTTP response; frontend polls for progress.
 	go func() {
 		ctx := context.Background() // Background context; not tied to HTTP request lifetime
-		err := h.svc.ApplyUpdateWithBackup(ctx)
+		err := svc.ApplyUpdateWithBackup(ctx)
+		if updateMetrics != nil {
+			// Determine success from the final flow state set by ApplyUpdateWithBackup.
+			finalState := svc.GetFlowState()
+			updateMetrics.RecordUpdateAttempt(err == nil && finalState.State == model.StateCompleted)
+		}
 		if err != nil {
 			// Update failed; state is already set to Failed by ApplyUpdateWithBackup
 			// Log for debugging

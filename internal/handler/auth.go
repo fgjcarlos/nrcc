@@ -14,11 +14,19 @@ import (
 
 const refreshCookieName = "nrcc_refresh"
 
+// loginMetricsRecorder is the narrow interface for recording login metrics.
+// Using an interface instead of *metrics.MetricsCollector keeps AuthHandler
+// testable with simple stubs and avoids a direct dependency on the metrics package.
+type loginMetricsRecorder interface {
+	RecordLoginAttempt(success bool)
+}
+
 // AuthHandler handles authentication endpoints
 type AuthHandler struct {
-	authSvc *service.AuthService
-	audit   *audit.Service
-	limiter *mw.RateLimiter
+	authSvc      *service.AuthService
+	audit        *audit.Service
+	limiter      *mw.RateLimiter
+	loginMetrics loginMetricsRecorder
 }
 
 // NewAuthHandler creates a new auth handler
@@ -31,6 +39,9 @@ func (h *AuthHandler) SetAuditService(a *audit.Service) { h.audit = a }
 
 // SetRateLimiter injects the rate limiter.
 func (h *AuthHandler) SetRateLimiter(rl *mw.RateLimiter) { h.limiter = rl }
+
+// SetLoginMetrics injects the metrics recorder for login attempts.
+func (h *AuthHandler) SetLoginMetrics(m loginMetricsRecorder) { h.loginMetrics = m }
 
 // SetupRequest represents the setup endpoint request
 type SetupRequest struct {
@@ -200,6 +211,9 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 			h.limiter.Record("ip:" + ip)
 			h.limiter.Record("user:" + req.Username)
 		}
+		if h.loginMetrics != nil {
+			h.loginMetrics.RecordLoginAttempt(false)
+		}
 		h.audit.Log(r, req.Username, "LOGIN", "", "fail", map[string]string{"reason": "unknown_user"})
 		model.RespondError(w, http.StatusUnauthorized, "AUTH_FAILED", "Invalid username or password")
 		return
@@ -210,6 +224,9 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		if h.limiter != nil {
 			h.limiter.Record("ip:" + ip)
 			h.limiter.Record("user:" + req.Username)
+		}
+		if h.loginMetrics != nil {
+			h.loginMetrics.RecordLoginAttempt(false)
 		}
 		h.audit.Log(r, req.Username, "LOGIN", "", "fail", map[string]string{"reason": "bad_password"})
 		model.RespondError(w, http.StatusUnauthorized, "AUTH_FAILED", "Invalid username or password")
@@ -251,6 +268,9 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
+	if h.loginMetrics != nil {
+		h.loginMetrics.RecordLoginAttempt(true)
+	}
 	h.audit.Log(r, req.Username, "LOGIN", "", "ok", nil)
 	model.RespondJSON(w, http.StatusOK, resp)
 }
