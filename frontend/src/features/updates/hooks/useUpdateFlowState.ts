@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { updateService } from '../services/updateService';
 
-export const UPDATE_FLOW_STATE_KEY = ['updateFlowState'] as const;
+import { queryKeys } from '@/shared/lib/queryKeys';
 
 /**
  * Hook to poll the update flow state from the server.
@@ -13,7 +13,7 @@ export const UPDATE_FLOW_STATE_KEY = ['updateFlowState'] as const;
  */
 export function useUpdateFlowState() {
   return useQuery({
-    queryKey: UPDATE_FLOW_STATE_KEY,
+    queryKey: queryKeys.updates.flowState,
     queryFn: updateService.getFlowState,
     // Aggressive polling while update is active; disabled otherwise
     refetchInterval: (query) => {

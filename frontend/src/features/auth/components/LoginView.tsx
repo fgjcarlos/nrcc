@@ -8,6 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { AlertCircle } from 'lucide-react';
 
+import { queryKeys } from '@/shared/lib/queryKeys';
 const loginSchema = z.object({
   username: z.string().min(1, 'Username is required'),
   password: z.string().min(1, 'Password is required'),
@@ -23,7 +24,7 @@ export function LoginView() {
 
   // Check auth status to determine if system is initialized
   const { data: status, isLoading: isStatusLoading } = useQuery({
-    queryKey: ['authStatus'],
+    queryKey: queryKeys.auth.status,
     queryFn: authService.getStatus,
     retry: false,
     staleTime: 0,

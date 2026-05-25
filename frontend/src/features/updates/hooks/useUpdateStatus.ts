@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { updateService } from '../services/updateService';
 
-export const UPDATE_STATUS_KEY = ['updateStatus'] as const;
+import { queryKeys } from '@/shared/lib/queryKeys';
 
 export interface UpdateStatus {
   currentVersion: string;
@@ -18,7 +18,7 @@ export interface UpdateStatus {
  */
 export function useUpdateStatus() {
   return useQuery({
-    queryKey: UPDATE_STATUS_KEY,
+    queryKey: queryKeys.updates.status,
     queryFn: () => updateService.getStatus(),
     refetchInterval: 30000, // Poll every 30 seconds
     staleTime: 5000,

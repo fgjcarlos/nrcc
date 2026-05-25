@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { libraryService } from '@/features/libraries/services';
 import type { NpmSearchResult } from '@/features/libraries/types';
 
+import { queryKeys } from '@/shared/lib/queryKeys';
 export function useLibrariesActions() {
   const queryClient = useQueryClient();
   const [searchResults, setSearchResults] = useState<NpmSearchResult[]>([]);
@@ -14,7 +15,7 @@ export function useLibrariesActions() {
     mutationFn: ({ name, alias }: { name: string; alias?: string }) =>
       libraryService.installLibrary(name, alias),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['libraries'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.libraries.root });
       toast.success('Library installed successfully');
       setSearchResults([]);
     },
@@ -27,7 +28,7 @@ export function useLibrariesActions() {
   const uninstallMutation = useMutation({
     mutationFn: libraryService.uninstallLibrary,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['libraries'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.libraries.root });
       toast.success('Library uninstalled successfully');
     },
     onError: (error: unknown) => {

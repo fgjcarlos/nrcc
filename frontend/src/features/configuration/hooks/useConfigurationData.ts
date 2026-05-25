@@ -4,16 +4,17 @@ import { bootstrapService } from '@/features/bootstrap/services';
 import type { HostStatus, NodeRedConfigFormData } from '@/shared/types';
 import { configToFormData } from '../lib/configTransformers';
 
+import { queryKeys } from '@/shared/lib/queryKeys';
 export function useConfigurationData() {
   // Fetch current config
   const configQuery = useQuery({
-    queryKey: ['config'],
+    queryKey: queryKeys.config.root,
     queryFn: () => configService.getConfig(),
   });
 
   // Fetch bootstrap status
   const bootstrapQuery = useQuery({
-    queryKey: ['bootstrap', 'status'],
+    queryKey: queryKeys.bootstrap.status,
     queryFn: async () => {
       const response = await bootstrapService.getStatus();
       return response.data?.data as HostStatus;
@@ -22,7 +23,7 @@ export function useConfigurationData() {
 
   // Fetch raw settings
   const rawSettingsQuery = useQuery({
-    queryKey: ['settings', 'raw'],
+    queryKey: queryKeys.config.rawSettings,
     queryFn: () => settingsService.getRaw(),
   });
 

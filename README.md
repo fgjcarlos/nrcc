@@ -74,6 +74,8 @@ export PATH="$HOME/.local/bin:$PATH"
 
 For the manual production rollout steps for GitHub Pages, DNS, and release validation, see [docs/production-install-launch-guide.md](docs/production-install-launch-guide.md).
 
+Architecture notes for future implementation slices live in [docs/architecture/](docs/architecture/), including the [multi-instance Node-RED management model](docs/architecture/multi-instance-node-red.md).
+
 ### Uninstall
 
 To remove nrcc service and clean up:

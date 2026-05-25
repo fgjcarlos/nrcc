@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { flowService } from '@/features/flows';
 
+import { queryKeys } from '@/shared/lib/queryKeys';
 export interface UseFlowsDataResult {
   flows: any[];
   available: boolean;
@@ -11,7 +12,7 @@ export interface UseFlowsDataResult {
 
 export function useFlowsData(): UseFlowsDataResult {
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['flows'],
+    queryKey: queryKeys.flows.root,
     queryFn: flowService.getFlows,
     refetchInterval: 30000,
   });

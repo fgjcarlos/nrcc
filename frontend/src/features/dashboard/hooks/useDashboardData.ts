@@ -3,9 +3,10 @@ import { dashboardService } from '../services';
 import type { DashboardContainerStatus, DashboardData } from '../types';
 import type { HostStatus } from '@/shared/types';
 
+import { queryKeys } from '@/shared/lib/queryKeys';
 export function useDashboardData(): DashboardData {
   const { data: dockerData, isLoading: dockerLoading, isError: dockerError } = useQuery({
-    queryKey: ['docker', 'status'],
+    queryKey: queryKeys.docker.status,
     queryFn: () => dashboardService.getDockerStatus(),
     refetchInterval: 10000,
     retry: false,
@@ -13,19 +14,19 @@ export function useDashboardData(): DashboardData {
   });
 
   const { data: systemData } = useQuery({
-    queryKey: ['system', 'info'],
+    queryKey: queryKeys.system.info,
     queryFn: () => dashboardService.getSystemInfo(),
     refetchInterval: 10000,
   });
 
   const { data: configData } = useQuery({
-    queryKey: ['config'],
+    queryKey: queryKeys.config.root,
     queryFn: () => dashboardService.getConfig(),
     refetchInterval: 60000,
   });
 
   const { data: hostData } = useQuery({
-    queryKey: ['bootstrap', 'status'],
+    queryKey: queryKeys.bootstrap.status,
     queryFn: async () => {
       const response = await dashboardService.getHostStatus();
       return response.data?.data as HostStatus;
@@ -34,7 +35,7 @@ export function useDashboardData(): DashboardData {
   });
 
   const { data: backupObservability } = useQuery({
-	queryKey: ['backups-observability'],
+	queryKey: queryKeys.backups.observability,
 	queryFn: () => dashboardService.getBackupObservability(),
 	refetchInterval: 15000,
   });

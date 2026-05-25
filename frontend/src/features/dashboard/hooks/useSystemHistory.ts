@@ -2,9 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 import { historyService } from '../services/historyService';
 import type { MetricsSnapshot } from '../types/history';
 
+import { queryKeys } from '@/shared/lib/queryKeys';
 export function useSystemHistory() {
   const { data: response, isLoading, isError } = useQuery({
-    queryKey: ['system', 'history'],
+    queryKey: queryKeys.system.history,
     queryFn: () => historyService.getSystemHistory(120),
     refetchInterval: 30000,
     retry: false,

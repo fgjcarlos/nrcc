@@ -1,8 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { updateService } from '../services/updateService';
-import { UPDATE_STATUS_KEY } from './useUpdateStatus';
-import { UPDATE_FLOW_STATE_KEY } from './useUpdateFlowState';
 
+import { queryKeys } from '@/shared/lib/queryKeys';
 /**
  * Mutation hook to trigger the apply-update flow.
  * 
@@ -11,7 +10,7 @@ import { UPDATE_FLOW_STATE_KEY } from './useUpdateFlowState';
  * - Backend transitions state: Idle -> BackingUp -> Applying -> Completed/Failed
  * - Frontend polls /api/updates/state (500ms interval) to track progress
  * 
- * On success, invalidates UPDATE_STATUS_KEY and UPDATE_FLOW_STATE_KEY
+ * On success, invalidates queryKeys.updates.status and queryKeys.updates.flowState
  * to ensure fresh data is fetched by useUpdateStatus and useUpdateFlowState hooks.
  */
 export function useApplyUpdate() {
@@ -23,10 +22,10 @@ export function useApplyUpdate() {
       // Invalidate status and flow state queries to trigger refetch
       // This ensures UI is in sync with new backend state
       await queryClient.invalidateQueries({
-        queryKey: UPDATE_STATUS_KEY,
+        queryKey: queryKeys.updates.status,
       });
       await queryClient.invalidateQueries({
-        queryKey: UPDATE_FLOW_STATE_KEY,
+        queryKey: queryKeys.updates.flowState,
       });
     },
   });

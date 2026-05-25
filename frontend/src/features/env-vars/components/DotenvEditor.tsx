@@ -4,6 +4,7 @@ import { envService } from '../services';
 import { toast } from 'sonner';
 import { Save, RefreshCw } from 'lucide-react';
 
+import { queryKeys } from '@/shared/lib/queryKeys';
 // TAREA 3: Component for editing .env file
 export function DotenvEditor() {
   const queryClient = useQueryClient();
@@ -11,7 +12,7 @@ export function DotenvEditor() {
   const [isEditing, setIsEditing] = useState(false);
 
   const { isLoading: isLoadingContent } = useQuery({
-    queryKey: ['dotenv'],
+    queryKey: queryKeys.dotenv.root,
     queryFn: async () => {
       const data = await envService.getDotenv();
       setContent(data.content);
@@ -46,7 +47,7 @@ export function DotenvEditor() {
 
   const handleCancel = () => {
     // Reload from server
-    queryClient.invalidateQueries({ queryKey: ['dotenv'] });
+    queryClient.invalidateQueries({ queryKey: queryKeys.dotenv.root });
     setIsEditing(false);
   };
 

@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { authService } from '@/features/auth/services/authService';
 
+import { queryKeys } from '@/shared/lib/queryKeys';
 export function useUsersActions() {
   const queryClient = useQueryClient();
 
@@ -9,7 +10,7 @@ export function useUsersActions() {
     mutationFn: ({ username, password, role }: { username: string; password: string; role: 'admin' | 'viewer' }) =>
       authService.createUser(username, password, role),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.auth.users });
       toast.success('User created successfully');
     },
     onError: (error: unknown) => {
@@ -21,7 +22,7 @@ export function useUsersActions() {
   const deleteMutation = useMutation({
     mutationFn: authService.deleteUser,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.auth.users });
       toast.success('User deleted successfully');
     },
     onError: (error: unknown) => {
@@ -46,7 +47,7 @@ export function useUsersActions() {
     mutationFn: ({ id, role }: { id: string; role: 'admin' | 'viewer' }) =>
       authService.updateUserRole(id, role),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.auth.users });
       toast.success('User role updated successfully');
     },
     onError: (error: unknown) => {
