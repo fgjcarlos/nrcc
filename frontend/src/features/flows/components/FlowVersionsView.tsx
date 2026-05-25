@@ -4,19 +4,20 @@ import { toast } from 'sonner';
 import { flowService } from '../services/flowService';
 import type { FlowVersionEntry, FlowDiff } from '../types';
 
+import { queryKeys } from '@/shared/lib/queryKeys';
 export function FlowVersionsView() {
   const queryClient = useQueryClient();
   const [selectedVersions, setSelectedVersions] = useState<[string, string] | null>(null);
   const [revertTarget, setRevertTarget] = useState<string | null>(null);
 
   const { data: versions = [], isLoading } = useQuery({
-    queryKey: ['flow-versions'],
+    queryKey: queryKeys.flows.versions,
     queryFn: flowService.getVersions,
     refetchInterval: 30_000,
   });
 
   const { data: diff, isLoading: diffLoading } = useQuery({
-    queryKey: ['flow-diff', selectedVersions],
+    queryKey: queryKeys.flows.diff(selectedVersions),
     queryFn: () =>
       selectedVersions ? flowService.getVersionDiff(selectedVersions[0], selectedVersions[1]) : null,
     enabled: !!selectedVersions,
@@ -26,7 +27,7 @@ export function FlowVersionsView() {
     mutationFn: flowService.revertToVersion,
     onSuccess: () => {
       toast.success('Flows reverted successfully');
-      queryClient.invalidateQueries({ queryKey: ['flow-versions'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.flows.versions });
       setRevertTarget(null);
     },
     onError: () => toast.error('Failed to revert flows'),
@@ -36,7 +37,7 @@ export function FlowVersionsView() {
     mutationFn: flowService.captureSnapshot,
     onSuccess: () => {
       toast.success('Snapshot captured');
-      queryClient.invalidateQueries({ queryKey: ['flow-versions'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.flows.versions });
     },
     onError: () => toast.error('Failed to capture snapshot'),
   });

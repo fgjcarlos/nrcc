@@ -1,16 +1,17 @@
 import { useQuery } from '@tanstack/react-query';
 import { envService } from '@/features/env-vars/services';
 
+import { queryKeys } from '@/shared/lib/queryKeys';
 export function useEnvVarsData() {
   // Query for all environment variables
   const envVarsQuery = useQuery({
-    queryKey: ['envVars'],
+    queryKey: queryKeys.envVars.root,
     queryFn: envService.getAll,
   });
 
   // Query for .env file content
   const dotenvQuery = useQuery({
-    queryKey: ['envVars-dotenv'],
+    queryKey: queryKeys.envVars.dotenv,
     queryFn: envService.getDotenv,
   });
 

@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { envService } from '@/features/env-vars/services';
 
+import { queryKeys } from '@/shared/lib/queryKeys';
 export function useEnvVarsActions() {
   const queryClient = useQueryClient();
 
@@ -9,7 +10,7 @@ export function useEnvVarsActions() {
   const createMutation = useMutation({
     mutationFn: envService.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['envVars'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.envVars.root });
       toast.success('Variable created successfully');
     },
     onError: (error: unknown) => {
@@ -28,7 +29,7 @@ export function useEnvVarsActions() {
   const deleteMutation = useMutation({
     mutationFn: envService.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['envVars'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.envVars.root });
       toast.success('Variable deleted successfully');
     },
     onError: (error: unknown) => {
@@ -41,8 +42,8 @@ export function useEnvVarsActions() {
   const saveDotenvMutation = useMutation({
     mutationFn: envService.saveDotenv,
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['envVars-dotenv'] });
-      queryClient.invalidateQueries({ queryKey: ['envVars'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.envVars.dotenv });
+      queryClient.invalidateQueries({ queryKey: queryKeys.envVars.root });
       toast.success(result.message || '.env file saved successfully');
       if (result.restarted) {
         toast.info('Node-RED restarted');

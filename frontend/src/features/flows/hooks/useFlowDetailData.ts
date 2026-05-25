@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { flowService } from '@/features/flows';
 
+import { queryKeys } from '@/shared/lib/queryKeys';
 interface UseFlowDetailDataParams {
   flowId: string | undefined;
 }
@@ -8,21 +9,21 @@ interface UseFlowDetailDataParams {
 export function useFlowDetailData({ flowId }: UseFlowDetailDataParams) {
   // Flow detail query
   const flowQuery = useQuery({
-    queryKey: ['flow', flowId],
+    queryKey: queryKeys.flows.detail(flowId),
     queryFn: () => flowService.getFlowById(flowId!),
     enabled: !!flowId,
   });
 
   // Flow metrics query
   const metricsQuery = useQuery({
-    queryKey: ['flow-metrics', flowId],
+    queryKey: queryKeys.flows.metrics(flowId),
     queryFn: () => flowService.getFlowMetrics(flowId!),
     enabled: !!flowId,
   });
 
   // All flows query (for pattern detection selector)
   const allFlowsQuery = useQuery({
-    queryKey: ['flows'],
+    queryKey: queryKeys.flows.root,
     queryFn: flowService.getFlows,
   });
 

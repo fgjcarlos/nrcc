@@ -3,12 +3,13 @@ import { logService } from '@/features/logs/services';
 import { useState } from 'react';
 import type { LogLevel } from '@/shared/types';
 
+import { queryKeys } from '@/shared/lib/queryKeys';
 export function useLogsData() {
   const [levelFilter, setLevelFilter] = useState<LogLevel[]>(['info', 'warn', 'error']);
   const [isPaused, setIsPaused] = useState(false);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ['logs', levelFilter.join(',')],
+    queryKey: queryKeys.logs.list(levelFilter),
     queryFn: () => logService.getLogs(100, levelFilter.join(',')),
     refetchInterval: isPaused ? false : 3000,
   });

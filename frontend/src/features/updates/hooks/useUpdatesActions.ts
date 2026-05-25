@@ -1,9 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { updateService } from '@/features/updates/services';
-import { UPDATE_STATUS_KEY } from './useUpdateStatus';
-import { UPDATE_FLOW_STATE_KEY } from './useUpdateFlowState';
 
+import { queryKeys } from '@/shared/lib/queryKeys';
 const DISMISS_KEY = 'cc-update-dismissed-version';
 
 /**
@@ -17,7 +16,7 @@ export function useUpdatesActions() {
   const checkMutation = useMutation({
     mutationFn: updateService.check,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: UPDATE_STATUS_KEY });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.updates.status });
       toast.success('Check completed');
     },
     onError: () => {
@@ -35,9 +34,9 @@ export function useUpdatesActions() {
           localStorage.setItem(DISMISS_KEY, data.toVersion);
         }
         toast.success(`Node-RED updated to ${toVersion}`);
-        await queryClient.invalidateQueries({ queryKey: UPDATE_STATUS_KEY });
-        await queryClient.invalidateQueries({ queryKey: UPDATE_FLOW_STATE_KEY });
-        await queryClient.invalidateQueries({ queryKey: ['updateHistory'] });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.updates.status });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.updates.flowState });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.updates.history });
       } else {
         toast.error(data.message);
       }

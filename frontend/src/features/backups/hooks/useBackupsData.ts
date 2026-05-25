@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { backupService } from '@/features/backups/services';
 
+import { queryKeys } from '@/shared/lib/queryKeys';
 interface UseBackupsDataParams {
   page: number;
   limit: number;
@@ -18,40 +19,40 @@ export function useBackupsData({
 }: UseBackupsDataParams) {
   // Config query
   const configQuery = useQuery({
-    queryKey: ['backups-config'],
+    queryKey: queryKeys.backups.config,
     queryFn: backupService.getConfig,
   });
 
   // Scheduler status query
   const statusQuery = useQuery({
-    queryKey: ['backups-status'],
+    queryKey: queryKeys.backups.status,
     queryFn: backupService.getStatus,
     refetchInterval: 15000,
   });
 
   // Observability query
   const observabilityQuery = useQuery({
-    queryKey: ['backups-observability'],
+    queryKey: queryKeys.backups.observability,
     queryFn: backupService.getObservability,
     refetchInterval: 15000,
   });
 
   // Backup list query
   const backupListQuery = useQuery({
-    queryKey: ['backup-list', page, limit, sort, order],
+    queryKey: queryKeys.backups.list(page, limit, sort, order),
     queryFn: () => backupService.listPaginated({ page, limit, sort, order }),
   });
 
   // Backup detail query
   const detailQuery = useQuery({
-    queryKey: ['backup-detail', selectedBackupId],
+    queryKey: queryKeys.backups.detail(selectedBackupId),
     queryFn: () => backupService.detail(selectedBackupId!, backups[0] || null),
     enabled: !!selectedBackupId,
   });
 
   // Storage query
   const storageQuery = useQuery({
-    queryKey: ['backups-storage'],
+    queryKey: queryKeys.backups.storage,
     queryFn: backupService.getStorage,
     refetchInterval: 15000,
   });

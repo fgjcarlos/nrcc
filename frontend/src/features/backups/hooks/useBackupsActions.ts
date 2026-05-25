@@ -4,6 +4,7 @@ import { backupService } from '@/features/backups/services';
 import { getErrorMessage } from '@/features/backups/lib/formatters';
 import { UI_COPY } from '@/shared/constants/uiCopy';
 
+import { queryKeys } from '@/shared/lib/queryKeys';
 export function useBackupsActions() {
   const queryClient = useQueryClient();
 
@@ -11,9 +12,9 @@ export function useBackupsActions() {
   const saveConfigMutation = useMutation({
     mutationFn: backupService.saveConfig,
     onSuccess: async (savedConfig) => {
-      await queryClient.invalidateQueries({ queryKey: ['backups-config'] });
-      await queryClient.invalidateQueries({ queryKey: ['backups-status'] });
-      await queryClient.invalidateQueries({ queryKey: ['backups-observability'] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.backups.config });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.backups.status });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.backups.observability });
       toast.success('Backup configuration saved');
       return savedConfig;
     },
@@ -26,10 +27,10 @@ export function useBackupsActions() {
   const createMutation = useMutation({
     mutationFn: () => backupService.create('manual'),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['backup-list'] });
-      await queryClient.invalidateQueries({ queryKey: ['backups-storage'] });
-      await queryClient.invalidateQueries({ queryKey: ['backups-status'] });
-      await queryClient.invalidateQueries({ queryKey: ['backups-observability'] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.backups.listRoot });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.backups.storage });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.backups.status });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.backups.observability });
       toast.success('Backup creado correctamente');
     },
      onError: (error) => {
@@ -41,10 +42,10 @@ export function useBackupsActions() {
   const restoreMutation = useMutation({
     mutationFn: backupService.restore,
     onSuccess: async (result) => {
-      await queryClient.invalidateQueries({ queryKey: ['backup-list'] });
-      await queryClient.invalidateQueries({ queryKey: ['backups-storage'] });
-      await queryClient.invalidateQueries({ queryKey: ['backups-status'] });
-      await queryClient.invalidateQueries({ queryKey: ['backups-observability'] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.backups.listRoot });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.backups.storage });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.backups.status });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.backups.observability });
       toast.success(result.message || 'Backup restaurado correctamente');
       if (result.preRestoreId) {
         toast.info(`Se creó un backup de seguridad: ${result.preRestoreId}`);
@@ -59,10 +60,10 @@ export function useBackupsActions() {
   const deleteMutation = useMutation({
     mutationFn: backupService.delete,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['backup-list'] });
-      await queryClient.invalidateQueries({ queryKey: ['backups-storage'] });
-      await queryClient.invalidateQueries({ queryKey: ['backups-status'] });
-      await queryClient.invalidateQueries({ queryKey: ['backups-observability'] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.backups.listRoot });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.backups.storage });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.backups.status });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.backups.observability });
       toast.success('Backup eliminado');
     },
      onError: (error) => {
@@ -74,8 +75,8 @@ export function useBackupsActions() {
   const retentionMutation = useMutation({
     mutationFn: backupService.patchStorageRetention,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['backups-config'] });
-      await queryClient.invalidateQueries({ queryKey: ['backups-storage'] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.backups.config });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.backups.storage });
       toast.success('Política de retención guardada');
     },
      onError: (error) => {

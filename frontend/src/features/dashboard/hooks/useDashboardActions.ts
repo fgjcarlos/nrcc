@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useToasts } from '@/shared/hooks/useToasts';
 import { dashboardService } from '../services';
 
+import { queryKeys } from '@/shared/lib/queryKeys';
 interface UseDashboardActionsOptions {
   uiPort?: number;
 }
@@ -26,7 +27,7 @@ export function useDashboardActions({ uiPort }: UseDashboardActionsOptions) {
   const [isStartStopping, setIsStartStopping] = useState(false);
 
   const invalidateRuntimeStatus = () => {
-    queryClient.invalidateQueries({ queryKey: ['runtime', 'status'] });
+    queryClient.invalidateQueries({ queryKey: queryKeys.runtime.status });
   };
 
   const getErrorMessage = (error: unknown) =>

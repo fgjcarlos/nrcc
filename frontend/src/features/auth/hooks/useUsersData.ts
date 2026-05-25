@@ -1,13 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { authService } from '@/features/auth/services/authService';
 
+import { queryKeys } from '@/shared/lib/queryKeys';
 interface UseUsersDataParams {
   enabled?: boolean;
 }
 
 export function useUsersData({ enabled = true }: UseUsersDataParams = {}) {
   const usersQuery = useQuery({
-    queryKey: ['users'],
+    queryKey: queryKeys.auth.users,
     queryFn: authService.getUsers,
     enabled,
   });

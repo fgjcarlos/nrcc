@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { libraryService } from '@/features/libraries/services';
 
+import { queryKeys } from '@/shared/lib/queryKeys';
 export function useLibrariesData() {
   const librariesQuery = useQuery({
-    queryKey: ['libraries'],
+    queryKey: queryKeys.libraries.root,
     queryFn: libraryService.getLibraries,
   });
 

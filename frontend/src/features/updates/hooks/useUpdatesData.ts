@@ -1,8 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { updateService } from '@/features/updates/services';
-import { UPDATE_STATUS_KEY } from './useUpdateStatus';
-import { UPDATE_FLOW_STATE_KEY } from './useUpdateFlowState';
 
+import { queryKeys } from '@/shared/lib/queryKeys';
 /**
  * Hook to fetch all update-related queries: status, flow state, and history.
  * Combines polling for real-time status and history tracking.
@@ -10,7 +9,7 @@ import { UPDATE_FLOW_STATE_KEY } from './useUpdateFlowState';
 export function useUpdatesData() {
   // Status query with 30s polling
   const statusQuery = useQuery({
-    queryKey: UPDATE_STATUS_KEY,
+    queryKey: queryKeys.updates.status,
     queryFn: updateService.getStatus,
     refetchInterval: 30000,
     staleTime: 5000,
@@ -18,7 +17,7 @@ export function useUpdatesData() {
 
   // Flow state with adaptive polling (500ms when active, disabled when idle)
   const flowStateQuery = useQuery({
-    queryKey: UPDATE_FLOW_STATE_KEY,
+    queryKey: queryKeys.updates.flowState,
     queryFn: updateService.getFlowState,
     refetchInterval: (query) => {
       // See useUpdateFlowState — `query.state` is an object whose `.status`
@@ -36,7 +35,7 @@ export function useUpdatesData() {
 
   // History query
   const historyQuery = useQuery({
-    queryKey: ['updateHistory'],
+    queryKey: queryKeys.updates.history,
     queryFn: updateService.getHistory,
   });
 

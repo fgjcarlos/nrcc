@@ -74,7 +74,7 @@ export PATH="$HOME/.local/bin:$PATH"
 
 For the manual production rollout steps for GitHub Pages, DNS, and release validation, see [docs/production-install-launch-guide.md](docs/production-install-launch-guide.md).
 
-Architecture decisions for future implementation slices live in [docs/adr/](docs/adr/).
+Architecture decisions for future implementation slices live in [docs/adr/](docs/adr/). Additional architecture notes live in [docs/architecture/](docs/architecture/), including the [multi-instance Node-RED management model](docs/architecture/multi-instance-node-red.md).
 
 ### Uninstall
 

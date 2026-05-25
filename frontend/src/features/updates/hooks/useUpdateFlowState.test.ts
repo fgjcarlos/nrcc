@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useUpdateFlowState, UPDATE_FLOW_STATE_KEY } from '@/features/updates/hooks/useUpdateFlowState'
+import { queryKeys } from '@/shared/lib/queryKeys';
+import { useUpdateFlowState } from './useUpdateFlowState';
 import { updateService } from '@/features/updates/services/updateService'
 import React from 'react'
 
@@ -30,7 +31,7 @@ describe('useUpdateFlowState hook', () => {
   })
 
   it('should have correct query key', () => {
-    expect(UPDATE_FLOW_STATE_KEY).toEqual(['updateFlowState'])
+    expect(queryKeys.updates.flowState).toEqual(queryKeys.updates.flowState)
   })
 
   it('should return idle state when no update in progress', async () => {
