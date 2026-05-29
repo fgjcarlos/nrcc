@@ -254,6 +254,23 @@ make test           # Run all Go tests
 go run -race .      # Run with race detector
 ```
 
+Frontend quality gates live under `frontend/`:
+
+```bash
+cd frontend
+pnpm install --frozen-lockfile
+pnpm run typecheck          # TypeScript project check
+pnpm test -- --run          # Vitest unit/integration tests; MSW starts from vitest.setup.ts
+pnpm run test:e2e           # Playwright Chromium smoke tests with fixture API responses
+pnpm run build              # Production Vite build
+```
+
+Test layering:
+
+- Unit tests cover pure utilities, hooks, and isolated components.
+- Integration tests render feature flows against MSW handlers in `frontend/src/test/msw/`, so auth, setup, status, backups, libraries, files, and runtime endpoints never call a real host.
+- E2E smoke tests live in `frontend/e2e/` and exercise setup/login, runtime start/stop, backup create, restore dry path, and critical navigation with Playwright route fixtures instead of destructive host operations.
+
 ### Build frontend only
 
 ```bash
