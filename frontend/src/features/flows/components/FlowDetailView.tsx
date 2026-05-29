@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { type PatternAnalysisResult } from '@/features/patterns/services';
 import { PatternCard } from '@/features/patterns/components';
 import { useFlowDetailData, useFlowDetailActions } from '@/features/flows/hooks';
+import type { AIFlowAction } from '@/features/flows/types';
 import { MetricCard } from './MetricCard';
 import { AnalysisResultView } from './AnalysisResultView';
 import {
@@ -14,6 +15,7 @@ import {
   GitBranch,
   CheckSquare,
   Square,
+  Bot,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/shared/lib';
@@ -25,7 +27,7 @@ export function FlowDetailView() {
   const { flow, metrics, allFlows, isLoading } = useFlowDetailData({
     flowId: id,
   });
-  const { analyzeFlowMutation, detectPatternsMutation } = useFlowDetailActions();
+  const { analyzeFlowMutation, detectPatternsMutation, aiFlowMutation } = useFlowDetailActions();
 
   // UI State
   const [showRawJson, setShowRawJson] = useState(false);
@@ -36,6 +38,7 @@ export function FlowDetailView() {
   const [patternResult, setPatternResult] = useState<PatternAnalysisResult | null>(
     null
   );
+  const [aiPrompt, setAiPrompt] = useState('');
 
   // Handlers
   const togglePatternFlow = (flowId: string) => {
@@ -59,6 +62,15 @@ export function FlowDetailView() {
         setShowPatternSelector(false);
       },
     });
+  };
+
+  const handleAIAction = (action: AIFlowAction) => {
+    const loadedFlow = flow;
+    if (!loadedFlow) {
+      toast.error('Flow not loaded');
+      return;
+    }
+    aiFlowMutation.mutate({ action, flow: loadedFlow, prompt: aiPrompt });
   };
 
   // Loading state
@@ -284,6 +296,72 @@ export function FlowDetailView() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* AI Flow Copilot */}
+      <div className="surface-card space-y-4 p-6">
+        <div>
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-base-content">
+            <Bot className="h-5 w-5" />
+            AI Flow Copilot
+          </h2>
+          <p className="mt-1 text-sm text-base-content/60">
+            Review-first actions are available only when AI is explicitly configured. Secrets are redacted before requests leave this host; generated JSON is never auto-applied.
+          </p>
+        </div>
+        <textarea
+          value={aiPrompt}
+          onChange={(event) => setAiPrompt(event.target.value)}
+          className="w-full rounded-xl border border-border bg-base-100 p-3 text-sm text-base-content"
+          rows={3}
+          placeholder="Optional instruction, e.g. suggest safer retry handling without changing credentials"
+        />
+        <div className="flex flex-wrap gap-2">
+          {(['explain', 'suggest', 'audit', 'generate'] as AIFlowAction[]).map((action) => (
+            <button
+              key={action}
+              type="button"
+              onClick={() => handleAIAction(action)}
+              disabled={aiFlowMutation.isPending}
+              className="action-btn-primary capitalize"
+            >
+              {aiFlowMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              {action}
+            </button>
+          ))}
+        </div>
+        {aiFlowMutation.data && (
+          <div className="surface-panel space-y-3 p-4">
+            <div className="flex flex-wrap gap-2 text-xs">
+              <span className="rounded-full bg-primary/10 px-2 py-1 text-primary">Provider: {aiFlowMutation.data.provider}</span>
+              <span className="rounded-full bg-success/10 px-2 py-1 text-success">Review only</span>
+              <span className="rounded-full bg-success/10 px-2 py-1 text-success">Redacted</span>
+            </div>
+            <p className="text-sm text-base-content/80">{aiFlowMutation.data.summary}</p>
+            {aiFlowMutation.data.suggestions && (
+              <ul className="list-disc space-y-1 pl-5 text-sm text-base-content/70">
+                {aiFlowMutation.data.suggestions.map((suggestion) => (
+                  <li key={suggestion}>{suggestion}</li>
+                ))}
+              </ul>
+            )}
+            {aiFlowMutation.data.auditFindings && (
+              <ul className="list-disc space-y-1 pl-5 text-sm text-warning">
+                {aiFlowMutation.data.auditFindings.map((finding) => (
+                  <li key={finding}>{finding}</li>
+                ))}
+              </ul>
+            )}
+            {aiFlowMutation.data.candidateFlow && (
+              <div>
+                <p className="mb-2 text-sm font-medium text-base-content">Candidate flow JSON (manual review/import required)</p>
+                <pre className="overflow-x-auto code-block-bg text-xs text-base-content/70">
+                  {JSON.stringify(aiFlowMutation.data.candidateFlow, null, 2)}
+                </pre>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Node Types */}
