@@ -1,149 +1,171 @@
+import { lazy, Suspense, useState, type ComponentType, type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { AlertCircle, Loader2 } from 'lucide-react';
 import { Layout } from '@/shared/components/layout/Layout';
 import { ProtectedRoute } from '@/shared/components/ProtectedRoute';
 import { ErrorBoundary } from '@/shared/components/layout/ErrorBoundary';
+import { Button } from '@/shared/components/ui/Button';
 import { ToastViewport } from './shared/components/ui/ToastViewport';
 
+function lazyNamed<T extends ComponentType<object>>(
+  importer: () => Promise<Record<string, T>>,
+  exportName: string,
+) {
+  return lazy(async () => ({ default: (await importer())[exportName] }));
+}
+
 // Public pages (no layout)
-import { LandingView, LoginView, ProfileView, SetupView } from '@/features/auth/components';
+const LandingView = lazyNamed(
+  () => import('@/features/auth/components/LandingView'),
+  'LandingView',
+);
+const SetupView = lazyNamed(
+  () => import('@/features/auth/components/SetupView'),
+  'SetupView',
+);
+const LoginView = lazyNamed(
+  () => import('@/features/auth/components/LoginView'),
+  'LoginView',
+);
 
 // Feature views (protected routes with layout)
-import { DashboardView } from '@/features/dashboard';
-import { ConfigurationView } from '@/features/configuration/components/ConfigurationView';
-import { LogsView } from '@/features/logs/components/LogsView';
-import { DockerView } from '@/features/docker/components/DockerView';
-import { UsersView } from '@/features/auth/components/UsersView';
-import { UpdatesView } from '@/features/updates/components/UpdatesView';
-import { LibrariesView } from '@/features/libraries/components/LibrariesView';
-import { FlowsView } from '@/features/flows/components/FlowsView';
-import { FlowDetailView } from '@/features/flows/components/FlowDetailView';
-import { FlowVersionsView } from '@/features/flows/components/FlowVersionsView';
-import { EnvVarsView } from '@/features/env-vars/components/EnvVarsView';
-import { BackupsView } from '@/features/backups/components/BackupsView';
-import { BootstrapView } from '@/features/bootstrap/components/BootstrapView';
+const DashboardView = lazyNamed(
+  () => import('@/features/dashboard/components/DashboardView'),
+  'DashboardView',
+);
+const ConfigurationView = lazyNamed(
+  () => import('@/features/configuration/components/ConfigurationView'),
+  'ConfigurationView',
+);
+const LogsView = lazyNamed(
+  () => import('@/features/logs/components/LogsView'),
+  'LogsView',
+);
+const DockerView = lazyNamed(
+  () => import('@/features/docker/components/DockerView'),
+  'DockerView',
+);
+const ProfileView = lazyNamed(
+  () => import('@/features/auth/components/ProfileView'),
+  'ProfileView',
+);
+const UsersView = lazyNamed(
+  () => import('@/features/auth/components/UsersView'),
+  'UsersView',
+);
+const UpdatesView = lazyNamed(
+  () => import('@/features/updates/components/UpdatesView'),
+  'UpdatesView',
+);
+const LibrariesView = lazyNamed(
+  () => import('@/features/libraries/components/LibrariesView'),
+  'LibrariesView',
+);
+const FlowsView = lazyNamed(
+  () => import('@/features/flows/components/FlowsView'),
+  'FlowsView',
+);
+const FlowVersionsView = lazyNamed(
+  () => import('@/features/flows/components/FlowVersionsView'),
+  'FlowVersionsView',
+);
+const FlowDetailView = lazyNamed(
+  () => import('@/features/flows/components/FlowDetailView'),
+  'FlowDetailView',
+);
+const BootstrapView = lazyNamed(
+  () => import('@/features/bootstrap/components/BootstrapView'),
+  'BootstrapView',
+);
+const EnvVarsView = lazyNamed(
+  () => import('@/features/env-vars/components/EnvVarsView'),
+  'EnvVarsView',
+);
+const BackupsView = lazyNamed(
+  () => import('@/features/backups/components/BackupsView'),
+  'BackupsView',
+);
+
+function RouteLoadingFallback({ label }: { label: string }) {
+  return (
+    <div className="flex min-h-[24rem] flex-col items-center justify-center gap-3 rounded-box border border-base-300 bg-base-100 p-8 text-center shadow-sm">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden="true" />
+      <div>
+        <p className="font-medium text-base-content">Loading {label}</p>
+        <p className="text-sm text-base-content/60">Preparing this section...</p>
+      </div>
+    </div>
+  );
+}
+
+function RouteErrorFallback({ label, onRetry }: { label: string; onRetry: () => void }) {
+  return (
+    <div className="rounded-box border border-error/20 bg-error/8 p-6 shadow-sm">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+        <AlertCircle className="mt-0.5 h-6 w-6 flex-shrink-0 text-error" aria-hidden="true" />
+        <div className="flex-1">
+          <h2 className="text-lg font-semibold text-base-content">Unable to load {label}</h2>
+          <p className="mt-1 text-sm text-base-content/70">
+            This route failed to load. You can retry without leaving the current page.
+          </p>
+        </div>
+        <Button type="button" onClick={onRetry} variant="secondary" size="sm">
+          Try again
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function RouteBoundary({ label, children }: { label: string; children: ReactNode }) {
+  const [attempt, setAttempt] = useState(0);
+
+  return (
+    <ErrorBoundary
+      key={`${label}-${attempt}`}
+      fallback={<RouteErrorFallback label={label} onRetry={() => setAttempt((current) => current + 1)} />}
+    >
+      <Suspense fallback={<RouteLoadingFallback label={label} />}>{children}</Suspense>
+    </ErrorBoundary>
+  );
+}
+
+function routeElement(label: string, view: ReactNode, requiredRole?: 'admin') {
+  return (
+    <RouteBoundary label={label}>
+      <ProtectedRoute requiredRole={requiredRole}>{view}</ProtectedRoute>
+    </RouteBoundary>
+  );
+}
+
+function publicRouteElement(label: string, view: ReactNode) {
+  return <RouteBoundary label={label}>{view}</RouteBoundary>;
+}
 
 function AppRoutes() {
   return (
     <Routes>
       {/* Public routes without layout */}
-      <Route path="/" element={<LandingView />} />
-      <Route path="/setup" element={<SetupView />} />
-      <Route path="/login" element={<LoginView />} />
+      <Route path="/" element={publicRouteElement('home', <LandingView />)} />
+      <Route path="/setup" element={publicRouteElement('setup', <SetupView />)} />
+      <Route path="/login" element={publicRouteElement('login', <LoginView />)} />
 
       {/* Protected routes with layout */}
       <Route path="/" element={<Layout />}>
-        <Route
-          path="dashboard"
-          element={
-            <ProtectedRoute>
-              <DashboardView />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="configuration"
-          element={
-            <ProtectedRoute>
-              <ConfigurationView />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="logs"
-          element={
-            <ProtectedRoute>
-              <LogsView />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="docker"
-          element={
-            <ProtectedRoute>
-              <DockerView />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="profile"
-          element={
-            <ProtectedRoute>
-              <ProfileView />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="settings/users"
-          element={
-            <ProtectedRoute requiredRole="admin">
-              <UsersView />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="updates"
-          element={
-            <ProtectedRoute>
-              <UpdatesView />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="libraries"
-          element={
-            <ProtectedRoute>
-              <LibrariesView />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="flows"
-          element={
-            <ProtectedRoute>
-              <FlowsView />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="flows/versions"
-          element={
-            <ProtectedRoute>
-              <FlowVersionsView />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="flows/:id"
-          element={
-            <ProtectedRoute>
-              <FlowDetailView />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="bootstrap"
-          element={
-            <ProtectedRoute>
-              <BootstrapView />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="environment"
-          element={
-            <ProtectedRoute>
-              <EnvVarsView />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="backups"
-          element={
-            <ProtectedRoute>
-              <BackupsView />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="dashboard" element={routeElement('dashboard', <DashboardView />)} />
+        <Route path="configuration" element={routeElement('configuration', <ConfigurationView />)} />
+        <Route path="logs" element={routeElement('logs', <LogsView />)} />
+        <Route path="docker" element={routeElement('docker', <DockerView />)} />
+        <Route path="profile" element={routeElement('profile', <ProfileView />)} />
+        <Route path="settings/users" element={routeElement('users', <UsersView />, 'admin')} />
+        <Route path="updates" element={routeElement('updates', <UpdatesView />)} />
+        <Route path="libraries" element={routeElement('libraries', <LibrariesView />)} />
+        <Route path="flows" element={routeElement('flows', <FlowsView />)} />
+        <Route path="flows/versions" element={routeElement('flow versions', <FlowVersionsView />)} />
+        <Route path="flows/:id" element={routeElement('flow details', <FlowDetailView />)} />
+        <Route path="bootstrap" element={routeElement('bootstrap', <BootstrapView />)} />
+        <Route path="environment" element={routeElement('environment variables', <EnvVarsView />)} />
+        <Route path="backups" element={routeElement('backups', <BackupsView />)} />
       </Route>
     </Routes>
   );
