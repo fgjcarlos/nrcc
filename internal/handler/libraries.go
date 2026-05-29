@@ -131,12 +131,12 @@ func (h *LibraryHandler) PostSearch(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// Search is an external registry convenience feature. Do not turn registry
 		// failures into UI-breaking 500s; return an empty result set instead.
-		model.RespondJSON(w, http.StatusOK, []interface{}{})
+		model.RespondJSON(w, http.StatusOK, []model.LibraryInfo{})
 		return
 	}
 
 	if results == nil {
-		results = []interface{}{}
+		results = []model.LibraryInfo{}
 	}
 
 	model.RespondJSON(w, http.StatusOK, results)

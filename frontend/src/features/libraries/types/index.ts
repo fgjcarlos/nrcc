@@ -3,16 +3,17 @@ export interface InstalledLibrary {
   version: string;
   description?: string;
   keywords?: string[];
+  category?: string;
+  author?: string;
+  license?: string;
   homepage?: string;
   repository?: string;
+  npm?: string;
+  downloads?: number;
+  date?: string;
 }
 
-export interface NpmSearchResult {
-  name: string;
-  version: string;
-  description: string;
-  downloads?: number;
-}
+export type NpmSearchResult = InstalledLibrary;
 
 export interface InstallResponse {
   jobId: string;

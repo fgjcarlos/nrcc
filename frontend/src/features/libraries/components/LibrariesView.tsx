@@ -62,12 +62,15 @@ export function LibrariesView() {
     return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
   };
 
-  // Get keywords badges (first 2-3)
+  // Get keyword/category badges (first few)
   const getKeywordBadges = (keywords: string[] | undefined) => {
     if (!keywords || keywords.length === 0) return null;
-    const maxBadges = 2;
+    const maxBadges = 3;
     return keywords.slice(0, maxBadges);
   };
+
+  const getExternalLink = (result: { npm?: string; homepage?: string; name: string }) =>
+    result.npm || result.homepage || `https://www.npmjs.com/package/${encodeURIComponent(result.name)}`;
 
   return (
     <div className="space-y-8 p-4 sm:p-6">
@@ -93,9 +96,9 @@ export function LibrariesView() {
         <div className="space-y-4">
           <div className="surface-card overflow-hidden p-0">
             <div className="border-b border-border p-5">
-              <h2 className="text-lg font-semibold text-base-content">Buscar e instalar</h2>
+              <h2 className="text-lg font-semibold text-base-content">Search and install</h2>
               <p className="mt-1 text-sm text-base-content/65">
-                Busca en npm y añade paquetes al runtime de Node-RED.
+                Search npm and add packages to the Node-RED runtime.
               </p>
             </div>
             <div className="p-5">
@@ -107,13 +110,13 @@ export function LibrariesView() {
                   setSearchQuery(e.target.value);
                   handleSearch(e.target.value);
                 }}
-                placeholder="Buscar paquetes npm..."
+                placeholder="Search npm packages..."
                 className="glass-panel w-full rounded-xl border border-border px-3 py-2 text-base-content transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50"
               />
             </div>
 
             {searching && (
-              <div className="mt-4 text-sm text-base-content/60">Buscando...</div>
+              <div className="mt-4 text-sm text-base-content/60">Searching...</div>
             )}
 
             <div className="mt-4 space-y-2">
@@ -127,18 +130,39 @@ export function LibrariesView() {
                     <div className="text-sm text-base-content/65">
                       v{result.version} • {truncate(result.description, 50)}
                     </div>
-                    {typeof result.downloads === 'number' && (
-                      <div className="text-xs text-base-content/55">
-                        {result.downloads.toLocaleString()} descargas/semana
+                    {(result.category || (result.keywords && result.keywords.length > 0)) && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {result.category && (
+                          <span className="badge badge-secondary badge-sm text-xs">{result.category}</span>
+                        )}
+                        {getKeywordBadges(result.keywords)?.map((keyword) => (
+                          <span key={keyword} className="badge badge-outline badge-sm text-xs">
+                            {keyword}
+                          </span>
+                        ))}
                       </div>
                     )}
+                    {typeof result.downloads === 'number' && (
+                      <div className="text-xs text-base-content/55">
+                        {result.downloads.toLocaleString()} downloads/week
+                      </div>
+                    )}
+                    <a
+                      href={getExternalLink(result)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                    >
+                      <ExternalLink size={12} />
+                      View package
+                    </a>
                   </div>
                   <button
                     onClick={() => handleInstall(result.name)}
                     disabled={installMutation.isPending}
                     className="action-btn-primary justify-center shrink-0 text-sm"
                   >
-                    Instalar
+                    Install
                   </button>
                 </div>
               ))}
@@ -157,17 +181,17 @@ export function LibrariesView() {
         <div className="space-y-4">
           <div className="surface-card overflow-hidden p-0">
             <div className="border-b border-border p-5">
-              <h2 className="text-lg font-semibold text-base-content">Librerías instaladas</h2>
+              <h2 className="text-lg font-semibold text-base-content">Installed libraries</h2>
               <p className="mt-1 text-sm text-base-content/65">
-                Paquetes activos detectados en el runtime de Node-RED.
+                Active packages detected in the Node-RED runtime.
               </p>
             </div>
 
             <div className="p-5">
             {isError ? (
               <div className="rounded-2xl border border-error/40 bg-error/10 px-4 py-8 text-center">
-                <p className="font-medium text-error">No se pudieron cargar las librerías.</p>
-                <p className="mt-1 text-sm text-base-content/60">Revisá que el backend esté levantado y autenticado.</p>
+                <p className="font-medium text-error">Could not load libraries.</p>
+                <p className="mt-1 text-sm text-base-content/60">Check that the backend is running and authenticated.</p>
               </div>
             ) : isLoading ? (
               <div className="animate-pulse space-y-2">
@@ -176,8 +200,8 @@ export function LibrariesView() {
               </div>
             ) : libraries.length === 0 ? (
               <div className="mt-4 rounded-2xl border border-dashed border-border px-4 py-8 text-center">
-                <p className="font-medium text-base-content">No hay librerías instaladas</p>
-                <p className="mt-1 text-sm text-base-content/60">Instalá una desde la columna de búsqueda.</p>
+                <p className="font-medium text-base-content">No installed libraries</p>
+                <p className="mt-1 text-sm text-base-content/60">Install one from the search column.</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -210,7 +234,7 @@ export function LibrariesView() {
                             : 'btn btn-ghost btn-xs shrink-0'
                         }
                       >
-                        {confirmingUninstall === lib.name ? 'Confirmar' : <Trash2 size={16} />}
+                        {confirmingUninstall === lib.name ? 'Confirm' : <Trash2 size={16} />}
                       </button>
                     </div>
 
@@ -222,8 +246,11 @@ export function LibrariesView() {
                     )}
 
                     {/* Keywords badges */}
-                    {lib.keywords && lib.keywords.length > 0 && (
+                    {(lib.category || (lib.keywords && lib.keywords.length > 0)) && (
                       <div className="flex flex-wrap gap-1 mb-3">
+                        {lib.category && (
+                          <span className="badge badge-secondary badge-sm text-xs">{lib.category}</span>
+                        )}
                         {getKeywordBadges(lib.keywords)?.map((keyword) => (
                           <span
                             key={keyword}
@@ -275,8 +302,8 @@ export function LibrariesView() {
                 {libraries.length > installedPageSize && (
                   <div className="flex flex-col gap-3 border-t border-border/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
                     <p className="text-xs font-medium text-base-content/55">
-                      Mostrando {(installedPage - 1) * installedPageSize + 1}-
-                      {Math.min(installedPage * installedPageSize, libraries.length)} de {libraries.length}
+                      Showing {(installedPage - 1) * installedPageSize + 1}-
+                      {Math.min(installedPage * installedPageSize, libraries.length)} of {libraries.length}
                     </p>
                     <div className="glass-panel inline-flex items-center gap-1 rounded-full border border-border p-1 self-start sm:self-auto">
                       <button
@@ -284,10 +311,10 @@ export function LibrariesView() {
                         className="inline-flex h-8 items-center gap-1 rounded-full px-3 text-xs font-semibold text-base-content/70 transition-colors hover:bg-primary/10 hover:text-primary disabled:pointer-events-none disabled:opacity-35"
                         disabled={installedPage === 1}
                         onClick={() => setInstalledPage((page) => Math.max(1, page - 1))}
-                        aria-label="Página anterior"
+                        aria-label="Previous page"
                       >
                         <ChevronLeft size={14} />
-                        Anterior
+                        Previous
                       </button>
                       <span className="rounded-full bg-primary/15 px-3 py-1.5 font-mono text-xs font-bold text-primary">
                         {installedPage} / {totalInstalledPages}
@@ -297,9 +324,9 @@ export function LibrariesView() {
                         className="inline-flex h-8 items-center gap-1 rounded-full px-3 text-xs font-semibold text-base-content/70 transition-colors hover:bg-primary/10 hover:text-primary disabled:pointer-events-none disabled:opacity-35"
                         disabled={installedPage === totalInstalledPages}
                         onClick={() => setInstalledPage((page) => Math.min(totalInstalledPages, page + 1))}
-                        aria-label="Página siguiente"
+                        aria-label="Next page"
                       >
-                        Siguiente
+                        Next
                         <ChevronRight size={14} />
                       </button>
                     </div>

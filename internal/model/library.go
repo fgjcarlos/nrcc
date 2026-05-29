@@ -6,10 +6,14 @@ type LibraryInfo struct {
 	Version     string   `json:"version"`
 	Description string   `json:"description,omitempty"`
 	Keywords    []string `json:"keywords,omitempty"`
+	Category    string   `json:"category,omitempty"`
 	Author      string   `json:"author,omitempty"`
 	License     string   `json:"license,omitempty"`
 	Homepage    string   `json:"homepage,omitempty"`
 	Repository  string   `json:"repository,omitempty"`
+	NPM         string   `json:"npm,omitempty"`
+	Downloads   int      `json:"downloads,omitempty"`
+	Date        string   `json:"date,omitempty"`
 }
 
 // UpdateStatus represents the update status for Node-RED
