@@ -228,6 +228,7 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 		r.Route("/api/files", func(r chi.Router) {
 			r.Get("/", filesHandler.GetList)
 			r.Post("/upload", filesHandler.PostUpload)
+			r.Get("/{name}/download", filesHandler.DownloadFile)
 			r.Delete("/{name}", filesHandler.DeleteFile)
 		})
 

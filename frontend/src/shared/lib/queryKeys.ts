@@ -42,6 +42,9 @@ export const queryKeys = {
     versions: ['flow-versions'] as const,
     diff: (selectedVersions: readonly string[] | null) => ['flow-diff', selectedVersions] as const,
   },
+  files: {
+    root: ['files'] as const,
+  },
   libraries: {
     root: ['libraries'] as const,
   },

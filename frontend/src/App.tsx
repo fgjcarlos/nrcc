@@ -85,6 +85,10 @@ const BackupsView = lazyNamed(
   () => import('@/features/backups/components/BackupsView'),
   'BackupsView',
 );
+const FilesView = lazyNamed(
+  () => import('@/features/files/components/FilesView'),
+  'FilesView',
+);
 
 function RouteLoadingFallback({ label }: { label: string }) {
   return (
@@ -166,6 +170,7 @@ function AppRoutes() {
         <Route path="bootstrap" element={routeElement('bootstrap', <BootstrapView />)} />
         <Route path="environment" element={routeElement('environment variables', <EnvVarsView />)} />
         <Route path="backups" element={routeElement('backups', <BackupsView />)} />
+        <Route path="files" element={routeElement('files', <FilesView />)} />
       </Route>
     </Routes>
   );
