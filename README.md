@@ -88,15 +88,23 @@ sudo nrcc uninstall --purge  # Also remove config and data files
 ## Quick Start
 
 ### Build from source
-
 ```bash
 git clone https://github.com/fgjcarlos/nrcc.git
 cd nrcc
 make build        # builds frontend + Go binary (~30s)
-./nrcc            # starts on :3001
+./nrcc            # local one-shot run on :3001
 ```
 
 Visit **http://localhost:3001** → Set up admin user → Login
+
+To install the locally built binary as a managed Ubuntu/systemd service, run:
+
+```bash
+sudo ./nrcc install
+# or: make install-local
+```
+
+`nrcc install` copies the currently running binary to `/usr/local/bin/nrcc`, checks the host, prepares Node-RED according to the selected/detected mode, writes `/etc/nrcc/nrcc.env`, installs the systemd unit, and starts the service.
 
 ### Binary release
 
@@ -104,6 +112,12 @@ Download the binary for your platform from [Releases](https://github.com/fgjcarl
 
 ```bash
 chmod +x nrcc-linux-amd64
+sudo ./nrcc-linux-amd64 install
+```
+
+For a local one-shot run without system service installation:
+
+```bash
 ./nrcc-linux-amd64
 ```
 

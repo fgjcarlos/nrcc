@@ -129,6 +129,73 @@ func withMockInstallerExecFunc(t *testing.T, execFunc func(string, ...string) *e
 	})
 }
 
+func TestEnsureInstalledBinaryCopiesCurrentExecutable(t *testing.T) {
+	root := t.TempDir()
+	source := filepath.Join(root, "nrcc-linux-amd64")
+	destination := filepath.Join(root, "usr", "local", "bin", "nrcc")
+	if err := os.WriteFile(source, []byte("fake nrcc binary"), 0700); err != nil {
+		t.Fatalf("write source binary: %v", err)
+	}
+
+	layout := model.DefaultInstallLayout()
+	layout.BinaryPath = destination
+	installer := NewInstallerService(layout)
+
+	originalExecutablePath := executablePath
+	executablePath = func() (string, error) { return source, nil }
+	t.Cleanup(func() { executablePath = originalExecutablePath })
+
+	if err := installer.ensureInstalledBinary(); err != nil {
+		t.Fatalf("ensureInstalledBinary error = %v", err)
+	}
+
+	data, err := os.ReadFile(destination)
+	if err != nil {
+		t.Fatalf("read installed binary: %v", err)
+	}
+	if string(data) != "fake nrcc binary" {
+		t.Fatalf("installed binary content = %q", string(data))
+	}
+	info, err := os.Stat(destination)
+	if err != nil {
+		t.Fatalf("stat installed binary: %v", err)
+	}
+	if info.Mode().Perm() != 0755 {
+		t.Fatalf("installed binary mode = %v, want 0755", info.Mode().Perm())
+	}
+}
+
+func TestEnsureInstalledBinarySkipsWhenAlreadyAtDestination(t *testing.T) {
+	root := t.TempDir()
+	destination := filepath.Join(root, "usr", "local", "bin", "nrcc")
+	if err := os.MkdirAll(filepath.Dir(destination), 0755); err != nil {
+		t.Fatalf("create destination dir: %v", err)
+	}
+	if err := os.WriteFile(destination, []byte("existing"), 0755); err != nil {
+		t.Fatalf("write destination binary: %v", err)
+	}
+
+	layout := model.DefaultInstallLayout()
+	layout.BinaryPath = destination
+	installer := NewInstallerService(layout)
+
+	originalExecutablePath := executablePath
+	executablePath = func() (string, error) { return destination, nil }
+	t.Cleanup(func() { executablePath = originalExecutablePath })
+
+	if err := installer.ensureInstalledBinary(); err != nil {
+		t.Fatalf("ensureInstalledBinary error = %v", err)
+	}
+
+	data, err := os.ReadFile(destination)
+	if err != nil {
+		t.Fatalf("read installed binary: %v", err)
+	}
+	if string(data) != "existing" {
+		t.Fatalf("destination should not be overwritten when already installed, got %q", string(data))
+	}
+}
+
 func TestInstallPortlessAddonsRunsRequestedSetup(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

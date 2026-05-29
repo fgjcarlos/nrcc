@@ -12,6 +12,7 @@ PLATFORMS   ?= linux/amd64,linux/arm64,linux/arm/v7
         docker docker-local docker-push docker-run docker-compose-up docker-compose-down \
         dev-docker dev-docker-build dev-docker-down \
         reset reset-data \
+        install-local \
         help
 
 ## Build single binary (requires frontend/dist to exist)
@@ -46,6 +47,10 @@ release: frontend-build
 	GOOS=darwin  GOARCH=arm64  go build -ldflags="$(LDFLAGS)" -o dist/$(BINARY)-darwin-arm64 .
 	GOOS=windows GOARCH=amd64  go build -ldflags="$(LDFLAGS)" -o dist/$(BINARY)-windows-amd64.exe .
 	@ls -lh dist/
+
+## Build and install local binary as systemd service on this machine
+install-local: build
+	sudo ./$(BINARY) install
 
 ## Remove build artifacts
 clean:
@@ -152,6 +157,7 @@ help:
 	@echo "  dev                - Start dev servers natively (Go + Vite)"
 	@echo "  test               - Run Go tests"
 	@echo "  release            - Cross-compile for all platforms"
+	@echo "  install-local      - Build and install nrcc as a local systemd service"
 	@echo "  clean              - Remove build artifacts"
 	@echo ""
 	@echo "  docker             - Build Docker image (local)"

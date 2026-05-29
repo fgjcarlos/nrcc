@@ -4,9 +4,11 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/user"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -67,6 +69,7 @@ var (
 	lookupUser       = user.Lookup
 	lookupGroup      = user.LookupGroup
 	chown            = os.Chown
+	executablePath   = os.Executable
 	detectHostStatus = func(hostSvc *HostService) model.HostStatus {
 		return hostSvc.Detect()
 	}
@@ -132,7 +135,15 @@ func (s *InstallerService) Install(ctx context.Context, opts model.InstallOpts) 
 		return fmt.Errorf("failed to create directories: %w", err)
 	}
 
+	// Step 3: Install the currently running binary to the system service path
+	if err := s.ensureInstalledBinary(); err != nil {
+		return fmt.Errorf("failed to install nrcc binary: %w", err)
+	}
+
 	hostSvc := NewHostService(s.layout.DataDir)
+	pterm.Info.Println("Checking host dependencies before service start...")
+	hostSvc.PrintDoctorReport()
+
 	decision, err := s.resolveNodeRedInstallDecision(hostSvc, opts)
 	if err != nil {
 		return err
@@ -143,12 +154,12 @@ func (s *InstallerService) Install(ctx context.Context, opts model.InstallOpts) 
 		return err
 	}
 
-	// Step 3: Generate and write env file
+	// Step 4: Generate and write env file
 	if err := s.generateEnvFile(decision); err != nil {
 		return fmt.Errorf("failed to generate env file: %w", err)
 	}
 
-	// Step 4: Write systemd unit
+	// Step 5: Write systemd unit
 	if err := s.writeSystemdUnit(); err != nil {
 		return fmt.Errorf("failed to write systemd unit: %w", err)
 	}
@@ -415,6 +426,79 @@ func (s *InstallerService) ensureSystemUser() error {
 		return fmt.Errorf("user %s not found after creation: %w", s.layout.ServiceUser, err)
 	}
 
+	return nil
+}
+
+func (s *InstallerService) ensureInstalledBinary() error {
+	source, err := executablePath()
+	if err != nil {
+		return fmt.Errorf("resolve current executable: %w", err)
+	}
+	if source == "" {
+		return fmt.Errorf("resolve current executable: empty path")
+	}
+
+	sourceAbs, err := filepath.Abs(source)
+	if err != nil {
+		return fmt.Errorf("resolve current executable path: %w", err)
+	}
+	destinationAbs, err := filepath.Abs(s.layout.BinaryPath)
+	if err != nil {
+		return fmt.Errorf("resolve install destination path: %w", err)
+	}
+
+	if sameFile(sourceAbs, destinationAbs) {
+		pterm.Info.Printf("nrcc binary already installed at %s\n", destinationAbs)
+		return nil
+	}
+
+	if err := os.MkdirAll(filepath.Dir(destinationAbs), 0755); err != nil {
+		return fmt.Errorf("create binary install directory: %w", err)
+	}
+	if err := copyExecutable(sourceAbs, destinationAbs); err != nil {
+		return err
+	}
+	pterm.Success.Printf("nrcc binary installed to %s\n", destinationAbs)
+	return nil
+}
+
+func sameFile(source string, destination string) bool {
+	sourceInfo, sourceErr := os.Stat(source)
+	destinationInfo, destinationErr := os.Stat(destination)
+	if sourceErr == nil && destinationErr == nil {
+		return os.SameFile(sourceInfo, destinationInfo)
+	}
+	return filepath.Clean(source) == filepath.Clean(destination)
+}
+
+func copyExecutable(source string, destination string) error {
+	in, err := os.Open(source)
+	if err != nil {
+		return fmt.Errorf("open current executable: %w", err)
+	}
+	defer in.Close()
+
+	tmp, err := os.CreateTemp(filepath.Dir(destination), ".nrcc-install-*")
+	if err != nil {
+		return fmt.Errorf("create temporary binary: %w", err)
+	}
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath)
+
+	if _, err := io.Copy(tmp, in); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("copy current executable: %w", err)
+	}
+	if err := tmp.Chmod(0755); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("set executable permissions: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("flush installed binary: %w", err)
+	}
+	if err := os.Rename(tmpPath, destination); err != nil {
+		return fmt.Errorf("move installed binary into place: %w", err)
+	}
 	return nil
 }
 
