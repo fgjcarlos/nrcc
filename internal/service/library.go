@@ -88,9 +88,10 @@ func (s *LibraryService) enrichLibraryMetadata(lib *model.LibraryInfo) error {
 	var pkg struct {
 		Description string      `json:"description"`
 		Keywords    []string    `json:"keywords"`
+		Category    string      `json:"category"`
 		Homepage    string      `json:"homepage"`
 		Repository  interface{} `json:"repository"` // Can be string or object
-		Author      string      `json:"author"`
+		Author      interface{} `json:"author"`     // Can be string or object
 		License     string      `json:"license"`
 	}
 
@@ -100,8 +101,9 @@ func (s *LibraryService) enrichLibraryMetadata(lib *model.LibraryInfo) error {
 
 	lib.Description = pkg.Description
 	lib.Keywords = pkg.Keywords
+	lib.Category = pkg.Category
 	lib.Homepage = pkg.Homepage
-	lib.Author = pkg.Author
+	lib.Author = extractAuthorName(pkg.Author)
 	lib.License = pkg.License
 
 	// Handle repository field — can be string or object with "url" property
@@ -118,6 +120,19 @@ func extractRepositoryURL(repo interface{}) string {
 	case map[string]interface{}:
 		if url, ok := v["url"].(string); ok {
 			return url
+		}
+	}
+	return ""
+}
+
+// extractAuthorName handles both string and object author formats.
+func extractAuthorName(author interface{}) string {
+	switch v := author.(type) {
+	case string:
+		return v
+	case map[string]interface{}:
+		if name, ok := v["name"].(string); ok {
+			return name
 		}
 	}
 	return ""
@@ -140,16 +155,22 @@ type searchRegistry struct {
 			Weekly int `json:"weekly"`
 		} `json:"downloads"`
 		Package struct {
-			Name        string `json:"name"`
-			Version     string `json:"version"`
-			Description string `json:"description"`
-			Date        string `json:"date"`
+			Name        string   `json:"name"`
+			Version     string   `json:"version"`
+			Description string   `json:"description"`
+			Date        string   `json:"date"`
+			Keywords    []string `json:"keywords"`
+			Links       struct {
+				NPM        string `json:"npm"`
+				Homepage   string `json:"homepage"`
+				Repository string `json:"repository"`
+			} `json:"links"`
 		} `json:"package"`
 	} `json:"objects"`
 }
 
 // Search searches npm registry for packages via HTTP API
-func (s *LibraryService) Search(query string) ([]interface{}, error) {
+func (s *LibraryService) Search(query string) ([]model.LibraryInfo, error) {
 	// Build registry URL with query parameters
 	registryURL := "https://registry.npmjs.org/-/v1/search"
 	params := url.Values{}
@@ -161,12 +182,12 @@ func (s *LibraryService) Search(query string) ([]interface{}, error) {
 	// Make HTTP GET request to npm registry
 	resp, err := http.Get(fullURL)
 	if err != nil {
-		return []interface{}{}, nil
+		return []model.LibraryInfo{}, nil
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return []interface{}{}, nil
+		return []model.LibraryInfo{}, nil
 	}
 
 	// Read and parse response
@@ -178,19 +199,27 @@ func (s *LibraryService) Search(query string) ([]interface{}, error) {
 	var result searchRegistry
 	if err := json.Unmarshal(body, &result); err != nil {
 		// Return empty result on parse error
-		return []interface{}{}, nil
+		return []model.LibraryInfo{}, nil
 	}
 
-	// Convert result to []interface{} for backward compatibility
-	results := make([]interface{}, len(result.Objects))
-	for i, obj := range result.Objects {
-		results[i] = map[string]interface{}{
-			"name":        obj.Package.Name,
-			"version":     obj.Package.Version,
-			"description": obj.Package.Description,
-			"downloads":   obj.Downloads.Weekly,
-			"date":        obj.Package.Date,
-		}
+	limit := len(result.Objects)
+	if limit > 10 {
+		limit = 10
+	}
+
+	results := make([]model.LibraryInfo, 0, limit)
+	for _, obj := range result.Objects[:limit] {
+		results = append(results, model.LibraryInfo{
+			Name:        obj.Package.Name,
+			Version:     obj.Package.Version,
+			Description: obj.Package.Description,
+			Keywords:    obj.Package.Keywords,
+			Homepage:    obj.Package.Links.Homepage,
+			Repository:  obj.Package.Links.Repository,
+			NPM:         obj.Package.Links.NPM,
+			Downloads:   obj.Downloads.Weekly,
+			Date:        obj.Package.Date,
+		})
 	}
 
 	return results, nil

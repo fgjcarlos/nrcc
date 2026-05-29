@@ -5,6 +5,9 @@ import { libraryService } from '@/features/libraries/services';
 import type { NpmSearchResult } from '@/features/libraries/types';
 
 import { queryKeys } from '@/shared/lib/queryKeys';
+
+const SEARCH_DEBOUNCE_MS = 300;
+
 export function useLibrariesActions() {
   const queryClient = useQueryClient();
   const [searchResults, setSearchResults] = useState<NpmSearchResult[]>([]);
@@ -45,12 +48,13 @@ export function useLibrariesActions() {
 
     if (query.length < 2) {
       setSearchResults([]);
+      setSearching(false);
       return;
     }
 
     setSearching(true);
 
-    // Set debounce timer (300ms)
+    // Debounce registry calls to avoid firing on every keystroke.
     debounceTimerRef.current = setTimeout(async () => {
       try {
         const results = await libraryService.searchLibraries(query);
@@ -62,7 +66,7 @@ export function useLibrariesActions() {
       } finally {
         setSearching(false);
       }
-    }, 300);
+    }, SEARCH_DEBOUNCE_MS);
   };
 
   const handleInstall = (name: string, alias?: string): void => {
