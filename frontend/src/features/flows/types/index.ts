@@ -67,3 +67,18 @@ export interface FlowDiff {
   removed?: FlowDiffEntry[];
   modified?: FlowDiffMod[];
 }
+
+export type AIFlowAction = 'explain' | 'suggest' | 'audit' | 'generate';
+
+export interface AIFlowResponse {
+  enabled: boolean;
+  provider: string;
+  action: AIFlowAction;
+  reviewOnly: boolean;
+  redacted: boolean;
+  summary: string;
+  suggestions?: string[];
+  auditFindings?: string[];
+  candidateFlow?: Record<string, unknown>;
+  request?: Record<string, unknown>;
+}

@@ -1,5 +1,5 @@
 import { api } from '@/shared/lib';
-import type { FlowSummary, FlowDetail, FlowMetrics, AnalysisResult, FlowVersionEntry, FlowDiff } from '../types';
+import type { FlowSummary, FlowDetail, FlowMetrics, AnalysisResult, FlowVersionEntry, FlowDiff, AIFlowAction, AIFlowResponse, FlowNode } from '../types';
 
 export const flowService = {
   getFlows: async (): Promise<{ available: boolean; flows: FlowSummary[] }> => {
@@ -19,6 +19,15 @@ export const flowService = {
 
   analyzeFlow: async (flowId: string): Promise<AnalysisResult> => {
     const response = await api.post<{ data: AnalysisResult }>(`/flows/${flowId}/analyze`);
+    return response.data.data;
+  },
+
+  requestAIAssistance: async (input: {
+    action: AIFlowAction;
+    flow: { id: string; label: string; nodes: FlowNode[] };
+    prompt?: string;
+  }): Promise<AIFlowResponse> => {
+    const response = await api.post<{ data: AIFlowResponse }>('/ai/analyze/flow', input);
     return response.data.data;
   },
 
