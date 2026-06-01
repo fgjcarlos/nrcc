@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/composedof2/nrcc/internal/middleware"
 	"github.com/composedof2/nrcc/internal/model"
@@ -18,6 +19,7 @@ type SystemHandler struct {
 	nodeVersion    string
 	metricsBuffer  *service.MetricsBuffer
 	processManager *service.ProcessManager
+	startedAt      time.Time
 }
 
 // SetMetricsBuffer wires the MetricsBuffer into the SystemHandler so it can
@@ -32,11 +34,30 @@ func (h *SystemHandler) SetProcessManager(pm *service.ProcessManager) {
 	h.processManager = pm
 }
 
-// NewSystemHandler creates a new system handler
+// NewSystemHandler creates a new system handler. The startedAt timestamp
+// captures NRCC process start time and is used to compute uptime in /api/health.
 func NewSystemHandler() *SystemHandler {
 	return &SystemHandler{
 		nodeVersion: getNodeVersion(),
+		startedAt:   time.Now(),
 	}
+}
+
+// GetHealth handles GET /api/health — public (no auth required).
+// Returns status:"ok", integer uptime (seconds since process start), and
+// restartCount (cumulative durable auto-restart count from ProcessManager).
+// If ProcessManager is not yet wired, uptime and restartCount report 0.
+func (h *SystemHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
+	uptime := int(time.Since(h.startedAt).Seconds())
+	restarts := 0
+	if h.processManager != nil {
+		restarts = h.processManager.CumulativeRestarts()
+	}
+	model.RespondJSON(w, http.StatusOK, map[string]interface{}{
+		"status":       "ok",
+		"uptime":       uptime,
+		"restartCount": restarts,
+	})
 }
 
 // CpuInfo represents CPU statistics
