@@ -10,7 +10,6 @@ import (
 	"github.com/composedof2/nrcc/internal/handler"
 	"github.com/composedof2/nrcc/internal/metrics"
 	"github.com/composedof2/nrcc/internal/middleware"
-	"github.com/composedof2/nrcc/internal/model"
 	"github.com/composedof2/nrcc/internal/service"
 	"github.com/go-chi/chi/v5"
 )
@@ -44,7 +43,10 @@ func NewServer(authSvc *service.AuthService) *Server {
 func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg middleware.CORSConfig) *Server {
 	r := chi.NewRouter()
 
-	// Global middleware
+	// Global middleware — Recoverer MUST be first so it wraps every downstream
+	// middleware and handler. A panic inside SecurityHeaders, CORS, or Logger
+	// would otherwise escape and drop the connection.
+	r.Use(middleware.Recoverer)
 	r.Use(middleware.SecurityHeaders)
 	r.Use(middleware.CORS(corsCfg))
 	r.Use(middleware.Logger)
@@ -102,11 +104,9 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 	updateHandler.SetUpdateMetrics(metricsCollector)
 
 	// Public routes (no auth required)
-	r.Get("/api/health", func(w http.ResponseWriter, r *http.Request) {
-		model.RespondJSON(w, http.StatusOK, map[string]interface{}{
-			"status": "ok",
-		})
-	})
+	// GetHealth replaces the old inline closure; it returns status + uptime +
+	// restartCount (the durable cumulative counter, not the backoff one).
+	r.Get("/api/health", systemHandler.GetHealth)
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
