@@ -141,8 +141,8 @@ export function UsersView() {
   if (currentUser?.role !== 'admin') {
     return (
       <div className="p-6">
-        <h1 className="text-2xl font-bold text-base-content">Access Denied</h1>
-        <p className="mt-2 text-base-content/60">You don't have permission to view this page.</p>
+        <h1 className="text-2xl font-bold text-base-content">{UI_COPY.accessDenied}</h1>
+        <p className="mt-2 text-base-content/60">{UI_COPY.accessDeniedDescription}</p>
       </div>
     );
   }
@@ -157,7 +157,7 @@ export function UsersView() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-base-content">User Management</h1>
+        <h1 className="text-2xl font-bold text-base-content">{UI_COPY.userManagement}</h1>
         <button
           onClick={openCreateModal}
           disabled={isAnyMutationPending}

@@ -29,7 +29,9 @@ export function UserTable({
               <th className="px-4 py-3 text-left text-sm font-medium text-base-content">
                 {UI_COPY.roleLabel}
               </th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-base-content">Created</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-base-content">
+                {UI_COPY.createdLabel}
+              </th>
               <th className="px-4 py-3 text-right text-sm font-medium text-base-content">
                 {UI_COPY.actions}
               </th>
@@ -107,7 +109,9 @@ export function UserTable({
                   </span>
                 </div>
                 <div>
-                  <p className="text-xs text-base-content/60 uppercase tracking-wider">Created</p>
+                  <p className="text-xs text-base-content/60 uppercase tracking-wider">
+                    {UI_COPY.createdLabel}
+                  </p>
                   <p className="text-sm text-base-content/60">
                     {new Date(user.createdAt).toLocaleDateString()}
                   </p>
