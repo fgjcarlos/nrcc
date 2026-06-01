@@ -17,6 +17,9 @@ nrcc.exe
 nrcc-final
 nrcc-test
 
+# npm lockfiles are banned — pnpm-only policy (pnpm-lock.yaml is the source of truth)
+package-lock.json
+
 # AI agent / IDE tool configs (local environment only)
 .claude/
 .cline/
