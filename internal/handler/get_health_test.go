@@ -49,7 +49,8 @@ func TestGetHealth_Returns200WithRequiredFields(t *testing.T) {
 }
 
 // TestGetHealth_NilProcessManager_ReturnsZeroNoPanic verifies that with a nil
-// ProcessManager GetHealth returns uptime 0 / restartCount 0 without panicking.
+// ProcessManager GetHealth returns restartCount 0 without panicking. (uptime
+// still reflects real elapsed time; only restartCount falls back to 0.)
 func TestGetHealth_NilProcessManager_ReturnsZeroNoPanic(t *testing.T) {
 	h := NewSystemHandler()
 	// processManager is nil by default on a freshly created handler.

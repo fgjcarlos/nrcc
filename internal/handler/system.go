@@ -46,7 +46,8 @@ func NewSystemHandler() *SystemHandler {
 // GetHealth handles GET /api/health — public (no auth required).
 // Returns status:"ok", integer uptime (seconds since process start), and
 // restartCount (cumulative durable auto-restart count from ProcessManager).
-// If ProcessManager is not yet wired, uptime and restartCount report 0.
+// uptime always reflects real elapsed time since handler construction; if the
+// ProcessManager is not yet wired, only restartCount falls back to 0 (no panic).
 func (h *SystemHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
 	uptime := int(time.Since(h.startedAt).Seconds())
 	restarts := 0

@@ -15,6 +15,12 @@ import (
 //   - Re-panics http.ErrAbortHandler so chi can perform its own connection
 //     tear-down (not swallowed).
 //
+// Limitation: if a downstream handler already wrote a status code or body before
+// panicking, the 500 response cannot replace it — the first WriteHeader wins, so
+// the client may receive the partial response with the error JSON appended. This
+// matches the behaviour of chi's own Recoverer; handlers that stream partial
+// output must guard their own writes.
+//
 // Recoverer MUST be registered as the FIRST r.Use(...) so it wraps every
 // subsequent middleware and every route handler.
 func Recoverer(next http.Handler) http.Handler {
