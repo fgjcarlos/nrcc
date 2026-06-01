@@ -46,7 +46,7 @@ func TestProcessCollector_Collect_NilSource_YieldsZeroGauges(t *testing.T) {
 	reg.MustRegister(pc)
 
 	want := `
-# HELP nrcc_nodered_restarts_total Point-in-time restart count for the Node-RED process as reported by the process manager.
+# HELP nrcc_nodered_restarts_total Durable cumulative auto-restart count for the Node-RED process.
 # TYPE nrcc_nodered_restarts_total gauge
 nrcc_nodered_restarts_total 0
 # HELP nrcc_nodered_running 1 if Node-RED is currently running, 0 otherwise.
@@ -81,7 +81,7 @@ func TestProcessCollector_Collect_RunningProcess_YieldsCorrectGauges(t *testing.
 	reg.MustRegister(pc)
 
 	want := `
-# HELP nrcc_nodered_restarts_total Point-in-time restart count for the Node-RED process as reported by the process manager.
+# HELP nrcc_nodered_restarts_total Durable cumulative auto-restart count for the Node-RED process.
 # TYPE nrcc_nodered_restarts_total gauge
 nrcc_nodered_restarts_total 3
 # HELP nrcc_nodered_running 1 if Node-RED is currently running, 0 otherwise.
@@ -115,7 +115,7 @@ func TestProcessCollector_Collect_StoppedProcess_YieldsZeroRunning(t *testing.T)
 	reg.MustRegister(pc)
 
 	want := `
-# HELP nrcc_nodered_restarts_total Point-in-time restart count for the Node-RED process as reported by the process manager.
+# HELP nrcc_nodered_restarts_total Durable cumulative auto-restart count for the Node-RED process.
 # TYPE nrcc_nodered_restarts_total gauge
 nrcc_nodered_restarts_total 0
 # HELP nrcc_nodered_running 1 if Node-RED is currently running, 0 otherwise.

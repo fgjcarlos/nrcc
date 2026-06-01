@@ -106,7 +106,7 @@ at scrape time:
 | Metric | Type | Description |
 |--------|------|-------------|
 | `nrcc_nodered_running` | Gauge | 1 if Node-RED process is running, 0 otherwise |
-| `nrcc_nodered_restarts_total` | Gauge | Cumulative auto-restart count since last user-initiated start |
+| `nrcc_nodered_restarts_total` | Gauge | Durable cumulative auto-restart count for this NRCC installation |
 | `nrcc_nodered_uptime_seconds` | Gauge | Seconds since the process last started; 0 when stopped |
 
 When ProcessManager is nil (server started before SetProcessManager is called),

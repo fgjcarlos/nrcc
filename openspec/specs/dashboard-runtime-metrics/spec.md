@@ -142,8 +142,10 @@ evicted FIFO.
 
 The system MUST expose `GET /api/runtime/history` returning a JSON object with
 two fields: `events` (an array of `RestartEvent`, oldest first) and `status` (a
-`RuntimeStatus` object carrying at least `uptime`, `restartCount`, and
-`startedAt`). The endpoint MUST require authentication. When the ProcessManager
+`RuntimeStatus` object carrying at least `uptime`, `restartCount`,
+`consecutiveFailures`, and `startedAt`). `restartCount` MUST be the durable
+cumulative auto-restart count; `consecutiveFailures` MUST be the backoff/give-up
+counter since the last user-initiated start. The endpoint MUST require authentication. When the ProcessManager
 is unset or has no events, `events` MUST be `[]` (never `null`) and `status` MUST
 be the zero-valued RuntimeStatus.
 

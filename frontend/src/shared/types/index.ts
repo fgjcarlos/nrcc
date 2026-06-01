@@ -448,6 +448,8 @@ export interface RuntimeInfo {
   status: RuntimeStatus;
   pid?: number;
   uptime: number;
+  restartCount?: number;
+  consecutiveFailures?: number;
   memory?: ProcessMemory;
   version?: string;
   installationMode?: InstallationMode;

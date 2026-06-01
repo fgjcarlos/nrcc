@@ -57,7 +57,7 @@ async function installApiMocks(page: Page, scenario: Scenario = 'initialized') {
       }))
     }
     if (method === 'GET' && path === '/config') return json(envelope({ uiPort: 1880, uiHost: '127.0.0.1', projectsEnabled: true }))
-    if (method === 'GET' && path === '/runtime/history') return json(envelope({ events: [], status: 'running' }))
+    if (method === 'GET' && path === '/runtime/history') return json(envelope({ events: [], status: { status: 'running', uptime: 0, restartCount: 0, consecutiveFailures: 0 } }))
     if (method === 'POST' && ['/runtime/start', '/runtime/stop', '/runtime/restart'].includes(path)) {
       return json(envelope({ message: 'Node-RED runtime action handled in fixture test mode' }))
     }

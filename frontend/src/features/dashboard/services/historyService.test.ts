@@ -38,7 +38,7 @@ describe('historyService.getRuntimeHistory', () => {
   });
 
   it('calls /runtime/history with default n=50', () => {
-    mockGet.mockResolvedValueOnce({ data: { success: true, data: { events: [], status: 'running' }, timestamp: '' } });
+    mockGet.mockResolvedValueOnce({ data: { success: true, data: { events: [], status: { status: 'running', uptime: 0, restartCount: 0, consecutiveFailures: 0 } }, timestamp: '' } });
 
     historyService.getRuntimeHistory();
 
@@ -46,7 +46,7 @@ describe('historyService.getRuntimeHistory', () => {
   });
 
   it('calls /runtime/history with custom n when specified', () => {
-    mockGet.mockResolvedValueOnce({ data: { success: true, data: { events: [], status: 'running' }, timestamp: '' } });
+    mockGet.mockResolvedValueOnce({ data: { success: true, data: { events: [], status: { status: 'running', uptime: 0, restartCount: 0, consecutiveFailures: 0 } }, timestamp: '' } });
 
     historyService.getRuntimeHistory(30);
 
