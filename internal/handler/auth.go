@@ -454,7 +454,7 @@ func (h *AuthHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if adminCount <= 1 {
-			model.RespondError(w, http.StatusBadRequest, "CANNOT_DELETE_LAST_ADMIN", "Cannot delete the last admin user")
+			model.RespondError(w, http.StatusForbidden, "CANNOT_DELETE_LAST_ADMIN", "Cannot delete the last admin user")
 			return
 		}
 	}

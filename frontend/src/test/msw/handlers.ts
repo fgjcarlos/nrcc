@@ -51,7 +51,7 @@ export function createNrccApiHandlers(scenario: NrccMswScenario = 'initialized')
       timestamp: new Date(0).toISOString(),
     })),
     http.get('/api/config', () => ok({ uiPort: 1880, uiHost: '127.0.0.1', projectsEnabled: true })),
-    http.get('/api/runtime/history', () => ok({ events: [], status: 'running' })),
+    http.get('/api/runtime/history', () => ok({ events: [], status: { status: 'running', uptime: 0, restartCount: 0, consecutiveFailures: 0 } })),
     http.post('/api/runtime/start', () => ok({ message: 'Node-RED start requested in test mode' })),
     http.post('/api/runtime/stop', () => ok({ message: 'Node-RED stop requested in test mode' })),
     http.post('/api/runtime/restart', () => ok({ message: 'Node-RED restart requested in test mode' })),

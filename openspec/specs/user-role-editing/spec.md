@@ -28,9 +28,7 @@ The system MUST NOT allow changing the role of the last remaining admin user to 
 
 The frontend MUST disable the delete action for the last remaining admin user. The backend MUST also enforce this guard on the DELETE endpoint.
 
-The backend delete guard returns **400 Bad Request** with code `CANNOT_DELETE_LAST_ADMIN` (not 403 Forbidden). Note: the demote guard uses 403, while the delete guard uses 400 — this is a known semantic inconsistency in the shipped code.
-
-> Follow-up candidate: Align the delete-last-admin response to 403 Forbidden to be consistent with the demote-last-admin guard (both enforce the same business rule).
+The backend delete guard returns **403 Forbidden** with code `CANNOT_DELETE_LAST_ADMIN`, matching the demote-last-admin guard because both enforce the same authorization/business-policy invariant.
 
 #### Scenario: Delete button disabled for last admin in UI
 
@@ -48,7 +46,7 @@ The backend delete guard returns **400 Bad Request** with code `CANNOT_DELETE_LA
 
 - GIVEN exactly one user with role `admin` exists
 - WHEN a DELETE request is sent for that user bypassing the UI
-- THEN the server returns 400 Bad Request with code `CANNOT_DELETE_LAST_ADMIN`
+- THEN the server returns 403 Forbidden with code `CANNOT_DELETE_LAST_ADMIN`
 
 ---
 

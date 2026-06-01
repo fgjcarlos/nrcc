@@ -34,7 +34,7 @@ func newProcessCollector() *ProcessCollector {
 		),
 		descRestarts: prometheus.NewDesc(
 			"nrcc_nodered_restarts_total",
-			"Point-in-time restart count for the Node-RED process as reported by the process manager.",
+			"Durable cumulative auto-restart count for the Node-RED process.",
 			nil, nil,
 		),
 		descUptime: prometheus.NewDesc(
