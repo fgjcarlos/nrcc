@@ -50,6 +50,12 @@ type ProcessManager struct {
 	// restart history (ring buffer, capacity 50)
 	tracker *restartTracker
 
+	// cumulativeRestarts is the durable lifetime count of auto-restarts.
+	// It is SEPARATE from restartCount (the backoff/give-up counter).
+	// Persisted via restartCountStore; never reset by the user-start path.
+	cumulativeRestarts int
+	restartStore       *restartCountStore
+
 	// version fetched once
 	version     string
 	versionOnce sync.Once
@@ -61,15 +67,27 @@ func NewProcessManager(cmd, dataDir string, logBuffer *LogBuffer) *ProcessManage
 	if cmd == "" {
 		cmd = "node-red"
 	}
+	store := newRestartCountStore(dataDir)
 	return &ProcessManager{
-		nodeRedCmd:   cmd,
-		dataDir:      dataDir,
-		logBuffer:    logBuffer,
-		maxRestarts:  10,
-		restartDelay: 2 * time.Second,
-		doneCh:       closedChan(), // sentinel so Stop() doesn't block when nothing is running
-		tracker:      newRestartTracker(50),
+		nodeRedCmd:         cmd,
+		dataDir:            dataDir,
+		logBuffer:          logBuffer,
+		maxRestarts:        10,
+		restartDelay:       2 * time.Second,
+		doneCh:             closedChan(), // sentinel so Stop() doesn't block when nothing is running
+		tracker:            newRestartTracker(50),
+		restartStore:       store,
+		cumulativeRestarts: store.Load(),
 	}
+}
+
+// CumulativeRestarts returns the total number of auto-restarts over the
+// lifetime of this installation. This is the DURABLE counter (separate from
+// the backoff counter pm.restartCount which resets on user-initiated starts).
+func (pm *ProcessManager) CumulativeRestarts() int {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+	return pm.cumulativeRestarts
 }
 
 // closedChan returns an already-closed channel used as a sentinel.
@@ -426,6 +444,11 @@ func (pm *ProcessManager) waitForExit(cmd *exec.Cmd, stopCh, doneCh chan struct{
 
 	pm.mu.Lock()
 	pm.restartCount++
+	pm.cumulativeRestarts++
+	if saveErr := pm.restartStore.Save(pm.cumulativeRestarts); saveErr != nil {
+		// Best-effort — a save failure is logged but never fatal.
+		ui.Warnf("restart count store: save failed: %v", saveErr)
+	}
 	if startErr := pm.startLocked(false); startErr != nil {
 		pm.lastError = startErr
 	}
