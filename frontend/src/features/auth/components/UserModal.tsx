@@ -46,14 +46,15 @@ export function UserModal({
   }, [mode, editingUser]);
 
   const isLastAdmin = editingUser?.role === 'admin' && adminCount === 1;
-  const canDemote = !isLastAdmin && formData.role === editingUser?.role;
   const canSubmit = !isPending && (
     mode === 'create'
       ? formData.username.trim() && formData.password.trim()
       : mode === 'edit_full'
       ? true // can change role or leave as-is
       : formData.password.trim() // edit_password requires password
-  ) && (mode !== 'edit_full' || canDemote);
+    // In edit_full the last admin cannot submit (their role select is disabled
+    // and password changes go through the dedicated change-password modal).
+  ) && (mode !== 'edit_full' || !isLastAdmin);
 
   const validatePassword = (pw: string): boolean => {
     if (pw.length < 8) {

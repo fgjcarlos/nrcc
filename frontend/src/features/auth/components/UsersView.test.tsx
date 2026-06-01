@@ -412,6 +412,49 @@ describe('UsersView', () => {
     })
   })
 
+  describe('role change submit (regression: canDemote gate)', () => {
+    it('enables submit button when a non-last-admin changes their role', async () => {
+      vi.mocked(useUsersDataModule.useUsersData).mockReturnValue({
+        users: [mockAdminUser, mockAnotherAdminUser],
+        isLoading: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      })
+      vi.mocked(authService.updateUserRole).mockResolvedValue({
+        ...mockAnotherAdminUser,
+        role: 'viewer',
+      })
+
+      const user = userEvent.setup()
+      renderWithProviders(<UsersView />)
+
+      // Open edit modal for the second admin (not the last admin — adminCount = 2)
+      const editButtons = screen.getAllByRole('button', { name: UI_COPY.editUser })
+      await user.click(editButtons[1])
+
+      // Confirm modal opened and role select is ENABLED (not last admin)
+      expect(screen.getByRole('heading', { name: UI_COPY.editUser })).toBeInTheDocument()
+      const roleSelect = screen.getByDisplayValue('Admin') as HTMLSelectElement
+      expect(roleSelect).toBeEnabled()
+
+      // Change the role to viewer
+      await user.selectOptions(roleSelect, 'viewer')
+      expect(roleSelect).toHaveValue('viewer')
+
+      // Submit button MUST be enabled after a role change
+      const confirmButton = screen.getByRole('button', { name: UI_COPY.confirm }) as HTMLButtonElement
+      expect(confirmButton).toBeEnabled()
+
+      // Click submit and assert the mutation is called with the new role
+      await user.click(confirmButton)
+
+      await waitFor(() => {
+        expect(authService.updateUserRole).toHaveBeenCalledWith(mockAnotherAdminUser.id, 'viewer')
+      })
+    })
+  })
+
   describe('last-admin protection', () => {
     it('protects the last admin from demotion via UI', async () => {
       vi.mocked(useUsersDataModule.useUsersData).mockReturnValue({
