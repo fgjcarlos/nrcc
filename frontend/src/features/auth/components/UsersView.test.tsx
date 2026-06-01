@@ -106,8 +106,8 @@ describe('UsersView', () => {
 
       renderWithProviders(<UsersView />)
 
-      expect(screen.getByText('Access Denied')).toBeInTheDocument()
-      expect(screen.getByText("You don't have permission to view this page.")).toBeInTheDocument()
+      expect(screen.getByText(UI_COPY.accessDenied)).toBeInTheDocument()
+      expect(screen.getByText(UI_COPY.accessDeniedDescription)).toBeInTheDocument()
     })
 
     it('shows user management header for admin user', () => {
@@ -121,7 +121,7 @@ describe('UsersView', () => {
 
       renderWithProviders(<UsersView />)
 
-      expect(screen.getByText('User Management')).toBeInTheDocument()
+      expect(screen.getByText(UI_COPY.userManagement)).toBeInTheDocument()
     })
   })
 
@@ -493,7 +493,7 @@ describe('UsersView', () => {
       renderWithProviders(<UsersView />)
 
       // Header should be visible even in loading state
-      expect(screen.getByText('User Management')).toBeInTheDocument()
+      expect(screen.getByText(UI_COPY.userManagement)).toBeInTheDocument()
     })
 
     it('shows empty state when user list is empty', () => {
@@ -522,7 +522,7 @@ describe('UsersView', () => {
 
       renderWithProviders(<UsersView />)
 
-      expect(screen.getByText('User Management')).toBeInTheDocument()
+      expect(screen.getByText(UI_COPY.userManagement)).toBeInTheDocument()
     })
 
     it('hides table when loading', () => {
@@ -677,6 +677,43 @@ describe('UsersView', () => {
       })
     })
 
+    it('shows an error toast and keeps the create modal open when create user fails', async () => {
+      vi.mocked(useUsersDataModule.useUsersData).mockReturnValue({
+        users: [mockAdminUser],
+        isLoading: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      })
+      vi.mocked(authService.createUser).mockRejectedValue({
+        response: { data: { error: { message: 'Username already exists' } } },
+      })
+
+      const user = userEvent.setup()
+      renderWithProviders(<UsersView />)
+
+      await user.click(screen.getByRole('button', { name: new RegExp(`${UI_COPY.add}.*${UI_COPY.createUser}`) }))
+      await user.type(screen.getByRole('textbox'), 'existinguser')
+
+      const passwordInputs = screen.getAllByDisplayValue('')
+      const passwordInput = passwordInputs.find(
+        (el) => el instanceof HTMLInputElement && el.type === 'password'
+      ) as HTMLInputElement | undefined
+
+      expect(passwordInput).toBeTruthy()
+      if (passwordInput) {
+        await user.type(passwordInput, 'securepass123')
+      }
+
+      await user.click(screen.getByRole('button', { name: UI_COPY.createUser }))
+
+      await waitFor(() => {
+        expect(authService.createUser).toHaveBeenCalledWith('existinguser', 'securepass123', 'viewer')
+      })
+      expect(await screen.findByText('Username already exists')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: UI_COPY.createUser })).toBeInTheDocument()
+    })
+
     it('changes a user password from the password modal', async () => {
       vi.mocked(useUsersDataModule.useUsersData).mockReturnValue({
         users: [mockAdminUser, mockViewerUser],
@@ -708,6 +745,43 @@ describe('UsersView', () => {
       await waitFor(() => {
         expect(authService.changePassword).toHaveBeenCalledWith(mockViewerUser.id, 'newpassword123')
       })
+    })
+
+    it('shows an error toast and keeps the password modal open when password reset fails', async () => {
+      vi.mocked(useUsersDataModule.useUsersData).mockReturnValue({
+        users: [mockAdminUser, mockViewerUser],
+        isLoading: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      })
+      vi.mocked(authService.changePassword).mockRejectedValue({
+        response: { data: { error: { message: 'Password reset failed' } } },
+      })
+
+      const user = userEvent.setup()
+      renderWithProviders(<UsersView />)
+
+      const changePasswordButtons = screen.getAllByRole('button', { name: UI_COPY.changePassword })
+      await user.click(changePasswordButtons[1])
+
+      const passwordInputs = screen.getAllByDisplayValue('')
+      const passwordInput = passwordInputs.find(
+        (el) => el instanceof HTMLInputElement && el.type === 'password'
+      ) as HTMLInputElement | undefined
+
+      expect(passwordInput).toBeTruthy()
+      if (passwordInput) {
+        await user.type(passwordInput, 'newpassword123')
+      }
+
+      await user.click(screen.getByRole('button', { name: UI_COPY.confirm }))
+
+      await waitFor(() => {
+        expect(authService.changePassword).toHaveBeenCalledWith(mockViewerUser.id, 'newpassword123')
+      })
+      expect(await screen.findByText('Password reset failed')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: UI_COPY.changePassword })).toBeInTheDocument()
     })
 
     it('deletes a user after confirmation', async () => {

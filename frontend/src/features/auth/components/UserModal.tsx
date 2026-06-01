@@ -172,7 +172,7 @@ export function UserModal({
               className="glass-panel w-full rounded-xl border border-border px-3 py-2 text-base-content focus:outline-none focus:ring-2 focus:ring-primary/50"
               required={mode === 'create' || mode === 'edit_password'}
               minLength={8}
-              placeholder={mode === 'edit_full' ? 'Leave empty to keep current password' : undefined}
+              placeholder={mode === 'edit_full' ? UI_COPY.keepCurrentPasswordPlaceholder : undefined}
             />
             {passwordError && (
               <p className="mt-1 text-sm text-error">{passwordError}</p>
