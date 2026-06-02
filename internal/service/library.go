@@ -13,15 +13,15 @@ import (
 	"github.com/composedof2/nrcc/internal/model"
 )
 
-// LibraryService handles package library operations with pnpm
+// LibraryService handles package library operations with npm
 type LibraryService struct {
 	dataDir string
 	pm      PackageManager
 }
 
-// NewLibraryService creates a new library service with default pnpm package manager
+// NewLibraryService creates a new library service with default npm package manager
 func NewLibraryService(dataDir string) *LibraryService {
-	return NewLibraryServiceWithPackageManager(dataDir, NewPnpmPackageManager(dataDir))
+	return NewLibraryServiceWithPackageManager(dataDir, NewNpmPackageManager(dataDir))
 }
 
 // NewLibraryServiceWithPackageManager creates a new library service with a custom package manager
@@ -138,12 +138,12 @@ func extractAuthorName(author interface{}) string {
 	return ""
 }
 
-// Install installs a package using pnpm add
+// Install installs a package using npm install
 func (s *LibraryService) Install(pkg string) error {
 	return s.pm.Install(pkg)
 }
 
-// Uninstall uninstalls a package using pnpm remove
+// Uninstall uninstalls a package using npm uninstall
 func (s *LibraryService) Uninstall(pkg string) error {
 	return s.pm.Uninstall(pkg)
 }
@@ -225,14 +225,18 @@ func (s *LibraryService) Search(query string) ([]model.LibraryInfo, error) {
 	return results, nil
 }
 
-// Check checks if a package is available using pnpm view
+// Check reports whether a package is available in the npm registry using
+// `npm view`. It returns (false, err) only when npm itself cannot run. A
+// non-zero `npm view` exit — whether the package does not exist OR the
+// registry is unreachable — is reported as (false, nil); these two cases
+// are not currently distinguished.
 func (s *LibraryService) Check(pkg string) (bool, error) {
-	bin := "pnpm"
-	if pm, ok := s.pm.(*PnpmPackageManager); ok {
+	bin := "npm"
+	if pm, ok := s.pm.(*NpmPackageManager); ok {
 		bin = pm.Bin
 	}
-	if err := ensureSupportedPnpm(bin); err != nil {
-		return false, nil
+	if err := ensureNpm(bin); err != nil {
+		return false, err
 	}
 
 	cmd := exec.Command(bin, "view", pkg)
@@ -242,7 +246,7 @@ func (s *LibraryService) Check(pkg string) (bool, error) {
 
 	err := cmd.Run()
 	if err != nil {
-		return false, nil // Package not found
+		return false, nil // Package not found in registry
 	}
 
 	return true, nil
