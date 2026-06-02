@@ -552,6 +552,11 @@ func (s *InstallerService) generateEnvFile(decision nodeRedInstallDecision) erro
 	if decision.Command != "" {
 		content = setEnvValue(content, "NODE_RED_CMD", decision.Command)
 	}
+	if npmPath, err := execLookPath("npm"); err == nil {
+		content = setEnvValue(content, "NPM_BIN", npmPath)
+	} else {
+		pterm.Warning.Printfln("npm not found at install time; NPM_BIN not frozen — runtime npm operations may fail under systemd (%v)", err)
+	}
 
 	if err := s.writeEnvFile(content); err != nil {
 		return err
