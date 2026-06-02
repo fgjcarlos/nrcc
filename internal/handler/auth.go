@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/composedof2/nrcc/internal/audit"
@@ -157,7 +158,7 @@ func (h *AuthHandler) Setup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Issue refresh cookie
-	h.setRefreshCookie(w, user.ID)
+	h.setRefreshCookie(w, r, user.ID)
 
 	resp := AuthResponse{
 		Token: token,
@@ -255,7 +256,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Issue refresh cookie
-	h.setRefreshCookie(w, user.ID)
+	h.setRefreshCookie(w, r, user.ID)
 
 	resp := AuthResponse{
 		Token: token,
@@ -620,7 +621,7 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 
 	sess, err := h.authSvc.ValidateRefreshSession(cookie.Value)
 	if err != nil {
-		clearRefreshCookie(w)
+		clearRefreshCookie(w, r)
 		model.RespondError(w, http.StatusUnauthorized, "INVALID_REFRESH", "Refresh token invalid or expired")
 		return
 	}
@@ -630,7 +631,7 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 
 	user := h.authSvc.GetUserByID(sess.UserID)
 	if user == nil {
-		clearRefreshCookie(w)
+		clearRefreshCookie(w, r)
 		model.RespondError(w, http.StatusUnauthorized, "USER_NOT_FOUND", "User no longer exists")
 		return
 	}
@@ -641,7 +642,7 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.setRefreshCookie(w, user.ID)
+	h.setRefreshCookie(w, r, user.ID)
 
 	model.RespondJSON(w, http.StatusOK, AuthResponse{
 		Token: token,
@@ -655,7 +656,15 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *AuthHandler) setRefreshCookie(w http.ResponseWriter, userID string) {
+// isSecureRequest reports whether the cookie Secure flag should be set.
+// nrcc serves plain HTTP; TLS is terminated upstream by the Portless proxy,
+// which forwards X-Forwarded-Proto: https. A direct TLS connection (r.TLS != nil)
+// is also treated as secure for local development with TLS.
+func isSecureRequest(r *http.Request) bool {
+	return r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
+}
+
+func (h *AuthHandler) setRefreshCookie(w http.ResponseWriter, r *http.Request, userID string) {
 	refreshToken, err := h.authSvc.CreateRefreshSession(userID)
 	if err != nil {
 		return
@@ -665,19 +674,19 @@ func (h *AuthHandler) setRefreshCookie(w http.ResponseWriter, userID string) {
 		Value:    refreshToken,
 		Path:     "/api/auth",
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   isSecureRequest(r),
 		SameSite: http.SameSiteStrictMode,
 		MaxAge:   int(service.RefreshTokenLifetime / time.Second),
 	})
 }
 
-func clearRefreshCookie(w http.ResponseWriter) {
+func clearRefreshCookie(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     refreshCookieName,
 		Value:    "",
 		Path:     "/api/auth",
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   isSecureRequest(r),
 		SameSite: http.SameSiteStrictMode,
 		MaxAge:   -1,
 	})
