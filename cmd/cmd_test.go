@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -67,6 +68,61 @@ func TestCommandsRegistered(t *testing.T) {
 		if !cmdNames[required] {
 			t.Errorf("command '%s' not registered in rootCmd", required)
 		}
+	}
+}
+
+func TestInitializeServices_SkipsDataDirCreationForDoctor(t *testing.T) {
+	oldMkdirAll := mkdirAll
+	oldSvc := svc
+	oldDataDir := os.Getenv("DATA_DIR")
+	defer func() {
+		mkdirAll = oldMkdirAll
+		svc = oldSvc
+		if oldDataDir == "" {
+			os.Unsetenv("DATA_DIR")
+		} else {
+			os.Setenv("DATA_DIR", oldDataDir)
+		}
+	}()
+
+	os.Setenv("DATA_DIR", "/var/lib/nrcc")
+	mkdirAll = func(path string, perm os.FileMode) error {
+		return errors.New("mkdir should not be called for doctor")
+	}
+
+	cmd := &cobra.Command{Use: "doctor"}
+	if err := initializeServices(cmd); err != nil {
+		t.Fatalf("doctor should initialize without creating data dir: %v", err)
+	}
+}
+
+func TestInitializeServices_CreatesDataDirForWriteCommands(t *testing.T) {
+	oldMkdirAll := mkdirAll
+	oldSvc := svc
+	oldDataDir := os.Getenv("DATA_DIR")
+	defer func() {
+		mkdirAll = oldMkdirAll
+		svc = oldSvc
+		if oldDataDir == "" {
+			os.Unsetenv("DATA_DIR")
+		} else {
+			os.Setenv("DATA_DIR", oldDataDir)
+		}
+	}()
+
+	os.Setenv("DATA_DIR", t.TempDir())
+	called := false
+	mkdirAll = func(path string, perm os.FileMode) error {
+		called = true
+		return nil
+	}
+
+	cmd := &cobra.Command{Use: "env"}
+	if err := initializeServices(cmd); err != nil {
+		t.Fatalf("write command initializeServices: %v", err)
+	}
+	if !called {
+		t.Fatal("write commands should still create the data directory")
 	}
 }
 

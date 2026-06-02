@@ -158,7 +158,10 @@ func (h *AuthHandler) Setup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Issue refresh cookie
-	h.setRefreshCookie(w, r, user.ID)
+	if err := h.setRefreshCookie(w, r, user.ID); err != nil {
+		model.RespondError(w, http.StatusInternalServerError, "REFRESH_SESSION_ERROR", "Failed to create refresh session")
+		return
+	}
 
 	resp := AuthResponse{
 		Token: token,
@@ -256,7 +259,10 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Issue refresh cookie
-	h.setRefreshCookie(w, r, user.ID)
+	if err := h.setRefreshCookie(w, r, user.ID); err != nil {
+		model.RespondError(w, http.StatusInternalServerError, "REFRESH_SESSION_ERROR", "Failed to create refresh session")
+		return
+	}
 
 	resp := AuthResponse{
 		Token: token,
@@ -313,7 +319,13 @@ func (h *AuthHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 
 // Logout handles POST /api/auth/logout - protected endpoint
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
-	// JWT logout is client-side (token invalidation). We just return success.
+	if cookie, err := r.Cookie(refreshCookieName); err == nil && cookie.Value != "" {
+		if err := h.authSvc.RevokeRefreshSession(cookie.Value); err != nil {
+			model.RespondError(w, http.StatusInternalServerError, "LOGOUT_ERROR", "Failed to revoke refresh session")
+			return
+		}
+	}
+	clearRefreshCookie(w, r)
 	model.RespondJSON(w, http.StatusOK, map[string]bool{"success": true})
 }
 
@@ -642,7 +654,10 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.setRefreshCookie(w, r, user.ID)
+	if err := h.setRefreshCookie(w, r, user.ID); err != nil {
+		model.RespondError(w, http.StatusInternalServerError, "REFRESH_SESSION_ERROR", "Failed to create refresh session")
+		return
+	}
 
 	model.RespondJSON(w, http.StatusOK, AuthResponse{
 		Token: token,
@@ -664,10 +679,10 @@ func isSecureRequest(r *http.Request) bool {
 	return r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
 }
 
-func (h *AuthHandler) setRefreshCookie(w http.ResponseWriter, r *http.Request, userID string) {
+func (h *AuthHandler) setRefreshCookie(w http.ResponseWriter, r *http.Request, userID string) error {
 	refreshToken, err := h.authSvc.CreateRefreshSession(userID)
 	if err != nil {
-		return
+		return err
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     refreshCookieName,
@@ -678,6 +693,7 @@ func (h *AuthHandler) setRefreshCookie(w http.ResponseWriter, r *http.Request, u
 		SameSite: http.SameSiteStrictMode,
 		MaxAge:   int(service.RefreshTokenLifetime / time.Second),
 	})
+	return nil
 }
 
 func clearRefreshCookie(w http.ResponseWriter, r *http.Request) {

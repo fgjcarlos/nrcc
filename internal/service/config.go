@@ -311,6 +311,10 @@ func generateSettingsJS(cfg model.NodeRedConfig) string {
 	if cfg.Lang != "" {
 		builder.WriteString(fmt.Sprintf("  lang: %q,\n", cfg.Lang))
 	}
+	if block := renderEnvBlock(cfg); block != "" {
+		builder.WriteString(block)
+		builder.WriteString("\n")
+	}
 	if cfg.AdminAuth != nil && len(cfg.AdminAuth.Users) > 0 {
 		user := cfg.AdminAuth.Users[0]
 		builder.WriteString("  adminAuth: {\n")
@@ -361,6 +365,11 @@ func patchSettingsJS(existingContent string, cfg model.NodeRedConfig) string {
 	}
 
 	// Block keys: use brace-aware replacement
+	if block := renderEnvBlock(cfg); block != "" {
+		content = replaceArrayKey(content, "env", block)
+	} else {
+		content = removeArrayKey(content, "env")
+	}
 	content = replaceBlockKey(content, "adminAuth", renderAdminAuthBlock(cfg))
 	content = replaceBlockKey(content, "editorTheme", renderEditorThemeBlock(cfg))
 	content = replaceBlockKey(content, "logging", renderLoggingBlock())
@@ -411,6 +420,72 @@ func replaceBlockKey(content, key, blockContent string) string {
 	}
 
 	return content
+}
+
+// replaceArrayKey replaces or appends a multi-line array key.
+func replaceArrayKey(content, key, arrayContent string) string {
+	rePattern := fmt.Sprintf(`(?ms)^\s*%s\s*:\s*\[[^\]]*\],?\s*$`, regexp.QuoteMeta(key))
+	re := regexp.MustCompile(rePattern)
+	if re.MatchString(content) {
+		return re.ReplaceAllString(content, arrayContent)
+	}
+
+	appendPattern := `\n\s*\}\s*$`
+	appendRe := regexp.MustCompile(appendPattern)
+	if appendRe.MatchString(content) {
+		newEntry := "\n" + arrayContent + "\n"
+		return appendRe.ReplaceAllString(content, newEntry+"}\n")
+	}
+	return content
+}
+
+func removeArrayKey(content, key string) string {
+	rePattern := fmt.Sprintf(`(?ms)^\s*%s\s*:\s*\[[^\]]*\],?\s*\n?`, regexp.QuoteMeta(key))
+	return regexp.MustCompile(rePattern).ReplaceAllString(content, "")
+}
+
+func nodeRedEnvType(typ string) string {
+	switch typ {
+	case "number":
+		return "num"
+	case "boolean":
+		return "bool"
+	default:
+		return "str"
+	}
+}
+
+func renderEnvBlock(cfg model.NodeRedConfig) string {
+	vars := make([]model.EnvVar, 0, len(cfg.EnvVars))
+	for _, envVar := range cfg.EnvVars {
+		typ := envVar.Type
+		if typ == "" || typ == "plain" {
+			typ = "string"
+		}
+		if envVar.Key == "" || envVar.Encrypted || typ == "secret" {
+			continue
+		}
+		vars = append(vars, model.EnvVar{Key: envVar.Key, Value: envVar.Value, Type: nodeRedEnvType(typ)})
+	}
+	if len(vars) == 0 {
+		return ""
+	}
+
+	var builder strings.Builder
+	builder.WriteString("  env: [\n")
+	for i, envVar := range vars {
+		builder.WriteString("    {\n")
+		builder.WriteString(fmt.Sprintf("      name: %q,\n", envVar.Key))
+		builder.WriteString(fmt.Sprintf("      value: %q,\n", envVar.Value))
+		builder.WriteString(fmt.Sprintf("      type: %q\n", envVar.Type))
+		if i == len(vars)-1 {
+			builder.WriteString("    }\n")
+		} else {
+			builder.WriteString("    },\n")
+		}
+	}
+	builder.WriteString("  ],")
+	return builder.String()
 }
 
 // renderAdminAuthBlock renders adminAuth as a block string
