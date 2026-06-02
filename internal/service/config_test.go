@@ -3,6 +3,7 @@ package service
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/composedof2/nrcc/internal/model"
@@ -940,5 +941,60 @@ func TestConfigService_SaveRawSettings_SyncsAdminAuth(t *testing.T) {
 				t.Errorf("Password should be 'hashedpwd456', got %s", user.Password)
 			}
 		}
+	}
+}
+
+func TestGenerateSettingsJS_RendersNodeRedGlobalEnvAndSkipsSecrets(t *testing.T) {
+	cfg := model.DefaultNodeRedConfig()
+	cfg.EnvVars = []model.EnvVar{
+		{Key: "PUBLIC_API_URL", Value: "https://example.test", Type: "string"},
+		{Key: "FEATURE_FLAG", Value: "true", Type: "boolean"},
+		{Key: "API_TOKEN", Value: "super-secret", Type: "secret", Encrypted: true},
+	}
+
+	content := generateSettingsJS(cfg)
+
+	for _, want := range []string{
+		`env: [`,
+		`name: "PUBLIC_API_URL"`,
+		`value: "https://example.test"`,
+		`type: "str"`,
+		`name: "FEATURE_FLAG"`,
+		`type: "bool"`,
+	} {
+		if !strings.Contains(content, want) {
+			t.Fatalf("settings.js missing %q in:\n%s", want, content)
+		}
+	}
+	if strings.Contains(content, "API_TOKEN") || strings.Contains(content, "super-secret") {
+		t.Fatalf("secret env vars must not be written to Node-RED settings.js env array:\n%s", content)
+	}
+}
+
+func TestPatchSettingsJS_ReplacesExistingEnvArray(t *testing.T) {
+	cfg := model.DefaultNodeRedConfig()
+	cfg.EnvVars = []model.EnvVar{{Key: "NEW_VALUE", Value: "42", Type: "number"}}
+	existing := `module.exports = {
+  uiPort: 1880,
+  env: [
+    {
+      name: "OLD_VALUE",
+      value: "old",
+      type: "str"
+    }
+  ],
+  logging: { console: { level: 'info' } },
+}`
+
+	content := patchSettingsJS(existing, cfg)
+
+	if !strings.Contains(content, `name: "NEW_VALUE"`) || !strings.Contains(content, `value: "42"`) {
+		t.Fatalf("patched settings.js missing new env value:\n%s", content)
+	}
+	if strings.Contains(content, "OLD_VALUE") {
+		t.Fatalf("patched settings.js should remove stale env values:\n%s", content)
+	}
+	if !strings.Contains(content, "logging:") {
+		t.Fatalf("patched settings.js should preserve unrelated blocks:\n%s", content)
 	}
 }

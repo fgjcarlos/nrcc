@@ -22,6 +22,7 @@ type cliServices struct {
 
 // package-level service instance
 var svc *cliServices
+var mkdirAll = os.MkdirAll
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -63,6 +64,15 @@ func init() {
 	)
 }
 
+func isReadOnlyDataDirCommand(cmd *cobra.Command) bool {
+	for current := cmd; current != nil; current = current.Parent() {
+		if current.Name() == "doctor" {
+			return true
+		}
+	}
+	return false
+}
+
 // initializeServices resolves the dataDir and initializes all services
 func initializeServices(cmd *cobra.Command) error {
 	// Resolve dataDir: flag → DATA_DIR env → ./data
@@ -80,9 +90,12 @@ func initializeServices(cmd *cobra.Command) error {
 		return fmt.Errorf("invalid data directory: %w", err)
 	}
 
-	// Create data directory if it doesn't exist
-	if err := os.MkdirAll(absDataDir, 0755); err != nil {
-		return fmt.Errorf("failed to create data directory: %w", err)
+	// Create data directory if it doesn't exist. Read-only commands such as
+	// `doctor` must not require write access to an existing production dataDir.
+	if !isReadOnlyDataDirCommand(cmd) {
+		if err := mkdirAll(absDataDir, 0755); err != nil {
+			return fmt.Errorf("failed to create data directory: %w", err)
+		}
 	}
 
 	// Initialize services
