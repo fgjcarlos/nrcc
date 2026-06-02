@@ -51,6 +51,8 @@ JWT_SECRET=%s
 NRCC_MANAGE_NODE_RED=true
 NRCC_BOOTSTRAP_INTERACTIVE=false
 NODE_RED_CMD=node-red
+NODE_RED_USER_DIR=
+NODE_RED_SETTINGS=
 `
 
 // InstallerService orchestrates system installation of nrcc
@@ -60,9 +62,35 @@ type InstallerService struct {
 }
 
 type nodeRedInstallDecision struct {
-	Mode     model.NodeRedInstallMode
-	Detected bool
-	Command  string
+	Mode         model.NodeRedInstallMode
+	Detected     bool
+	Command      string
+	UserDir      string
+	SettingsPath string
+}
+
+type installRollback struct {
+	committed bool
+	steps     []func()
+}
+
+func (r *installRollback) Defer(fn func()) {
+	if fn != nil {
+		r.steps = append(r.steps, fn)
+	}
+}
+
+func (r *installRollback) Commit() {
+	r.committed = true
+}
+
+func (r *installRollback) Run() {
+	if r.committed {
+		return
+	}
+	for i := len(r.steps) - 1; i >= 0; i-- {
+		r.steps[i]()
+	}
 }
 
 var (
@@ -113,8 +141,24 @@ func (s *InstallerService) IsInstalled() bool {
 	return errUnit == nil && errBin == nil && errConf == nil
 }
 
-// Install performs the full system installation
+// Install performs the full system installation from CLI/API options.
 func (s *InstallerService) Install(ctx context.Context, opts model.InstallOpts) error {
+	hostSvc := NewHostService(s.layout.DataDir)
+	pterm.Info.Println("Checking host dependencies before install decisions...")
+	status := detectHostStatus(hostSvc)
+	plan := model.NewInstallPlanFromOpts(opts)
+
+	resolvedPlan, err := s.resolveInstallPlan(hostSvc, plan, status)
+	if err != nil {
+		return err
+	}
+	return s.InstallPlan(ctx, resolvedPlan)
+}
+
+// InstallPlan consumes a normalized install plan. This is the shared execution
+// path for flags and the guided wizard, so all install front-ends get the same
+// rollback and commit semantics.
+func (s *InstallerService) InstallPlan(ctx context.Context, plan model.InstallPlan) error {
 	// Check if already installed (non-fatal, just print info)
 	if s.IsInstalled() {
 		pterm.Info.Println("nrcc is already installed. Re-running installation to ensure service is active...")
@@ -125,48 +169,51 @@ func (s *InstallerService) Install(ctx context.Context, opts model.InstallOpts) 
 		return fmt.Errorf("systemd not available on this system. Only systemd is supported.")
 	}
 
+	rollback := &installRollback{}
+	defer rollback.Run()
+
 	// Step 1: Create system user and group
 	if err := s.ensureSystemUser(); err != nil {
 		return fmt.Errorf("failed to create system user: %w", err)
 	}
 
 	// Step 2: Create directories
-	if err := s.createDirectories(); err != nil {
+	if err := s.createDirectoriesWithRollback(rollback); err != nil {
 		return fmt.Errorf("failed to create directories: %w", err)
 	}
 
 	// Step 3: Install the currently running binary to the system service path
-	if err := s.ensureInstalledBinary(); err != nil {
+	if err := s.ensureInstalledBinaryWithRollback(rollback); err != nil {
 		return fmt.Errorf("failed to install nrcc binary: %w", err)
 	}
 
 	hostSvc := NewHostService(s.layout.DataDir)
-	pterm.Info.Println("Checking host dependencies before service start...")
-	hostSvc.PrintDoctorReport()
-
-	decision, err := s.resolveNodeRedInstallDecision(hostSvc, opts)
-	if err != nil {
-		return err
+	decision := nodeRedInstallDecision{
+		Mode:         plan.NodeRedMode,
+		Detected:     plan.NodeRedDetected,
+		Command:      plan.NodeRedCommand,
+		UserDir:      plan.NodeRedUserDir,
+		SettingsPath: plan.NodeRedSettings,
 	}
-
-	decision, err = s.applyNodeRedInstallDecision(hostSvc, decision)
+	decision, err := s.applyNodeRedInstallDecision(hostSvc, decision)
 	if err != nil {
 		return err
 	}
 
 	// Step 4: Generate and write env file
-	if err := s.generateEnvFile(decision); err != nil {
+	if err := s.generateEnvFileWithRollback(decision, rollback); err != nil {
 		return fmt.Errorf("failed to generate env file: %w", err)
 	}
 
-	// Step 5: Write systemd unit
+	// Commit point: the systemd unit makes the install visible to service managers.
 	if err := s.writeSystemdUnit(); err != nil {
 		return fmt.Errorf("failed to write systemd unit: %w", err)
 	}
+	rollback.Commit()
 
 	// Optional: install Portless before starting nrcc so post-install aliases can be created immediately.
-	if opts.WithPortless {
-		if err := s.installPortlessAddons(opts); err != nil {
+	if plan.WithPortless {
+		if err := s.installPortlessAddons(plan); err != nil {
 			return err
 		}
 	}
@@ -189,21 +236,21 @@ func (s *InstallerService) Install(ctx context.Context, opts model.InstallOpts) 
 	return nil
 }
 
-func (s *InstallerService) installPortlessAddons(opts model.InstallOpts) error {
+func (s *InstallerService) installPortlessAddons(plan model.InstallPlan) error {
 	hostSvc := NewHostService(s.layout.DataDir)
 	if err := hostSvc.InstallPortless(); err != nil {
 		return fmt.Errorf("failed to install Portless: %w", err)
 	}
-	if opts.PortlessQuickSetup {
+	if plan.PortlessQuickSetup {
 		if err := hostSvc.QuickSetupPortless(false); err != nil {
 			return fmt.Errorf("failed to configure Portless aliases: %w", err)
 		}
 		pterm.Info.Println("Portless aliases configured and proxy started: https://nrcc.localhost and https://node-red.localhost")
-		if !opts.PortlessTrust {
+		if !plan.PortlessTrust {
 			pterm.Info.Println("If you see HTTPS certificate warnings, run: sudo nrcc portless setup-trust")
 		}
 	}
-	if opts.PortlessTrust {
+	if plan.PortlessTrust {
 		if err := hostSvc.SetupPortlessTrust(); err != nil {
 			return fmt.Errorf("failed to configure Portless trust: %w", err)
 		}
@@ -212,14 +259,27 @@ func (s *InstallerService) installPortlessAddons(opts model.InstallOpts) error {
 	return nil
 }
 
-func (s *InstallerService) resolveNodeRedInstallDecision(hostSvc *HostService, opts model.InstallOpts) (nodeRedInstallDecision, error) {
-	status := detectHostStatus(hostSvc)
+func (s *InstallerService) resolveInstallPlan(hostSvc *HostService, plan model.InstallPlan, status model.HostStatus) (model.InstallPlan, error) {
+	decision, err := s.resolveNodeRedInstallDecision(hostSvc, plan, status)
+	if err != nil {
+		return model.InstallPlan{}, err
+	}
+	plan.NodeRedMode = decision.Mode
+	plan.NodeRedDetected = decision.Detected
+	plan.NodeRedCommand = decision.Command
+	plan.NodeRedUserDir = decision.UserDir
+	plan.NodeRedSettings = decision.SettingsPath
+	return plan, nil
+}
 
-	if opts.NodeRedMode != "" {
-		decision := nodeRedInstallDecision{Mode: opts.NodeRedMode}
-		if opts.NodeRedMode == model.NodeRedInstallModeNative {
+func (s *InstallerService) resolveNodeRedInstallDecision(hostSvc *HostService, plan model.InstallPlan, status model.HostStatus) (nodeRedInstallDecision, error) {
+	if plan.NodeRedMode != "" {
+		decision := nodeRedInstallDecision{Mode: plan.NodeRedMode}
+		if plan.NodeRedMode == model.NodeRedInstallModeNative {
 			decision.Command = nativeNodeRedCommand(status)
 			decision.Detected = decision.Command != ""
+			decision.UserDir = status.NodeRed.UserDir
+			decision.SettingsPath = status.NodeRed.SettingsPath
 		}
 		return decision, nil
 	}
@@ -230,13 +290,15 @@ func (s *InstallerService) resolveNodeRedInstallDecision(hostSvc *HostService, o
 			command = nativeNodeRedCommand(status)
 		}
 		return nodeRedInstallDecision{
-			Mode:     model.NodeRedInstallModeSkip,
-			Detected: true,
-			Command:  command,
+			Mode:         model.NodeRedInstallModeSkip,
+			Detected:     true,
+			Command:      command,
+			UserDir:      status.NodeRed.UserDir,
+			SettingsPath: status.NodeRed.SettingsPath,
 		}, nil
 	}
 
-	if opts.SkipPrompt {
+	if plan.SkipPrompt {
 		return nodeRedInstallDecision{Mode: model.NodeRedInstallModeSkip}, nil
 	}
 
@@ -462,6 +524,23 @@ func (s *InstallerService) ensureInstalledBinary() error {
 	return nil
 }
 
+func (s *InstallerService) ensureInstalledBinaryWithRollback(rollback *installRollback) error {
+	destination := s.layout.BinaryPath
+	before, statErr := os.Stat(destination)
+	existed := statErr == nil
+	if err := s.ensureInstalledBinary(); err != nil {
+		return err
+	}
+	if !existed {
+		rollback.Defer(func() { _ = os.Remove(destination) })
+		return nil
+	}
+	// If the file existed and we overwrote it, do not try to reconstruct it from
+	// stale metadata. Existing installs are past the pre-commit cleanup boundary.
+	_ = before
+	return nil
+}
+
 func sameFile(source string, destination string) bool {
 	sourceInfo, sourceErr := os.Stat(source)
 	destinationInfo, destinationErr := os.Stat(destination)
@@ -504,14 +583,27 @@ func copyExecutable(source string, destination string) error {
 
 // createDirectories creates the required installation directories
 func (s *InstallerService) createDirectories() error {
+	return s.createDirectoriesWithRollback(nil)
+}
+
+func (s *InstallerService) createDirectoriesWithRollback(rollback *installRollback) error {
+	configExisted := pathExists(s.layout.ConfigDir)
+	dataExisted := pathExists(s.layout.DataDir)
+
 	// Create /etc/nrcc
 	if err := os.MkdirAll(s.layout.ConfigDir, 0755); err != nil {
 		return err
+	}
+	if rollback != nil && !configExisted {
+		rollback.Defer(func() { _ = os.RemoveAll(s.layout.ConfigDir) })
 	}
 
 	// Create /var/lib/nrcc with restricted permissions
 	if err := os.MkdirAll(s.layout.DataDir, 0750); err != nil {
 		return err
+	}
+	if rollback != nil && !dataExisted {
+		rollback.Defer(func() { _ = os.RemoveAll(s.layout.DataDir) })
 	}
 
 	// Change ownership to nrcc:nrcc
@@ -535,13 +627,24 @@ func (s *InstallerService) createDirectories() error {
 	return nil
 }
 
+func pathExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
 // generateEnvFile creates or updates /etc/nrcc/nrcc.env
 func (s *InstallerService) generateEnvFile(decision nodeRedInstallDecision) error {
+	return s.generateEnvFileWithRollback(decision, nil)
+}
+
+func (s *InstallerService) generateEnvFileWithRollback(decision nodeRedInstallDecision, rollback *installRollback) error {
 	manageNodeRed := "true"
 	if !decision.Detected && decision.Mode == model.NodeRedInstallModeSkip {
 		manageNodeRed = "false"
 	}
 
+	before, readErr := os.ReadFile(s.layout.EnvFile)
+	existed := readErr == nil
 	content, err := s.loadOrCreateEnvFile()
 	if err != nil {
 		return err
@@ -552,6 +655,12 @@ func (s *InstallerService) generateEnvFile(decision nodeRedInstallDecision) erro
 	if decision.Command != "" {
 		content = setEnvValue(content, "NODE_RED_CMD", decision.Command)
 	}
+	if decision.UserDir != "" {
+		content = setEnvValue(content, "NODE_RED_USER_DIR", decision.UserDir)
+	}
+	if decision.SettingsPath != "" {
+		content = setEnvValue(content, "NODE_RED_SETTINGS", decision.SettingsPath)
+	}
 	if npmPath, err := execLookPath("npm"); err == nil {
 		content = setEnvValue(content, "NPM_BIN", npmPath)
 	} else {
@@ -560,6 +669,14 @@ func (s *InstallerService) generateEnvFile(decision nodeRedInstallDecision) erro
 
 	if err := s.writeEnvFile(content); err != nil {
 		return err
+	}
+	if rollback != nil {
+		if existed {
+			backup := append([]byte(nil), before...)
+			rollback.Defer(func() { _ = os.WriteFile(s.layout.EnvFile, backup, 0640) })
+		} else {
+			rollback.Defer(func() { _ = os.Remove(s.layout.EnvFile) })
+		}
 	}
 
 	return nil

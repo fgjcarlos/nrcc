@@ -207,8 +207,7 @@ func TestInstallPortlessAddonsRunsRequestedSetup(t *testing.T) {
 	layout.DataDir = t.TempDir()
 	installer := NewInstallerService(layout)
 
-	err := installer.installPortlessAddons(model.InstallOpts{
-		Layout:             layout,
+	err := installer.installPortlessAddons(model.InstallPlan{
 		WithPortless:       true,
 		PortlessQuickSetup: true,
 		PortlessTrust:      true,
@@ -317,7 +316,13 @@ func TestGenerateEnvFilePersistsDetectedNativeNodeRedCommand(t *testing.T) {
 	}
 
 	installer := NewInstallerService(layout)
-	if err := installer.generateEnvFile(nodeRedInstallDecision{Detected: true, Mode: model.NodeRedInstallModeSkip, Command: "/usr/local/bin/node-red"}); err != nil {
+	if err := installer.generateEnvFile(nodeRedInstallDecision{
+		Detected:     true,
+		Mode:         model.NodeRedInstallModeSkip,
+		Command:      "/usr/local/bin/node-red",
+		UserDir:      "/home/nr/.node-red",
+		SettingsPath: "/home/nr/.node-red/settings.js",
+	}); err != nil {
 		t.Fatalf("generateEnvFile error = %v", err)
 	}
 
@@ -326,8 +331,14 @@ func TestGenerateEnvFilePersistsDetectedNativeNodeRedCommand(t *testing.T) {
 		t.Fatalf("read env file: %v", err)
 	}
 	content := string(data)
-	if !strings.Contains(content, "NODE_RED_CMD=/usr/local/bin/node-red") {
-		t.Fatalf("env file should persist detected native Node-RED command:\n%s", content)
+	for _, want := range []string{
+		"NODE_RED_CMD=/usr/local/bin/node-red",
+		"NODE_RED_USER_DIR=/home/nr/.node-red",
+		"NODE_RED_SETTINGS=/home/nr/.node-red/settings.js",
+	} {
+		if !strings.Contains(content, want) {
+			t.Fatalf("env file missing %q:\n%s", want, content)
+		}
 	}
 	if strings.Contains(content, "NODE_RED_CMD=node-red") {
 		t.Fatalf("env file should replace fallback node-red command:\n%s", content)
@@ -453,6 +464,26 @@ func TestAllNodeRedInstallOptions(t *testing.T) {
 	}
 }
 
+func TestInstallRollbackRunsLIFOUntilCommit(t *testing.T) {
+	var order []string
+	rollback := &installRollback{}
+	rollback.Defer(func() { order = append(order, "first") })
+	rollback.Defer(func() { order = append(order, "second") })
+	rollback.Run()
+	if !reflect.DeepEqual(order, []string{"second", "first"}) {
+		t.Fatalf("rollback order = %#v", order)
+	}
+
+	order = nil
+	rollback = &installRollback{}
+	rollback.Defer(func() { order = append(order, "should-not-run") })
+	rollback.Commit()
+	rollback.Run()
+	if len(order) != 0 {
+		t.Fatalf("committed rollback ran steps: %#v", order)
+	}
+}
+
 func TestResolveNodeRedInstallDecision(t *testing.T) {
 	installer := NewInstallerService(model.DefaultInstallLayout())
 	originalDetectHostStatus := detectHostStatus
@@ -476,8 +507,8 @@ func TestResolveNodeRedInstallDecision(t *testing.T) {
 	}{
 		{
 			name:   "detected skips prompt",
-			status: model.HostStatus{NodeRed: model.NodeRedEnvironment{Detected: true, Mode: model.InstallationModeNative, Executable: "/usr/local/bin/node-red"}},
-			want:   nodeRedInstallDecision{Mode: model.NodeRedInstallModeSkip, Detected: true, Command: "/usr/local/bin/node-red"},
+			status: model.HostStatus{NodeRed: model.NodeRedEnvironment{Detected: true, Mode: model.InstallationModeNative, Executable: "/usr/local/bin/node-red", UserDir: "/home/nr/.node-red", SettingsPath: "/home/nr/.node-red/settings.js"}},
+			want:   nodeRedInstallDecision{Mode: model.NodeRedInstallModeSkip, Detected: true, Command: "/usr/local/bin/node-red", UserDir: "/home/nr/.node-red", SettingsPath: "/home/nr/.node-red/settings.js"},
 		},
 		{
 			name:   "flag native wins",
@@ -530,7 +561,7 @@ func TestResolveNodeRedInstallDecision(t *testing.T) {
 				return tt.selectMode, nil
 			}
 
-			got, err := installer.resolveNodeRedInstallDecision(&HostService{}, tt.opts)
+			got, err := installer.resolveNodeRedInstallDecision(&HostService{}, model.NewInstallPlanFromOpts(tt.opts), tt.status)
 			if err != nil {
 				t.Fatalf("resolveNodeRedInstallDecision error = %v", err)
 			}
