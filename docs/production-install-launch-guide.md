@@ -132,6 +132,13 @@ sudo nrcc install
 ```
 
 2. Confirmar que el servicio queda instalado y arrancado.
+
+   En una VM Linux limpia, validar cada modo de Node-RED:
+   - `native`: si `node` o `npm` faltan, el instalador debe instalarlos antes de ejecutar `npm install -g node-red`.
+   - `docker`: si `docker` falta, el instalador debe instalar Docker y comprobar `docker info` antes de crear el contenedor Node-RED.
+   - `skip`: no debe instalar Node-RED ni dependencias específicas de Node-RED.
+   - `--with-portless`: si Portless está activado y `node`/`npm` faltan, debe preparar Node.js/npm antes de instalar Portless.
+
 3. Verificar estado:
 
 ```bash
