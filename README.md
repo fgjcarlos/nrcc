@@ -24,8 +24,8 @@ A single-binary management UI for Node-RED. Run it alongside Node-RED to get a w
 ## Requirements
 
 - Go 1.25+ (to build from source)
-- Node.js 22+ and pnpm 11+ (for frontend build)
-- Node-RED installed globally or in PATH (`npm install -g node-red`)
+- For source/frontend builds: Node.js 22+ and pnpm 11+
+- For `nrcc install`: a supported Linux package manager when dependencies must be installed automatically (`apt-get`, `dnf`, `yum`, `pacman`, `zypper`, or `apk`)
 
 ## Quick Install
 
@@ -105,6 +105,15 @@ sudo ./nrcc install
 ```
 
 `nrcc install` copies the currently running binary to `/usr/local/bin/nrcc`, checks the host, prepares Node-RED according to the selected/detected mode, writes `/etc/nrcc/nrcc.env`, installs the systemd unit, and starts the service.
+
+Dependency handling by Node-RED mode:
+
+- `native`: if Node.js or npm is missing, nrcc installs both with the detected Linux package manager before running `npm install -g node-red`.
+- `docker`: if Docker is missing, nrcc installs Docker with the detected Linux package manager and verifies that the Docker daemon is reachable before pulling/running Node-RED.
+- `skip`: nrcc does not install Node-RED or Node-RED-specific dependencies.
+- `--with-portless`: if Portless is requested and Node.js/npm is missing, nrcc prepares Node.js/npm before installing the Portless CLI globally.
+
+If the host has no supported package manager, or Docker installs but its daemon cannot be reached, the installer fails with an explicit prerequisite error instead of continuing with a broken service setup.
 
 ### Binary release
 

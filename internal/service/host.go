@@ -582,11 +582,11 @@ func buildBootstrapOptionsDisplay(options []string) string {
 
 func (s *HostService) installNodeJS() error {
 	if runtime.GOOS != "linux" {
-		return fmt.Errorf("automatic Node.js installation is only implemented for linux")
+		return fmt.Errorf("automatic Node.js/npm installation is only implemented for linux")
 	}
 	pm := detectPackageManager()
 	if pm == "" {
-		return fmt.Errorf("no supported package manager found (tried: apt-get, dnf, yum, pacman, zypper, apk)")
+		return fmt.Errorf("no supported package manager found for automatic Node.js/npm installation (tried: apt-get, dnf, yum, pacman, zypper, apk)")
 	}
 
 	var updateCmd, installCmd []string
@@ -605,9 +605,10 @@ func (s *HostService) installNodeJS() error {
 	case "apk":
 		installCmd = []string{"apk", "add", "--no-cache", "nodejs", "npm"}
 	default:
-		return fmt.Errorf("unsupported package manager: %s", pm)
+		return fmt.Errorf("unsupported package manager for Node.js/npm installation: %s", pm)
 	}
 
+	ui.Info("Installing Node.js and npm prerequisites...")
 	if updateCmd != nil {
 		if err := runElevatedCommands(updateCmd); err != nil {
 			return err
@@ -619,10 +620,106 @@ func (s *HostService) installNodeJS() error {
 
 	// Verify installation
 	status := s.Detect()
-	if !status.NodeJS.Installed {
-		return fmt.Errorf("Node.js installation appeared to succeed but verification failed")
+	if !status.NodeJS.Installed || !status.NPM.Installed {
+		missing := []string{}
+		if !status.NodeJS.Installed {
+			missing = append(missing, "node")
+		}
+		if !status.NPM.Installed {
+			missing = append(missing, "npm")
+		}
+		return fmt.Errorf("Node.js/npm installation appeared to succeed but verification failed; missing: %s", strings.Join(missing, ", "))
 	}
-	ui.Info(fmt.Sprintf("✓ Node.js %s y npm %s instalados correctamente", status.NodeJS.Version, status.NPM.Version))
+	ui.Info(fmt.Sprintf("✓ Node.js %s and npm %s installed successfully", status.NodeJS.Version, status.NPM.Version))
+	return nil
+}
+
+func (s *HostService) ensureNodeJSAndNPM() error {
+	status := s.Detect()
+	if status.NodeJS.Installed && status.NPM.Installed {
+		return nil
+	}
+	return s.installNodeJS()
+}
+
+func (s *HostService) installDocker() error {
+	if runtime.GOOS != "linux" {
+		return fmt.Errorf("automatic Docker installation is only implemented for linux")
+	}
+	pm := detectPackageManager()
+	if pm == "" {
+		return fmt.Errorf("no supported package manager found for automatic Docker installation (tried: apt-get, dnf, yum, pacman, zypper, apk)")
+	}
+
+	var updateCmd, installCmd []string
+	switch pm {
+	case "apt-get":
+		updateCmd = []string{"apt-get", "update"}
+		installCmd = []string{"apt-get", "install", "-y", "docker.io"}
+	case "dnf":
+		installCmd = []string{"dnf", "install", "-y", "docker"}
+	case "yum":
+		installCmd = []string{"yum", "install", "-y", "docker"}
+	case "pacman":
+		installCmd = []string{"pacman", "-Sy", "--noconfirm", "docker"}
+	case "zypper":
+		installCmd = []string{"zypper", "install", "-y", "docker"}
+	case "apk":
+		installCmd = []string{"apk", "add", "--no-cache", "docker"}
+	default:
+		return fmt.Errorf("unsupported package manager for Docker installation: %s", pm)
+	}
+
+	ui.Info("Installing Docker prerequisite...")
+	if updateCmd != nil {
+		if err := runElevatedCommands(updateCmd); err != nil {
+			return err
+		}
+	}
+	if err := runElevatedCommands(installCmd); err != nil {
+		return err
+	}
+
+	status := s.Detect()
+	if !status.Docker.Installed {
+		return fmt.Errorf("Docker installation appeared to succeed but verification failed")
+	}
+	if err := s.ensureDockerDaemon(status.Docker.Command); err != nil {
+		return err
+	}
+	ui.Info(fmt.Sprintf("✓ Docker %s installed and daemon reachable", status.Docker.Version))
+	return nil
+}
+
+func (s *HostService) ensureDockerAvailable() error {
+	status := s.Detect()
+	if !status.Docker.Installed {
+		if err := s.installDocker(); err != nil {
+			return err
+		}
+		status = s.Detect()
+	}
+	if !status.Docker.Installed {
+		return fmt.Errorf("Docker is required for Docker-based installation")
+	}
+	return s.ensureDockerDaemon(status.Docker.Command)
+}
+
+func (s *HostService) ensureDockerDaemon(dockerCmd string) error {
+	if dockerCmd == "" {
+		dockerCmd = "docker"
+	}
+	cmd := execCommand(dockerCmd, "info")
+	if err := cmd.Run(); err != nil {
+		if _, systemctlErr := execLookPath("systemctl"); systemctlErr == nil {
+			_ = runElevatedCommands([]string{"systemctl", "enable", "--now", "docker"})
+			cmd = execCommand(dockerCmd, "info")
+			if retryErr := cmd.Run(); retryErr == nil {
+				return nil
+			}
+		}
+		return fmt.Errorf("Docker is installed but the daemon is not reachable; start Docker and retry: %w", err)
+	}
 	return nil
 }
 
@@ -636,9 +733,13 @@ func detectPackageManager() string {
 }
 
 func (s *HostService) InstallNodeRedNative() error {
+	if err := s.ensureNodeJSAndNPM(); err != nil {
+		return fmt.Errorf("failed to prepare Node.js/npm for native Node-RED installation: %w", err)
+	}
+
 	npmPath, err := execLookPath("npm")
 	if err != nil {
-		return fmt.Errorf("npm is required to install Node-RED natively")
+		return fmt.Errorf("npm is required to install Node-RED natively after dependency preparation: %w", err)
 	}
 
 	nodePath, _ := execLookPath("node")
@@ -666,9 +767,13 @@ func (s *HostService) InstallNodeRedNative() error {
 
 // InstallPortless installs the Portless CLI globally via npm.
 func (s *HostService) InstallPortless() error {
+	if err := s.ensureNodeJSAndNPM(); err != nil {
+		return fmt.Errorf("failed to prepare Node.js/npm for Portless installation: %w", err)
+	}
+
 	npmPath, err := execLookPath("npm")
 	if err != nil {
-		return fmt.Errorf("npm is required to install Portless")
+		return fmt.Errorf("npm is required to install Portless after dependency preparation: %w", err)
 	}
 
 	nodePath, _ := execLookPath("node")
@@ -1155,9 +1260,12 @@ func validatePortlessAlias(name string, port int) error {
 }
 
 func (s *HostService) installNodeRedDocker() (err error) {
+	if err := s.ensureDockerAvailable(); err != nil {
+		return fmt.Errorf("failed to prepare Docker for Docker-based Node-RED installation: %w", err)
+	}
 	dockerPath, dockerErr := execLookPath("docker")
 	if dockerErr != nil {
-		return fmt.Errorf("docker is required for Docker-based installation")
+		return fmt.Errorf("docker is required for Docker-based installation after dependency preparation: %w", dockerErr)
 	}
 	_ = dockerPath
 	targetDir := filepath.Join(s.dataDir, "nodered")

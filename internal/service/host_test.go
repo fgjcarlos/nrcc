@@ -124,6 +124,117 @@ func withMockExec(t *testing.T, recordFile string, uninstalledMarker string) {
 	})
 }
 
+func readCommandLog(t *testing.T, recordFile string) string {
+	t.Helper()
+	data, err := os.ReadFile(recordFile)
+	if err != nil {
+		t.Fatalf("read command log: %v", err)
+	}
+	return string(data)
+}
+
+func withMockDependencyInstallerExec(t *testing.T, recordFile, nodeInstalledMarker, nodeRedInstalledMarker, portlessInstalledMarker string) {
+	t.Helper()
+	originalCommand := execCommand
+	originalLookPath := execLookPath
+	execCommand = func(name string, args ...string) *exec.Cmd {
+		base := filepath.Base(name)
+		allArgs := append([]string{name}, args...)
+		record := "printf '%s\\n' " + shellQuoteForTest(strings.Join(allArgs, " ")) + " >> " + shellQuoteForTest(recordFile)
+		script := record
+		switch {
+		case base == "apt-get" && len(args) >= 1 && args[0] == "install":
+			script += " && touch " + shellQuoteForTest(nodeInstalledMarker)
+		case base == "npm" && len(args) >= 1 && args[0] == "prefix":
+			script += " && printf '%s\\n' " + shellQuoteForTest(t.TempDir())
+		case base == "npm" && strings.Contains(strings.Join(args, " "), "node-red"):
+			script += " && touch " + shellQuoteForTest(nodeRedInstalledMarker)
+		case base == "npm" && strings.Contains(strings.Join(args, " "), "portless"):
+			script += " && touch " + shellQuoteForTest(portlessInstalledMarker)
+		case (base == "node" || base == "npm" || base == "node-red" || base == "portless") && len(args) == 1 && args[0] == "--version":
+			script += " && printf 'v1.2.3\\n'"
+		}
+		return exec.Command("sh", "-c", script)
+	}
+	execLookPath = func(name string) (string, error) {
+		switch name {
+		case "apt-get":
+			return "/mock/bin/apt-get", nil
+		case "node", "npm":
+			if _, err := os.Stat(nodeInstalledMarker); err == nil {
+				return "/mock/bin/" + name, nil
+			}
+			return "", errors.New("not found")
+		case "node-red":
+			if _, err := os.Stat(nodeRedInstalledMarker); err == nil {
+				return "/mock/bin/node-red", nil
+			}
+			return "", errors.New("not found")
+		case "portless":
+			if _, err := os.Stat(portlessInstalledMarker); err == nil {
+				return "/mock/bin/portless", nil
+			}
+			return "", errors.New("not found")
+		default:
+			return "", errors.New("not found")
+		}
+	}
+	t.Cleanup(func() {
+		execCommand = originalCommand
+		execLookPath = originalLookPath
+	})
+}
+
+func withMockDockerInstallerExec(t *testing.T, recordFile, dockerInstalledMarker, nodeRedContainerMarker string) {
+	t.Helper()
+	originalCommand := execCommand
+	originalLookPath := execLookPath
+	execCommand = func(name string, args ...string) *exec.Cmd {
+		base := filepath.Base(name)
+		allArgs := append([]string{name}, args...)
+		record := "printf '%s\\n' " + shellQuoteForTest(strings.Join(allArgs, " ")) + " >> " + shellQuoteForTest(recordFile)
+		script := record
+		switch {
+		case base == "apt-get" && len(args) >= 1 && args[0] == "install":
+			script += " && touch " + shellQuoteForTest(dockerInstalledMarker)
+		case base == "docker" && len(args) == 1 && args[0] == "--version":
+			script += " && printf 'Docker version 25.0.0\\n'"
+		case base == "docker" && len(args) == 1 && args[0] == "info":
+			script += " && printf 'Server: Docker\\n'"
+		case base == "docker" && len(args) >= 1 && args[0] == "pull":
+			// record only
+		case base == "docker" && len(args) >= 1 && args[0] == "run":
+			script += " && touch " + shellQuoteForTest(nodeRedContainerMarker)
+		case base == "docker" && len(args) >= 2 && args[0] == "ps":
+			if _, err := os.Stat(nodeRedContainerMarker); err == nil {
+				script += " && printf 'abc123\\tnodered/node-red:latest\\tnrcc-node-red\\tUp 1 second\\n'"
+			}
+		}
+		return exec.Command("sh", "-c", script)
+	}
+	execLookPath = func(name string) (string, error) {
+		switch name {
+		case "apt-get":
+			return "/mock/bin/apt-get", nil
+		case "docker":
+			if _, err := os.Stat(dockerInstalledMarker); err == nil {
+				return "/mock/bin/docker", nil
+			}
+			return "", errors.New("not found")
+		default:
+			return "", errors.New("not found")
+		}
+	}
+	t.Cleanup(func() {
+		execCommand = originalCommand
+		execLookPath = originalLookPath
+	})
+}
+
+func shellQuoteForTest(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"
+}
+
 func TestHostService_Detect_ReturnsHostStatus(t *testing.T) {
 	// Create temp data dir
 	tempDir := t.TempDir()
@@ -793,6 +904,77 @@ func TestUpdateNodeRedNative_ReturnTypes(t *testing.T) {
 		}
 	}) {
 		t.Skip("Update method test skipped")
+	}
+}
+
+func TestInstallNodeRedNativeInstallsMissingNodeJSAndNPM(t *testing.T) {
+	recordFile := filepath.Join(t.TempDir(), "commands.log")
+	nodeInstalledMarker := filepath.Join(t.TempDir(), "node-installed")
+	nodeRedInstalledMarker := filepath.Join(t.TempDir(), "node-red-installed")
+	withMockDependencyInstallerExec(t, recordFile, nodeInstalledMarker, nodeRedInstalledMarker, "")
+
+	err := NewHostService(t.TempDir()).InstallNodeRedNative()
+	if err != nil {
+		t.Fatalf("InstallNodeRedNative error = %v", err)
+	}
+
+	commands := readCommandLog(t, recordFile)
+	for _, want := range []string{
+		"apt-get update",
+		"apt-get install -y nodejs npm",
+		"/mock/bin/npm install -g --unsafe-perm node-red",
+	} {
+		if !strings.Contains(commands, want) {
+			t.Fatalf("commands missing %q:\n%s", want, commands)
+		}
+	}
+}
+
+func TestInstallPortlessInstallsMissingNodeJSAndNPM(t *testing.T) {
+	recordFile := filepath.Join(t.TempDir(), "commands.log")
+	nodeInstalledMarker := filepath.Join(t.TempDir(), "node-installed")
+	portlessInstalledMarker := filepath.Join(t.TempDir(), "portless-installed")
+	withMockDependencyInstallerExec(t, recordFile, nodeInstalledMarker, "", portlessInstalledMarker)
+
+	err := NewHostService(t.TempDir()).InstallPortless()
+	if err != nil {
+		t.Fatalf("InstallPortless error = %v", err)
+	}
+
+	commands := readCommandLog(t, recordFile)
+	for _, want := range []string{
+		"apt-get update",
+		"apt-get install -y nodejs npm",
+		"/mock/bin/npm install -g portless",
+	} {
+		if !strings.Contains(commands, want) {
+			t.Fatalf("commands missing %q:\n%s", want, commands)
+		}
+	}
+}
+
+func TestInstallNodeRedDockerInstallsMissingDockerAndVerifiesDaemon(t *testing.T) {
+	recordFile := filepath.Join(t.TempDir(), "commands.log")
+	dockerInstalledMarker := filepath.Join(t.TempDir(), "docker-installed")
+	nodeRedContainerMarker := filepath.Join(t.TempDir(), "node-red-container")
+	withMockDockerInstallerExec(t, recordFile, dockerInstalledMarker, nodeRedContainerMarker)
+
+	err := NewHostService(t.TempDir()).installNodeRedDocker()
+	if err != nil {
+		t.Fatalf("installNodeRedDocker error = %v", err)
+	}
+
+	commands := readCommandLog(t, recordFile)
+	for _, want := range []string{
+		"apt-get update",
+		"apt-get install -y docker.io",
+		"/mock/bin/docker info",
+		"docker pull nodered/node-red:latest",
+		"docker run -d --name nrcc-node-red -p 1880:1880",
+	} {
+		if !strings.Contains(commands, want) {
+			t.Fatalf("commands missing %q:\n%s", want, commands)
+		}
 	}
 }
 
