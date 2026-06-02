@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"os/user"
@@ -540,6 +541,76 @@ func TestResolveNodeRedInstallDecision(t *testing.T) {
 				t.Fatalf("prompted = %v, want %v", prompted, tt.wantPrompt)
 			}
 		})
+	}
+}
+
+func TestGenerateEnvFileFreezesNpmBin(t *testing.T) {
+	withMockInstallerUserLookup(t, true, true)
+	originalChown := chown
+	chown = func(string, int, int) error { return nil }
+	t.Cleanup(func() { chown = originalChown })
+
+	originalExecLookPath := execLookPath
+	execLookPath = func(string) (string, error) { return "/usr/local/bin/npm", nil }
+	t.Cleanup(func() { execLookPath = originalExecLookPath })
+
+	root := t.TempDir()
+	layout := model.DefaultInstallLayout()
+	layout.ConfigDir = filepath.Join(root, "etc", "nrcc")
+	layout.EnvFile = filepath.Join(layout.ConfigDir, "nrcc.env")
+	layout.DataDir = filepath.Join(root, "var", "lib", "nrcc")
+
+	if err := os.MkdirAll(layout.ConfigDir, 0755); err != nil {
+		t.Fatalf("create config dir: %v", err)
+	}
+
+	installer := NewInstallerService(layout)
+	if err := installer.generateEnvFile(nodeRedInstallDecision{Detected: true, Mode: model.NodeRedInstallModeSkip}); err != nil {
+		t.Fatalf("generateEnvFile error = %v", err)
+	}
+
+	data, err := os.ReadFile(layout.EnvFile)
+	if err != nil {
+		t.Fatalf("read env file: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "NPM_BIN=/usr/local/bin/npm") {
+		t.Fatalf("env file should contain frozen NPM_BIN path:\n%s", content)
+	}
+}
+
+func TestGenerateEnvFileSkipsNpmBinWhenNpmAbsent(t *testing.T) {
+	withMockInstallerUserLookup(t, true, true)
+	originalChown := chown
+	chown = func(string, int, int) error { return nil }
+	t.Cleanup(func() { chown = originalChown })
+
+	originalExecLookPath := execLookPath
+	execLookPath = func(string) (string, error) { return "", errors.New("not found") }
+	t.Cleanup(func() { execLookPath = originalExecLookPath })
+
+	root := t.TempDir()
+	layout := model.DefaultInstallLayout()
+	layout.ConfigDir = filepath.Join(root, "etc", "nrcc")
+	layout.EnvFile = filepath.Join(layout.ConfigDir, "nrcc.env")
+	layout.DataDir = filepath.Join(root, "var", "lib", "nrcc")
+
+	if err := os.MkdirAll(layout.ConfigDir, 0755); err != nil {
+		t.Fatalf("create config dir: %v", err)
+	}
+
+	installer := NewInstallerService(layout)
+	if err := installer.generateEnvFile(nodeRedInstallDecision{Detected: true, Mode: model.NodeRedInstallModeSkip}); err != nil {
+		t.Fatalf("generateEnvFile error = %v", err)
+	}
+
+	data, err := os.ReadFile(layout.EnvFile)
+	if err != nil {
+		t.Fatalf("read env file: %v", err)
+	}
+	content := string(data)
+	if strings.Contains(content, "NPM_BIN=") {
+		t.Fatalf("env file should NOT contain NPM_BIN when npm is absent:\n%s", content)
 	}
 }
 
