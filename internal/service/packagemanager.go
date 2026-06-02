@@ -7,11 +7,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 )
-
-const minPnpmMajorVersion = 11
 
 // PackageManager defines operations for package management
 type PackageManager interface {
@@ -19,65 +16,54 @@ type PackageManager interface {
 	Uninstall(pkg string) error
 }
 
-// PnpmPackageManager implements PackageManager using pnpm
-type PnpmPackageManager struct {
+// NpmPackageManager implements PackageManager using npm
+type NpmPackageManager struct {
 	WorkDir string
 	Bin     string
 }
 
-// NewPnpmPackageManager creates a new PnpmPackageManager
-func NewPnpmPackageManager(workDir string) *PnpmPackageManager {
-	return &PnpmPackageManager{
+// NewNpmPackageManager creates a new NpmPackageManager, resolving the npm binary path.
+func NewNpmPackageManager(workDir string) *NpmPackageManager {
+	return &NpmPackageManager{
 		WorkDir: workDir,
-		Bin:     resolvePnpmBin(),
+		Bin:     resolveNpmBin(),
 	}
 }
 
-func ensureSupportedPnpm(bin string) error {
-	output, err := exec.Command(bin, "--version").Output()
-	if err != nil {
-		return fmt.Errorf("pnpm is required but was not found or could not run at %q: %w", bin, err)
+// ensureNpm runs bin --version to verify that npm is available and executable.
+// If the binary cannot be executed, it returns a descriptive error.
+func ensureNpm(bin string) error {
+	if err := exec.Command(bin, "--version").Run(); err != nil {
+		return fmt.Errorf("npm is required but was not found or could not run at %q: %w", bin, err)
 	}
-
-	version := strings.TrimSpace(string(output))
-	majorText, _, _ := strings.Cut(version, ".")
-	major, err := strconv.Atoi(majorText)
-	if err != nil {
-		return fmt.Errorf("could not parse pnpm version %q from %q", version, bin)
-	}
-
-	if major < minPnpmMajorVersion {
-		return fmt.Errorf("pnpm >= %d is required for safer package operations; found %s at %q", minPnpmMajorVersion, version, bin)
-	}
-
 	return nil
 }
 
-func resolvePnpmBin() string {
-	if bin := os.Getenv("PNPM_BIN"); bin != "" {
+// resolveNpmBin returns the path to the npm binary using the following precedence:
+//  1. NPM_BIN environment variable (set by /etc/nrcc/nrcc.env via issue #257)
+//  2. npm on PATH via exec.LookPath
+//  3. Known installation candidate paths (nvm, system, Homebrew)
+//  4. Bare "npm" (falls back to PATH resolution at exec time)
+func resolveNpmBin() string {
+	if bin := os.Getenv("NPM_BIN"); bin != "" {
 		return bin
 	}
 
-	if bin, err := exec.LookPath("pnpm"); err == nil {
+	if bin, err := exec.LookPath("npm"); err == nil {
 		return bin
 	}
 
 	var candidates []string
 	if home, err := os.UserHomeDir(); err == nil {
-		candidates = append(candidates,
-			filepath.Join(home, ".local", "share", "pnpm", "pnpm"),
-			filepath.Join(home, ".npm-global", "bin", "pnpm"),
-		)
-
-		if matches, err := filepath.Glob(filepath.Join(home, ".nvm", "versions", "node", "*", "bin", "pnpm")); err == nil {
+		if matches, err := filepath.Glob(filepath.Join(home, ".nvm", "versions", "node", "*", "bin", "npm")); err == nil {
 			candidates = append(candidates, matches...)
 		}
 	}
 
 	candidates = append(candidates,
-		"/usr/local/bin/pnpm",
-		"/usr/bin/pnpm",
-		"/opt/homebrew/bin/pnpm",
+		"/usr/local/bin/npm",
+		"/usr/bin/npm",
+		"/opt/homebrew/bin/npm",
 	)
 
 	for _, candidate := range candidates {
@@ -86,7 +72,7 @@ func resolvePnpmBin() string {
 		}
 	}
 
-	return "pnpm"
+	return "npm"
 }
 
 var (
@@ -122,43 +108,43 @@ func ValidatePackageName(pkg string) error {
 	return nil
 }
 
-// Install installs a package using pnpm add
-func (p *PnpmPackageManager) Install(pkg string) error {
+// Install installs a package using npm install
+func (p *NpmPackageManager) Install(pkg string) error {
 	if err := ValidatePackageName(pkg); err != nil {
 		return err
 	}
-	if err := ensureSupportedPnpm(p.Bin); err != nil {
+	if err := ensureNpm(p.Bin); err != nil {
 		return err
 	}
 
-	cmd := exec.Command(p.Bin, "add", pkg)
+	cmd := exec.Command(p.Bin, "install", "--no-fund", "--no-audit", pkg)
 	cmd.Dir = p.WorkDir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to install package with pnpm (%s): %w", p.Bin, err)
+		return fmt.Errorf("failed to install package with npm (%s): %w", p.Bin, err)
 	}
 
 	return nil
 }
 
-// Uninstall uninstalls a package using pnpm remove
-func (p *PnpmPackageManager) Uninstall(pkg string) error {
+// Uninstall uninstalls a package using npm uninstall
+func (p *NpmPackageManager) Uninstall(pkg string) error {
 	if err := ValidatePackageName(pkg); err != nil {
 		return err
 	}
-	if err := ensureSupportedPnpm(p.Bin); err != nil {
+	if err := ensureNpm(p.Bin); err != nil {
 		return err
 	}
 
-	cmd := exec.Command(p.Bin, "remove", pkg)
+	cmd := exec.Command(p.Bin, "uninstall", "--no-fund", "--no-audit", pkg)
 	cmd.Dir = p.WorkDir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to uninstall package with pnpm (%s): %w", p.Bin, err)
+		return fmt.Errorf("failed to uninstall package with npm (%s): %w", p.Bin, err)
 	}
 
 	return nil

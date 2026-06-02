@@ -1241,7 +1241,7 @@ paths:
       tags: [Libraries]
       operationId: installLibrary
       summary: Install a library
-      description: Installs an npm package into the Node-RED user directory via pnpm.
+      description: Installs an npm package into the Node-RED user directory via npm.
       security:
         - bearerAuth: []
       requestBody:
