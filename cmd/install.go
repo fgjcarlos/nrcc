@@ -9,6 +9,7 @@ import (
 	"github.com/composedof2/nrcc/internal/model"
 	"github.com/composedof2/nrcc/internal/service"
 	"github.com/composedof2/nrcc/internal/ui"
+	"github.com/composedof2/nrcc/internal/wizard"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 )
@@ -57,33 +58,56 @@ Requires root privileges (run with sudo).`,
 		layout := model.DefaultInstallLayout()
 		installer := service.NewInstallerService(layout)
 
-		// Perform installation
-		opts := model.InstallOpts{
-			Layout:             layout,
-			SkipPrompt:         false,
-			NodeRedMode:        model.NodeRedInstallMode(installNodeRedMode),
-			WithPortless:       installWithPortless,
-			PortlessQuickSetup: installPortlessQuickSetup,
-			PortlessTrust:      installPortlessTrust,
-		}
-
-		spinner := ui.StartSpinner("Installing nrcc as system service…")
 		ctx := context.Background()
-		err := installer.Install(ctx, opts)
-		if err != nil {
-			spinner.Fail(fmt.Sprintf("Installation failed: %v", err))
-			return err
+		hostStatus := service.NewHostService(layout.DataDir).Detect()
+		explicitInstallFlags := hasExplicitInstallFlags(cmd)
+		accessURL := "http://localhost:3001"
+		showTrustHint := false
+
+		if wizard.ShouldRunWizard(hostStatus, explicitInstallFlags) {
+			plan, wizardState, err := wizard.Run(ctx, hostStatus)
+			if err != nil {
+				return err
+			}
+			accessURL = wizardState.SuccessURL()
+			showTrustHint = accessURL == "https://nrcc.localhost" && !wizardState.PortlessTrust
+			spinner := ui.StartSpinner("Installing nrcc as system service…")
+			err = installer.InstallPlan(ctx, plan)
+			if err != nil {
+				spinner.Fail(fmt.Sprintf("Installation failed: %v", err))
+				return err
+			}
+			spinner.Success("Installation completed successfully")
+		} else {
+			// Perform flag-driven installation
+			opts := model.InstallOpts{
+				Layout:             layout,
+				SkipPrompt:         false,
+				NodeRedMode:        model.NodeRedInstallMode(installNodeRedMode),
+				WithPortless:       installWithPortless,
+				PortlessQuickSetup: installPortlessQuickSetup,
+				PortlessTrust:      installPortlessTrust,
+			}
+			if installWithPortless && installPortlessQuickSetup {
+				accessURL = "https://nrcc.localhost"
+				showTrustHint = !installPortlessTrust
+			}
+
+			spinner := ui.StartSpinner("Installing nrcc as system service…")
+			err := installer.Install(ctx, opts)
+			if err != nil {
+				spinner.Fail(fmt.Sprintf("Installation failed: %v", err))
+				return err
+			}
+			spinner.Success("Installation completed successfully")
 		}
-		spinner.Success("Installation completed successfully")
 
 		// Print success message
 		pterm.Println()
 		pterm.Success.Println("✓ nrcc installed and running")
-		if installWithPortless && installPortlessQuickSetup {
-			pterm.Printfln("🌐 Access nrcc at: https://nrcc.localhost")
+		pterm.Printfln("🌐 Access nrcc at: %s", accessURL)
+		if showTrustHint {
 			pterm.Printfln("🔐 Local HTTPS uses Portless trust. If your browser warns, run: sudo nrcc portless setup-trust")
-		} else {
-			pterm.Printfln("🌐 Access nrcc at: http://localhost:3001")
 		}
 		pterm.Printfln("📁 Data directory: %s", layout.DataDir)
 		pterm.Printfln("⚙️  Config file: %s", layout.EnvFile)
@@ -101,6 +125,15 @@ var installWithPortless bool
 var installPortlessQuickSetup bool
 var installPortlessTrust bool
 var installNodeRedMode string
+
+func hasExplicitInstallFlags(cmd *cobra.Command) bool {
+	for _, name := range []string{"node-red", "with-portless", "portless-quick-setup", "portless-trust"} {
+		if cmd.Flags().Changed(name) {
+			return true
+		}
+	}
+	return false
+}
 
 func validateInstallPortlessFlags() error {
 	if !installWithPortless && (installPortlessQuickSetup || installPortlessTrust) {
