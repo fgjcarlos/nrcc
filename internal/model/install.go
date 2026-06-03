@@ -33,7 +33,11 @@ func DefaultInstallLayout() InstallLayout {
 	}
 }
 
-// InstallOpts provides options for the installation process
+// InstallOpts provides options for the installation process.
+//
+// InstallOpts is the CLI/API input shape. It is intentionally mapped into an
+// InstallPlan before side effects start so flag-driven installs and future TUI
+// wizard installs share one execution path.
 type InstallOpts struct {
 	Layout             InstallLayout
 	SkipPrompt         bool // for non-interactive/scripting use
@@ -41,6 +45,33 @@ type InstallOpts struct {
 	WithPortless       bool // install Portless CLI alongside nrcc
 	PortlessQuickSetup bool // configure default Portless aliases after install
 	PortlessTrust      bool // run Portless trust setup after install
+}
+
+// InstallPlan is the normalized, side-effect-free install decision model.
+// Both the existing flag path and the guided wizard path produce this shape;
+// InstallerService consumes only the plan after host detection and prompting.
+type InstallPlan struct {
+	SkipPrompt         bool
+	NodeRedMode        NodeRedInstallMode
+	NodeRedDetected    bool
+	NodeRedCommand     string
+	NodeRedUserDir     string
+	NodeRedSettings    string
+	WithPortless       bool
+	PortlessQuickSetup bool
+	PortlessTrust      bool
+}
+
+// NewInstallPlanFromOpts preserves the current flag-driven behavior while
+// making it explicit and testable for future wizard front-ends.
+func NewInstallPlanFromOpts(opts InstallOpts) InstallPlan {
+	return InstallPlan{
+		SkipPrompt:         opts.SkipPrompt,
+		NodeRedMode:        opts.NodeRedMode,
+		WithPortless:       opts.WithPortless,
+		PortlessQuickSetup: opts.PortlessQuickSetup,
+		PortlessTrust:      opts.PortlessTrust,
+	}
 }
 
 // UninstallOpts provides options for the uninstall process

@@ -183,14 +183,18 @@ sudo nrcc install --with-portless --portless-quick-setup --portless-trust
 
 `nrcc install` now decides how to handle Node-RED before starting the service:
 
+- It runs host detection first, before install side effects, so the installer can adopt an existing Node-RED instead of reinstalling it.
+- Existing native Node-RED installs are frozen into `/etc/nrcc/nrcc.env` with `NODE_RED_CMD`, `NODE_RED_USER_DIR`, and `NODE_RED_SETTINGS` so systemd uses the same detected paths.
 - If `--node-red skip|native|docker` is provided, that mode is used without prompting.
 - If Node-RED is already detected on the host, install continues without prompting.
-- If Node-RED is missing and the install runs in an interactive terminal, nrcc prompts for `skip`, `native`, or `docker` based on what the host supports.
+- If Node-RED is missing and the install runs in an interactive terminal, nrcc prompts for `skip`, `native`, or `docker`.
 - If Node-RED is missing and there is no interactive terminal, nrcc falls back to `--node-red skip` and prints a warning.
+
+The install flow is normalized into an `InstallPlan` before mutations start. Pre-systemd steps use a rollback stack and the commit point is the systemd unit write, so an abort before that point cleans up newly-created install files/directories where possible. The guided installer model lives under `internal/wizard/`; its pure model is the TTY-gated foundation for future richer huh/Bubble Tea rendering while preserving the same `InstallPlan` execution path.
 
 `--portless-quick-setup` registers `nrcc -> 3001` and `node-red -> 1880`, then starts the Portless proxy required for `https://*.localhost` to respond. `--portless-trust` is explicit because it may prompt for permission to install the local HTTPS CA.
 
-For advanced LAN, Tailscale, or Funnel usage, follow the official [Portless documentation](https://portless.sh) and run Portless directly.
+For advanced LAN, Tailscale, or Funnel usage, follow the official [Portless documentation](https://portless.sh) and run Portless directly. nrcc only prints guidance for public exposure: verify `tailscaled` is running, MagicDNS is enabled, and HTTPS certificates are enabled in the Tailscale admin console before turning on Tailscale Funnel. These prerequisites are outside nrcc's local installer and are not automated by `nrcc install`.
 
 ### HTTPS Trust & Certificate Errors
 

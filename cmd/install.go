@@ -79,7 +79,12 @@ Requires root privileges (run with sudo).`,
 		// Print success message
 		pterm.Println()
 		pterm.Success.Println("✓ nrcc installed and running")
-		pterm.Printfln("🌐 Access nrcc at: http://localhost:3001")
+		if installWithPortless && installPortlessQuickSetup {
+			pterm.Printfln("🌐 Access nrcc at: https://nrcc.localhost")
+			pterm.Printfln("🔐 Local HTTPS uses Portless trust. If your browser warns, run: sudo nrcc portless setup-trust")
+		} else {
+			pterm.Printfln("🌐 Access nrcc at: http://localhost:3001")
+		}
 		pterm.Printfln("📁 Data directory: %s", layout.DataDir)
 		pterm.Printfln("⚙️  Config file: %s", layout.EnvFile)
 		pterm.Println()
