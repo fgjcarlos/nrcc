@@ -2,8 +2,8 @@ package wizard
 
 import "github.com/composedof2/nrcc/internal/model"
 
-// Step identifies a guided-install wizard stage. The model is intentionally
-// pure so the TTY renderer can be swapped without changing install semantics.
+// Step names the guided install stages. It is intentionally UI-agnostic so the
+// wizard decisions can be tested without a terminal or Bubble Tea runtime.
 type Step string
 
 const (
@@ -16,69 +16,74 @@ const (
 	StepSuccess      Step = "success"
 )
 
-// Model holds wizard state without terminal/UI dependencies.
-type Model struct {
-	Status model.HostStatus
-	Plan   model.InstallPlan
-	Step   Step
+// State is the pure decision model for the install wizard.
+type State struct {
+	Status             model.HostStatus
+	NodeRedMode        model.NodeRedInstallMode
+	WithPortless       bool
+	PortlessQuickSetup bool
+	PortlessTrust      bool
+	PublicAccessNotice bool
+	Confirmed          bool
+	CurrentStep        Step
 }
 
-// New creates a wizard model from a pre-scan result. Existing Node-RED
-// installations are adopted by default and missing Node-RED starts with a
-// skip-safe plan until the user explicitly chooses native or docker.
-func New(status model.HostStatus) Model {
-	plan := model.InstallPlan{}
+// NewState creates a detect-first wizard state from host status.
+func NewState(status model.HostStatus) State {
+	state := State{Status: status, CurrentStep: StepPreScan}
 	if status.NodeRed.Detected {
-		plan.NodeRedMode = model.NodeRedInstallModeSkip
-		plan.NodeRedDetected = true
-		plan.NodeRedUserDir = status.NodeRed.UserDir
-		plan.NodeRedSettings = status.NodeRed.SettingsPath
-		if status.NodeRed.Mode == model.InstallationModeNative {
-			plan.NodeRedCommand = status.NodeRed.Executable
-		}
+		state.NodeRedMode = model.NodeRedInstallModeSkip
+	} else {
+		state.NodeRedMode = model.NodeRedInstallModeNative
 	}
-	return Model{Status: status, Plan: plan, Step: StepPreScan}
+	return state
 }
 
-// ChooseNodeRedMode records the user's Node-RED path.
-func (m Model) ChooseNodeRedMode(mode model.NodeRedInstallMode) Model {
-	m.Plan.NodeRedMode = mode
-	m.Step = StepHTTPS
-	return m
-}
-
-// ConfigureHTTPS records optional in-flow HTTPS/Portless decisions.
-func (m Model) ConfigureHTTPS(enabled, quickSetup, trust bool) Model {
-	m.Plan.WithPortless = enabled
-	m.Plan.PortlessQuickSetup = enabled && quickSetup
-	m.Plan.PortlessTrust = enabled && trust
-	m.Step = StepPublicAccess
-	return m
-}
-
-// Advance moves to the next stable wizard stage.
-func (m Model) Advance() Model {
-	switch m.Step {
-	case StepPreScan:
-		m.Step = StepNodeRedMode
-	case StepNodeRedMode:
-		m.Step = StepHTTPS
-	case StepHTTPS:
-		m.Step = StepPublicAccess
-	case StepPublicAccess:
-		m.Step = StepSummary
-	case StepSummary:
-		m.Step = StepExecute
-	case StepExecute:
-		m.Step = StepSuccess
+// NodeRedOptions returns the selectable Node-RED modes for the current host.
+func (s State) NodeRedOptions() []model.NodeRedInstallMode {
+	if s.Status.NodeRed.Detected {
+		return []model.NodeRedInstallMode{model.NodeRedInstallModeSkip}
 	}
-	return m
+	return []model.NodeRedInstallMode{
+		model.NodeRedInstallModeNative,
+		model.NodeRedInstallModeDocker,
+		model.NodeRedInstallModeSkip,
+	}
 }
 
-// SuccessURL is the user-facing URL shown at the end of the wizard.
-func (m Model) SuccessURL() string {
-	if m.Plan.WithPortless && m.Plan.PortlessQuickSetup {
+// BuildPlan converts wizard choices into the shared installer plan.
+func (s State) BuildPlan() model.InstallPlan {
+	plan := model.InstallPlan{
+		SkipPrompt:         true,
+		NodeRedMode:        s.NodeRedMode,
+		NodeRedDetected:    s.Status.NodeRed.Detected,
+		NodeRedCommand:     s.Status.NodeRed.Executable,
+		NodeRedUserDir:     s.Status.NodeRed.UserDir,
+		NodeRedSettings:    s.Status.NodeRed.SettingsPath,
+		WithPortless:       s.WithPortless,
+		PortlessQuickSetup: s.PortlessQuickSetup,
+		PortlessTrust:      s.PortlessTrust,
+	}
+	if plan.NodeRedCommand == "" && s.Status.NodeRedBinary.Installed {
+		plan.NodeRedCommand = s.Status.NodeRedBinary.Command
+	}
+	if plan.NodeRedSettings == "" {
+		plan.NodeRedSettings = s.Status.Settings.Path
+	}
+	return plan
+}
+
+// SuccessURL is the URL shown at the end of the install flow.
+func (s State) SuccessURL() string {
+	if s.WithPortless && s.PortlessQuickSetup {
 		return "https://nrcc.localhost"
 	}
 	return "http://localhost:3001"
+}
+
+// ShouldRunWizard enforces the TTY gate: only an interactive terminal with no
+// explicit install flags may enter the TUI. Non-TTY and flag-driven installs use
+// the existing non-interactive path.
+func ShouldRunWizard(status model.HostStatus, explicitInstallFlags bool) bool {
+	return status.Interactive && !explicitInstallFlags
 }

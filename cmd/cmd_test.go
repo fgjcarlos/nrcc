@@ -185,6 +185,24 @@ func TestInstallPortlessFlagsRegistered(t *testing.T) {
 	}
 }
 
+func TestHasExplicitInstallFlags(t *testing.T) {
+	cmd := &cobra.Command{Use: "install"}
+	cmd.Flags().String("node-red", "", "")
+	cmd.Flags().Bool("with-portless", false, "")
+	cmd.Flags().Bool("portless-quick-setup", false, "")
+	cmd.Flags().Bool("portless-trust", false, "")
+
+	if hasExplicitInstallFlags(cmd) {
+		t.Fatal("new command should not report explicit install flags")
+	}
+	if err := cmd.Flags().Set("node-red", "skip"); err != nil {
+		t.Fatal(err)
+	}
+	if !hasExplicitInstallFlags(cmd) {
+		t.Fatal("changed --node-red should report explicit install flags")
+	}
+}
+
 func TestValidateInstallPortlessFlags(t *testing.T) {
 	tests := []struct {
 		name       string

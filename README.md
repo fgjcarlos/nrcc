@@ -48,7 +48,7 @@ Then set up the system service:
 sudo nrcc install
 ```
 
-Open **http://localhost:3001** in your browser and set up your admin user.
+In an interactive terminal, `sudo nrcc install` opens a guided wizard that detects the host, lets you choose the Node-RED path, and can configure Portless local HTTPS in-flow. If you select Portless quick setup, open **https://nrcc.localhost**; otherwise open **http://localhost:3001** and set up your admin user.
 
 ### Version Pinning
 
@@ -104,7 +104,7 @@ sudo ./nrcc install
 # or: make install-local
 ```
 
-`nrcc install` copies the currently running binary to `/usr/local/bin/nrcc`, checks the host, prepares Node-RED according to the selected/detected mode, writes `/etc/nrcc/nrcc.env`, installs the systemd unit, and starts the service.
+`nrcc install` copies the currently running binary to `/usr/local/bin/nrcc`, checks the host, prepares Node-RED according to the selected/detected mode, writes `/etc/nrcc/nrcc.env`, installs the systemd unit, and starts the service. Interactive TTY installs use the guided wizard; non-TTY installs or any explicit install flag keep the existing flag-driven path. For automation, pass flags such as `--node-red skip|native|docker`, `--with-portless`, `--portless-quick-setup`, and `--portless-trust`.
 
 Dependency handling by Node-RED mode:
 

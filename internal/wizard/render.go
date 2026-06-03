@@ -1,38 +1,125 @@
 package wizard
 
 import (
+	"context"
 	"fmt"
+	"strings"
 
-	"github.com/pterm/pterm"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/huh"
+	"github.com/composedof2/nrcc/internal/model"
 )
 
-// RenderSummary is the current thin TTY renderer for the pure wizard model.
-// The model deliberately stays independent from pterm/Bubble Tea/huh so the
-// guided install can migrate renderers without changing install decisions.
-func RenderSummary(m Model) {
-	pterm.Info.Println("Install summary")
-	pterm.Printfln("  Node-RED mode: %s", m.Plan.NodeRedMode)
-	if m.Plan.NodeRedDetected {
-		pterm.Printfln("  Adopt existing Node-RED: yes")
+// Run renders the staged TUI and returns the shared install plan. The rendering
+// stays thin; durable install decisions live in State/BuildPlan for table tests.
+func Run(ctx context.Context, status model.HostStatus) (model.InstallPlan, State, error) {
+	state := NewState(status)
+
+	if !status.NodeRed.Detected {
+		state.CurrentStep = StepNodeRedMode
+		mode := string(state.NodeRedMode)
+		form := huh.NewForm(huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("How should nrcc prepare Node-RED?").
+				Description("Detected host first; choose how to make Node-RED available before nrcc starts.").
+				Options(
+					huh.NewOption("Install native Node-RED with npm", string(model.NodeRedInstallModeNative)),
+					huh.NewOption("Install Docker and run Node-RED in Docker", string(model.NodeRedInstallModeDocker)),
+					huh.NewOption("Skip Node-RED setup", string(model.NodeRedInstallModeSkip)),
+				).
+				Value(&mode),
+		))
+		if err := form.WithTheme(huh.ThemeCharm()).WithAccessible(true).RunWithContext(ctx); err != nil {
+			return model.InstallPlan{}, state, err
+		}
+		state.NodeRedMode = model.NodeRedInstallMode(mode)
+	} else {
+		state.NodeRedMode = model.NodeRedInstallModeSkip
 	}
-	if m.Plan.NodeRedCommand != "" {
-		pterm.Printfln("  Node-RED command: %s", m.Plan.NodeRedCommand)
+
+	state.CurrentStep = StepHTTPS
+	form := huh.NewForm(huh.NewGroup(
+		huh.NewConfirm().
+			Title("Configure local HTTPS with Portless?").
+			Description("nrcc remains HTTP internally; Portless provides https://nrcc.localhost and https://node-red.localhost.").
+			Affirmative("Yes, install and configure Portless").
+			Negative("No, keep http://localhost:3001").
+			Value(&state.WithPortless),
+	))
+	if err := form.WithTheme(huh.ThemeCharm()).WithAccessible(true).RunWithContext(ctx); err != nil {
+		return model.InstallPlan{}, state, err
 	}
-	if m.Plan.NodeRedSettings != "" {
-		pterm.Printfln("  settings.js: %s", m.Plan.NodeRedSettings)
+	if state.WithPortless {
+		state.PortlessQuickSetup = true
+		form := huh.NewForm(huh.NewGroup(
+			huh.NewConfirm().
+				Title("Trust the Portless local CA now?").
+				Description("Choose yes to run the same trust setup as `nrcc portless setup-trust` during install.").
+				Affirmative("Trust now").
+				Negative("Show command later").
+				Value(&state.PortlessTrust),
+		))
+		if err := form.WithTheme(huh.ThemeCharm()).WithAccessible(true).RunWithContext(ctx); err != nil {
+			return model.InstallPlan{}, state, err
+		}
 	}
-	pterm.Printfln("  HTTPS: %s", yesNo(m.Plan.WithPortless))
-	pterm.Printfln("  URL after install: %s", m.SuccessURL())
+
+	state.CurrentStep = StepPublicAccess
+	state.PublicAccessNotice = true
+	if err := runNotice(ctx, "Public access", "Tailscale Funnel/public DNS is not changed by nrcc. Use Portless locally first, then expose deliberately after install."); err != nil {
+		return model.InstallPlan{}, state, err
+	}
+
+	state.CurrentStep = StepSummary
+	state.Confirmed = true
+	confirm := true
+	summary := []string{
+		fmt.Sprintf("Node-RED mode: %s", state.NodeRedMode),
+		fmt.Sprintf("HTTPS URL after install: %s", state.SuccessURL()),
+	}
+	if state.PortlessTrust {
+		summary = append(summary, "Portless trust: run during install")
+	}
+	form = huh.NewForm(huh.NewGroup(
+		huh.NewConfirm().
+			Title("Review install plan").
+			Description(strings.Join(summary, "\n")).
+			Affirmative("Install nrcc").
+			Negative("Abort").
+			Value(&confirm),
+	))
+	if err := form.WithTheme(huh.ThemeCharm()).WithAccessible(true).RunWithContext(ctx); err != nil {
+		return model.InstallPlan{}, state, err
+	}
+	if !confirm {
+		return model.InstallPlan{}, state, fmt.Errorf("install aborted by user")
+	}
+
+	state.CurrentStep = StepExecute
+	return state.BuildPlan(), state, nil
 }
 
-func yesNo(value bool) string {
-	if value {
-		return "yes"
+func runNotice(ctx context.Context, title, description string) error {
+	m := noticeModel{title: title, description: description}
+	_, err := tea.NewProgram(m, tea.WithoutRenderer(), tea.WithInput(nil)).Run()
+	if err != nil {
+		return err
 	}
-	return "no"
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+		return nil
+	}
 }
 
-// PublicAccessGuidance returns non-mutating guidance for Tailscale Funnel.
-func PublicAccessGuidance() string {
-	return fmt.Sprintf("Tailscale Funnel is informational only: verify tailscaled, MagicDNS, and HTTPS certs in the Tailscale admin console before exposing %s.", "nrcc")
+type noticeModel struct {
+	title       string
+	description string
 }
+
+func (m noticeModel) Init() tea.Cmd { return tea.Quit }
+
+func (m noticeModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) { return m, tea.Quit }
+
+func (m noticeModel) View() string { return m.title + "\n" + m.description + "\n" }
