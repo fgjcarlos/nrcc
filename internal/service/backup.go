@@ -245,8 +245,21 @@ func (s *BackupService) CreateTyped(backupType model.BackupType, name string) (m
 	return s.createBackup(createBackupOptions{Type: normalizeBackupType(string(backupType)), Name: name})
 }
 
+// ValidateBackupID rejects identifiers that could escape the backups directory
+// when joined into a file path. Backup ids are server-generated (uuids / typed
+// names), so requiring a single clean path component is safe and sufficient.
+func ValidateBackupID(id string) error {
+	if id == "" || id != filepath.Base(id) || strings.Contains(id, "..") {
+		return fmt.Errorf("invalid backup id: %q", id)
+	}
+	return nil
+}
+
 // Detail returns authoritative metadata for a backup file.
 func (s *BackupService) Detail(id string) (model.BackupManifest, error) {
+	if err := ValidateBackupID(id); err != nil {
+		return model.BackupManifest{}, err
+	}
 	backupPath := filepath.Join(s.dataDir, "backups", id+".zip")
 	manifest, err := s.inspectBackup(backupPath)
 	if err != nil {
@@ -351,6 +364,9 @@ func (s *BackupService) SaveConfig(cfg model.BackupConfig) (model.BackupConfig, 
 
 // Restore restores a backup by ID.
 func (s *BackupService) Restore(id string) error {
+	if err := ValidateBackupID(id); err != nil {
+		return err
+	}
 	backupDir := filepath.Join(s.dataDir, "backups")
 	backupPath := filepath.Join(backupDir, id+".zip")
 
@@ -380,6 +396,9 @@ func (s *BackupService) Restore(id string) error {
 
 // RestoreWithSafetyBackup creates a pre-restore snapshot before restoring.
 func (s *BackupService) RestoreWithSafetyBackup(id string) (string, error) {
+	if err := ValidateBackupID(id); err != nil {
+		return "", err
+	}
 	backupPath := filepath.Join(s.dataDir, "backups", id+".zip")
 	if _, err := os.Stat(backupPath); err != nil {
 		return "", fmt.Errorf("backup not found: %w", err)
@@ -420,6 +439,9 @@ func (s *BackupService) RestoreWithSafetyBackup(id string) (string, error) {
 
 // Delete deletes a backup by ID.
 func (s *BackupService) Delete(id string) error {
+	if err := ValidateBackupID(id); err != nil {
+		return err
+	}
 	backupDir := filepath.Join(s.dataDir, "backups")
 	backupPath := filepath.Join(backupDir, id+".zip")
 	backup, _ := s.describeBackup(backupPath)
@@ -443,6 +465,9 @@ func (s *BackupService) Delete(id string) error {
 
 // Download streams a backup file to the response writer.
 func (s *BackupService) Download(id string, w io.Writer) error {
+	if err := ValidateBackupID(id); err != nil {
+		return err
+	}
 	backupDir := filepath.Join(s.dataDir, "backups")
 	backupPath := filepath.Join(backupDir, id+".zip")
 
