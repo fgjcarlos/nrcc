@@ -25,7 +25,7 @@ export function FlowDetailView() {
   const { id } = useParams<{ id: string }>();
 
   // Hooks for data and actions
-  const { flow, metrics, allFlows, isLoading } = useFlowDetailData({
+  const { flow, metrics, allFlows, isLoading, flowError, refetchFlow } = useFlowDetailData({
     flowId: id,
   });
   const { analyzeFlowMutation, detectPatternsMutation, aiFlowMutation } = useFlowDetailActions();
@@ -81,6 +81,23 @@ export function FlowDetailView() {
         <div className="surface-card animate-pulse space-y-4 p-6">
           <div className="h-8 w-1/4 rounded skeleton-dark"></div>
           <div className="h-32 rounded skeleton-dark"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state (network/fetch failure) — distinct from a genuinely missing flow.
+  if (flowError) {
+    return (
+      <div className="p-6 space-y-4">
+        <p className="text-base-content/60">Failed to load flow.</p>
+        <div className="flex items-center gap-3">
+          <button onClick={() => refetchFlow()} className="action-btn-primary">
+            Try again
+          </button>
+          <Link to="/flows" className="action-btn-ghost">
+            Back to flows
+          </Link>
         </div>
       </div>
     );
