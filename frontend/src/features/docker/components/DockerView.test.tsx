@@ -93,7 +93,7 @@ describe('DockerView', () => {
     expect(screen.getAllByText('1880').length).toBeGreaterThan(0)
 
     await user.click(screen.getByRole('button', { name: /restart container/i }))
-    expect(screen.getByRole('heading', { name: /reiniciar contenedor/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /restart container/i })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /confirm/i }))
     expect(mockRestartMutate).toHaveBeenCalled()

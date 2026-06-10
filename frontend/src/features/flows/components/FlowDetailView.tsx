@@ -4,6 +4,7 @@ import { type PatternAnalysisResult } from '@/features/patterns/services';
 import { PatternCard } from '@/features/patterns/components';
 import { useFlowDetailData, useFlowDetailActions } from '@/features/flows/hooks';
 import type { AIFlowAction } from '@/features/flows/types';
+import { UI_COPY } from '@/shared/constants';
 import { MetricCard } from './MetricCard';
 import { AnalysisResultView } from './AnalysisResultView';
 import {
@@ -210,8 +211,8 @@ export function FlowDetailView() {
                       className="shrink-0 text-base-content/60 hover:text-primary"
                       aria-label={
                         selectedPatternFlows.has(f.id)
-                          ? 'Deseleccionar'
-                          : 'Seleccionar'
+                          ? UI_COPY.deselect
+                          : UI_COPY.select
                       }
                     >
                       {selectedPatternFlows.has(f.id) ? (

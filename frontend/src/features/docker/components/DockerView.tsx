@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { formatBytes, cn } from '@/shared/lib';
 import { RotateCcw, Square } from 'lucide-react';
 import { ConfirmationDialog, StateContainer } from '@/shared/components';
+import { UI_COPY } from '@/shared/constants';
 import { useDockerData, useDockerActions } from '@/features/docker/hooks';
 
 export function DockerView() {
@@ -21,8 +22,8 @@ export function DockerView() {
   const handleRestart = () => {
     setConfirmConfig({
       isOpen: true,
-      title: 'Reiniciar contenedor',
-      description: '¿Está seguro que desea reiniciar el contenedor de Node-RED? El servicio estará indisponible brevemente.',
+      title: UI_COPY.restartContainerTitle,
+      description: UI_COPY.restartContainerDesc,
       variant: 'warning',
       onConfirm: () => {
         setConfirmConfig(null);
@@ -34,8 +35,8 @@ export function DockerView() {
   const handleStop = () => {
     setConfirmConfig({
       isOpen: true,
-      title: 'Detener contenedor',
-      description: '¿Está seguro que desea detener el contenedor de Node-RED? El servicio no estará disponible hasta que lo reinicie.',
+      title: UI_COPY.stopContainerTitle,
+      description: UI_COPY.stopContainerDesc,
       variant: 'danger',
       onConfirm: () => {
         setConfirmConfig(null);
