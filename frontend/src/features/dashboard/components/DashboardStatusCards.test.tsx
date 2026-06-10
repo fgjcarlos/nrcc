@@ -41,7 +41,7 @@ describe('DashboardStatusCards — with system history', () => {
     vi.clearAllMocks();
   });
 
-  it('displays CPU percentage value and chart when system and history data are available', () => {
+  it('displays CPU percentage value and chart when system and history data are available', async () => {
     vi.mocked(useSystemHistoryModule.useSystemHistory).mockReturnValue({
       data: mockHistory,
       isLoading: false,
@@ -59,7 +59,8 @@ describe('DashboardStatusCards — with system history', () => {
 
     // formatPercent rounds: 42.5 -> 43%
     expect(screen.getByText('43%')).toBeInTheDocument();
-    expect(screen.getAllByTestId('area-chart').length).toBeGreaterThan(0);
+    // MetricsChart is lazy-loaded (#301), so the chart appears after the chunk resolves.
+    expect((await screen.findAllByTestId('area-chart')).length).toBeGreaterThan(0);
   });
 
   it('displays memory percentage value when system data is available', () => {
