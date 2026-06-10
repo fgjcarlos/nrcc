@@ -716,13 +716,18 @@ func TestApplyUpdate_BlocksOnAuditFailure(t *testing.T) {
 	_, _ = svc.ForceCheck(ctx)
 	cancel()
 
+	// npm audit exits non-zero when it finds vulnerabilities, but still emits a
+	// JSON report. The update must be blocked only when that report confirms at
+	// least one critical vulnerability.
+	criticalReport := `{"metadata":{"vulnerabilities":{"critical":2,"high":0}}}`
 	runner := &sequenceRunner{
 		results: []struct {
 			output []byte
 			err    error
 		}{
-			{[]byte("installed"), nil},                                  // npm install succeeds
-			{[]byte("critical vuln found"), fmt.Errorf("exit status 1")}, // npm audit fails
+			{[]byte("installed"), nil},                              // npm install -g
+			{[]byte(""), nil},                                       // npm install --package-lock-only
+			{[]byte(criticalReport), fmt.Errorf("exit status 1")},   // npm audit (criticals found)
 		},
 	}
 	svc.runner = runner
@@ -731,8 +736,126 @@ func TestApplyUpdate_BlocksOnAuditFailure(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when post-install audit finds critical vulnerabilities")
 	}
-	if len(runner.calls) != 2 {
-		t.Fatalf("expected 2 runner calls (install + audit), got %d", len(runner.calls))
+}
+
+// TestApplyUpdate_DoesNotUseGlobalAuditFlag is the regression test for #275:
+// `npm audit -g` is not a valid command (EAUDITGLOBAL), so the audit must never
+// be invoked with the -g flag.
+func TestApplyUpdate_DoesNotUseGlobalAuditFlag(t *testing.T) {
+	tmpDir := t.TempDir()
+	svc := NewUpdateService(tmpDir)
+
+	svc.getInstalledVersionFn = func(ctx context.Context) string { return "4.0.1" }
+	svc.getLatestVersionFn = func(ctx context.Context) (string, error) { return "4.0.2", nil }
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	_, _ = svc.ForceCheck(ctx)
+	cancel()
+
+	runner := &sequenceRunner{}
+	svc.runner = runner
+
+	_ = svc.ApplyUpdate()
+
+	for _, call := range runner.calls {
+		isAudit := false
+		for _, a := range call.args {
+			if a == "audit" {
+				isAudit = true
+			}
+		}
+		if !isAudit {
+			continue
+		}
+		for _, a := range call.args {
+			if a == "-g" || a == "--global" {
+				t.Fatalf("npm audit must not run with a global flag (EAUDITGLOBAL); args: %v", call.args)
+			}
+		}
+	}
+}
+
+// TestApplyUpdate_AllowsWhenAuditCannotRun is the core regression for #275:
+// an operational audit failure (npm missing, network down, unresolvable tree)
+// must NOT be reported as a critical vulnerability and must NOT block the update.
+func TestApplyUpdate_AllowsWhenAuditCannotRun(t *testing.T) {
+	tmpDir := t.TempDir()
+	svc := NewUpdateService(tmpDir)
+
+	svc.getInstalledVersionFn = func(ctx context.Context) string { return "4.0.1" }
+	svc.getLatestVersionFn = func(ctx context.Context) (string, error) { return "4.0.2", nil }
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	_, _ = svc.ForceCheck(ctx)
+	cancel()
+
+	// install succeeds; the lockfile/audit step errors without a JSON report,
+	// mimicking EAUDITGLOBAL or a registry outage.
+	runner := &sequenceRunner{
+		results: []struct {
+			output []byte
+			err    error
+		}{
+			{[]byte("installed"), nil},
+			{[]byte("npm error code EAUDITGLOBAL"), fmt.Errorf("exit status 1")},
+			{[]byte("npm error code EAUDITGLOBAL"), fmt.Errorf("exit status 1")},
+		},
+	}
+	svc.runner = runner
+
+	if err := svc.ApplyUpdate(); err != nil {
+		t.Fatalf("update must not be blocked by an operational audit failure: %v", err)
+	}
+}
+
+// TestApplyUpdate_AllowsWhenNoCriticals confirms a clean audit report (non-zero
+// exit for high/moderate findings but zero criticals) does not block the update.
+func TestApplyUpdate_AllowsWhenNoCriticals(t *testing.T) {
+	tmpDir := t.TempDir()
+	svc := NewUpdateService(tmpDir)
+
+	svc.getInstalledVersionFn = func(ctx context.Context) string { return "4.0.1" }
+	svc.getLatestVersionFn = func(ctx context.Context) (string, error) { return "4.0.2", nil }
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	_, _ = svc.ForceCheck(ctx)
+	cancel()
+
+	report := `{"metadata":{"vulnerabilities":{"critical":0,"high":3}}}`
+	runner := &sequenceRunner{
+		results: []struct {
+			output []byte
+			err    error
+		}{
+			{[]byte("installed"), nil},
+			{[]byte(""), nil},
+			{[]byte(report), fmt.Errorf("exit status 1")}, // non-zero for highs, but no criticals
+		},
+	}
+	svc.runner = runner
+
+	if err := svc.ApplyUpdate(); err != nil {
+		t.Fatalf("update must not be blocked when there are no critical vulnerabilities: %v", err)
+	}
+}
+
+func TestParseCriticalCount(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want int
+	}{
+		{"criticals present", `{"metadata":{"vulnerabilities":{"critical":3}}}`, 3},
+		{"zero criticals", `{"metadata":{"vulnerabilities":{"critical":0,"high":5}}}`, 0},
+		{"not json", "npm error code EAUDITGLOBAL", 0},
+		{"empty", "", 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := parseCriticalCount([]byte(tt.in)); got != tt.want {
+				t.Fatalf("parseCriticalCount(%q) = %d, want %d", tt.in, got, tt.want)
+			}
+		})
 	}
 }
 
