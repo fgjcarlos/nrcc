@@ -22,6 +22,22 @@ describe('ConfirmationDialog', () => {
     expect(screen.getByText(UI_COPY.confirm)).toBeInTheDocument();
   });
 
+  it('exposes dialog semantics for assistive technology (#296)', () => {
+    render(
+      <ConfirmationDialog
+        isOpen={true}
+        title="Delete User"
+        description="Are you sure?"
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />
+    );
+
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(dialog).toHaveAccessibleName('Delete User');
+  });
+
   it('does not render when isOpen is false', () => {
     render(
       <ConfirmationDialog

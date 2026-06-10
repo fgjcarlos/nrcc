@@ -96,14 +96,19 @@ export function ConfirmationDialog({
       />
 
       {/* Dialog */}
-      <div className={`relative surface-panel border ${styles.border} w-full max-w-md mx-4 overflow-hidden shadow-glow`}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirmation-dialog-title"
+        className={`relative surface-panel border ${styles.border} w-full max-w-md mx-4 overflow-hidden shadow-glow`}
+      >
         {/* Header */}
         <div className="flex items-start justify-between border-b ghost-divider modal-inner p-6">
           <div className="flex items-center gap-3">
             <div className={`rounded-2xl bg-base-200/70 p-2 ${styles.icon}`}>
               <AlertTriangle className="w-5 h-5" />
             </div>
-            <h3 className="text-lg font-semibold text-base-content">{title}</h3>
+            <h3 id="confirmation-dialog-title" className="text-lg font-semibold text-base-content">{title}</h3>
           </div>
           <button
             onClick={onCancel}
