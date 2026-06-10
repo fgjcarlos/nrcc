@@ -20,6 +20,7 @@ import { useFlowsData } from '@/features/flows/hooks/useFlowsData';
 import { useFlowsActions } from '@/features/flows/hooks/useFlowsActions';
 import { StateContainer } from '@/shared/components/StateContainer';
 import { UI_COPY } from '@/shared/constants/uiCopy';
+import { toast } from 'sonner';
 
 export function FlowsView() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -59,10 +60,16 @@ export function FlowsView() {
     if (selected.size === 0) return;
     setAnalyzing(true);
     const ids = Array.from(selected);
-    const results = await analyzeFlows(ids);
-    setAnalysisResults(prev => ({ ...prev, ...results }));
-    setExpandedResults(new Set(ids.filter(id => results[id])));
-    setAnalyzing(false);
+    try {
+      const results = await analyzeFlows(ids);
+      setAnalysisResults(prev => ({ ...prev, ...results }));
+      setExpandedResults(new Set(ids.filter(id => results[id])));
+    } catch {
+      toast.error('Failed to analyze flows');
+    } finally {
+      // Always clear the analyzing state so the Analyze bar never stays stuck.
+      setAnalyzing(false);
+    }
   };
 
   const allSelected = flows.length > 0 && selected.size === flows.length;
