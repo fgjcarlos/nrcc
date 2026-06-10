@@ -77,7 +77,7 @@ describe('FilesView', () => {
     renderView();
 
     expect(screen.getByText('flows.json')).toBeInTheDocument();
-    expect(screen.getByText('2.0 KB')).toBeInTheDocument();
+    expect(screen.getByText('2 KB')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Download flows.json' })).toHaveAttribute(
       'href',
       '/api/files/flows.json/download',

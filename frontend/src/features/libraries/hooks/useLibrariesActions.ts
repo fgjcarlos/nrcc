@@ -81,10 +81,6 @@ export function useLibrariesActions() {
     setSearchResults([]);
   };
 
-  const clearSearchResults = (): void => {
-    setSearchResults([]);
-  };
-
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -108,6 +104,5 @@ export function useLibrariesActions() {
     handleInstall,
     handleUninstall,
     handleClearSearch,
-    clearSearchResults,
   };
 }
