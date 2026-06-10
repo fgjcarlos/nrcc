@@ -380,16 +380,24 @@ func TestGetFlowState(t *testing.T) {
 }
 
 // TestCreateBackup tests backup entry creation
+// failingBackupCreator simulates a backup engine that cannot write to disk.
+type failingBackupCreator struct{}
+
+func (failingBackupCreator) CreateTyped(model.BackupType, string) (model.Backup, error) {
+	return model.Backup{}, fmt.Errorf("disk full")
+}
+
 func TestCreateBackup(t *testing.T) {
 	tmpDir := t.TempDir()
 	svc := NewUpdateService(tmpDir)
+	svc.SetBackupCreator(NewBackupService(tmpDir))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	entry, err := svc.CreateBackup(ctx, "4.0.1")
 	if err != nil {
-		t.Errorf("CreateBackup should not error: %v", err)
+		t.Fatalf("CreateBackup should not error: %v", err)
 	}
 
 	if entry.ID == "" {
@@ -403,6 +411,51 @@ func TestCreateBackup(t *testing.T) {
 	}
 	if entry.Timestamp.IsZero() {
 		t.Error("Expected Timestamp to be set")
+	}
+
+	// Regression for #276: the backup must be a REAL file on disk, not a phantom record.
+	if entry.Path == "" {
+		t.Fatal("Expected BackupEntry Path to be set")
+	}
+	info, statErr := os.Stat(entry.Path)
+	if statErr != nil {
+		t.Fatalf("Expected backup archive to exist at %s: %v", entry.Path, statErr)
+	}
+	if info.Size() == 0 {
+		t.Error("Expected backup archive to be non-empty")
+	}
+	if entry.SizeBytes != info.Size() {
+		t.Errorf("Expected SizeBytes %d to match file size %d", entry.SizeBytes, info.Size())
+	}
+}
+
+// TestCreateBackup_FailsWithoutBackupCreator is part of the #276 regression:
+// the service must refuse to report a "completed" backup when no real backup
+// engine is wired in, rather than fabricating a placeholder entry.
+func TestCreateBackup_FailsWithoutBackupCreator(t *testing.T) {
+	tmpDir := t.TempDir()
+	svc := NewUpdateService(tmpDir)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if _, err := svc.CreateBackup(ctx, "4.0.1"); err == nil {
+		t.Fatal("expected error when no backup creator is configured")
+	}
+}
+
+// TestCreateBackup_PropagatesError ensures a real backup failure surfaces as an
+// error so the caller can abort the update.
+func TestCreateBackup_PropagatesError(t *testing.T) {
+	tmpDir := t.TempDir()
+	svc := NewUpdateService(tmpDir)
+	svc.SetBackupCreator(failingBackupCreator{})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if _, err := svc.CreateBackup(ctx, "4.0.1"); err == nil {
+		t.Fatal("expected CreateBackup to propagate the backup engine error")
 	}
 }
 
@@ -526,6 +579,7 @@ func TestApplyUpdateWithBackup_ConcurrencyGuard(t *testing.T) {
 func TestApplyUpdateWithBackup_SuccessfulFlow(t *testing.T) {
 	tmpDir := t.TempDir()
 	svc := NewUpdateService(tmpDir)
+	svc.SetBackupCreator(NewBackupService(tmpDir))
 
 	// Mock version functions
 	svc.getInstalledVersionFn = func(ctx context.Context) string {
@@ -574,6 +628,7 @@ func TestApplyUpdateWithBackup_SuccessfulFlow(t *testing.T) {
 func TestApplyUpdateWithBackup_NpmFailure(t *testing.T) {
 	tmpDir := t.TempDir()
 	svc := NewUpdateService(tmpDir)
+	svc.SetBackupCreator(NewBackupService(tmpDir))
 
 	// Mock version functions
 	svc.getInstalledVersionFn = func(ctx context.Context) string {
@@ -615,6 +670,50 @@ func TestApplyUpdateWithBackup_NpmFailure(t *testing.T) {
 	}
 	if len(backups) != 1 {
 		t.Errorf("Expected 1 backup persisted despite npm failure, got %d", len(backups))
+	}
+}
+
+// TestApplyUpdateWithBackup_AbortsWhenBackupFails is the core #276 regression:
+// if the pre-update backup cannot be created, the npm install must NOT run and
+// the flow must end in Failed/backup_failed.
+func TestApplyUpdateWithBackup_AbortsWhenBackupFails(t *testing.T) {
+	tmpDir := t.TempDir()
+	svc := NewUpdateService(tmpDir)
+	svc.SetBackupCreator(failingBackupCreator{})
+
+	svc.getInstalledVersionFn = func(ctx context.Context) string { return "4.0.1" }
+	svc.getLatestVersionFn = func(ctx context.Context) (string, error) { return "4.0.2", nil }
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	_, _ = svc.ForceCheck(ctx)
+	cancel()
+
+	runner := &mockRunner{output: []byte("success"), err: nil}
+	svc.runner = runner
+
+	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := svc.ApplyUpdateWithBackup(ctx)
+	if err == nil {
+		t.Fatal("expected error when backup creation fails")
+	}
+
+	// npm install must never have been invoked.
+	for _, call := range runner.lastCalls {
+		for _, a := range call.args {
+			if a == "install" {
+				t.Fatalf("npm install must not run when the pre-update backup fails; calls: %v", runner.lastCalls)
+			}
+		}
+	}
+
+	state := svc.GetFlowState()
+	if state.State != "Failed" {
+		t.Errorf("expected state Failed, got %s", state.State)
+	}
+	if state.Error != "backup_failed" {
+		t.Errorf("expected error reason 'backup_failed', got %s", state.Error)
 	}
 }
 
