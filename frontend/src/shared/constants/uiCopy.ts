@@ -84,4 +84,13 @@ export const UI_COPY = {
   improvements: 'Improvements',
   suggestions: 'Suggestions',
   analyzedAt: (date: string) => `Analyzed ${date}`,
+  select: 'Select',
+  deselect: 'Deselect',
+  // Docker container actions
+  restartContainerTitle: 'Restart container',
+  restartContainerDesc:
+    'Are you sure you want to restart the Node-RED container? The service will be briefly unavailable.',
+  stopContainerTitle: 'Stop container',
+  stopContainerDesc:
+    'Are you sure you want to stop the Node-RED container? The service will be unavailable until you restart it.',
 } as const;
