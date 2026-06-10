@@ -11,7 +11,7 @@ A single-binary management UI for Node-RED. Run it alongside Node-RED to get a w
 
 - **Authentication** — JWT-based auth with multi-user support (admin/user roles)
 - **Process Management** — Start, stop, restart Node-RED remotely
-- **Real-time Logs** — SSE streaming of Node-RED output
+- **Live Logs** — near-real-time view of Node-RED output (polled)
 - **Configuration Editor** — Edit Node-RED config with validation
 - **Backup & Restore** — One-click backups, timestamped archives, restore with integrity checks
 - **Environment Management** — Manage Node-RED environment variables

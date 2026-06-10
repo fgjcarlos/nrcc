@@ -11,8 +11,4 @@ export const logService = {
   },
 
   clearLogs: () => api.delete<ApiResponse<{ message: string }>>('/runtime/logs'),
-  
-  streamLogs: () => {
-    return new EventSource(`${api.defaults.baseURL}/runtime/logs/stream`);
-  },
 };
