@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -378,42 +379,82 @@ func (s *InstallerService) Uninstall(ctx context.Context, opts model.UninstallOp
 		return nil
 	}
 
-	// Step 1: Stop and disable service (non-fatal)
-	_ = s.systemd.Stop(s.layout.ServiceName)
-	_ = s.systemd.Disable(s.layout.ServiceName)
-
-	// Step 2: Remove unit file
-	_ = os.Remove(s.layout.SystemdUnit)
-
-	// Step 3: Daemon reload
-	_ = s.systemd.DaemonReload()
-
-	// Step 4: Remove binary
-	_ = os.Remove(s.layout.BinaryPath)
-
-	// Step 5: Handle data directory
-	keepData := opts.KeepData || opts.Purge == false
-	if opts.Purge {
-		keepData = false
-	} else if !opts.SkipPrompt && !opts.KeepData && !opts.Purge {
-		// Interactive prompt
-		result, err := pterm.DefaultInteractiveConfirm.Show("Keep /var/lib/nrcc data?")
+	// Collect step errors instead of silently discarding them. Best-effort steps
+	// (stopping an already-stopped service) only warn; removal steps that fail
+	// are surfaced both as warnings and in the returned aggregate error so the
+	// command never reports success when it actually removed nothing.
+	var errs []error
+	warn := func(step string, err error) {
 		if err != nil {
-			// On error, default to keeping data
-			keepData = true
-		} else {
-			keepData = result
+			pterm.Warning.Printfln("uninstall: %s: %v", step, err)
+		}
+	}
+	fail := func(step string, err error) {
+		if err != nil {
+			pterm.Warning.Printfln("uninstall: %s: %v", step, err)
+			errs = append(errs, fmt.Errorf("%s: %w", step, err))
 		}
 	}
 
-	if !keepData {
-		_ = os.RemoveAll(s.layout.DataDir)
+	// Step 1: Stop and disable service (best-effort).
+	warn("stop service", s.systemd.Stop(s.layout.ServiceName))
+	warn("disable service", s.systemd.Disable(s.layout.ServiceName))
+
+	// Step 2: Remove unit file, then reload.
+	fail("remove unit file", removeIfExists(s.layout.SystemdUnit))
+	warn("daemon reload", s.systemd.DaemonReload())
+
+	// Step 3: Remove binary.
+	fail("remove binary", removeIfExists(s.layout.BinaryPath))
+
+	// Step 4: Decide whether to keep the data directory.
+	keepData := opts.KeepData
+	if opts.Purge {
+		keepData = false
+	} else if !opts.KeepData && !opts.SkipPrompt {
+		// Interactive prompt; on error default to keeping data.
+		result, err := pterm.DefaultInteractiveConfirm.Show("Keep /var/lib/nrcc data?")
+		keepData = err != nil || result
 	}
 
-	// Step 6: Always remove config directory
-	_ = os.RemoveAll(s.layout.ConfigDir)
+	// Step 5: A full uninstall (no data kept) also removes the data directory and
+	// the dedicated system user/group created at install time.
+	if !keepData {
+		fail("remove data directory", os.RemoveAll(s.layout.DataDir))
+		fail("remove system user", s.removeSystemUser())
+	}
 
+	// Step 6: Always remove the config directory.
+	fail("remove config directory", os.RemoveAll(s.layout.ConfigDir))
+
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
 	return nil
+}
+
+// removeIfExists removes a path, treating "not found" as success.
+func removeIfExists(path string) error {
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
+// removeSystemUser deletes the dedicated nrcc system user and group if present.
+func (s *InstallerService) removeSystemUser() error {
+	var errs []error
+	if _, err := lookupUser(s.layout.ServiceUser); err == nil {
+		if err := execCommand("userdel", s.layout.ServiceUser).Run(); err != nil {
+			errs = append(errs, fmt.Errorf("userdel: %w", err))
+		}
+	}
+	if _, err := lookupGroup(s.layout.ServiceUser); err == nil {
+		if err := execCommand("groupdel", s.layout.ServiceUser).Run(); err != nil {
+			errs = append(errs, fmt.Errorf("groupdel: %w", err))
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // Status returns the current installation state
