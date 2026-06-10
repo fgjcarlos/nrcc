@@ -1,6 +1,58 @@
 import type { NodeRedConfigFormData, LoggingLevel, EditorTheme, RuntimeStateSettings } from '@/shared/types';
 
 /**
+ * Shape of the raw Node-RED config response consumed by configToFormData.
+ *
+ * This models the READ response, which is external data: enum-like fields
+ * (log level, code editor lib, deploy type) arrive as plain strings and are
+ * narrowed to the domain unions at the point of use. Auth is a credentials
+ * object with a `users` array (distinct from the write-side AdminAuthSettings).
+ * The index signature keeps the door open for the many other Node-RED settings
+ * without resorting to `as any` on the fields we actually read.
+ */
+interface CredentialsAuthResponse {
+  users?: Array<{ username?: string }>;
+}
+
+interface LoggingHandlerResponse {
+  level?: string;
+  metrics?: boolean;
+}
+
+interface EditorThemeResponse {
+  page?: { title?: string; favicon?: string };
+  header?: { title?: string; image?: string; url?: string };
+  deployButton?: { type?: string; label?: string; icon?: string };
+  palette?: { editable?: boolean; catalogues?: string[] };
+  projects?: { enabled?: boolean };
+  codeEditor?: { lib?: string; options?: { theme?: string; fontSize?: number } };
+  userMenu?: boolean;
+  tours?: boolean;
+  login?: { image?: string };
+  logout?: { redirect?: string };
+}
+
+export interface NodeRedConfigResponse {
+  uiPort?: number;
+  uiHost?: string;
+  httpAdminRoot?: string | false;
+  httpNodeRoot?: string | false;
+  disableEditor?: boolean;
+  projectsEnabled?: boolean;
+  adminAuth?: CredentialsAuthResponse;
+  nodeHttpAuth?: CredentialsAuthResponse;
+  staticAuth?: CredentialsAuthResponse;
+  logging?: { console?: LoggingHandlerResponse; internal?: LoggingHandlerResponse };
+  flowFile?: string;
+  userDir?: string;
+  nodesDir?: string;
+  editorTheme?: EditorThemeResponse;
+  runtimeState?: RuntimeStateSettings;
+  lang?: string;
+  [key: string]: unknown;
+}
+
+/**
  * API payload shape for admin/node-http/static auth
  */
 export interface AuthPayloadUser {
@@ -172,58 +224,59 @@ export function formDataToConfigPayload(formData: NodeRedConfigFormData): Config
  * Convert API config response to form data
  * Pure function with no React dependencies
  */
-export function configToFormData(config: Record<string, unknown>): NodeRedConfigFormData {
+export function configToFormData(config: NodeRedConfigResponse): NodeRedConfigFormData {
+  const editor = config.editorTheme;
   return {
-    uiPort: config.uiPort as number,
-    uiHost: config.uiHost as string || '0.0.0.0',
+    uiPort: config.uiPort ?? 1880,
+    uiHost: config.uiHost || '0.0.0.0',
     httpAdminRoot: typeof config.httpAdminRoot === 'string' ? config.httpAdminRoot : '/',
     httpNodeRoot: typeof config.httpNodeRoot === 'string' ? config.httpNodeRoot : '/',
-    disableEditor: (config.disableEditor as boolean) || false,
+    disableEditor: config.disableEditor || false,
 
     // Authentication — password nunca se precarga (no exponemos hashes)
-    authEnabled: !!(config.adminAuth as any),
-    authAdminUser: (config.adminAuth as any)?.users?.[0]?.username || '',
+    authEnabled: !!config.adminAuth,
+    authAdminUser: config.adminAuth?.users?.[0]?.username || '',
     authAdminPassword: '', // vacío: si no cambia, el backend preserva el hash
-    authNodeHttpEnabled: !!(config.nodeHttpAuth as any),
-    authNodeHttpUser: (config.nodeHttpAuth as any)?.users?.[0]?.username || '',
+    authNodeHttpEnabled: !!config.nodeHttpAuth,
+    authNodeHttpUser: config.nodeHttpAuth?.users?.[0]?.username || '',
     authNodeHttpPassword: '',
-    authStaticEnabled: !!(config.staticAuth as any),
-    authStaticUser: (config.staticAuth as any)?.users?.[0]?.username || '',
+    authStaticEnabled: !!config.staticAuth,
+    authStaticUser: config.staticAuth?.users?.[0]?.username || '',
     authStaticPassword: '',
 
-    projectsEnabled: (config.projectsEnabled as boolean) || false,
+    projectsEnabled: config.projectsEnabled || false,
 
-    loggingConsoleLevel: (config.logging as any)?.console?.level || 'info',
-    loggingConsoleMetrics: (config.logging as any)?.console?.metrics || false,
-    loggingInternalLevel: (config.logging as any)?.internal?.level || 'info',
-    loggingInternalMetrics: (config.logging as any)?.internal?.metrics || false,
+    loggingConsoleLevel: (config.logging?.console?.level as LoggingLevel) || 'info',
+    loggingConsoleMetrics: config.logging?.console?.metrics || false,
+    loggingInternalLevel: (config.logging?.internal?.level as LoggingLevel) || 'info',
+    loggingInternalMetrics: config.logging?.internal?.metrics || false,
 
-    flowFile: (config.flowFile as string) || 'flows.json',
-    userDir: (config.userDir as string) || '',
-    nodesDir: (config.nodesDir as string) || '',
+    flowFile: config.flowFile || 'flows.json',
+    userDir: config.userDir || '',
+    nodesDir: config.nodesDir || '',
 
-    editorPageTitle: (config.editorTheme as any)?.page?.title || 'Node-RED',
-    editorPageFavicon: (config.editorTheme as any)?.page?.favicon || '',
+    editorPageTitle: editor?.page?.title || 'Node-RED',
+    editorPageFavicon: editor?.page?.favicon || '',
     editorPageCss: '',
-    editorHeaderTitle: (config.editorTheme as any)?.header?.title || 'Node-RED',
-    editorHeaderImage: (config.editorTheme as any)?.header?.image || '',
-    editorHeaderUrl: (config.editorTheme as any)?.header?.url || '',
-    editorDeployType: (config.editorTheme as any)?.deployButton?.type || 'default',
-    editorDeployLabel: (config.editorTheme as any)?.deployButton?.label || 'Deploy',
-    editorDeployIcon: (config.editorTheme as any)?.deployButton?.icon || '',
-    editorPaletteEditable: (config.editorTheme as any)?.palette?.editable !== false,
-    editorPaletteCatalogues: ((config.editorTheme as any)?.palette?.catalogues as string[] || []).join('\n'),
-    editorProjectsEnabled: (config.editorTheme as any)?.projects?.enabled || false,
-    editorCodeLib: (config.editorTheme as any)?.codeEditor?.lib || 'ace',
-    editorCodeTheme: (config.editorTheme as any)?.codeEditor?.options?.theme || 'vs',
-    editorCodeFontSize: (config.editorTheme as any)?.codeEditor?.options?.fontSize || 12,
-    editorUserMenu: (config.editorTheme as any)?.userMenu !== false,
-    editorTours: (config.editorTheme as any)?.tours !== false,
-    editorLoginImage: (config.editorTheme as any)?.login?.image || '',
-    editorLogoutRedirect: (config.editorTheme as any)?.logout?.redirect || '',
+    editorHeaderTitle: editor?.header?.title || 'Node-RED',
+    editorHeaderImage: editor?.header?.image || '',
+    editorHeaderUrl: editor?.header?.url || '',
+    editorDeployType: (editor?.deployButton?.type as NodeRedConfigFormData['editorDeployType']) || 'default',
+    editorDeployLabel: editor?.deployButton?.label || 'Deploy',
+    editorDeployIcon: editor?.deployButton?.icon || '',
+    editorPaletteEditable: editor?.palette?.editable !== false,
+    editorPaletteCatalogues: (editor?.palette?.catalogues || []).join('\n'),
+    editorProjectsEnabled: editor?.projects?.enabled || false,
+    editorCodeLib: (editor?.codeEditor?.lib as NodeRedConfigFormData['editorCodeLib']) || 'ace',
+    editorCodeTheme: editor?.codeEditor?.options?.theme || 'vs',
+    editorCodeFontSize: editor?.codeEditor?.options?.fontSize || 12,
+    editorUserMenu: editor?.userMenu !== false,
+    editorTours: editor?.tours !== false,
+    editorLoginImage: editor?.login?.image || '',
+    editorLogoutRedirect: editor?.logout?.redirect || '',
 
-    runtimeStateEnabled: (config.runtimeState as any)?.enabled || false,
-    runtimeStateFile: (config.runtimeState as any)?.file || '',
-    lang: (config.lang as string) || 'en-US',
+    runtimeStateEnabled: config.runtimeState?.enabled || false,
+    runtimeStateFile: config.runtimeState?.file || '',
+    lang: config.lang || 'en-US',
   };
 }

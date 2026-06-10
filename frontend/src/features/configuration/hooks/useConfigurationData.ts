@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { configService, settingsService } from '../services';
 import { bootstrapService } from '@/features/bootstrap/services';
 import type { HostStatus, NodeRedConfigFormData } from '@/shared/types';
-import { configToFormData } from '../lib/configTransformers';
+import { configToFormData, type NodeRedConfigResponse } from '../lib/configTransformers';
 
 import { queryKeys } from '@/shared/lib/queryKeys';
 export function useConfigurationData() {
@@ -30,7 +30,7 @@ export function useConfigurationData() {
   // Helper: derive loaded config from query result
   const loadedConfig = configQuery.data?.data?.data;
   const initialFormData: NodeRedConfigFormData | null = loadedConfig
-    ? configToFormData(loadedConfig as unknown as Record<string, unknown>)
+    ? configToFormData(loadedConfig as NodeRedConfigResponse)
     : null;
 
   // Helper: derive raw settings content
