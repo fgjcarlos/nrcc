@@ -29,6 +29,7 @@ type Server struct {
 	metricsCollector *metrics.MetricsCollector
 	metricsBuffer    *service.MetricsBuffer
 	metricsSampler   *service.MetricsSampler
+	flowVersionSvc   *service.FlowVersionService
 	ctx              context.Context
 	cancel           context.CancelFunc
 	shutdownCh       chan struct{}
@@ -264,6 +265,7 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 		metricsCollector: metricsCollector,
 		metricsBuffer:    metricsBuffer,
 		metricsSampler:   metricsSampler,
+		flowVersionSvc:   flowVersionSvc,
 	}
 
 	// Create a cancellable context for the server lifecycle
@@ -294,6 +296,9 @@ func (s *Server) Shutdown() {
 	}
 	if s.updateSvc != nil {
 		s.updateSvc.Stop()
+	}
+	if s.flowVersionSvc != nil {
+		s.flowVersionSvc.Stop()
 	}
 }
 
