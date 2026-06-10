@@ -159,9 +159,9 @@ func (h *UpdateHandler) PostApply(w http.ResponseWriter, r *http.Request) {
 // GetHistory returns update history (stub).
 // GET /api/updates/history
 //
-// Currently returns empty list. Can be extended to persist update application history.
+// Returns the applied-update backup catalog (most recent updates).
 func (h *UpdateHandler) GetHistory(w http.ResponseWriter, r *http.Request) {
-	model.RespondJSON(w, http.StatusOK, []interface{}{})
+	model.RespondJSON(w, http.StatusOK, h.svc.History())
 }
 
 // GetState returns the current update flow state.
