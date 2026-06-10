@@ -146,10 +146,22 @@ func (h *SystemHandler) GetSystemInfo(w http.ResponseWriter, r *http.Request) {
 			Used:         diskUsed,
 			UsagePercent: diskPercent,
 		},
-		NodeRedVersion: "1.3.5",
+		NodeRedVersion: h.nodeRedVersion(),
 	}
 
 	model.RespondJSON(w, http.StatusOK, info)
+}
+
+// nodeRedVersion resolves the installed Node-RED version from the process
+// manager, falling back to "unknown" when it is unavailable.
+func (h *SystemHandler) nodeRedVersion() string {
+	if h.processManager == nil {
+		return "unknown"
+	}
+	if v := h.processManager.Version(); v != "" {
+		return v
+	}
+	return "unknown"
 }
 
 // GetSystemHistory handles GET /api/system/history — returns recent MetricsSnapshot entries.
