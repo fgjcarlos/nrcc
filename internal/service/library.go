@@ -231,6 +231,12 @@ func (s *LibraryService) Search(query string) ([]model.LibraryInfo, error) {
 // registry is unreachable — is reported as (false, nil); these two cases
 // are not currently distinguished.
 func (s *LibraryService) Check(pkg string) (bool, error) {
+	// Validate before invoking npm: `npm view` would otherwise resolve local
+	// paths (file:...), URLs and git refs from the raw URL parameter.
+	if err := ValidatePackageName(pkg); err != nil {
+		return false, err
+	}
+
 	bin := "npm"
 	if pm, ok := s.pm.(*NpmPackageManager); ok {
 		bin = pm.Bin
