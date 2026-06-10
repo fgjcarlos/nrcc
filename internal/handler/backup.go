@@ -3,7 +3,9 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
+	"os"
 	"strconv"
 
 	"github.com/composedof2/nrcc/internal/audit"
@@ -170,15 +172,29 @@ func (h *BackupHandler) DownloadBackup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Set response headers for file download
-	w.Header().Set("Content-Type", "application/zip")
-	w.Header().Set("Content-Disposition", "attachment; filename=\"backup-"+id+".zip\"")
-
-	err := h.svc.Download(id, w)
+	// Open and confirm the file exists BEFORE writing any headers, so a missing
+	// or unreadable backup returns a clean error status instead of a truncated
+	// zip served with HTTP 200.
+	rc, size, err := h.svc.OpenForDownload(id)
 	if err != nil {
-		model.RespondError(w, http.StatusInternalServerError, "BACKUP_ERROR", err.Error())
+		status := http.StatusInternalServerError
+		code := "BACKUP_ERROR"
+		if errors.Is(err, os.ErrNotExist) {
+			status = http.StatusNotFound
+			code = "BACKUP_NOT_FOUND"
+		}
+		model.RespondError(w, status, code, "Backup not found")
 		return
 	}
+	defer rc.Close()
+
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", "attachment; filename=\"backup-"+id+".zip\"")
+	w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
+
+	// Headers are now committed; a mid-stream copy error can no longer change the
+	// status, but Content-Length lets the client detect a truncated download.
+	_, _ = io.Copy(w, rc)
 }
 
 // RestoreBackup restores a backup

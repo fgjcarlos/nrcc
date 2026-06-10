@@ -463,25 +463,37 @@ func (s *BackupService) Delete(id string) error {
 	return nil
 }
 
-// Download streams a backup file to the response writer.
-func (s *BackupService) Download(id string, w io.Writer) error {
+// OpenForDownload validates the id, confirms the backup exists and opens it,
+// returning a reader and the file size. Callers (HTTP handlers) can use this to
+// detect missing/unreadable backups and set Content-Length BEFORE writing any
+// response body, avoiding truncated downloads served with a 200 status.
+func (s *BackupService) OpenForDownload(id string) (io.ReadCloser, int64, error) {
 	if err := ValidateBackupID(id); err != nil {
-		return err
+		return nil, 0, err
 	}
-	backupDir := filepath.Join(s.dataDir, "backups")
-	backupPath := filepath.Join(backupDir, id+".zip")
+	backupPath := filepath.Join(s.dataDir, "backups", id+".zip")
 
-	if _, err := os.Stat(backupPath); err != nil {
-		return fmt.Errorf("backup not found: %w", err)
+	info, err := os.Stat(backupPath)
+	if err != nil {
+		return nil, 0, fmt.Errorf("backup not found: %w", err)
 	}
 
 	file, err := os.Open(backupPath)
 	if err != nil {
-		return fmt.Errorf("failed to open backup: %w", err)
+		return nil, 0, fmt.Errorf("failed to open backup: %w", err)
 	}
-	defer file.Close()
+	return file, info.Size(), nil
+}
 
-	if _, err := io.Copy(w, file); err != nil {
+// Download streams a backup file to the response writer.
+func (s *BackupService) Download(id string, w io.Writer) error {
+	rc, _, err := s.OpenForDownload(id)
+	if err != nil {
+		return err
+	}
+	defer rc.Close()
+
+	if _, err := io.Copy(w, rc); err != nil {
 		return fmt.Errorf("failed to download backup: %w", err)
 	}
 
