@@ -159,39 +159,40 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 		r.Get("/api/system/history", systemHandler.GetSystemHistory)
 		r.Get("/api/runtime/history", systemHandler.GetRuntimeHistory)
 
-		// Backup routes
+		// Backup routes — reads are open to any authenticated user; all
+		// state-mutating operations require the admin role.
 		r.Route("/api/backups", func(r chi.Router) {
 			r.Get("/", backupHandler.GetBackups)
-			r.Post("/", backupHandler.PostBackup)
+			r.With(middleware.RequireAdmin).Post("/", backupHandler.PostBackup)
 			r.Get("/status", backupHandler.GetBackupStatus)
 			r.Get("/observability", backupHandler.GetBackupObservability)
 			r.Get("/storage", backupHandler.GetBackupStorage)
 			r.Get("/config", backupHandler.GetBackupConfig)
-			r.Post("/config", backupHandler.PostBackupConfig)
+			r.With(middleware.RequireAdmin).Post("/config", backupHandler.PostBackupConfig)
 			r.Get("/{id}", backupHandler.GetBackupDetail)
-			r.Delete("/{id}", backupHandler.DeleteBackup)
+			r.With(middleware.RequireAdmin).Delete("/{id}", backupHandler.DeleteBackup)
 			r.Get("/{id}/download", backupHandler.DownloadBackup)
-			r.Post("/{id}/restore", backupHandler.RestoreBackup)
+			r.With(middleware.RequireAdmin).Post("/{id}/restore", backupHandler.RestoreBackup)
 		})
 
 		// Scheduler routes
 		r.Route("/api/scheduler", func(r chi.Router) {
-			r.Post("/config", backupHandler.PostSchedulerConfig)
+			r.With(middleware.RequireAdmin).Post("/config", backupHandler.PostSchedulerConfig)
 			r.Get("/history", backupHandler.GetSchedulerHistory)
 		})
 
 		// Storage routes
 		r.Route("/api/storage", func(r chi.Router) {
-			r.Patch("/retention", backupHandler.PatchStorageRetention)
+			r.With(middleware.RequireAdmin).Patch("/retention", backupHandler.PatchStorageRetention)
 		})
 
 		// Environment variable routes
 		r.Route("/api/env", func(r chi.Router) {
 			r.Get("/", envHandler.GetEnv)
-			r.Post("/", envHandler.PostEnv)
-			r.Delete("/{key}", envHandler.DeleteEnv)
-			r.Get("/dotenv", envHandler.GetDotenv) // TAREA 2c: Read .env file
-			r.Put("/dotenv", envHandler.PutDotenv) // TAREA 2c: Write .env file
+			r.With(middleware.RequireAdmin).Post("/", envHandler.PostEnv)
+			r.With(middleware.RequireAdmin).Delete("/{key}", envHandler.DeleteEnv)
+			r.Get("/dotenv", envHandler.GetDotenv)                               // TAREA 2c: Read .env file
+			r.With(middleware.RequireAdmin).Put("/dotenv", envHandler.PutDotenv) // TAREA 2c: Write .env file
 		})
 
 		// Flow routes
@@ -200,18 +201,18 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 			r.Get("/export", flowHandler.ExportFlows)
 			r.Post("/analyze", flowHandler.AnalyzeFlows)
 			r.Get("/versions", flowHandler.GetVersions)
-			r.Post("/versions", flowHandler.PostSnapshot)
+			r.With(middleware.RequireAdmin).Post("/versions", flowHandler.PostSnapshot)
 			r.Get("/versions/{from}/diff/{to}", flowHandler.GetVersionDiff)
-			r.Post("/versions/{id}/revert", flowHandler.PostRevert)
+			r.With(middleware.RequireAdmin).Post("/versions/{id}/revert", flowHandler.PostRevert)
 			r.Get("/{id}", flowHandler.GetFlow)
 		})
 
 		// Library routes
 		r.Route("/api/libraries", func(r chi.Router) {
 			r.Get("/", libraryHandler.GetLibraries)
-			r.Post("/install", libraryHandler.PostInstall)
+			r.With(middleware.RequireAdmin).Post("/install", libraryHandler.PostInstall)
 			r.Post("/search", libraryHandler.PostSearch)
-			r.Delete("/{name}", libraryHandler.DeleteLibrary)
+			r.With(middleware.RequireAdmin).Delete("/{name}", libraryHandler.DeleteLibrary)
 			r.Get("/{name}/check", libraryHandler.GetLibraryCheck)
 		})
 
@@ -220,24 +221,24 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 			r.Get("/status", updateHandler.GetStatus)
 			r.Get("/check", updateHandler.GetCheck)
 			r.Get("/state", updateHandler.GetState)
-			r.Post("/apply", updateHandler.PostApply)
+			r.With(middleware.RequireAdmin).Post("/apply", updateHandler.PostApply)
 			r.Get("/history", updateHandler.GetHistory)
 		})
 
 		// Files routes
 		r.Route("/api/files", func(r chi.Router) {
 			r.Get("/", filesHandler.GetList)
-			r.Post("/upload", filesHandler.PostUpload)
+			r.With(middleware.RequireAdmin).Post("/upload", filesHandler.PostUpload)
 			r.Get("/{name}/download", filesHandler.DownloadFile)
-			r.Delete("/{name}", filesHandler.DeleteFile)
+			r.With(middleware.RequireAdmin).Delete("/{name}", filesHandler.DeleteFile)
 		})
 
 		// Docker routes
 		r.Route("/api/docker", func(r chi.Router) {
 			r.Get("/status", dockerHandler.GetStatus)
 			r.Get("/info", dockerHandler.GetInfo)
-			r.Post("/restart", dockerHandler.PostRestart)
-			r.Post("/stop", dockerHandler.PostStop)
+			r.With(middleware.RequireAdmin).Post("/restart", dockerHandler.PostRestart)
+			r.With(middleware.RequireAdmin).Post("/stop", dockerHandler.PostStop)
 		})
 
 		// AI routes
