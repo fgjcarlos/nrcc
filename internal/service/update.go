@@ -338,6 +338,20 @@ func (s *UpdateService) CreateBackup(ctx context.Context, fromVersion string) (m
 	}, nil
 }
 
+// History returns the applied-update backup catalog (most recent updates), or an
+// empty slice when none exist. This is the real source for the update history
+// endpoint.
+func (s *UpdateService) History() []model.BackupEntry {
+	if !s.backupStore.Exists() {
+		return []model.BackupEntry{}
+	}
+	entries, err := s.backupStore.Read()
+	if err != nil {
+		return []model.BackupEntry{}
+	}
+	return entries
+}
+
 // AppendBackup persists a backup entry to the catalog, keeping max 5 entries.
 // If catalog already has 5 entries, removes the oldest before appending the new one.
 // Thread-safe via backupStore mutex.
