@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/composedof2/nrcc/internal/model"
@@ -420,10 +421,10 @@ func TestListPaginatedHappyPath(t *testing.T) {
 	// Create 25 backups with controlled CreatedAt timestamps
 	for i := 1; i <= 25; i++ {
 		backup := backupMetadata{
-			ID:        fmt.Sprintf("backup-%03d", i),
-			Name:      fmt.Sprintf("backup-%03d", i),
-			Type:      model.BackupTypeManual,
-			CreatedAt: fmt.Sprintf("2026-01-01T%02d:00:00Z", (i % 24) + 1),
+			ID:          fmt.Sprintf("backup-%03d", i),
+			Name:        fmt.Sprintf("backup-%03d", i),
+			Type:        model.BackupTypeManual,
+			CreatedAt:   fmt.Sprintf("2026-01-01T%02d:00:00Z", (i%24)+1),
 			TriggeredBy: "manual",
 		}
 		createBackupArchive(t, tempDir, backup)
@@ -470,10 +471,10 @@ func TestListPaginatedSecondPage(t *testing.T) {
 	// Create exactly 25 backups
 	for i := 1; i <= 25; i++ {
 		backup := backupMetadata{
-			ID:        fmt.Sprintf("backup-%03d", i),
-			Name:      fmt.Sprintf("backup-%03d", i),
-			Type:      model.BackupTypeManual,
-			CreatedAt: fmt.Sprintf("2026-01-01T%02d:00:00Z", (i % 24) + 1),
+			ID:          fmt.Sprintf("backup-%03d", i),
+			Name:        fmt.Sprintf("backup-%03d", i),
+			Type:        model.BackupTypeManual,
+			CreatedAt:   fmt.Sprintf("2026-01-01T%02d:00:00Z", (i%24)+1),
 			TriggeredBy: "manual",
 		}
 		createBackupArchive(t, tempDir, backup)
@@ -524,10 +525,10 @@ func TestListPaginatedSortBySize(t *testing.T) {
 	// Create multiple backups
 	for i := 1; i <= 3; i++ {
 		backup := backupMetadata{
-			ID:        fmt.Sprintf("size-%03d", i),
-			Name:      fmt.Sprintf("size-%03d", i),
-			Type:      model.BackupTypeManual,
-			CreatedAt: fmt.Sprintf("2026-01-01T%02d:00:00Z", i),
+			ID:          fmt.Sprintf("size-%03d", i),
+			Name:        fmt.Sprintf("size-%03d", i),
+			Type:        model.BackupTypeManual,
+			CreatedAt:   fmt.Sprintf("2026-01-01T%02d:00:00Z", i),
 			TriggeredBy: "manual",
 		}
 		createBackupArchive(t, tempDir, backup)
@@ -590,10 +591,10 @@ func TestListPaginatedLimitClamping(t *testing.T) {
 	// Create 5 backups
 	for i := 1; i <= 5; i++ {
 		backup := backupMetadata{
-			ID:        fmt.Sprintf("backup-%03d", i),
-			Name:      fmt.Sprintf("backup-%03d", i),
-			Type:      model.BackupTypeManual,
-			CreatedAt: fmt.Sprintf("2026-01-01T%02d:00:00Z", (i%24)+1),
+			ID:          fmt.Sprintf("backup-%03d", i),
+			Name:        fmt.Sprintf("backup-%03d", i),
+			Type:        model.BackupTypeManual,
+			CreatedAt:   fmt.Sprintf("2026-01-01T%02d:00:00Z", (i%24)+1),
 			TriggeredBy: "manual",
 		}
 		createBackupArchive(t, tempDir, backup)
@@ -628,24 +629,24 @@ func TestListPaginatedSortOrder(t *testing.T) {
 	// We use different months to ensure strict ordering
 	backups := []backupMetadata{
 		{
-			ID:        "backup-jan",
-			Name:      "backup-jan",
-			Type:      model.BackupTypeManual,
-			CreatedAt: "2026-01-01T10:00:00Z",
+			ID:          "backup-jan",
+			Name:        "backup-jan",
+			Type:        model.BackupTypeManual,
+			CreatedAt:   "2026-01-01T10:00:00Z",
 			TriggeredBy: "manual",
 		},
 		{
-			ID:        "backup-feb",
-			Name:      "backup-feb",
-			Type:      model.BackupTypeManual,
-			CreatedAt: "2026-02-01T10:00:00Z",
+			ID:          "backup-feb",
+			Name:        "backup-feb",
+			Type:        model.BackupTypeManual,
+			CreatedAt:   "2026-02-01T10:00:00Z",
 			TriggeredBy: "manual",
 		},
 		{
-			ID:        "backup-mar",
-			Name:      "backup-mar",
-			Type:      model.BackupTypeManual,
-			CreatedAt: "2026-03-01T10:00:00Z",
+			ID:          "backup-mar",
+			Name:        "backup-mar",
+			Type:        model.BackupTypeManual,
+			CreatedAt:   "2026-03-01T10:00:00Z",
 			TriggeredBy: "manual",
 		},
 	}
@@ -810,6 +811,66 @@ func TestExtractFileFromZipRestoresValidArchive(t *testing.T) {
 	}
 	if string(content) != `[{"id":"1"}]` {
 		t.Fatalf("unexpected content: %s", content)
+	}
+}
+
+// TestExtractFileFromZip_RejectsOversizedEntry is the #279 regression: an entry
+// whose uncompressed content exceeds the per-entry limit must be rejected
+// (decompression-bomb guard) and must not be left on disk.
+func TestExtractFileFromZip_RejectsOversizedEntry(t *testing.T) {
+	orig := maxBackupEntrySize
+	maxBackupEntrySize = 16
+	defer func() { maxBackupEntrySize = orig }()
+
+	restoreDir := t.TempDir()
+	zipPath := filepath.Join(t.TempDir(), "bomb.zip")
+	createZipWithEntry(t, zipPath, "flows.json", strings.Repeat("A", 1024)) // 1 KiB >> 16 B limit
+
+	reader, err := zip.OpenReader(zipPath)
+	if err != nil {
+		t.Fatalf("open zip: %v", err)
+	}
+	defer reader.Close()
+
+	svc := NewBackupService(restoreDir)
+	for _, f := range reader.File {
+		if f.Name == "backup-metadata.json" {
+			continue
+		}
+		if err := svc.extractFileFromZip(f, restoreDir); err == nil {
+			t.Fatalf("expected error extracting oversized entry %q, got nil", f.Name)
+		}
+	}
+
+	if _, err := os.Stat(filepath.Join(restoreDir, "flows.json")); err == nil {
+		t.Fatal("oversized entry must not be left on disk")
+	}
+}
+
+// TestExtractFileFromZip_AllowsEntryWithinLimit guards against over-tightening.
+func TestExtractFileFromZip_AllowsEntryWithinLimit(t *testing.T) {
+	orig := maxBackupEntrySize
+	maxBackupEntrySize = 1024
+	defer func() { maxBackupEntrySize = orig }()
+
+	restoreDir := t.TempDir()
+	zipPath := filepath.Join(t.TempDir(), "ok.zip")
+	createZipWithEntry(t, zipPath, "flows.json", `[{"id":"1"}]`)
+
+	reader, err := zip.OpenReader(zipPath)
+	if err != nil {
+		t.Fatalf("open zip: %v", err)
+	}
+	defer reader.Close()
+
+	svc := NewBackupService(restoreDir)
+	for _, f := range reader.File {
+		if f.Name == "backup-metadata.json" {
+			continue
+		}
+		if err := svc.extractFileFromZip(f, restoreDir); err != nil {
+			t.Fatalf("entry within limit should extract: %v", err)
+		}
 	}
 }
 
