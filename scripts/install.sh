@@ -94,24 +94,27 @@ curl -fsSL -o "$TMP_DIR/nrcc" "$BINARY_URL" || {
 }
 
 echo "→ Downloading checksum…"
-curl -fsSL -o "$TMP_DIR/nrcc.sha256" "$CHECKSUM_URL" || {
-	echo "Warning: SHA256SUMS not found for ${VERSION}. Skipping checksum verification. To verify manually, download from https://github.com/composedof2/nrcc/releases"
-	# Continue with warning instead of failing - checksum files may not exist for legacy releases
-}
+CHECKSUM_AVAILABLE=1
+curl -fsSL -o "$TMP_DIR/nrcc.sha256" "$CHECKSUM_URL" || CHECKSUM_AVAILABLE=0
 
-# Step 5: Verify checksum (if file exists)
+# Step 5: Verify checksum — verification is mandatory by default. A missing
+# checksum file aborts the install unless the operator opts out explicitly
+# (NRCC_SKIP_CHECKSUM=1), so a network/CDN failure can never silently downgrade
+# the install to an unverified binary.
 echo "→ Verifying checksum…"
 cd "$TMP_DIR"
-if [ -f "nrcc.sha256" ]; then
+if [ "$CHECKSUM_AVAILABLE" = "1" ] && [ -f "nrcc.sha256" ]; then
 	if ! $SHA256_CMD -c nrcc.sha256 >/dev/null 2>&1; then
 		echo "Error: Checksum verification failed for ${BINARY}. The downloaded file may be corrupt. Please retry or download manually from https://github.com/composedof2/nrcc/releases"
 		exit 1
 	fi
+	echo "✓ Checksum verified"
+elif [ "${NRCC_SKIP_CHECKSUM:-0}" = "1" ]; then
+	echo "Warning: SHA256 checksum unavailable for ${VERSION}; skipping verification because NRCC_SKIP_CHECKSUM=1."
 else
-	if [ "${NRCC_STRICT_CHECKSUMS:-0}" = "1" ]; then
-		echo "Error: SHA256SUMS not found for ${VERSION} and NRCC_STRICT_CHECKSUMS=1. Aborting."
-		exit 1
-	fi
+	echo "Error: SHA256 checksum could not be downloaded for ${VERSION}; refusing to install an unverified binary."
+	echo "If this is a legacy release without checksums, re-run with NRCC_SKIP_CHECKSUM=1 to bypass (not recommended)."
+	exit 1
 fi
 
 # Step 6: Make executable
