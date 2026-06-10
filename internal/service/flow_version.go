@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	versionDir     = "flow-versions"
-	maxVersions    = 100
-	pollInterval   = 10 * time.Second
+	versionDir   = "flow-versions"
+	maxVersions  = 100
+	pollInterval = 10 * time.Second
 )
 
 type FlowVersion struct {
@@ -51,6 +51,7 @@ type FlowVersionService struct {
 	mu       sync.Mutex
 	lastHash string
 	stopCh   chan struct{}
+	stopOnce sync.Once
 }
 
 func NewFlowVersionService(dataDir string) *FlowVersionService {
@@ -75,8 +76,11 @@ func (s *FlowVersionService) StartPolling() {
 	}()
 }
 
+// Stop signals the polling goroutine to exit. It is safe to call multiple times.
 func (s *FlowVersionService) Stop() {
-	close(s.stopCh)
+	s.stopOnce.Do(func() {
+		close(s.stopCh)
+	})
 }
 
 func (s *FlowVersionService) captureIfChanged() {
