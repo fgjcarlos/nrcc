@@ -20,6 +20,21 @@ updates:
     labels:
       - dependencies
       - frontend
+    # Wait a few days after a release before opening a PR. This keeps bumps
+    # above pnpm's minimum-release-age supply-chain policy, so the lockfile
+    # check doesn't reject freshly published versions (see PR #270).
+    cooldown:
+      default-days: 5
+    groups:
+      # React and react-dom must always move together (react-dom validates it
+      # matches React's version at runtime); bumping one without the other
+      # breaks the renderer and every component test (see PR #273).
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
 
   - package-ecosystem: docker
     directory: /
