@@ -78,6 +78,8 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 	librarySvc := service.NewLibraryService(dataDir)
 	libraryHandler := handler.NewLibraryHandler(librarySvc)
 	updateSvc := service.NewUpdateService(dataDir)
+	// Wire the backup engine so pre-update backups are real archives, not placeholders.
+	updateSvc.SetBackupCreator(backupSvc)
 	updateHandler := handler.NewUpdateHandler(updateSvc)
 	filesHandler := handler.NewFilesHandler(dataDir)
 	dockerHandler := handler.NewDockerHandler()

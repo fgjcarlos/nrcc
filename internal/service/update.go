@@ -27,6 +27,13 @@ func (r *defaultRunner) Run(ctx context.Context, name string, args ...string) ([
 	return cmd.CombinedOutput()
 }
 
+// backupCreator is the minimal slice of BackupService that the update flow needs
+// to take a real pre-update backup. It is an interface so tests can inject a
+// fake and so UpdateService does not depend on the full BackupService surface.
+type backupCreator interface {
+	CreateTyped(backupType model.BackupType, name string) (model.Backup, error)
+}
+
 // UpdateService handles Node-RED update detection and caching.
 //
 // Design: Backend-owned polling goroutine runs on a configurable interval (default 4 hours),
@@ -65,6 +72,14 @@ type UpdateService struct {
 	flowState     model.UpdateFlowState
 	flowStateMu   sync.RWMutex
 	backupStore   *store.JSONStore[[]model.BackupEntry]
+	backupSvc     backupCreator
+}
+
+// SetBackupCreator wires the backup engine used to take a real archive before an
+// update is applied. It must be called during server wiring; without it, the
+// update flow refuses to proceed (it will not fabricate a phantom backup).
+func (s *UpdateService) SetBackupCreator(bc backupCreator) {
+	s.backupSvc = bc
 }
 
 const (
@@ -293,31 +308,33 @@ func (s *UpdateService) SetFlowState(state model.UpdateFlowState) {
 	s.flowState = state
 }
 
-// CreateBackup creates a timestamped backup of Node-RED configuration.
-// Returns BackupEntry with status "completed" on success or error on failure.
-// Does NOT persist the entry to disk; caller decides persistence.
+// CreateBackup takes a real archive of the Node-RED data directory before an
+// update is applied, delegating to the configured backup engine. It returns a
+// BackupEntry referencing the on-disk archive (with its actual size), or an
+// error if no backup could be written — the caller MUST abort the update in
+// that case so we never apply an update without a restore point.
 //
-// Design note: Backup path and size calculation are simplified for MVP.
-// Real implementation would tar/zip the Node-RED dataDir and calculate actual size.
-// For now, we create a placeholder entry to establish the interface.
+// Does NOT persist the entry to the update catalog; the caller decides
+// persistence (see AppendBackup / ApplyUpdateWithBackup).
 func (s *UpdateService) CreateBackup(ctx context.Context, fromVersion string) (model.BackupEntry, error) {
-	// Generate backup ID (simple timestamp-based ID for MVP)
-	now := time.Now().UTC()
-	backupID := fmt.Sprintf("backup_%d", now.UnixNano())
-	
-	// Backup path (simplified; would be tar/zip in production)
-	backupPath := fmt.Sprintf("%s/backups/%s.tar.gz", s.dataDir, backupID)
-	
-	entry := model.BackupEntry{
-		ID:          backupID,
-		Path:        backupPath,
-		SizeBytes:   0, // Placeholder; would calculate actual tar/zip size
-		Timestamp:   now,
+	if s.backupSvc == nil {
+		return model.BackupEntry{}, fmt.Errorf("backup engine not configured: refusing to apply update without a real backup")
+	}
+
+	name := fmt.Sprintf("Pre-update backup (from %s)", fromVersion)
+	backup, err := s.backupSvc.CreateTyped(model.BackupTypeManual, name)
+	if err != nil {
+		return model.BackupEntry{}, fmt.Errorf("failed to create pre-update backup: %w", err)
+	}
+
+	return model.BackupEntry{
+		ID:          backup.ID,
+		Path:        backup.Path,
+		SizeBytes:   backup.SizeBytes,
+		Timestamp:   time.Now().UTC(),
 		FromVersion: fromVersion,
 		Status:      "completed",
-	}
-	
-	return entry, nil
+	}, nil
 }
 
 // AppendBackup persists a backup entry to the catalog, keeping max 5 entries.
