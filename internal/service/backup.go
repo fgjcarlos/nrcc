@@ -825,6 +825,11 @@ func (s *BackupService) addFileToZip(zipWriter *zip.Writer, srcPath, dstPath str
 	return true, nil
 }
 
+// maxBackupEntrySize caps the uncompressed size of a single backup entry to
+// guard against decompression bombs during restore. It is a var (not const) so
+// tests can lower it. 200 MiB comfortably covers real Node-RED data files.
+var maxBackupEntrySize int64 = 200 * 1024 * 1024
+
 func (s *BackupService) extractFileFromZip(file *zip.File, destDir string) error {
 	if file.FileInfo().IsDir() || file.Name == "backup-metadata.json" {
 		return nil
@@ -833,6 +838,12 @@ func (s *BackupService) extractFileFromZip(file *zip.File, destDir string) error
 	// Reject symlinks and hardlinks.
 	if file.FileInfo().Mode()&(os.ModeSymlink|os.ModeNamedPipe|os.ModeDevice) != 0 {
 		return fmt.Errorf("unsafe archive entry type: %s", file.Name)
+	}
+
+	// Decompression-bomb guard: reject entries whose declared uncompressed size
+	// already exceeds the limit before reading a single byte.
+	if file.UncompressedSize64 > uint64(maxBackupEntrySize) {
+		return fmt.Errorf("archive entry %s exceeds maximum allowed size", file.Name)
 	}
 
 	destPath, err := sanitizeArchivePath(destDir, file.Name)
@@ -856,8 +867,18 @@ func (s *BackupService) extractFileFromZip(file *zip.File, destDir string) error
 	}
 	defer writer.Close()
 
-	_, err = io.Copy(writer, reader)
-	return err
+	// The declared size can lie; cap the actual bytes copied. Reading one byte
+	// past the limit means the entry is oversized.
+	written, err := io.Copy(writer, io.LimitReader(reader, maxBackupEntrySize+1))
+	if err != nil {
+		return err
+	}
+	if written > maxBackupEntrySize {
+		writer.Close()
+		os.Remove(destPath)
+		return fmt.Errorf("archive entry %s exceeds maximum allowed size", file.Name)
+	}
+	return nil
 }
 
 // sanitizeArchivePath validates that a zip entry resolves within destDir.
