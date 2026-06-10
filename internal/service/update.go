@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -459,20 +460,63 @@ func (s *UpdateService) ApplyUpdate() error {
 		return fmt.Errorf("%s", sanitized)
 	}
 
-	if err := s.postInstallAudit(ctx); err != nil {
+	if err := s.postInstallAudit(ctx, cached.LatestVersion); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-// postInstallAudit runs npm audit after install and blocks on CRITICAL findings.
-func (s *UpdateService) postInstallAudit(ctx context.Context) error {
-	output, err := s.runner.Run(ctx, "npm", "audit", "--omit=dev", "--audit-level=critical", "-g")
+// postInstallAudit audits the dependency tree of the freshly-installed Node-RED
+// version and blocks the update only when npm reports a CONFIRMED critical
+// vulnerability.
+//
+// npm cannot audit globally-installed packages (`npm audit -g` errors with
+// EAUDITGLOBAL), so we resolve the pinned version's tree in an isolated
+// workspace and audit that. Operational failures — npm missing, registry
+// unreachable, tree unresolvable — are NOT vulnerabilities and must never block
+// a legitimate update; only a parsed critical count > 0 blocks.
+func (s *UpdateService) postInstallAudit(ctx context.Context, version string) error {
+	auditDir, err := os.MkdirTemp("", "nrcc-audit-")
 	if err != nil {
-		return fmt.Errorf("post-install audit found critical vulnerabilities — update blocked: %s", truncateOutput(output, 200))
+		return nil // cannot stage audit workspace → do not block
+	}
+	defer os.RemoveAll(auditDir)
+
+	manifest := fmt.Sprintf(`{"name":"nrcc-audit","version":"0.0.0","private":true,"dependencies":{"node-red":"%s"}}`, version)
+	if err := os.WriteFile(filepath.Join(auditDir, "package.json"), []byte(manifest), 0o600); err != nil {
+		return nil // cannot write manifest → do not block
+	}
+
+	// Resolve the dependency tree without installing node_modules (lockfile only).
+	if _, err := s.runner.Run(ctx, "npm", "install", "--package-lock-only", "--prefix", auditDir); err != nil {
+		return nil // unresolvable tree (e.g. registry outage) → do not block
+	}
+
+	// `npm audit` exits non-zero when it finds vulnerabilities but still prints a
+	// JSON report; we trust the parsed critical count, not the exit code.
+	output, _ := s.runner.Run(ctx, "npm", "audit", "--audit-level=critical", "--omit=dev", "--json", "--prefix", auditDir)
+	if critical := parseCriticalCount(output); critical > 0 {
+		return fmt.Errorf("post-install audit found %d critical vulnerability(ies) — update blocked: %s", critical, truncateOutput(output, 200))
 	}
 	return nil
+}
+
+// parseCriticalCount extracts metadata.vulnerabilities.critical from an
+// `npm audit --json` report. Any parse failure yields 0 so an unreadable or
+// non-JSON audit output (e.g. an npm error string) never blocks an update.
+func parseCriticalCount(output []byte) int {
+	var report struct {
+		Metadata struct {
+			Vulnerabilities struct {
+				Critical int `json:"critical"`
+			} `json:"vulnerabilities"`
+		} `json:"metadata"`
+	}
+	if err := json.Unmarshal(output, &report); err != nil {
+		return 0
+	}
+	return report.Metadata.Vulnerabilities.Critical
 }
 
 func truncateOutput(b []byte, max int) string {
