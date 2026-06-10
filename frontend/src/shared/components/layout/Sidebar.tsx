@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import {
   Blocks,
   Box,
@@ -45,6 +45,7 @@ const MOBILE_BREAKPOINT = 768;
 
 export function Sidebar() {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const isAdmin = user?.role === 'admin';
   
   const [isMobile, setIsMobile] = useState(false);
@@ -71,7 +72,7 @@ export function Sidebar() {
 
   const handleLogout = () => {
     logout();
-    window.location.href = '/login';
+    navigate('/login');
   };
 
   const navLinkClass = (isActive: boolean) =>

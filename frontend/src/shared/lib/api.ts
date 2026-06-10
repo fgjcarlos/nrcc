@@ -1,5 +1,6 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import type { ApiResponse } from 'shared/types';
+import { redirectToLogin } from './navigation';
 
 const api = axios.create({
   baseURL: '/api',
@@ -72,7 +73,9 @@ api.interceptors.response.use(
 
       if (!window.location.pathname.includes('/login') &&
           !window.location.pathname.includes('/setup')) {
-        window.location.href = '/login';
+        // Navigate via React Router (registered by the app) instead of a full
+        // document reload, preserving SPA state/history.
+        redirectToLogin();
       }
     }
 
