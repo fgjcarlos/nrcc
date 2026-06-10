@@ -19,8 +19,8 @@ const (
 )
 
 type attempt struct {
-	Count     int       `json:"count"`
-	FirstAt   time.Time `json:"firstAt"`
+	Count       int       `json:"count"`
+	FirstAt     time.Time `json:"firstAt"`
 	LockedUntil time.Time `json:"lockedUntil,omitempty"`
 }
 
@@ -116,15 +116,74 @@ func (rl *RateLimiter) load() {
 	_ = json.Unmarshal(data, &rl.attempts)
 }
 
+// trustedProxies holds the networks whose X-Forwarded-For header is honored.
+// It is populated from NRCC_TRUSTED_PROXIES (comma-separated CIDRs or bare IPs);
+// empty by default, which means X-Forwarded-For is ignored entirely.
+var trustedProxies = parseTrustedProxies(os.Getenv("NRCC_TRUSTED_PROXIES"))
+
+// ExtractIP returns the client IP used to key rate limiting. It only honors
+// X-Forwarded-For when the immediate peer (RemoteAddr) is a configured trusted
+// proxy; otherwise the peer address is authoritative. This stops a direct
+// client from spoofing X-Forwarded-For to rotate rate-limit buckets and bypass
+// login throttling.
 func ExtractIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		return strings.TrimSpace(strings.SplitN(xff, ",", 2)[0])
+	return extractIP(r, trustedProxies)
+}
+
+func extractIP(r *http.Request, trusted []*net.IPNet) string {
+	peer := peerHost(r.RemoteAddr)
+	if len(trusted) > 0 && ipInNets(peer, trusted) {
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			if first := strings.TrimSpace(strings.SplitN(xff, ",", 2)[0]); first != "" {
+				return first
+			}
+		}
 	}
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	return peer
+}
+
+func peerHost(remoteAddr string) string {
+	host, _, err := net.SplitHostPort(remoteAddr)
 	if err != nil {
-		return r.RemoteAddr
+		return remoteAddr
 	}
 	return host
+}
+
+func ipInNets(ip string, nets []*net.IPNet) bool {
+	parsed := net.ParseIP(ip)
+	if parsed == nil {
+		return false
+	}
+	for _, n := range nets {
+		if n.Contains(parsed) {
+			return true
+		}
+	}
+	return false
+}
+
+// parseTrustedProxies parses a comma-separated list of CIDRs or bare IPs. Bare
+// IPs become host routes (/32 or /128). Invalid entries are skipped.
+func parseTrustedProxies(s string) []*net.IPNet {
+	var nets []*net.IPNet
+	for _, part := range strings.Split(s, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if !strings.Contains(part, "/") {
+			if strings.Contains(part, ":") {
+				part += "/128"
+			} else {
+				part += "/32"
+			}
+		}
+		if _, n, err := net.ParseCIDR(part); err == nil {
+			nets = append(nets, n)
+		}
+	}
+	return nets
 }
 
 func RespondTooManyRequests(w http.ResponseWriter, retryAfter time.Duration) {
