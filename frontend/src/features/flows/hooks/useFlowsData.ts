@@ -1,13 +1,17 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, type QueryObserverResult } from '@tanstack/react-query';
 import { flowService } from '@/features/flows';
+import type { FlowSummary } from '@/features/flows/types';
 
 import { queryKeys } from '@/shared/lib/queryKeys';
+
+type FlowsResponse = { available: boolean; flows: FlowSummary[] };
+
 export interface UseFlowsDataResult {
-  flows: any[];
+  flows: FlowSummary[];
   available: boolean;
   isLoading: boolean;
   error: Error | null;
-  refetch: () => Promise<any>;
+  refetch: () => Promise<QueryObserverResult<FlowsResponse, Error>>;
 }
 
 export function useFlowsData(): UseFlowsDataResult {
