@@ -163,6 +163,13 @@ func (h *BackupHandler) DeleteBackup(w http.ResponseWriter, r *http.Request) {
 func (h *BackupHandler) DownloadBackup(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
+	// Validate before writing any headers so a malicious id never reaches the
+	// Content-Disposition filename and never resolves to a path outside backups.
+	if err := service.ValidateBackupID(id); err != nil {
+		model.RespondError(w, http.StatusBadRequest, "INVALID_ID", "Invalid backup id")
+		return
+	}
+
 	// Set response headers for file download
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Content-Disposition", "attachment; filename=\"backup-"+id+".zip\"")
