@@ -74,17 +74,40 @@ func (s *AuthService) VerifyToken(tokenStr string) (*model.Claims, error) {
 		return nil, fmt.Errorf("invalid token")
 	}
 
-	claims, ok := token.Claims.(*jwt.MapClaims)
+	mapClaims, ok := token.Claims.(*jwt.MapClaims)
 	if !ok {
 		return nil, fmt.Errorf("invalid claims")
 	}
+	claims := *mapClaims
+
+	userID, ok := claims["userId"].(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid token claims: userId")
+	}
+	username, ok := claims["username"].(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid token claims: username")
+	}
+	role, ok := claims["role"].(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid token claims: role")
+	}
+	// JSON numbers decode to float64 through jwt.MapClaims.
+	exp, ok := claims["exp"].(float64)
+	if !ok {
+		return nil, fmt.Errorf("invalid token claims: exp")
+	}
+	iat, ok := claims["iat"].(float64)
+	if !ok {
+		return nil, fmt.Errorf("invalid token claims: iat")
+	}
 
 	return &model.Claims{
-		UserID:    (*claims)["userId"].(string),
-		Username:  (*claims)["username"].(string),
-		Role:      model.UserRole((*claims)["role"].(string)),
-		ExpiresAt: int64((*claims)["exp"].(float64)),
-		IssuedAt:  int64((*claims)["iat"].(float64)),
+		UserID:    userID,
+		Username:  username,
+		Role:      model.UserRole(role),
+		ExpiresAt: int64(exp),
+		IssuedAt:  int64(iat),
 	}, nil
 }
 
