@@ -34,6 +34,15 @@ export function EnvVarModal({
     };
   }, []);
 
+  // Close on Escape, matching ConfirmationDialog's keyboard behavior.
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCancel();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onCancel]);
+
   // Validate form on formData changes
   useEffect(() => {
     const errors: Record<string, string> = {};
@@ -153,13 +162,16 @@ export function EnvVarModal({
   return createPortal(
     <div className="modal-overlay" onClick={onCancel}>
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="env-var-modal-title"
         className="surface-panel max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto border border-border p-6 shadow-glow"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-start justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">Environment</p>
-            <h2 className="text-xl font-bold text-base-content">{editing ? 'Edit Variable' : 'New Variable'}</h2>
+            <h2 id="env-var-modal-title" className="text-xl font-bold text-base-content">{editing ? 'Edit Variable' : 'New Variable'}</h2>
           </div>
         </div>
         <form onSubmit={onSubmit} className="space-y-5">

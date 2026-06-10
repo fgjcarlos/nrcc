@@ -22,6 +22,7 @@ export function LogsView() {
         <div className="surface-panel flex flex-wrap items-center gap-2 border border-border p-3">
           <select
             multiple
+            aria-label="Filter logs by level"
             value={levelFilter}
             onChange={(e) => setLevelFilter(Array.from(e.target.selectedOptions, o => o.value as LogLevel))}
             className="min-h-11 rounded-xl border border-border bg-base-100/70 px-3 py-2 text-sm text-base-content focus:outline-none focus:ring-2 focus:ring-primary"
@@ -34,6 +35,7 @@ export function LogsView() {
 
           <button
             onClick={() => setIsPaused(!isPaused)}
+            aria-label={isPaused ? 'Resume log updates' : 'Pause log updates'}
             className={cn(
               'rounded-xl border border-border p-3 transition-colors',
               isPaused ? 'bg-warning/10 text-warning' : 'bg-base-300/60 text-base-content hover:bg-base-300/80'
@@ -44,6 +46,7 @@ export function LogsView() {
 
           <button
             onClick={() => handleClear(refetch)}
+            aria-label="Clear logs"
             className="rounded-xl border border-border p-3 text-base-content transition-colors hover:bg-base-300/60"
           >
             <Trash2 className="w-4 h-4" />
@@ -51,6 +54,7 @@ export function LogsView() {
 
           <button
             onClick={() => handleDownload(logs)}
+            aria-label="Download logs"
             className="rounded-xl border border-border p-3 text-base-content transition-colors hover:bg-base-300/60"
           >
             <Download className="w-4 h-4" />
