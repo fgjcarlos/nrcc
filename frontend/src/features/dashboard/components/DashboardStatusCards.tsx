@@ -5,7 +5,7 @@ import { Cpu, HardDrive, MemoryStick, Server } from 'lucide-react';
 import type { DashboardContainerStatus } from '../types';
 import { getDeploymentLabel } from '../lib';
 import { useSystemHistory } from '../hooks/useSystemHistory';
-import { MetricsChart } from './MetricsChart';
+import { LazyMetricsChart as MetricsChart } from './LazyMetricsChart';
 
 interface DashboardStatusCardsProps {
   container?: DashboardContainerStatus | null;
