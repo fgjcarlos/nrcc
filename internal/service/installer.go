@@ -14,14 +14,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/composedof2/nrcc/internal/model"
+	"github.com/fgjcarlos/nrcc/internal/model"
 	"github.com/pterm/pterm"
 )
 
 // systemdUnitTemplate is the content for /etc/systemd/system/nrcc.service
 const systemdUnitTemplate = `[Unit]
 Description=Node-RED Control Center
-Documentation=https://github.com/composedof2/nrcc
+Documentation=https://github.com/fgjcarlos/nrcc
 After=network-online.target
 Wants=network-online.target
 

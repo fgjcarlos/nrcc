@@ -6,10 +6,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/composedof2/nrcc/internal/middleware"
-	"github.com/composedof2/nrcc/internal/model"
-	"github.com/composedof2/nrcc/internal/service"
-	"github.com/composedof2/nrcc/internal/store"
+	"github.com/fgjcarlos/nrcc/internal/middleware"
+	"github.com/fgjcarlos/nrcc/internal/model"
+	"github.com/fgjcarlos/nrcc/internal/service"
+	"github.com/fgjcarlos/nrcc/internal/store"
 	"github.com/go-chi/chi/v5"
 )
 

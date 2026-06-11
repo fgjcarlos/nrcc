@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/composedof2/nrcc/internal/audit"
-	"github.com/composedof2/nrcc/internal/model"
+	"github.com/fgjcarlos/nrcc/internal/audit"
+	"github.com/fgjcarlos/nrcc/internal/model"
 	"github.com/go-chi/chi/v5"
 )
 

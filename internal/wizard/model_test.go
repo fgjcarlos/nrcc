@@ -3,7 +3,7 @@ package wizard
 import (
 	"testing"
 
-	"github.com/composedof2/nrcc/internal/model"
+	"github.com/fgjcarlos/nrcc/internal/model"
 )
 
 func TestShouldRunWizardTTYGate(t *testing.T) {

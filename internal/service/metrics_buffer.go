@@ -3,7 +3,7 @@ package service
 import (
 	"sync"
 
-	"github.com/composedof2/nrcc/internal/model"
+	"github.com/fgjcarlos/nrcc/internal/model"
 )
 
 // MetricsBuffer is a thread-safe ring buffer for MetricsSnapshot entries.

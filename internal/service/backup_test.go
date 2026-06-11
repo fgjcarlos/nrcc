@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/composedof2/nrcc/internal/model"
+	"github.com/fgjcarlos/nrcc/internal/model"
 )
 
 func TestBackupServiceCreateIncludesExplicitTypeAndDetail(t *testing.T) {

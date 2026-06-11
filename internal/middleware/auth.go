@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/composedof2/nrcc/internal/model"
-	"github.com/composedof2/nrcc/internal/service"
+	"github.com/fgjcarlos/nrcc/internal/model"
+	"github.com/fgjcarlos/nrcc/internal/service"
 )
 
 // CtxKeyUser is the key for storing user claims in request context

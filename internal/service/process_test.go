@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/composedof2/nrcc/internal/model"
+	"github.com/fgjcarlos/nrcc/internal/model"
 )
 
 // TestGetLogs_Empty tests that GetLogs returns empty slice for new ProcessManager

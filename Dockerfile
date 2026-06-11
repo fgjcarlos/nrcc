@@ -43,7 +43,7 @@ FROM nodered/node-red:latest
 
 LABEL org.opencontainers.image.title="nrcc"
 LABEL org.opencontainers.image.description="Node-RED Control Center — all-in-one binary + Node-RED"
-LABEL org.opencontainers.image.source="https://github.com/composedof2/nrcc"
+LABEL org.opencontainers.image.source="https://github.com/fgjcarlos/nrcc"
 
 USER root
 

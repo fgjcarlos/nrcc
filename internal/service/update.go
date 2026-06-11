@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/composedof2/nrcc/internal/model"
-	"github.com/composedof2/nrcc/internal/store"
+	"github.com/fgjcarlos/nrcc/internal/model"
+	"github.com/fgjcarlos/nrcc/internal/store"
 )
 
 // execRunner abstracts subprocess execution for testability.

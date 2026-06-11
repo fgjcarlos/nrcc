@@ -3,7 +3,7 @@ package service
 import (
 	"testing"
 
-	"github.com/composedof2/nrcc/internal/model"
+	"github.com/fgjcarlos/nrcc/internal/model"
 )
 
 // TestUpdateService_History is part of the #292 fix: update history must reflect

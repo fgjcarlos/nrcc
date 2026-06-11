@@ -3,10 +3,10 @@ package handler
 import (
 	"net/http"
 
-	"github.com/composedof2/nrcc/internal/audit"
-	"github.com/composedof2/nrcc/internal/middleware"
-	"github.com/composedof2/nrcc/internal/model"
-	"github.com/composedof2/nrcc/internal/service"
+	"github.com/fgjcarlos/nrcc/internal/audit"
+	"github.com/fgjcarlos/nrcc/internal/middleware"
+	"github.com/fgjcarlos/nrcc/internal/model"
+	"github.com/fgjcarlos/nrcc/internal/service"
 	"github.com/go-chi/chi/v5"
 )
 

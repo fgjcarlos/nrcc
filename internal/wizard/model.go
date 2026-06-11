@@ -1,6 +1,6 @@
 package wizard
 
-import "github.com/composedof2/nrcc/internal/model"
+import "github.com/fgjcarlos/nrcc/internal/model"
 
 // Step names the guided install stages. It is intentionally UI-agnostic so the
 // wizard decisions can be tested without a terminal or Bubble Tea runtime.

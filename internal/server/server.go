@@ -6,11 +6,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/composedof2/nrcc/internal/audit"
-	"github.com/composedof2/nrcc/internal/handler"
-	"github.com/composedof2/nrcc/internal/metrics"
-	"github.com/composedof2/nrcc/internal/middleware"
-	"github.com/composedof2/nrcc/internal/service"
+	"github.com/fgjcarlos/nrcc/internal/audit"
+	"github.com/fgjcarlos/nrcc/internal/handler"
+	"github.com/fgjcarlos/nrcc/internal/metrics"
+	"github.com/fgjcarlos/nrcc/internal/middleware"
+	"github.com/fgjcarlos/nrcc/internal/service"
 	"github.com/go-chi/chi/v5"
 )
 

@@ -15,7 +15,7 @@
 
 services:
   nrcc:
-    image: ghcr.io/composedof2/nrcc:latest
+    image: ghcr.io/fgjcarlos/nrcc:latest
     # Uncomment to build locally instead:
     # build: .
     container_name: nrcc

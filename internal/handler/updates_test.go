@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/composedof2/nrcc/internal/model"
-	"github.com/composedof2/nrcc/internal/service"
+	"github.com/fgjcarlos/nrcc/internal/model"
+	"github.com/fgjcarlos/nrcc/internal/service"
 )
 
 // TestUpdateHandler_GetStatus_ReturnsOK tests that GET /api/updates/status returns 200

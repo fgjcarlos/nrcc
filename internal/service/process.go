@@ -13,8 +13,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/composedof2/nrcc/internal/model"
-	"github.com/composedof2/nrcc/internal/ui"
+	"github.com/fgjcarlos/nrcc/internal/model"
+	"github.com/fgjcarlos/nrcc/internal/ui"
 )
 
 // ProcessManager manages the Node-RED child process lifecycle.

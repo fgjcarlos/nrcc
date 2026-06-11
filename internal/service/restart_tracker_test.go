@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/composedof2/nrcc/internal/model"
+	"github.com/fgjcarlos/nrcc/internal/model"
 )
 
 func TestRestartTracker_Push_RecordsCorrectFields(t *testing.T) {
