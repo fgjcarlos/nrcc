@@ -101,7 +101,9 @@ jobs:
           # Linux (static — Alpine/glibc compatible)
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64  go build -tags netgo -ldflags="${LDFLAGS} -extldflags=-static" -o dist/nrcc-linux-amd64 .
           CGO_ENABLED=0 GOOS=linux GOARCH=arm64  go build -tags netgo -ldflags="${LDFLAGS} -extldflags=-static" -o dist/nrcc-linux-arm64 .
-          CGO_ENABLED=0 GOOS=linux GOARCH=arm    go build -tags netgo -ldflags="${LDFLAGS} -extldflags=-static" -o dist/nrcc-linux-armv7 .
+          # Pin GOARM=7 so the armv7 ABI matches the linux/arm/v7 Docker image and does
+          # not silently regress to GOARM=6 if built with an older toolchain default.
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build -tags netgo -ldflags="${LDFLAGS} -extldflags=-static" -o dist/nrcc-linux-armv7 .
 
           # macOS
           GOOS=darwin  GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o dist/nrcc-darwin-amd64 .

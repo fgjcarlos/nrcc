@@ -41,7 +41,9 @@ release: frontend-build
 	# Linux: static binary (compatible with Alpine/musl AND glibc containers)
 	CGO_ENABLED=0 GOOS=linux   GOARCH=amd64  go build -tags netgo -ldflags="$(LDFLAGS) -extldflags=-static" -o dist/$(BINARY)-linux-amd64 .
 	CGO_ENABLED=0 GOOS=linux   GOARCH=arm64  go build -tags netgo -ldflags="$(LDFLAGS) -extldflags=-static" -o dist/$(BINARY)-linux-arm64 .
-	CGO_ENABLED=0 GOOS=linux   GOARCH=arm    go build -tags netgo -ldflags="$(LDFLAGS) -extldflags=-static" -o dist/$(BINARY)-linux-armv7 .
+	# Pin GOARM=7 so the armv7 ABI matches the linux/arm/v7 Docker image and does
+	# not silently regress to GOARM=6 if built with an older toolchain default.
+	CGO_ENABLED=0 GOOS=linux   GOARCH=arm GOARM=7 go build -tags netgo -ldflags="$(LDFLAGS) -extldflags=-static" -o dist/$(BINARY)-linux-armv7 .
 	# macOS / Windows: standard dynamic build
 	GOOS=darwin  GOARCH=amd64  go build -ldflags="$(LDFLAGS)" -o dist/$(BINARY)-darwin-amd64 .
 	GOOS=darwin  GOARCH=arm64  go build -ldflags="$(LDFLAGS)" -o dist/$(BINARY)-darwin-arm64 .
