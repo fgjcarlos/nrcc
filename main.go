@@ -12,13 +12,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/composedof2/nrcc/cmd"
-	"github.com/composedof2/nrcc/internal/middleware"
-	"github.com/composedof2/nrcc/internal/model"
-	"github.com/composedof2/nrcc/internal/server"
-	"github.com/composedof2/nrcc/internal/service"
-	"github.com/composedof2/nrcc/internal/store"
-	"github.com/composedof2/nrcc/internal/ui"
+	"github.com/fgjcarlos/nrcc/cmd"
+	"github.com/fgjcarlos/nrcc/internal/middleware"
+	"github.com/fgjcarlos/nrcc/internal/model"
+	"github.com/fgjcarlos/nrcc/internal/server"
+	"github.com/fgjcarlos/nrcc/internal/service"
+	"github.com/fgjcarlos/nrcc/internal/store"
+	"github.com/fgjcarlos/nrcc/internal/ui"
 )
 
 var Version string = "dev"

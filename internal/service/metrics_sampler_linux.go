@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/composedof2/nrcc/internal/model"
+	"github.com/fgjcarlos/nrcc/internal/model"
 )
 
 // sampleHost collects CPU, memory, and disk metrics on Linux.

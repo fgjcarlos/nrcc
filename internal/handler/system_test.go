@@ -3,7 +3,7 @@ package handler
 import (
 	"testing"
 
-	"github.com/composedof2/nrcc/internal/service"
+	"github.com/fgjcarlos/nrcc/internal/service"
 )
 
 // TestSystemHandler_NodeRedVersion is the #289 regression: the Node-RED version

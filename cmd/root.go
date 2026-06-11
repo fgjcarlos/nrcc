@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/composedof2/nrcc/internal/service"
+	"github.com/fgjcarlos/nrcc/internal/service"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 )

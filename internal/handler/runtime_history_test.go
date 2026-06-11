@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/composedof2/nrcc/internal/model"
-	"github.com/composedof2/nrcc/internal/service"
+	"github.com/fgjcarlos/nrcc/internal/model"
+	"github.com/fgjcarlos/nrcc/internal/service"
 )
 
 // runtimeHistoryResponse matches the JSON shape returned by GetRuntimeHistory.

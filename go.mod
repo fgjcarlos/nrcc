@@ -1,4 +1,4 @@
-module github.com/composedof2/nrcc
+module github.com/fgjcarlos/nrcc
 
 go 1.25.0
 

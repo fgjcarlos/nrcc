@@ -7,7 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
-	"github.com/composedof2/nrcc/internal/model"
+	"github.com/fgjcarlos/nrcc/internal/model"
 )
 
 // Run renders the staged TUI and returns the shared install plan. The rendering

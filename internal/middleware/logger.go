@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/composedof2/nrcc/internal/ui"
+	"github.com/fgjcarlos/nrcc/internal/ui"
 )
 
 // Logger middleware logs HTTP requests with method, path, status, and duration

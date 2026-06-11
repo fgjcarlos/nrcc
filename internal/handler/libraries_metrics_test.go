@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/composedof2/nrcc/internal/service"
+	"github.com/fgjcarlos/nrcc/internal/service"
 	"github.com/go-chi/chi/v5"
 )
 

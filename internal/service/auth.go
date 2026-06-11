@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/composedof2/nrcc/internal/model"
-	"github.com/composedof2/nrcc/internal/store"
+	"github.com/fgjcarlos/nrcc/internal/model"
+	"github.com/fgjcarlos/nrcc/internal/store"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )

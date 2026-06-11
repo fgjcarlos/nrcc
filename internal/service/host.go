@@ -15,8 +15,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/composedof2/nrcc/internal/model"
-	"github.com/composedof2/nrcc/internal/ui"
+	"github.com/fgjcarlos/nrcc/internal/model"
+	"github.com/fgjcarlos/nrcc/internal/ui"
 	"github.com/pterm/pterm"
 )
 

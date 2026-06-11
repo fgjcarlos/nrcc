@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/composedof2/nrcc/internal/model"
-	"github.com/composedof2/nrcc/internal/store"
+	"github.com/fgjcarlos/nrcc/internal/model"
+	"github.com/fgjcarlos/nrcc/internal/store"
 )
 
 func newTestAuthService(t *testing.T) *AuthService {

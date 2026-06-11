@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/composedof2/nrcc/internal/ui"
+	"github.com/fgjcarlos/nrcc/internal/ui"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
 )

@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/composedof2/nrcc/internal/model"
+	"github.com/fgjcarlos/nrcc/internal/model"
 )
 
 func TestSet_EncryptsSecretWhenKeyProvided(t *testing.T) {

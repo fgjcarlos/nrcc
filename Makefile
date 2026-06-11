@@ -5,7 +5,7 @@ VERSION     ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo 
 LDFLAGS     := -s -w -X main.Version=$(VERSION)
 
 # Docker
-IMAGE       ?= ghcr.io/composedof2/nrcc
+IMAGE       ?= ghcr.io/fgjcarlos/nrcc
 PLATFORMS   ?= linux/amd64,linux/arm64,linux/arm/v7
 
 .PHONY: build frontend-build dev test release clean \

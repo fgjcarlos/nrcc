@@ -2,7 +2,7 @@
 
 package service
 
-import "github.com/composedof2/nrcc/internal/model"
+import "github.com/fgjcarlos/nrcc/internal/model"
 
 // sampleHost returns a zero MetricsSnapshot on non-Linux platforms.
 func sampleHost() model.MetricsSnapshot {

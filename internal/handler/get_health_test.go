@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/composedof2/nrcc/internal/model"
-	"github.com/composedof2/nrcc/internal/service"
+	"github.com/fgjcarlos/nrcc/internal/model"
+	"github.com/fgjcarlos/nrcc/internal/service"
 )
 
 // healthPayload is the shape of the data field returned by GetHealth.

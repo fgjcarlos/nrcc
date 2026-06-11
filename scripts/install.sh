@@ -5,7 +5,7 @@ set -e
 # Usage: curl https://get.nrcc.dev | sh
 # Or pinned version: NRCC_VERSION=v1.0.0 curl https://get.nrcc.dev | sh
 
-REPO="composedof2/nrcc"
+REPO="fgjcarlos/nrcc"
 VERSION="${NRCC_VERSION:-latest}"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 
@@ -38,7 +38,7 @@ case "$ARCH" in
 	arm64) ARCH="arm64" ;;
 	armv7l) ARCH="armv7" ;;
 	*)
-		echo "Error: Unsupported architecture: $ARCH. Please download manually from https://github.com/composedof2/nrcc/releases"
+		echo "Error: Unsupported architecture: $ARCH. Please download manually from https://github.com/fgjcarlos/nrcc/releases"
 		exit 1
 		;;
 esac
@@ -48,7 +48,7 @@ case "$OS" in
 	linux) OS="linux" ;;
 	darwin) OS="darwin" ;;
 	*)
-		echo "Error: Unsupported OS: $OS. Please download manually from https://github.com/composedof2/nrcc/releases"
+		echo "Error: Unsupported OS: $OS. Please download manually from https://github.com/fgjcarlos/nrcc/releases"
 		exit 1
 		;;
 esac
@@ -105,7 +105,7 @@ echo "→ Verifying checksum…"
 cd "$TMP_DIR"
 if [ "$CHECKSUM_AVAILABLE" = "1" ] && [ -f "nrcc.sha256" ]; then
 	if ! $SHA256_CMD -c nrcc.sha256 >/dev/null 2>&1; then
-		echo "Error: Checksum verification failed for ${BINARY}. The downloaded file may be corrupt. Please retry or download manually from https://github.com/composedof2/nrcc/releases"
+		echo "Error: Checksum verification failed for ${BINARY}. The downloaded file may be corrupt. Please retry or download manually from https://github.com/fgjcarlos/nrcc/releases"
 		exit 1
 	fi
 	echo "✓ Checksum verified"

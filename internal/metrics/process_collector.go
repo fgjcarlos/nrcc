@@ -3,7 +3,7 @@ package metrics
 import (
 	"sync"
 
-	"github.com/composedof2/nrcc/internal/model"
+	"github.com/fgjcarlos/nrcc/internal/model"
 	"github.com/prometheus/client_golang/prometheus"
 )
 

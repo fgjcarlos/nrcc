@@ -3,7 +3,7 @@ package middleware
 import (
 	"net/http"
 
-	"github.com/composedof2/nrcc/internal/model"
+	"github.com/fgjcarlos/nrcc/internal/model"
 )
 
 // RequireAdmin restricts a route to users with the admin role. It MUST be

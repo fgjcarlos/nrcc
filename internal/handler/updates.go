@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/composedof2/nrcc/internal/audit"
-	"github.com/composedof2/nrcc/internal/model"
-	"github.com/composedof2/nrcc/internal/service"
+	"github.com/fgjcarlos/nrcc/internal/audit"
+	"github.com/fgjcarlos/nrcc/internal/model"
+	"github.com/fgjcarlos/nrcc/internal/service"
 )
 
 // updateMetricsRecorder is the narrow interface for recording update attempt metrics.
