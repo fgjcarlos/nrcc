@@ -4,7 +4,7 @@ import { type PatternAnalysisResult } from '@/features/patterns/services';
 import { PatternCard } from '@/features/patterns/components';
 import { useFlowDetailData, useFlowDetailActions } from '@/features/flows/hooks';
 import type { AIFlowAction } from '@/features/flows/types';
-import { UI_COPY } from '@/shared/constants';
+import { UI_COPY, FEATURES } from '@/shared/constants';
 import { MetricCard } from './MetricCard';
 import { AnalysisResultView } from './AnalysisResultView';
 import {
@@ -196,17 +196,32 @@ export function FlowDetailView() {
                 Detect Reusable Patterns
               </span>
             </div>
-            <button
-              onClick={() => setShowPatternSelector(!showPatternSelector)}
-              className="action-btn-ghost text-sm"
-            >
-              <GitBranch className="w-4 h-4" />
-              {showPatternSelector ? 'Hide' : 'Detect Patterns'}
-            </button>
+            {FEATURES.patternDetection ? (
+              <button
+                onClick={() => setShowPatternSelector(!showPatternSelector)}
+                className="action-btn-ghost text-sm"
+              >
+                <GitBranch className="w-4 h-4" />
+                {showPatternSelector ? 'Hide' : 'Detect Patterns'}
+              </button>
+            ) : (
+              <span className="rounded-full border ghost-divider px-2.5 py-0.5 text-xs text-base-content/60">
+                Coming soon
+              </span>
+            )}
           </div>
 
+          {/* Pattern detection backend is a 501 stub (see issue #295) — advertise
+              it as upcoming instead of exposing controls that always error. */}
+          {!FEATURES.patternDetection && (
+            <p className="text-sm text-base-content/60">
+              Automatic detection of reusable patterns across your flows is on the
+              way. This feature will light up here once it ships.
+            </p>
+          )}
+
           {/* Flow Selector */}
-          {showPatternSelector && (
+          {FEATURES.patternDetection && showPatternSelector && (
             <div className="surface-panel space-y-4 p-4">
               <p className="text-sm text-base-content/60">
                 Select flows to compare and detect reusable patterns. The
