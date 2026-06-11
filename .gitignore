@@ -1,6 +1,7 @@
 bin/
 dist/
 data/
+tmp/
 node_modules/
 frontend/node_modules/
 frontend/dist/
@@ -11,11 +12,10 @@ frontend/dist/
 *.swp
 *.swo
 
-# Binaries
+# Binaries (nrcc-* catches stray local builds: nrcc-final, nrcc-test, nrcc-linux-*, ...)
 nrcc
 nrcc.exe
-nrcc-final
-nrcc-test
+nrcc-*
 
 # npm lockfiles are banned — pnpm-only policy (pnpm-lock.yaml is the source of truth)
 package-lock.json
