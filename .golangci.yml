@@ -1,0 +1,13 @@
+# golangci-lint v2 configuration.
+#
+# Introduced as a RATCHET: the CI job (.github/workflows/pr.yml) runs with
+# only-new-issues, so the ~74 pre-existing findings are grandfathered and only
+# new or changed code is gated. Burn the existing backlog down in follow-up PRs,
+# then drop only-new-issues to enforce repo-wide.
+version: "2"
+
+linters:
+  # Default v2 linters (errcheck, govet, ineffassign, staticcheck, unused) plus
+  # gocritic for the opinionated diagnostics requested in #286.
+  enable:
+    - gocritic

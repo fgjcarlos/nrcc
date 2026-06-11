@@ -112,3 +112,56 @@ jobs:
 
       - name: Validate OpenAPI spec
         run: npx --yes @redocly/cli lint docs/openapi.yaml --format stylish
+
+  lint:
+    name: Lint (golangci-lint)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: "1.25.11"
+          cache-dependency-path: go.sum
+
+      # golangci-lint type-checks the packages, so go:embed needs a real file.
+      # Same placeholder trick as the backend job.
+      - name: Stub frontend/dist for go:embed
+        run: |
+          mkdir -p frontend/dist
+          echo "ci placeholder" > frontend/dist/placeholder
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.12.2
+          # Ratchet: only gate code changed in this PR; ~74 pre-existing issues
+          # are grandfathered. Remove once the backlog is burned down.
+          only-new-issues: true
+
+  scripts:
+    name: Install script
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      # shellcheck is preinstalled on ubuntu-latest runners.
+      - name: ShellCheck
+        run: |
+          shellcheck scripts/install.sh
+          shellcheck docs/install.sh
+
+      - name: POSIX sh syntax check
+        run: |
+          sh -n scripts/install.sh
+          sh -n docs/install.sh
+
+      - name: docs/install.sh in sync with scripts/install.sh
+        run: |
+          if ! diff -q scripts/install.sh docs/install.sh; then
+            echo "::error::docs/install.sh (served by GitHub Pages at get.nrcc.dev) is out of sync with scripts/install.sh"
+            exit 1
+          fi

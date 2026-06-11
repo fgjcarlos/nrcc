@@ -132,3 +132,31 @@ jobs:
         with:
           files: dist/*
           generate_release_notes: true
+
+  # ── Post-release smoke test of the public install URL ───────────────────────
+  # NON-BLOCKING for now: get.nrcc.dev (GitHub Pages custom domain) is not live
+  # yet — there is no docs/CNAME and the host does not resolve. This job surfaces
+  # a warning in the Actions log without failing the release. Once DNS + Pages +
+  # docs/CNAME are configured, remove `continue-on-error` to make it a hard gate.
+  smoke-install-url:
+    name: Install URL smoke (non-blocking)
+    runs-on: ubuntu-latest
+    needs: [binaries]
+    continue-on-error: true
+    permissions:
+      contents: read
+    steps:
+      - name: Curl get.nrcc.dev/install.sh (HTTP 200 + shebang)
+        run: |
+          code=$(curl -fsSL -o /tmp/install.sh -w '%{http_code}' --max-time 30 \
+            https://get.nrcc.dev/install.sh) || true
+          echo "HTTP status: ${code:-000}"
+          if [ "${code:-000}" != "200" ]; then
+            echo "::warning::get.nrcc.dev/install.sh returned HTTP ${code:-000} (expected 200); DNS/Pages may not be live yet."
+            exit 1
+          fi
+          if ! head -1 /tmp/install.sh | grep -qE '^#!/'; then
+            echo "::warning::Served install.sh is missing a shebang on its first line."
+            exit 1
+          fi
+          echo "OK: install.sh served with HTTP 200 and a shebang."
