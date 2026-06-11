@@ -2,21 +2,15 @@
 # Dockerfile.local — for local dev/test builds
 #
 # Unlike the main Dockerfile (which does a full 3-stage build pulling
-# golang:1.22-alpine from the registry), this variant:
+# golang:1.25-alpine from the registry), this variant:
 #   1. Expects a pre-built linux/amd64 binary at dist/nrcc-linux-amd64
+#      (the frontend is already embedded in that binary via go:embed, so no
+#      frontend build stage is needed here)
 #   2. Uses locally available images (nodered/node-red:latest)
 #
 # Usage:
 #   make docker-local
 # ─────────────────────────────────────────────────────────────────────────────
-FROM node:26 AS frontend-builder
-
-WORKDIR /build/frontend
-COPY frontend/package*.json ./
-RUN npm ci
-COPY frontend/ ./
-RUN npm run build
-
 FROM nodered/node-red:latest
 
 LABEL org.opencontainers.image.title="nrcc-dev"
