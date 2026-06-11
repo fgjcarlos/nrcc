@@ -1,7 +1,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Dockerfile.dev — development image
 #
-# Includes: Node.js 20 + node-red + Go 1.22 + air (hot reload)
+# Includes: Node.js 26 + node-red + Go 1.25 + air (hot reload)
 # Source code is mounted at runtime — nothing embedded here.
 #
 # Built once with: docker compose -f docker-compose.dev.yml build
@@ -9,7 +9,8 @@
 FROM node:26
 
 # ── Install Go ────────────────────────────────────────────────────────────────
-ARG GO_VERSION=1.22.12
+# Keep in sync with go.mod, CI, and scripts/dev-entrypoint.sh.
+ARG GO_VERSION=1.25.11
 RUN apt-get update && apt-get install -y --no-install-recommends \
         wget ca-certificates git \
     && wget -qO /tmp/go.tar.gz "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" \

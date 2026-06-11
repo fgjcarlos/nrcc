@@ -1,13 +1,16 @@
 # Local server build for NRCC using pnpm lockfile
 FROM node:26-slim AS frontend-builder
 WORKDIR /build/frontend
-RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
+# pnpm 11 to match the pnpm-lock.yaml format (and the main Dockerfile).
+RUN npm install -g pnpm@^11
 COPY frontend/package.json frontend/pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+# --ignore-scripts matches the main Dockerfile: under pnpm 11 unapproved build
+# scripts (msw, a test-only dep) otherwise fail the install with ERR_PNPM_IGNORED_BUILDS.
+RUN pnpm install --frozen-lockfile --ignore-scripts
 COPY frontend/ ./
 RUN pnpm build
 
-FROM golang:1.26-alpine AS go-builder
+FROM golang:1.25-alpine AS go-builder
 WORKDIR /build
 COPY go.mod go.sum ./
 RUN go mod download
@@ -19,10 +22,11 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o nrcc .
 
 FROM node:26-slim
 LABEL org.opencontainers.image.title="nrcc-local"
-# Runtime needs Node-RED plus pnpm >= 11 for NRCC package operations.
+# Runtime needs Node-RED only. nrcc shells out to npm (not pnpm) for all
+# host-side package operations (library install, updates) — see packagemanager.go.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends wget \
-    && npm install -g --unsafe-perm node-red pnpm@^11 \
+    && npm install -g --unsafe-perm node-red \
     && npm cache clean --force \
     && rm -rf /var/lib/apt/lists/*
 COPY --chmod=755 --from=go-builder /build/nrcc /usr/local/bin/nrcc

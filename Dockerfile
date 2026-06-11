@@ -17,7 +17,7 @@ RUN pnpm build
 # Stage 2: Build Go binary
 # Needs frontend/dist for go:embed
 # ─────────────────────────────────────────────────────────────────────────────
-FROM golang:1.26-alpine AS go-builder
+FROM golang:1.25-alpine AS go-builder
 
 WORKDIR /build
 
@@ -46,9 +46,6 @@ LABEL org.opencontainers.image.description="Node-RED Control Center — all-in-o
 LABEL org.opencontainers.image.source="https://github.com/composedof2/nrcc"
 
 USER root
-
-# Install pnpm 11+ (package manager used by nrcc library service)
-RUN npm install -g pnpm@^11
 
 # Copy nrcc binary from go-builder stage
 COPY --chmod=755 --from=go-builder /build/nrcc /usr/local/bin/nrcc
