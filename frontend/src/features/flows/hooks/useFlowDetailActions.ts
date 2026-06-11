@@ -1,4 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
+import { isAxiosError } from 'axios';
 import { toast } from 'sonner';
 import { flowService } from '@/features/flows';
 import type { AIFlowAction, FlowDetail } from '@/features/flows/types';
@@ -34,9 +35,13 @@ export function useFlowDetailActions() {
       }
     },
     onError: (error: Error) => {
-      toast.error(
-        (error as Error).message || 'Failed to detect patterns'
-      );
+      if (isAxiosError(error) && error.response?.status === 501) {
+        toast.info('Pattern detection is not yet available — coming soon');
+      } else {
+        toast.error(
+          (error as Error).message || 'Failed to detect patterns'
+        );
+      }
     },
   });
 

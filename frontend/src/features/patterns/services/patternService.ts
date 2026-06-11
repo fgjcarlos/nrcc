@@ -19,7 +19,7 @@ export const patternService = {
    * Analyze multiple flows to detect reusable patterns
    */
   analyzePatterns: async (request: PatternAnalysisRequest): Promise<PatternAnalysisResult> => {
-    const response = await api.post<{ data: PatternAnalysisResult }>('/patterns/analyze', request, {
+    const response = await api.post<{ data: PatternAnalysisResult }>('/ai/analyze/patterns', request, {
       timeout: 60000,
     });
     return response.data.data;
@@ -30,7 +30,7 @@ export const patternService = {
    */
   getReadme: async (analysisId: string, patternId: string): Promise<ReadmeResponse> => {
     const response = await api.get<{ data: ReadmeResponse }>(
-      `/patterns/${analysisId}/readme?patternId=${patternId}`
+      `/ai/patterns/${analysisId}/readme?patternId=${patternId}`
     );
     return response.data.data;
   },
@@ -40,7 +40,7 @@ export const patternService = {
    */
   downloadReadme: async (analysisId: string, patternId: string): Promise<void> => {
     const token = authService.getToken();
-    const response = await fetch(`/api/patterns/${analysisId}/download?patternId=${patternId}`, {
+    const response = await fetch(`/api/ai/patterns/${analysisId}/download?patternId=${patternId}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,

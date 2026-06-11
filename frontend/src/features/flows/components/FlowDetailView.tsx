@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { isAxiosError } from 'axios';
 import { useParams, Link } from 'react-router-dom';
 import { type PatternAnalysisResult } from '@/features/patterns/services';
 import { PatternCard } from '@/features/patterns/components';
@@ -285,6 +286,17 @@ export function FlowDetailView() {
               {selectedPatternFlows.size !== 1 ? 's' : ''}...
             </div>
           )}
+
+          {/* Coming Soon — endpoint returns 501 */}
+          {detectPatternsMutation.isError &&
+            isAxiosError(detectPatternsMutation.error) &&
+            detectPatternsMutation.error.response?.status === 501 && (
+              <div className="surface-panel border border-info/20 p-4">
+                <p className="text-sm text-info">
+                  Pattern detection is not yet available. This feature is under active development — check back soon.
+                </p>
+              </div>
+            )}
 
           {/* No Patterns Found */}
            {patternResult && patternResult.patterns.length === 0 && (
