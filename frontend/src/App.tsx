@@ -1,5 +1,6 @@
-import { lazy, Suspense, useState, type ComponentType, type ReactNode } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { lazy, Suspense, useEffect, useState, type ComponentType, type ReactNode } from 'react';
+import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
+import { setNavigator } from '@/shared/lib/navigation';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { Layout } from '@/shared/components/layout/Layout';
 import { ProtectedRoute } from '@/shared/components/ProtectedRoute';
@@ -176,10 +177,22 @@ function AppRoutes() {
   );
 }
 
+// Registers React Router's navigate with the navigation bridge so non-React
+// code (the axios interceptor) can redirect without a full page reload.
+function NavigatorRegistrar() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    setNavigator((path) => navigate(path));
+    return () => setNavigator(null);
+  }, [navigate]);
+  return null;
+}
+
 function App() {
   return (
     <BrowserRouter>
       <ErrorBoundary>
+        <NavigatorRegistrar />
         <AppRoutes />
         <ToastViewport />
       </ErrorBoundary>
