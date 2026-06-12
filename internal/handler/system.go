@@ -20,6 +20,14 @@ type SystemHandler struct {
 	metricsBuffer  *service.MetricsBuffer
 	processManager *service.ProcessManager
 	startedAt      time.Time
+	edgeMode       bool
+}
+
+// SetEdgeMode records whether NRCC is running in edge mode (resolved from
+// EDGE_MODE at startup). It is surfaced read-only via GetSystemInfo so the UI
+// can show an "Edge mode: enabled/disabled" badge. Default false.
+func (h *SystemHandler) SetEdgeMode(enabled bool) {
+	h.edgeMode = enabled
 }
 
 // SetMetricsBuffer wires the MetricsBuffer into the SystemHandler so it can
@@ -94,6 +102,7 @@ type SystemInfo struct {
 	Memory         MemoryInfo `json:"memory"`
 	Disk           DiskInfo   `json:"disk"`
 	NodeRedVersion string     `json:"nodeRedVersion"`
+	EdgeMode       bool       `json:"edgeMode"`
 }
 
 // GetSystemInfo handles GET /api/system/info - protected
@@ -147,6 +156,7 @@ func (h *SystemHandler) GetSystemInfo(w http.ResponseWriter, r *http.Request) {
 			UsagePercent: diskPercent,
 		},
 		NodeRedVersion: h.nodeRedVersion(),
+		EdgeMode:       h.edgeMode,
 	}
 
 	model.RespondJSON(w, http.StatusOK, info)
