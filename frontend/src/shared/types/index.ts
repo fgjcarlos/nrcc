@@ -575,6 +575,8 @@ export interface SystemInfo {
   uptime: number;
   platform: string;
   hostname: string;
+  /** Whether NRCC runs in edge mode (EDGE_MODE). Optional: older backends omit it. */
+  edgeMode?: boolean;
 }
 
 // ============================================

@@ -26,7 +26,7 @@ export function DashboardView() {
 
   return (
     <div className="space-y-8">
-      <DashboardHeader />
+      <DashboardHeader edgeMode={system?.edgeMode} />
       <DashboardWarnings showDockerWarning={showDockerWarning} host={host} />
       <SystemHealthCard host={host} />
       <DashboardStatusCards
