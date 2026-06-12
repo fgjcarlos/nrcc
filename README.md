@@ -142,6 +142,7 @@ cp .env.example .env
 |----------|---------|-------------|
 | `PORT` | 3001 | HTTP server port |
 | `DATA_DIR` | `./data` | Directory for config, users, backups |
+| `EDGE_MODE` | `false` | Opt-in edge mode for constrained deployments (resource-safe defaults). See [ADR 0002](docs/adr/0002-edge-mode-defaults-and-exposure-ux.md) |
 | `JWT_SECRET` | (insecure) | ⚠️ **Must set in production** |
 | `NODE_RED_CMD` | `node-red` | Path to node-red executable |
 | `NODE_RED_PORT` | 1880 | Node-RED HTTP port (for health checks) |

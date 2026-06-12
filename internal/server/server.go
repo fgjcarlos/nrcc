@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/fgjcarlos/nrcc/internal/audit"
+	"github.com/fgjcarlos/nrcc/internal/config"
 	"github.com/fgjcarlos/nrcc/internal/handler"
 	"github.com/fgjcarlos/nrcc/internal/metrics"
 	"github.com/fgjcarlos/nrcc/internal/middleware"
@@ -59,6 +60,7 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 	configHandler := handler.NewConfigHandler(configSvc)
 	settingsHandler := handler.NewSettingsHandler(configSvc)
 	systemHandler := handler.NewSystemHandler()
+	systemHandler.SetEdgeMode(config.EdgeMode())
 	bootstrapHandler := handler.NewBootstrapHandler(hostSvc)
 
 	// Initialize MetricsBuffer (120-entry ring buffer) and sampler (30s interval)

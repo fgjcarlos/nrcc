@@ -2345,7 +2345,7 @@ components:
 
     SystemInfo:
       type: object
-      required: [platform, arch, nodeVersion, hostname, uptime, cpu, memory, disk, nodeRedVersion]
+      required: [platform, arch, nodeVersion, hostname, uptime, cpu, memory, disk, nodeRedVersion, edgeMode]
       properties:
         platform:
           type: string
@@ -2371,6 +2371,10 @@ components:
         nodeRedVersion:
           type: string
           example: 4.0.2
+        edgeMode:
+          type: boolean
+          description: Whether NRCC runs in edge mode (EDGE_MODE). Default false.
+          example: false
 
     # ── Backups ────────────────────────────────────────────────────────────────────
 
