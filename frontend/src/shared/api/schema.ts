@@ -1629,6 +1629,11 @@ export interface components {
             disk: components["schemas"]["DiskInfo"];
             /** @example 4.0.2 */
             nodeRedVersion: string;
+            /**
+             * @description Whether NRCC runs in edge mode (EDGE_MODE). Default false.
+             * @example false
+             */
+            edgeMode: boolean;
         };
         /** @enum {string} */
         BackupType: "manual" | "auto" | "pre-restore";
