@@ -387,6 +387,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/instances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List managed Node-RED instances
+         * @description Read-only, backwards-compatible first slice of the multi-instance model. Returns the configured instances; currently only the synthesized "default" instance that maps to the existing DATA_DIR. The single-instance runtime is unchanged.
+         */
+        get: operations["getInstances"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/backups": {
         parameters: {
             query?: never;
@@ -1399,6 +1419,48 @@ export interface components {
         HealthStatus: {
             /** @example ok */
             status: string;
+        };
+        /** @description A managed Node-RED control boundary (see multi-instance architecture). */
+        Instance: {
+            /**
+             * @description Stable, URL-safe instance identifier.
+             * @example default
+             */
+            id: string;
+            /** @example Default */
+            name: string;
+            /**
+             * @example local
+             * @enum {string}
+             */
+            kind: "local" | "docker" | "ssh" | "agent";
+            /**
+             * @description Data directory for local instances.
+             * @example ./data
+             */
+            dataDir?: string;
+            /** @description Base URL for remote instances (read-only). */
+            baseUrl?: string;
+            /**
+             * @example unknown
+             * @enum {string}
+             */
+            health: "unknown" | "healthy" | "unhealthy";
+            /** @description Indirect reference to stored credentials; never an inline secret. */
+            authContext?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        InstanceList: components["schemas"]["Instance"][];
+        SuccessEnvelope_InstanceList: {
+            /** @enum {boolean} */
+            success: true;
+            /** Format: date-time */
+            timestamp: string;
+        } & {
+            data?: components["schemas"]["InstanceList"];
         };
         BoolSuccess: {
             /** @example true */
@@ -2965,6 +3027,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SuccessEnvelope_SystemInfo"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getInstances: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Configured instances */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope_InstanceList"];
                 };
             };
             401: components["responses"]["Unauthorized"];
