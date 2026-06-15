@@ -116,8 +116,14 @@ export interface paths {
         put?: never;
         /**
          * Log in
-         * @description Authenticates with username and password. Returns a short-lived JWT and
-         *     sets an httpOnly refresh cookie.
+         * @description Authenticates with username and password.
+         *
+         *     For users that have not enrolled in MFA, the response is the standard
+         *     `AuthResponse` (short-lived JWT + httpOnly refresh cookie).
+         *
+         *     For users that have enrolled in TOTP, the response is
+         *     `MfaLoginResponse` (no JWT, no cookie) and the client must complete
+         *     the second factor with `POST /api/auth/mfa/verify`.
          */
         post: operations["postAuthLogin"];
         delete?: never;
@@ -157,7 +163,9 @@ export interface paths {
         };
         /**
          * Get current user
-         * @description Returns the profile of the authenticated user.
+         * @description Returns the profile of the authenticated user, including the
+         *     user's MFA status. The `mfa` block lets the UI show enrollment
+         *     state without a second round-trip on page load.
          */
         get: operations["getAuthMe"];
         put?: never;
@@ -256,6 +264,119 @@ export interface paths {
          *     Admins can change any user's password; non-admins can only change their own.
          */
         patch: operations["patchAuthUserPassword"];
+        trace?: never;
+    };
+    "/api/auth/mfa/enroll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Begin TOTP enrollment
+         * @description Generates a candidate TOTP secret and returns the `otpauth://` URL the
+         *     user can paste into any RFC 6238 authenticator (Google Authenticator,
+         *     1Password, Bitwarden, etc.). The secret is NOT yet committed — the
+         *     client must follow up with `POST /api/auth/mfa/enroll/confirm` to
+         *     commit the enrollment and receive recovery codes.
+         */
+        post: operations["postMfaEnroll"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/mfa/enroll/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm TOTP enrollment
+         * @description Verifies a 6-digit code from the user's authenticator against the
+         *     candidate secret from `POST /api/auth/mfa/enroll`. On success the
+         *     enrollment is committed and ten recovery codes are returned exactly
+         *     once.
+         */
+        post: operations["postMfaEnrollConfirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/mfa/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Disable TOTP for a user
+         * @description Disables TOTP enrollment. The calling user's current password is
+         *     always required. Admins can target any user via `userId`; non-admins
+         *     can only disable themselves (the `userId` field is silently ignored).
+         */
+        post: operations["postMfaDisable"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/mfa/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get current user's MFA status
+         * @description Reports whether the calling user has an active TOTP enrollment and how many recovery codes remain.
+         */
+        get: operations["getMfaStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/mfa/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify a TOTP code or recovery code after login
+         * @description Completes the second-factor challenge. The body carries the
+         *     short-lived `mfaToken` returned by `POST /api/auth/login` (when
+         *     `mfaRequired: true`) and either a 6-digit TOTP code or a recovery
+         *     code in `xxxx-xxxx-xxxx` form. On success, the server issues an
+         *     access token and refresh cookie exactly like the no-MFA login.
+         */
+        post: operations["postMfaVerify"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/config": {
@@ -1135,8 +1256,21 @@ export interface paths {
         };
         /**
          * Get container status
-         * @description Returns container runtime information when running inside Docker.
-         *     Returns `{available: false}` with HTTP 200 when not in Docker mode.
+         * @description Returns container runtime information.
+         *
+         *     - When `nrcc` runs inside a Docker container (`/.dockerenv` is
+         *       present), the response is a synthetic `ContainerInfo` whose
+         *       `inDocker` is true and whose `image` is read from the
+         *       `NRCC_IMAGE` env var (falling back to `nrcc`).
+         *     - When `nrcc` runs natively on a host that has the `docker`
+         *       CLI and a Node-RED container, the response carries the full
+         *       `ContainerInfo` shape (id, name, image, status, created,
+         *       ports, state). The container is discovered with
+         *       `docker ps -a` and the first container whose image or name
+         *       contains `node-red` (case-insensitive) is used.
+         *     - Otherwise the response is `{ available: false, message }`
+         *       with HTTP 200 so the UI can render a meaningful empty
+         *       state.
          */
         get: operations["getDockerStatus"];
         put?: never;
@@ -1156,7 +1290,12 @@ export interface paths {
         };
         /**
          * Get Docker engine info
-         * @description Returns extended Docker information (stub — currently returns `{inDocker: true}` or not-available).
+         * @description Returns extended Docker information.
+         *
+         *     - In-Docker: `{ inDocker: true }`.
+         *     - Native (Node-RED container discoverable):
+         *       `{ available: true, inDocker: false, source: "docker-cli", containerName }`.
+         *     - Otherwise: `{ available: false, message }` (HTTP 200).
          */
         get: operations["getDockerInfo"];
         put?: never;
@@ -1178,9 +1317,15 @@ export interface paths {
         put?: never;
         /**
          * Restart container
-         * @description Gracefully stops Node-RED and signals process exit, allowing Docker's
-         *     restart policy to bring the container back up.
-         *     Returns 503 when not running inside Docker.
+         * @description Restarts the Node-RED container.
+         *
+         *     - In-Docker: gracefully stops Node-RED and signals shutdown
+         *       so Docker's restart policy brings the container back up.
+         *     - Native: runs `docker restart <name>` against the
+         *       discovered Node-RED container.
+         *
+         *     Returns 503 (`DOCKER_NOT_AVAILABLE`) when neither path can
+         *     find a container to act on.
          */
         post: operations["postDockerRestart"];
         delete?: never;
@@ -1200,8 +1345,14 @@ export interface paths {
         put?: never;
         /**
          * Stop container
-         * @description Gracefully stops Node-RED and signals process exit.
-         *     Returns 503 when not running inside Docker.
+         * @description Stops the Node-RED container.
+         *
+         *     - In-Docker: gracefully stops Node-RED and signals shutdown.
+         *     - Native: runs `docker stop <name>` against the discovered
+         *       Node-RED container.
+         *
+         *     Returns 503 (`DOCKER_NOT_AVAILABLE`) when neither path can
+         *     find a container to act on.
          */
         post: operations["postDockerStop"];
         delete?: never;
@@ -1388,6 +1539,72 @@ export interface components {
             /** @description Short-lived JWT access token (~15 min) */
             token: string;
             user: components["schemas"]["CCUserPublic"];
+        };
+        /**
+         * @description Generic success envelope used for endpoints that have no
+         *     meaningful response body beyond a status flag (e.g. MFA
+         *     disable).
+         */
+        GenericSuccess: {
+            /** @example true */
+            success: boolean;
+        };
+        MfaStatusResponse: {
+            /** @description True when the user has a committed TOTP enrollment */
+            enabled: boolean;
+            /** @description Unused recovery codes remaining for the user */
+            recoveryCodesRemaining: number;
+        };
+        /**
+         * @description Returned by `POST /api/auth/login` when the user is enrolled
+         *     in TOTP. No JWT and no refresh cookie are issued at this
+         *     step — the client must complete the second factor with
+         *     `POST /api/auth/mfa/verify`.
+         */
+        MfaLoginResponse: {
+            /** @enum {boolean} */
+            mfaRequired: true;
+            /** @description Opaque single-use token, 5 min TTL */
+            mfaToken: string;
+        };
+        /**
+         * @description Returned by `POST /api/auth/mfa/enroll`. The enrollment is
+         *     NOT yet committed — the client must follow up with
+         *     `POST /api/auth/mfa/enroll/confirm`.
+         */
+        MfaEnrollBeginResponse: {
+            /** @description Base32-encoded TOTP secret (RFC 6238) */
+            secret: string;
+            /**
+             * Format: uri
+             * @description `otpauth://` URL suitable for any RFC 6238 authenticator
+             *     (Google Authenticator, 1Password, Bitwarden, etc.)
+             * @example otpauth://totp/NRCC:user:admin?secret=JBSWY3DPEHPK3PXP&issuer=NRCC
+             */
+            otpauthUrl: string;
+        };
+        /**
+         * @description Returned by `POST /api/auth/mfa/enroll/confirm` on success.
+         *     The recovery codes are shown to the user exactly once and
+         *     cannot be retrieved again.
+         */
+        MfaEnrollConfirmResponse: {
+            /**
+             * @example [
+             *       "a1b2-c3d4-e5f6",
+             *       "0123-4567-89ab"
+             *     ]
+             */
+            recoveryCodes: string[];
+            recoveryCodesRemaining: number;
+        };
+        /**
+         * @description Extension of `CCUserPublic` that adds the user's MFA status.
+         *     Returned by `GET /api/auth/me` so the UI can show enrollment
+         *     state without a second round-trip.
+         */
+        CCUserPublicWithMfa: components["schemas"]["CCUserPublic"] & {
+            mfa: components["schemas"]["MfaStatusResponse"];
         };
         StatusResponse: {
             /** @description True when at least one user exists */
@@ -1950,16 +2167,52 @@ export interface components {
             path: string;
         };
         ContainerInfo: {
+            /**
+             * @description Container ID (12-char short hash). Present on the native-host path.
+             * @example a1b2c3d4e5f6
+             */
+            id?: string;
+            /**
+             * @description Container name. Present on the native-host path.
+             * @example nrcc-node-red
+             */
+            name?: string;
+            /** @example nodered/node-red:latest */
+            image?: string;
             /** @example running */
             status: string;
-            /** @example nrcc */
-            image?: string;
+            /**
+             * @description ISO-8601 timestamp from `docker ps --format {{.CreatedAt}}`.
+             * @example 2026-05-01 00:00:00 +0000 UTC
+             */
+            created?: string;
+            /** @description Port mappings. Currently populated only on the native-host path; reserved for future enrichment. */
+            ports?: components["schemas"]["ContainerPort"][];
+            state?: components["schemas"]["ContainerState"];
+            /** @description True when nrcc itself runs inside a Docker container. */
             inDocker: boolean;
+        };
+        ContainerPort: {
+            /** @example 1880 */
+            privatePort: number;
+            /** @example 1880 */
+            publicPort?: number;
+            /** @enum {string} */
+            type: "tcp" | "udp";
+        };
+        ContainerState: {
+            running: boolean;
+            paused?: boolean;
+            restartCount?: number;
+            /** Format: int64 */
+            memory?: number;
+            /** Format: double */
+            cpu?: number;
         };
         DockerStatusResult: components["schemas"]["ContainerInfo"] | {
             /** @enum {boolean} */
             available: false;
-            /** @example Docker mode not available — binary manages Node-RED directly */
+            /** @example No Node-RED container found */
             message: string;
         };
         LogEntry: {
@@ -2333,6 +2586,54 @@ export interface components {
         } & {
             data?: components["schemas"]["AnyObject"];
         };
+        SuccessEnvelope_MfaLoginResponse: {
+            /** @enum {boolean} */
+            success: true;
+            /** Format: date-time */
+            timestamp: string;
+        } & {
+            data?: components["schemas"]["MfaLoginResponse"];
+        };
+        SuccessEnvelope_MfaEnrollBeginResponse: {
+            /** @enum {boolean} */
+            success: true;
+            /** Format: date-time */
+            timestamp: string;
+        } & {
+            data?: components["schemas"]["MfaEnrollBeginResponse"];
+        };
+        SuccessEnvelope_MfaEnrollConfirmResponse: {
+            /** @enum {boolean} */
+            success: true;
+            /** Format: date-time */
+            timestamp: string;
+        } & {
+            data?: components["schemas"]["MfaEnrollConfirmResponse"];
+        };
+        SuccessEnvelope_MfaStatusResponse: {
+            /** @enum {boolean} */
+            success: true;
+            /** Format: date-time */
+            timestamp: string;
+        } & {
+            data?: components["schemas"]["MfaStatusResponse"];
+        };
+        SuccessEnvelope_CCUserPublicWithMfa: {
+            /** @enum {boolean} */
+            success: true;
+            /** Format: date-time */
+            timestamp: string;
+        } & {
+            data?: components["schemas"]["CCUserPublicWithMfa"];
+        };
+        SuccessEnvelope_GenericSuccess: {
+            /** @enum {boolean} */
+            success: true;
+            /** Format: date-time */
+            timestamp: string;
+        } & {
+            data?: components["schemas"]["GenericSuccess"];
+        };
     };
     responses: {
         /** @description Bad request — invalid input or missing required fields */
@@ -2628,15 +2929,18 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful login */
+            /**
+             * @description Successful login — either `AuthResponse` (no MFA) or
+             *     `MfaLoginResponse` (MFA required).
+             */
             200: {
                 headers: {
-                    /** @description httpOnly refresh cookie (`nrcc_refresh`) */
+                    /** @description httpOnly refresh cookie (`nrcc_refresh`) — only set on the no-MFA path. */
                     "Set-Cookie"?: string;
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SuccessEnvelope_AuthResponse"];
+                    "application/json": components["schemas"]["SuccessEnvelope_AuthResponse"] | components["schemas"]["SuccessEnvelope_MfaLoginResponse"];
                 };
             };
             400: components["responses"]["BadRequest"];
@@ -2679,13 +2983,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Current user profile */
+            /** @description Current user profile with MFA status */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SuccessEnvelope_CCUserPublic"];
+                    "application/json": components["schemas"]["SuccessEnvelope_CCUserPublicWithMfa"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -2850,6 +3154,151 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    postMfaEnroll: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Candidate secret + otpauth URL */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope_MfaEnrollBeginResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    postMfaEnrollConfirm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * @description 6-digit TOTP code from the authenticator app
+                     * @example 123456
+                     */
+                    code: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Enrollment committed; recovery codes returned once */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope_MfaEnrollConfirmResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    postMfaDisable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Target user id (admin only; defaults to caller) */
+                    userId?: string;
+                    /** @description Calling user's current password */
+                    password: string;
+                };
+            };
+        };
+        responses: {
+            /** @description MFA disabled */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope_GenericSuccess"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    getMfaStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description MFA status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope_MfaStatusResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    postMfaVerify: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Opaque mfaToken returned by the login response */
+                    mfaToken: string;
+                    /** @description 6-digit TOTP code or recovery code (`xxxx-xxxx-xxxx`) */
+                    code: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Session issued */
+            200: {
+                headers: {
+                    /** @description httpOnly refresh cookie (`nrcc_refresh`) */
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope_AuthResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            429: components["responses"]["TooManyRequests"];
         };
     };
     getConfig: {
@@ -4028,7 +4477,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Docker status (in Docker or not-in-Docker) */
+            /** @description Docker status (in Docker, native, or not-available) */
             200: {
                 headers: {
                     [name: string]: unknown;

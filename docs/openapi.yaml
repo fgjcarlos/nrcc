@@ -1737,13 +1737,26 @@ paths:
       operationId: getDockerStatus
       summary: Get container status
       description: |
-        Returns container runtime information when running inside Docker.
-        Returns `{available: false}` with HTTP 200 when not in Docker mode.
+        Returns container runtime information.
+
+        - When `nrcc` runs inside a Docker container (`/.dockerenv` is
+          present), the response is a synthetic `ContainerInfo` whose
+          `inDocker` is true and whose `image` is read from the
+          `NRCC_IMAGE` env var (falling back to `nrcc`).
+        - When `nrcc` runs natively on a host that has the `docker`
+          CLI and a Node-RED container, the response carries the full
+          `ContainerInfo` shape (id, name, image, status, created,
+          ports, state). The container is discovered with
+          `docker ps -a` and the first container whose image or name
+          contains `node-red` (case-insensitive) is used.
+        - Otherwise the response is `{ available: false, message }`
+          with HTTP 200 so the UI can render a meaningful empty
+          state.
       security:
         - bearerAuth: []
       responses:
         "200":
-          description: Docker status (in Docker or not-in-Docker)
+          description: Docker status (in Docker, native, or not-available)
           content:
             application/json:
               schema:
@@ -1756,7 +1769,13 @@ paths:
       tags: [Docker]
       operationId: getDockerInfo
       summary: Get Docker engine info
-      description: "Returns extended Docker information (stub — currently returns `{inDocker: true}` or not-available)."
+      description: |
+        Returns extended Docker information.
+
+        - In-Docker: `{ inDocker: true }`.
+        - Native (Node-RED container discoverable):
+          `{ available: true, inDocker: false, source: "docker-cli", containerName }`.
+        - Otherwise: `{ available: false, message }` (HTTP 200).
       security:
         - bearerAuth: []
       responses:
@@ -1775,9 +1794,15 @@ paths:
       operationId: postDockerRestart
       summary: Restart container
       description: |
-        Gracefully stops Node-RED and signals process exit, allowing Docker's
-        restart policy to bring the container back up.
-        Returns 503 when not running inside Docker.
+        Restarts the Node-RED container.
+
+        - In-Docker: gracefully stops Node-RED and signals shutdown
+          so Docker's restart policy brings the container back up.
+        - Native: runs `docker restart <name>` against the
+          discovered Node-RED container.
+
+        Returns 503 (`DOCKER_NOT_AVAILABLE`) when neither path can
+        find a container to act on.
       security:
         - bearerAuth: []
       responses:
@@ -1798,8 +1823,14 @@ paths:
       operationId: postDockerStop
       summary: Stop container
       description: |
-        Gracefully stops Node-RED and signals process exit.
-        Returns 503 when not running inside Docker.
+        Stops the Node-RED container.
+
+        - In-Docker: gracefully stops Node-RED and signals shutdown.
+        - Native: runs `docker stop <name>` against the discovered
+          Node-RED container.
+
+        Returns 503 (`DOCKER_NOT_AVAILABLE`) when neither path can
+        find a container to act on.
       security:
         - bearerAuth: []
       responses:
@@ -3290,14 +3321,65 @@ components:
       type: object
       required: [status, inDocker]
       properties:
+        id:
+          type: string
+          description: Container ID (12-char short hash). Present on the native-host path.
+          example: a1b2c3d4e5f6
+        name:
+          type: string
+          description: Container name. Present on the native-host path.
+          example: nrcc-node-red
+        image:
+          type: string
+          example: nodered/node-red:latest
         status:
           type: string
           example: running
-        image:
+        created:
           type: string
-          example: nrcc
+          description: ISO-8601 timestamp from `docker ps --format {{.CreatedAt}}`.
+          example: 2026-05-01 00:00:00 +0000 UTC
+        ports:
+          type: array
+          description: Port mappings. Currently populated only on the native-host path; reserved for future enrichment.
+          items:
+            $ref: "#/components/schemas/ContainerPort"
+        state:
+          $ref: "#/components/schemas/ContainerState"
         inDocker:
           type: boolean
+          description: True when nrcc itself runs inside a Docker container.
+
+    ContainerPort:
+      type: object
+      required: [privatePort, type]
+      properties:
+        privatePort:
+          type: integer
+          example: 1880
+        publicPort:
+          type: integer
+          example: 1880
+        type:
+          type: string
+          enum: [tcp, udp]
+
+    ContainerState:
+      type: object
+      required: [running]
+      properties:
+        running:
+          type: boolean
+        paused:
+          type: boolean
+        restartCount:
+          type: integer
+        memory:
+          type: integer
+          format: int64
+        cpu:
+          type: number
+          format: double
 
     DockerStatusResult:
       oneOf:
@@ -3310,7 +3392,7 @@ components:
               enum: [false]
             message:
               type: string
-              example: Docker mode not available — binary manages Node-RED directly
+              example: No Node-RED container found
 
     # ── Logs ───────────────────────────────────────────────────────────────────────
 
