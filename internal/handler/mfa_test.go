@@ -41,7 +41,7 @@ func setupMfaHandlerTest(t *testing.T) (*MfaHandler, *AuthHandler, *service.MfaS
 	if err != nil {
 		t.Fatalf("audit.NewService: %v", err)
 	}
-	t.Cleanup(func() { auditSvc.Close() })
+	t.Cleanup(func() { _ = auditSvc.Close() })
 
 	authHandler := NewAuthHandler(authSvc)
 	authHandler.SetAuditService(auditSvc)
