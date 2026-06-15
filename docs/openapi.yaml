@@ -172,8 +172,14 @@ paths:
       operationId: postAuthLogin
       summary: Log in
       description: |
-        Authenticates with username and password. Returns a short-lived JWT and
-        sets an httpOnly refresh cookie.
+        Authenticates with username and password.
+
+        For users that have not enrolled in MFA, the response is the standard
+        `AuthResponse` (short-lived JWT + httpOnly refresh cookie).
+
+        For users that have enrolled in TOTP, the response is
+        `MfaLoginResponse` (no JWT, no cookie) and the client must complete
+        the second factor with `POST /api/auth/mfa/verify`.
       security: []
       requestBody:
         required: true
@@ -183,16 +189,20 @@ paths:
               $ref: "#/components/schemas/LoginRequest"
       responses:
         "200":
-          description: Successful login
+          description: |
+            Successful login — either `AuthResponse` (no MFA) or
+            `MfaLoginResponse` (MFA required).
           headers:
             Set-Cookie:
-              description: httpOnly refresh cookie (`nrcc_refresh`)
+              description: httpOnly refresh cookie (`nrcc_refresh`) — only set on the no-MFA path.
               schema:
                 type: string
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SuccessEnvelope_AuthResponse"
+                oneOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope_AuthResponse"
+                  - $ref: "#/components/schemas/SuccessEnvelope_MfaLoginResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -239,16 +249,19 @@ paths:
       tags: [Auth]
       operationId: getAuthMe
       summary: Get current user
-      description: Returns the profile of the authenticated user.
+      description: |
+        Returns the profile of the authenticated user, including the
+        user's MFA status. The `mfa` block lets the UI show enrollment
+        state without a second round-trip on page load.
       security:
         - bearerAuth: []
       responses:
         "200":
-          description: Current user profile
+          description: Current user profile with MFA status
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SuccessEnvelope_CCUserPublic"
+                $ref: "#/components/schemas/SuccessEnvelope_CCUserPublicWithMfa"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -411,6 +424,179 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+
+  # ─── MFA / TOTP (issue #305) ────────────────────────────────────────────────────
+
+  /api/auth/mfa/enroll:
+    post:
+      tags: [Auth, MFA]
+      operationId: postMfaEnroll
+      summary: Begin TOTP enrollment
+      description: |
+        Generates a candidate TOTP secret and returns the `otpauth://` URL the
+        user can paste into any RFC 6238 authenticator (Google Authenticator,
+        1Password, Bitwarden, etc.). The secret is NOT yet committed — the
+        client must follow up with `POST /api/auth/mfa/enroll/confirm` to
+        commit the enrollment and receive recovery codes.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Candidate secret + otpauth URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_MfaEnrollBeginResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /api/auth/mfa/enroll/confirm:
+    post:
+      tags: [Auth, MFA]
+      operationId: postMfaEnrollConfirm
+      summary: Confirm TOTP enrollment
+      description: |
+        Verifies a 6-digit code from the user's authenticator against the
+        candidate secret from `POST /api/auth/mfa/enroll`. On success the
+        enrollment is committed and ten recovery codes are returned exactly
+        once.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code:
+                  type: string
+                  description: 6-digit TOTP code from the authenticator app
+                  example: "123456"
+      responses:
+        "200":
+          description: Enrollment committed; recovery codes returned once
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_MfaEnrollConfirmResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /api/auth/mfa/disable:
+    post:
+      tags: [Auth, MFA]
+      operationId: postMfaDisable
+      summary: Disable TOTP for a user
+      description: |
+        Disables TOTP enrollment. The calling user's current password is
+        always required. Admins can target any user via `userId`; non-admins
+        can only disable themselves (the `userId` field is silently ignored).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                userId:
+                  type: string
+                  description: Target user id (admin only; defaults to caller)
+                password:
+                  type: string
+                  description: Calling user's current password
+      responses:
+        "200":
+          description: MFA disabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_GenericSuccess"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /api/auth/mfa/status:
+    get:
+      tags: [Auth, MFA]
+      operationId: getMfaStatus
+      summary: Get current user's MFA status
+      description: Reports whether the calling user has an active TOTP enrollment and how many recovery codes remain.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: MFA status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_MfaStatusResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/auth/mfa/verify:
+    post:
+      tags: [Auth, MFA]
+      operationId: postMfaVerify
+      summary: Verify a TOTP code or recovery code after login
+      description: |
+        Completes the second-factor challenge. The body carries the
+        short-lived `mfaToken` returned by `POST /api/auth/login` (when
+        `mfaRequired: true`) and either a 6-digit TOTP code or a recovery
+        code in `xxxx-xxxx-xxxx` form. On success, the server issues an
+        access token and refresh cookie exactly like the no-MFA login.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mfaToken, code]
+              properties:
+                mfaToken:
+                  type: string
+                  description: Opaque mfaToken returned by the login response
+                code:
+                  type: string
+                  description: 6-digit TOTP code or recovery code (`xxxx-xxxx-xxxx`)
+      responses:
+        "200":
+          description: Session issued
+          headers:
+            Set-Cookie:
+              description: httpOnly refresh cookie (`nrcc_refresh`)
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_AuthResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 
   # ─── Config ────────────────────────────────────────────────────────────────────
 
@@ -1945,6 +2131,98 @@ components:
           description: Short-lived JWT access token (~15 min)
         user:
           $ref: "#/components/schemas/CCUserPublic"
+
+    # ─── MFA / TOTP (issue #305) ──────────────────────────────────────
+
+    GenericSuccess:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+          example: true
+      description: |
+        Generic success envelope used for endpoints that have no
+        meaningful response body beyond a status flag (e.g. MFA
+        disable).
+
+    MfaStatusResponse:
+      type: object
+      required: [enabled, recoveryCodesRemaining]
+      properties:
+        enabled:
+          type: boolean
+          description: True when the user has a committed TOTP enrollment
+        recoveryCodesRemaining:
+          type: integer
+          minimum: 0
+          description: Unused recovery codes remaining for the user
+
+    MfaLoginResponse:
+      type: object
+      description: |
+        Returned by `POST /api/auth/login` when the user is enrolled
+        in TOTP. No JWT and no refresh cookie are issued at this
+        step — the client must complete the second factor with
+        `POST /api/auth/mfa/verify`.
+      required: [mfaRequired, mfaToken]
+      properties:
+        mfaRequired:
+          type: boolean
+          enum: [true]
+        mfaToken:
+          type: string
+          description: Opaque single-use token, 5 min TTL
+
+    MfaEnrollBeginResponse:
+      type: object
+      description: |
+        Returned by `POST /api/auth/mfa/enroll`. The enrollment is
+        NOT yet committed — the client must follow up with
+        `POST /api/auth/mfa/enroll/confirm`.
+      required: [secret, otpauthUrl]
+      properties:
+        secret:
+          type: string
+          description: Base32-encoded TOTP secret (RFC 6238)
+        otpauthUrl:
+          type: string
+          format: uri
+          description: |
+            `otpauth://` URL suitable for any RFC 6238 authenticator
+            (Google Authenticator, 1Password, Bitwarden, etc.)
+          example: "otpauth://totp/NRCC:user:admin?secret=JBSWY3DPEHPK3PXP&issuer=NRCC"
+
+    MfaEnrollConfirmResponse:
+      type: object
+      description: |
+        Returned by `POST /api/auth/mfa/enroll/confirm` on success.
+        The recovery codes are shown to the user exactly once and
+        cannot be retrieved again.
+      required: [recoveryCodes, recoveryCodesRemaining]
+      properties:
+        recoveryCodes:
+          type: array
+          items:
+            type: string
+            pattern: '^[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}$'
+          example: ["a1b2-c3d4-e5f6", "0123-4567-89ab"]
+        recoveryCodesRemaining:
+          type: integer
+          minimum: 0
+
+    CCUserPublicWithMfa:
+      description: |
+        Extension of `CCUserPublic` that adds the user's MFA status.
+        Returned by `GET /api/auth/me` so the UI can show enrollment
+        state without a second round-trip.
+      allOf:
+        - $ref: "#/components/schemas/CCUserPublic"
+        - type: object
+          required: [mfa]
+          properties:
+            mfa:
+              $ref: "#/components/schemas/MfaStatusResponse"
 
     StatusResponse:
       type: object
@@ -3788,6 +4066,104 @@ components:
           properties:
             data:
               $ref: "#/components/schemas/AnyObject"
+
+    # ─── MFA / TOTP envelopes (issue #305) ──────────────────────────
+
+    SuccessEnvelope_MfaLoginResponse:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/MfaLoginResponse"
+
+    SuccessEnvelope_MfaEnrollBeginResponse:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/MfaEnrollBeginResponse"
+
+    SuccessEnvelope_MfaEnrollConfirmResponse:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/MfaEnrollConfirmResponse"
+
+    SuccessEnvelope_MfaStatusResponse:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/MfaStatusResponse"
+
+    SuccessEnvelope_CCUserPublicWithMfa:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/CCUserPublicWithMfa"
+
+    SuccessEnvelope_GenericSuccess:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/GenericSuccess"
 
   # ── Reusable Responses ──────────────────────────────────────────────────────────
 

@@ -25,6 +25,7 @@ type loginMetricsRecorder interface {
 // AuthHandler handles authentication endpoints
 type AuthHandler struct {
 	authSvc      *service.AuthService
+	mfaSvc       *service.MfaService
 	audit        *audit.Service
 	limiter      *mw.RateLimiter
 	loginMetrics loginMetricsRecorder
@@ -34,6 +35,10 @@ type AuthHandler struct {
 func NewAuthHandler(authSvc *service.AuthService) *AuthHandler {
 	return &AuthHandler{authSvc: authSvc}
 }
+
+// SetMfaService injects the MFA service so the login handler can
+// branch on TOTP enrollment. nil is a valid value (MFA disabled).
+func (h *AuthHandler) SetMfaService(m *service.MfaService) { h.mfaSvc = m }
 
 // SetAuditService injects the audit logger.
 func (h *AuthHandler) SetAuditService(a *audit.Service) { h.audit = a }
@@ -251,6 +256,26 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// MFA branch: if the user is enrolled in TOTP, do NOT issue a
+	// session yet — return mfaRequired + a short-lived mfaToken
+	// and let the client call /api/auth/mfa/verify.
+	if h.mfaSvc != nil && h.mfaSvc.IsEnrolled(user.ID) {
+		mfaToken, err := h.mfaSvc.IssueMfaToken(user.ID)
+		if err != nil {
+			model.RespondError(w, http.StatusInternalServerError, "MFA_TOKEN_ERROR", "Failed to issue MFA challenge")
+			return
+		}
+		if h.loginMetrics != nil {
+			h.loginMetrics.RecordLoginAttempt(true)
+		}
+		h.audit.Log(r, req.Username, "LOGIN", "", "ok", map[string]string{"stage": "password", "mfa": "required"})
+		model.RespondJSON(w, http.StatusOK, model.MfaLoginResponse{
+			MfaRequired: true,
+			MfaToken:    mfaToken,
+		})
+		return
+	}
+
 	// Generate access token
 	token, err := h.authSvc.GenerateToken(user)
 	if err != nil {
@@ -314,7 +339,19 @@ func (h *AuthHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt: user.UpdatedAt,
 	}
 
-	model.RespondJSON(w, http.StatusOK, resp)
+	// Embed MFA status so the UI does not need a second round-trip
+	// on page load. If MFA is disabled (mfaSvc == nil) we report
+	// { enabled: false, recoveryCodesRemaining: 0 }.
+	mfa := model.MfaStatusResponse{Enabled: false, RecoveryCodesRemaining: 0}
+	if h.mfaSvc != nil {
+		if s, err := h.mfaSvc.Status(user.ID); err == nil {
+			mfa = s
+		}
+	}
+	model.RespondJSON(w, http.StatusOK, struct {
+		model.CCUserPublic
+		Mfa model.MfaStatusResponse `json:"mfa"`
+	}{resp, mfa})
 }
 
 // Logout handles POST /api/auth/logout - protected endpoint
