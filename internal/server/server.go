@@ -63,6 +63,12 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 	systemHandler.SetEdgeMode(config.EdgeMode())
 	bootstrapHandler := handler.NewBootstrapHandler(hostSvc)
 
+	// MFA service + handler. Wires the auth flow so enrolled users
+	// get the second-factor challenge at login.
+	mfaSvc := service.NewMfaService(dataDir, authSvc)
+	authHandler.SetMfaService(mfaSvc)
+	mfaHandler := handler.NewMfaHandler(mfaSvc, authSvc)
+
 	// Initialize MetricsBuffer (120-entry ring buffer) and sampler (30s interval)
 	metricsBuffer := service.NewMetricsBuffer(120)
 	metricsSampler := service.NewMetricsSampler(metricsBuffer, 30*time.Second)
@@ -101,6 +107,11 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 	dockerHandler.SetAuditService(auditSvc)
 	flowHandler.SetAuditService(auditSvc)
 	authHandler.SetRateLimiter(middleware.NewRateLimiter(dataDir))
+	mfaHandler.SetAuditService(auditSvc)
+	// MFA verify shares the auth surface's rate limiter instance so
+	// the per-IP and per-user buckets used by /api/auth/login also
+	// cover /api/auth/mfa/verify. Constructed once and shared.
+	mfaHandler.SetRateLimiter(middleware.NewRateLimiter(dataDir))
 
 	// Initialize metrics collector and wire into handlers
 	metricsCollector := metrics.NewCollector()
@@ -125,6 +136,7 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 		r.Post("/setup", authHandler.Setup)
 		r.Post("/login", authHandler.Login)
 		r.Post("/refresh", authHandler.Refresh)
+		r.Post("/mfa/verify", mfaHandler.Verify)
 
 		// Protected auth endpoints
 		r.Group(func(r chi.Router) {
@@ -136,6 +148,10 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 			r.Delete("/users/{id}", authHandler.DeleteUser)
 			r.Patch("/users/{id}", authHandler.UpdateUser)
 			r.Patch("/users/{id}/password", authHandler.ChangePassword)
+			r.Post("/mfa/enroll", mfaHandler.Enroll)
+			r.Post("/mfa/enroll/confirm", mfaHandler.EnrollConfirm)
+			r.Post("/mfa/disable", mfaHandler.Disable)
+			r.Get("/mfa/status", mfaHandler.Status)
 		})
 	})
 
