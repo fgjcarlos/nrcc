@@ -86,14 +86,14 @@ func isInDocker() bool {
 // id and created timestamp so the existing UI renders without
 // special-casing the in-Docker path.
 type containerInfo struct {
-	ID      string          `json:"id"`
-	Name    string          `json:"name"`
-	Image   string          `json:"image"`
-	Status  string          `json:"status"`
-	Created string          `json:"created"`
-	Ports   []containerPort `json:"ports,omitempty"`
-	State   containerState  `json:"state"`
-	InDocker bool           `json:"inDocker"`
+	ID       string          `json:"id"`
+	Name     string          `json:"name"`
+	Image    string          `json:"image"`
+	Status   string          `json:"status"`
+	Created  string          `json:"created"`
+	Ports    []containerPort `json:"ports,omitempty"`
+	State    containerState  `json:"state"`
+	InDocker bool            `json:"inDocker"`
 }
 
 type containerPort struct {
@@ -119,9 +119,9 @@ func (h *DockerHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 			image = "nrcc"
 		}
 		model.RespondJSON(w, http.StatusOK, containerInfo{
-			Name:    "nrcc",
-			Image:   image,
-			Status:  "running",
+			Name:     "nrcc",
+			Image:    image,
+			Status:   "running",
 			InDocker: true,
 			State: containerState{
 				Running: true,
@@ -188,6 +188,7 @@ func (h *DockerHandler) GetInfo(w http.ResponseWriter, r *http.Request) {
 //     restart policy brings everything back up.
 //   - Native: runs `docker restart <name>` against the discovered
 //     container and audit-logs the result.
+//
 // POST /api/docker/restart
 func (h *DockerHandler) PostRestart(w http.ResponseWriter, r *http.Request) {
 	if isInDocker() {
@@ -195,7 +196,7 @@ func (h *DockerHandler) PostRestart(w http.ResponseWriter, r *http.Request) {
 		model.RespondJSON(w, http.StatusOK, map[string]string{"message": "Container restarting…"})
 		go func() {
 			if h.pm != nil {
-				h.pm.Stop()
+				_ = h.pm.Stop()
 			}
 			time.Sleep(300 * time.Millisecond)
 			if h.shutdownCh != nil {
@@ -224,6 +225,7 @@ func (h *DockerHandler) PostRestart(w http.ResponseWriter, r *http.Request) {
 //   - In-Docker: stops Node-RED and signals shutdown.
 //   - Native: runs `docker stop <name>` against the discovered
 //     container and audit-logs the result.
+//
 // POST /api/docker/stop
 func (h *DockerHandler) PostStop(w http.ResponseWriter, r *http.Request) {
 	if isInDocker() {
@@ -231,7 +233,7 @@ func (h *DockerHandler) PostStop(w http.ResponseWriter, r *http.Request) {
 		model.RespondJSON(w, http.StatusOK, map[string]string{"message": "Container stopping…"})
 		go func() {
 			if h.pm != nil {
-				h.pm.Stop()
+				_ = h.pm.Stop()
 			}
 			time.Sleep(300 * time.Millisecond)
 			if h.shutdownCh != nil {
