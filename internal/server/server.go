@@ -92,6 +92,12 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 	updateHandler := handler.NewUpdateHandler(updateSvc)
 	filesHandler := handler.NewFilesHandler(dataDir)
 	dockerHandler := handler.NewDockerHandler()
+	// DockerService powers the native-host container endpoints
+	// (status, info, restart, stop) when nrcc itself runs natively.
+	// The handler is the only consumer; the service is intentionally
+	// stateless so a single instance is safe to share.
+	dockerSvc := service.NewDockerService()
+	dockerHandler.SetDockerService(dockerSvc)
 	aiHandler := handler.NewAIHandler()
 	instanceHandler := handler.NewInstanceHandler(service.NewInstanceStore(dataDir))
 
