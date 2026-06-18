@@ -2,12 +2,19 @@ import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import type { ApiResponse } from 'shared/types';
 import { redirectToLogin } from './navigation';
 
+// All requests go out with `withCredentials: true` so the httpOnly
+// `nrcc_refresh` cookie (set on /auth/login and /auth/setup) is sent on
+// every call, including the page-load rehydrate via /auth/refresh from
+// useAuth. Without this, a full page reload (F5) on a protected route
+// drops the session because the access token lives only in memory and
+// the refresh cookie never reaches the server — see issue #362.
 const api = axios.create({
   baseURL: '/api',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true,
 });
 
 let tokenGetter: (() => string | null) | null = null;
@@ -24,9 +31,11 @@ export function registerTokenAccessors(
 
 async function refreshAccessToken(): Promise<string | null> {
   try {
-    const response = await axios.post<{ data: { token: string } }>('/api/auth/refresh', null, {
-      withCredentials: true,
-    });
+    // Use the shared `api` instance so the request picks up the global
+    // withCredentials + baseURL config. A previous version used a bare
+    // `axios.post` with explicit options; consolidating on `api` keeps
+    // the cookie/transport behaviour consistent across refresh paths.
+    const response = await api.post<{ data: { token: string } }>('/auth/refresh', null);
     const token = response.data.data.token;
     tokenSetter?.(token);
     return token;
