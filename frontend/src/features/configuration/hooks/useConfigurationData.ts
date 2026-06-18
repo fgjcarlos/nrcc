@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { configService, settingsService } from '../services';
 import { bootstrapService } from '@/features/bootstrap/services';
@@ -27,15 +28,29 @@ export function useConfigurationData() {
     queryFn: () => settingsService.getRaw(),
   });
 
-  // Helper: derive loaded config from query result
+  // The raw query data is the only value we want to track for memo
+  // invalidation. `configToFormData` returns a fresh object every call,
+  // so without `useMemo` its reference changes on every render and the
+  // `useEffect` in ConfigurationView that syncs form state would
+  // re-fire on every interaction, clobbering the user's in-flight edits
+  // (toggles not flipping, fields reverting). The same applies to the
+  // raw settings content. See issue #366.
   const loadedConfig = configQuery.data?.data?.data;
-  const initialFormData: NodeRedConfigFormData | null = loadedConfig
-    ? configToFormData(loadedConfig as NodeRedConfigResponse)
-    : null;
+  const initialFormData = useMemo<NodeRedConfigFormData | null>(
+    () =>
+      loadedConfig
+        ? configToFormData(loadedConfig as NodeRedConfigResponse)
+        : null,
+    [loadedConfig],
+  );
 
-  // Helper: derive raw settings content
-  const rawSettingsContent = rawSettingsQuery.data?.data?.data?.content || '';
   const settingsDoc = rawSettingsQuery.data?.data?.data;
+  // settingsDoc is an object reference from react-query, which is stable
+  // per fetch. `content` is a primitive string, also stable.
+  const rawSettingsContent = useMemo(
+    () => settingsDoc?.content || '',
+    [settingsDoc],
+  );
 
   // Helper: derive host info
   const hostStatus = bootstrapQuery.data;
