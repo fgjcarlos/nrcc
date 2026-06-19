@@ -143,3 +143,38 @@ describe('ConfigurationView (issue #366 — toggles were reset on every render)'
     expect(toggle.className).toContain('bg-muted');
   });
 });
+
+describe('ConfigurationView (issue #363 — Advanced settings panel i18n)', () => {
+  it('renders the advanced settings heading in English without backticks', async () => {
+    renderConfiguration();
+
+    // Heading is plain text — no literal backticks, no Spanish words.
+    const heading = await screen.findByRole('heading', { level: 2, name: 'Advanced settings.js' });
+    expect(heading).toBeInTheDocument();
+    expect(heading.textContent).not.toContain('`');
+    expect(heading.textContent).not.toMatch(/Avanced/);
+  });
+
+  it('renders the advanced settings description in English and routes through UI_COPY', async () => {
+    renderConfiguration();
+
+    expect(
+      await screen.findByText(/Edit the live settings\.js file detected by nrcc\./i),
+    ).toBeInTheDocument();
+    // No Spanish copy should leak through.
+    expect(screen.queryByText(/Edita el archivo real/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Último backup/i)).not.toBeInTheDocument();
+  });
+
+  it('renders the host-status block labels in English', async () => {
+    renderConfiguration();
+
+    expect(
+      await screen.findByText(/Installation detected/i),
+    ).toBeInTheDocument();
+    // Old Spanish strings should be gone.
+    expect(screen.queryByText(/Instalación detectada/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/sin Node-RED detectado/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/sin ruta detectada/i)).not.toBeInTheDocument();
+  });
+});

@@ -93,4 +93,13 @@ export const UI_COPY = {
   stopContainerTitle: 'Stop container',
   stopContainerDesc:
     'Are you sure you want to stop the Node-RED container? The service will be unavailable until you restart it.',
+  // Configuration: host status block
+  installationDetected: 'Installation detected',
+  nodeRedNotDetected: '(no Node-RED detected)',
+  pathNotDetected: 'no path detected',
+  // Configuration: raw settings editor panel
+  advancedSettingsTitle: 'Advanced settings.js',
+  advancedSettingsDescription:
+    'Edit the live settings.js file detected by nrcc. A backup is created automatically before saving.',
+  lastBackup: (path: string) => `Last backup: ${path}`,
 } as const;

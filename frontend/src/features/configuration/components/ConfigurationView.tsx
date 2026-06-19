@@ -12,6 +12,7 @@ import {
   Save, Globe
 } from 'lucide-react';
 import { useConfigurationData, useConfigurationActions } from '../hooks';
+import { UI_COPY } from '@/shared/constants/uiCopy';
 
 // ============================================
 // Sections Configuration
@@ -221,11 +222,11 @@ export function ConfigurationView() {
         <div className="rounded-2xl border border-border bg-base-200/35 p-4">
           <div className="flex flex-col gap-2 text-sm text-base-content/75">
             <span>
-              Instalación detectada: <strong className="text-base-content">{data.hostStatus.nodeRed.mode}</strong>
-              {data.hostStatus.nodeRed.detected ? '' : ' (sin Node-RED detectado)'}
+              {UI_COPY.installationDetected}: <strong className="text-base-content">{data.hostStatus.nodeRed.mode}</strong>
+              {data.hostStatus.nodeRed.detected ? '' : ` ${UI_COPY.nodeRedNotDetected}`}
             </span>
             <span>
-              settings.js: <strong className="text-base-content">{data.hostStatus.settings.path || 'sin ruta detectada'}</strong>
+              settings.js: <strong className="text-base-content">{data.hostStatus.settings.path || UI_COPY.pathNotDetected}</strong>
             </span>
             {data.hostStatus.recommendations && data.hostStatus.recommendations.length > 0 && (
               <span>{data.hostStatus.recommendations[0]}</span>
@@ -271,13 +272,17 @@ export function ConfigurationView() {
       <div className="surface-card p-6 space-y-4">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h2 className="text-lg font-semibold text-base-content">Advanced `settings.js`</h2>
+            <h2 className="text-lg font-semibold text-base-content">
+              {UI_COPY.advancedSettingsTitle}
+            </h2>
             <p className="text-sm text-base-content/65">
-              Edita el archivo real detectado por nrcc. Se crea backup antes de guardar.
+              {UI_COPY.advancedSettingsDescription}
             </p>
           </div>
           {data.settingsDoc?.backupPath && (
-            <span className="text-xs text-base-content/55">Último backup: {data.settingsDoc.backupPath}</span>
+            <span className="text-xs text-base-content/55">
+              {UI_COPY.lastBackup(data.settingsDoc.backupPath)}
+            </span>
           )}
         </div>
 
