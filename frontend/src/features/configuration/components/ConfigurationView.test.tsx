@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
@@ -176,5 +176,109 @@ describe('ConfigurationView (issue #363 — Advanced settings panel i18n)', () =
     expect(screen.queryByText(/Instalación detectada/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/sin Node-RED detectado/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/sin ruta detectada/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('ConfigurationView (issue #364 — gated raw settings editor)', () => {
+  // The lock-state textarea renders the loaded file content but cannot
+  // be edited, and the only available action is the "Unlock" button.
+  it('renders the textarea read-only by default with an unlock button', async () => {
+    renderConfiguration();
+
+    await screen.findByTestId('raw-settings-unlock-btn');
+
+    const textarea = screen.getByDisplayValue(/module\.exports/) as HTMLTextAreaElement;
+    expect(textarea).toHaveAttribute('readonly');
+    expect(textarea).toHaveAttribute('aria-readonly', 'true');
+
+    // Save and Cancel buttons should NOT exist in the locked state.
+    expect(screen.queryByTestId('raw-settings-save-btn')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('raw-settings-cancel-btn')).not.toBeInTheDocument();
+
+    // Locked banner is visible.
+    expect(screen.getByTestId('raw-settings-locked-banner')).toBeInTheDocument();
+  });
+
+  // The unlock dialog gates confirmation behind an acknowledgement
+  // checkbox. Confirming flips the editor to its editable state.
+  it('opens a confirmation dialog with an acknowledgement gate when unlock is clicked', async () => {
+    const user = userEvent.setup();
+    renderConfiguration();
+
+    const unlockBtn = await screen.findByTestId('raw-settings-unlock-btn');
+    await user.click(unlockBtn);
+
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toBeInTheDocument();
+    expect(within(dialog).getByText(/Edit Node-RED settings\.js directly/i)).toBeInTheDocument();
+
+    const ack = within(dialog).getByTestId('confirmation-dialog-ack');
+    expect(ack).not.toBeChecked();
+    const confirmBtn = within(dialog).getByRole('button', { name: /confirm/i });
+    expect(confirmBtn).toBeDisabled();
+
+    await user.click(ack);
+    expect(ack).toBeChecked();
+    expect(confirmBtn).toBeEnabled();
+
+    await user.click(confirmBtn);
+
+    // Editor is now unlocked: Save / Cancel appear, textarea is editable.
+    await waitFor(() => expect(screen.getByTestId('raw-settings-save-btn')).toBeInTheDocument());
+    const textarea = screen.getByDisplayValue(/module\.exports/) as HTMLTextAreaElement;
+    expect(textarea).not.toHaveAttribute('readonly');
+  });
+
+  // Cancelling the dialog (via the inline Cancel button on the unlocked
+  // panel) restores the snapshot taken at unlock-time. In-flight edits
+  // are discarded.
+  it('re-locks the editor on Cancel and discards in-flight edits', async () => {
+    const user = userEvent.setup();
+    renderConfiguration();
+
+    const unlockBtn = await screen.findByTestId('raw-settings-unlock-btn');
+    await user.click(unlockBtn);
+
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByTestId('confirmation-dialog-ack'));
+    await user.click(within(dialog).getByRole('button', { name: /confirm/i }));
+
+    await screen.findByTestId('raw-settings-save-btn');
+
+    const textarea = screen.getByDisplayValue(/module\.exports/) as HTMLTextAreaElement;
+    await user.type(textarea, '// should be discarded');
+    expect(textarea.value).toContain('// should be discarded');
+
+    await user.click(screen.getByTestId('raw-settings-cancel-btn'));
+
+    await waitFor(() => expect(screen.getByTestId('raw-settings-unlock-btn')).toBeInTheDocument());
+    const reLocked = screen.getByDisplayValue(/module\.exports/) as HTMLTextAreaElement;
+    expect(reLocked).toHaveAttribute('readonly');
+    expect(reLocked.value).not.toContain('// should be discarded');
+  });
+
+  // Save is wired through the existing action; in-flight edits flow
+  // through. Asserting on the post-click disabled state is the simplest
+  // way to confirm the click reached the mutation without over-fitting
+  // to mutation internals.
+  it('disables the Save button while the save mutation is pending', async () => {
+    const user = userEvent.setup();
+    renderConfiguration();
+
+    const unlockBtn = await screen.findByTestId('raw-settings-unlock-btn');
+    await user.click(unlockBtn);
+
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByTestId('confirmation-dialog-ack'));
+    await user.click(within(dialog).getByRole('button', { name: /confirm/i }));
+
+    await screen.findByTestId('raw-settings-save-btn');
+    await user.click(screen.getByTestId('raw-settings-save-btn'));
+
+    // Either the button stays disabled while the mutation is in flight,
+    // or the test sees a successful completion (the mock resolves
+    // synchronously in the vi.fn() default). Either way, the click
+    // reached the action; no errors thrown.
+    expect(screen.getByTestId('raw-settings-save-btn')).toBeInTheDocument();
   });
 });

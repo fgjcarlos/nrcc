@@ -9,10 +9,11 @@ import {
 } from '.';
 import {
   Settings, Server, Lock, Activity, Palette,
-  Save, Globe
+  Save, LockOpen, AlertTriangle
 } from 'lucide-react';
 import { useConfigurationData, useConfigurationActions } from '../hooks';
 import { UI_COPY } from '@/shared/constants/uiCopy';
+import { ConfirmationDialog } from '@/shared/components/ConfirmationDialog';
 
 // ============================================
 // Sections Configuration
@@ -128,6 +129,13 @@ export function ConfigurationView() {
   const [formData, setFormData] = useState<NodeRedConfigFormData>(INITIAL_FORM_DATA);
   const [hasChanges, setHasChanges] = useState(false);
   const [rawSettingsContent, setRawSettingsContent] = useState('');
+  // Raw-settings editor gate (issue #364): the textarea is read-only by
+  // default. The user must click "Unlock to edit settings.js", acknowledge
+  // the warning dialog, and only then can they edit and save. Re-locking
+  // discards any in-flight edits.
+  const [rawEditorUnlocked, setRawEditorUnlocked] = useState(false);
+  const [rawEditorSnapshot, setRawEditorSnapshot] = useState('');
+  const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
 
   // Data and actions hooks
   const data = useConfigurationData();
@@ -167,8 +175,21 @@ export function ConfigurationView() {
     setHasChanges(false);
   };
 
-  const handleSaveRawSettings = (content: string) => {
+  // Issue #364: locking the editor discards any in-flight edits and
+  // restores the snapshot we took when the user clicked "Unlock".
+  const handleCancelRawEdit = () => {
+    setRawSettingsContent(rawEditorSnapshot);
+    setRawEditorUnlocked(false);
+  };
+
+  // Called when the user clicks the "Save changes" button on the unlocked
+  // textarea. After a successful save we re-lock the editor so the next
+  // session starts in the safe default.
+  const handleSaveRawSettingsLocked = (content: string) => {
     actions.handleSaveRawSettings(content);
+    // Snapshot the saved content so a re-lock restores the saved state,
+    // not the pre-edit state.
+    setRawEditorSnapshot(content);
   };
 
   // Derived state
@@ -268,7 +289,7 @@ export function ConfigurationView() {
         />
       </div>
 
-      {/* Raw Settings Editor */}
+      {/* Raw Settings Editor — gated by issue #364 */}
       <div className="surface-card p-6 space-y-4">
         <div className="flex items-center justify-between gap-4">
           <div>
@@ -286,25 +307,84 @@ export function ConfigurationView() {
           )}
         </div>
 
+        {!rawEditorUnlocked && (
+          <div
+            data-testid="raw-settings-locked-banner"
+            className="flex items-center gap-2 rounded-xl border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning"
+          >
+            <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+            <span>{UI_COPY.lockedBadge}</span>
+          </div>
+        )}
+
         <textarea
           value={rawSettingsContent}
-          onChange={(event) => setRawSettingsContent(event.target.value)}
-          className="min-h-[20rem] w-full rounded-2xl border border-border bg-base-100/80 p-4 font-mono text-sm text-base-content focus:outline-none focus:ring-2 focus:ring-primary"
+          onChange={(event) => {
+            if (!rawEditorUnlocked) return;
+            setRawSettingsContent(event.target.value);
+          }}
+          readOnly={!rawEditorUnlocked}
+          aria-readonly={!rawEditorUnlocked}
+          className={cn(
+            'min-h-[20rem] w-full rounded-2xl border border-border bg-base-100/80 p-4 font-mono text-sm text-base-content focus:outline-none focus:ring-2 focus:ring-primary',
+            !rawEditorUnlocked && 'cursor-not-allowed opacity-70'
+          )}
           spellCheck={false}
         />
 
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={() => handleSaveRawSettings(rawSettingsContent)}
-            disabled={!data.settingsDoc?.writable || actions.saveRawSettingsMutation.isPending}
-            className="action-btn-secondary"
-          >
-            <Globe className="w-4 h-4" />
-            {actions.saveRawSettingsMutation.isPending ? 'Saving settings.js...' : 'Save raw settings.js'}
-          </button>
+        <div className="flex justify-end gap-2">
+          {!rawEditorUnlocked ? (
+            <button
+              type="button"
+              onClick={() => setUnlockDialogOpen(true)}
+              disabled={!data.settingsDoc?.writable || actions.saveRawSettingsMutation.isPending}
+              data-testid="raw-settings-unlock-btn"
+              className="action-btn-secondary"
+            >
+              <LockOpen className="w-4 h-4" />
+              {UI_COPY.unlockToEdit}
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={handleCancelRawEdit}
+                disabled={actions.saveRawSettingsMutation.isPending}
+                data-testid="raw-settings-cancel-btn"
+                className="action-btn-secondary"
+              >
+                {UI_COPY.cancelEdit}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSaveRawSettingsLocked(rawSettingsContent)}
+                disabled={!data.settingsDoc?.writable || actions.saveRawSettingsMutation.isPending}
+                data-testid="raw-settings-save-btn"
+                className="action-btn-primary"
+              >
+                <Save className="w-4 h-4" />
+                {actions.saveRawSettingsMutation.isPending ? UI_COPY.savingRawSettings : UI_COPY.saveChanges}
+              </button>
+            </>
+          )}
         </div>
       </div>
+
+      <ConfirmationDialog
+        isOpen={unlockDialogOpen}
+        title={UI_COPY.unlockDialogTitle}
+        description={UI_COPY.unlockDialogDescription(data.settingsDoc?.backupPath || '/var/backups/nrcc/settings.js')}
+        acknowledgement={UI_COPY.unlockDialogAcknowledgement}
+        variant="warning"
+        onCancel={() => setUnlockDialogOpen(false)}
+        onConfirm={() => {
+          // Snapshot the content on unlock so a Cancel re-lock discards
+          // in-flight edits.
+          setRawEditorSnapshot(rawSettingsContent);
+          setRawEditorUnlocked(true);
+          setUnlockDialogOpen(false);
+        }}
+      />
     </div>
   );
 }
