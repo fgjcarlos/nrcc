@@ -9,6 +9,7 @@ interface ConfirmationDialogProps {
   title: string;
   description: string;
   confirmText?: string;
+  acknowledgement?: string;
   variant?: ConfirmationVariant;
   isPending?: boolean;
   onConfirm: () => void;
@@ -20,32 +21,41 @@ export function ConfirmationDialog({
   title,
   description,
   confirmText = '',
+  acknowledgement,
   variant = 'default',
   isPending = false,
   onConfirm,
   onCancel,
 }: ConfirmationDialogProps) {
   const [inputValue, setInputValue] = useState('');
+  const [acknowledged, setAcknowledged] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Memoize canConfirm to prevent stale closures in useEffect dependency array
+  // Memoize canConfirm to prevent stale closures in useEffect dependency array.
+  // The Confirm button is enabled only when every gate has been satisfied:
+  //   - if `confirmText` is provided, the user must type it verbatim
+  //   - if `acknowledgement` is provided, the user must tick the checkbox
   const canConfirm = useMemo(
     () => () => {
-      if (!confirmText) return true;
-      return inputValue === confirmText;
+      if (confirmText && inputValue !== confirmText) return false;
+      if (acknowledgement && !acknowledged) return false;
+      return true;
     },
-    [confirmText, inputValue]
+    [confirmText, inputValue, acknowledgement, acknowledged]
   );
 
-  // Focus input when dialog opens
+  // Reset state when the dialog opens, then focus the input.
   useEffect(() => {
-    if (isOpen && confirmText) {
+    if (isOpen) {
       setInputValue('');
-      setTimeout(() => inputRef.current?.focus(), 100);
+      setAcknowledged(false);
+      if (confirmText) {
+        setTimeout(() => inputRef.current?.focus(), 100);
+      }
     }
   }, [isOpen, confirmText]);
 
-  // Handle escape key
+  // Handle escape / enter
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen && !isPending) {
@@ -138,6 +148,20 @@ export function ConfirmationDialog({
                  className="glass-panel w-full rounded-xl border border-border px-3 py-2 text-base-content focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
                />
              </div>
+           )}
+
+           {acknowledgement && (
+             <label className="mt-4 flex items-start gap-3 cursor-pointer select-none">
+               <input
+                 type="checkbox"
+                 checked={acknowledged}
+                 onChange={(e) => setAcknowledged(e.target.checked)}
+                 disabled={isPending}
+                 className="checkbox checkbox-sm mt-0.5"
+                 data-testid="confirmation-dialog-ack"
+               />
+               <span className="text-sm text-base-content/80">{acknowledgement}</span>
+             </label>
            )}
         </div>
 

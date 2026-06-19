@@ -259,4 +259,101 @@ describe('ConfirmationDialog', () => {
       expect(document.activeElement).toBe(input);
     });
   });
+
+  it('gates Confirm behind an acknowledgement checkbox when acknowledgement is provided', async () => {
+    const user = userEvent.setup();
+    render(
+      <ConfirmationDialog
+        isOpen={true}
+        title="Edit settings.js"
+        description="Risky action"
+        acknowledgement="I understand the risks"
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />
+    );
+
+    const ack = screen.getByTestId('confirmation-dialog-ack');
+    expect(ack).not.toBeChecked();
+    const confirmBtn = screen.getByRole('button', { name: UI_COPY.confirm });
+    expect(confirmBtn).toBeDisabled();
+
+    await user.click(ack);
+    expect(ack).toBeChecked();
+    expect(confirmBtn).toBeEnabled();
+  });
+
+  it('combines confirmText and acknowledgement gates', async () => {
+    const user = userEvent.setup();
+    render(
+      <ConfirmationDialog
+        isOpen={true}
+        title="Edit settings.js"
+        description="Risky action"
+        confirmText="settings.js"
+        acknowledgement="I understand the risks"
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />
+    );
+
+    const confirmBtn = screen.getByRole('button', { name: UI_COPY.confirm });
+    const ack = screen.getByTestId('confirmation-dialog-ack');
+    const input = screen.getByPlaceholderText('settings.js') as HTMLInputElement;
+
+    // Both gates closed.
+    expect(confirmBtn).toBeDisabled();
+    // Tick the ack only — still gated by confirmText.
+    await user.click(ack);
+    expect(confirmBtn).toBeDisabled();
+    // Type the wrong text.
+    await user.type(input, 'wrong');
+    expect(confirmBtn).toBeDisabled();
+    // Fix the text — both gates open.
+    await user.clear(input);
+    await user.type(input, 'settings.js');
+    expect(confirmBtn).toBeEnabled();
+  });
+
+  it('resets the acknowledgement state when the dialog is re-opened', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <ConfirmationDialog
+        isOpen={true}
+        title="Edit"
+        description="x"
+        acknowledgement="I understand"
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByTestId('confirmation-dialog-ack'));
+    expect(screen.getByTestId('confirmation-dialog-ack')).toBeChecked();
+
+    rerender(
+      <ConfirmationDialog
+        isOpen={false}
+        title="Edit"
+        description="x"
+        acknowledgement="I understand"
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />
+    );
+    rerender(
+      <ConfirmationDialog
+        isOpen={true}
+        title="Edit"
+        description="x"
+        acknowledgement="I understand"
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />
+    );
+
+    // Re-opened dialog should not carry the previous tick.
+    expect(screen.getByTestId('confirmation-dialog-ack')).not.toBeChecked();
+    expect(screen.getByRole('button', { name: UI_COPY.confirm })).toBeDisabled();
+  });
 });

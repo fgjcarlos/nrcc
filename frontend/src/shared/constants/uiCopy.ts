@@ -102,4 +102,16 @@ export const UI_COPY = {
   advancedSettingsDescription:
     'Edit the live settings.js file detected by nrcc. A backup is created automatically before saving.',
   lastBackup: (path: string) => `Last backup: ${path}`,
+  unlockToEdit: 'Unlock to edit settings.js',
+  unlockDialogTitle: 'Edit Node-RED settings.js directly',
+  unlockDialogDescription: (backupPath: string) =>
+    `This change is written directly to the host settings.js file (${backupPath}). A backup is taken automatically before saving. ` +
+    'A syntax error in settings.js can prevent Node-RED from starting, which would take the orchestrator offline.',
+  unlockDialogAcknowledgement:
+    'I understand that a bad save can break Node-RED startup.',
+  saveChanges: 'Save changes',
+  cancelEdit: 'Cancel',
+  saveRawSettings: 'Save raw settings.js',
+  savingRawSettings: 'Saving settings.js...',
+  lockedBadge: 'Locked — click "Unlock to edit" to make changes',
 } as const;
