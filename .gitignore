@@ -27,3 +27,10 @@ package-lock.json
 .continue/
 .junie/
 .kiro/
+
+# Skill-registry metadata is not tracked: only the canonical root
+# .agents/skills/ + skills-lock.json are kept. The local `.atl/` cache and
+# the nested `frontend/.agents/` mirror must not be re-introduced.
+.atl/
+frontend/.agents/
+frontend/skills-lock.json
