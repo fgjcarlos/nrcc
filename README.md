@@ -7,6 +7,9 @@
 
 A single-binary management UI for Node-RED. Run it alongside Node-RED to get a web dashboard for configuration, backups, logs, and more.
 
+> **Status: Beta · hardening phase.**
+> nrcc is feature-complete for its MVP scope but it is **not** 1.0. There is no SLA, no promised compatibility between minor versions, and no external security audit has been performed. Run it behind your firewall and review the security notes in [`SECURITY.md`](SECURITY.md) before exposing it publicly. Tag releases are published from `main` — see the [Releases page](https://github.com/fgjcarlos/nrcc/releases).
+
 ## Features
 
 - **Authentication** — JWT-based auth with multi-user support (admin/user roles)
@@ -236,7 +239,9 @@ nrcc portless uninstall
 nrcc portless uninstall --clean-aliases
 ```
 
-### Production checklist
+### Before deploying
+
+This is an operator self-check, not a vendor production-readiness claim. nrcc is in beta hardening — confirm these before you put it on the public internet.
 
 1. Set `JWT_SECRET` to a strong random value
 2. Set `ENCRYPTION_KEY` to a strong random value

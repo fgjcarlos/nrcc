@@ -152,10 +152,10 @@
     <section class="mt-20 space-y-10">
       <div class="flex flex-col gap-3">
         <p class="text-xs font-semibold uppercase tracking-[0.3em] text-sp-accent-hover">What works today</p>
-        <h2 class="text-3xl font-semibold tracking-tight text-sp-text">A full operations surface in beta.</h2>
+        <h2 class="text-3xl font-semibold tracking-tight text-sp-text">Beta · hardening phase.</h2>
         <p class="max-w-2xl text-sp-text-2">
           The MVP scope is feature-complete and nrcc is in a hardening phase. Every item below
-          is shipped, runs in a 225-test Vitest suite, and is exercised by Go tests and the
+          is shipped, runs in a 325-test Vitest suite, and is exercised by Go tests and the
           backend/frontend CI gates on every PR.
         </p>
       </div>
@@ -229,6 +229,18 @@
         </div>
 
       </div>
+    </section>
+
+    <!-- Project status -->
+    <section class="mt-12 rounded-2xl border border-sp-warning/30 bg-sp-warning/[0.06] p-8 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.55)]">
+      <p class="text-xs font-semibold uppercase tracking-[0.3em] text-sp-warning">Project status</p>
+      <h2 class="mt-3 text-3xl font-semibold tracking-tight text-sp-text">Beta · no production guarantees yet.</h2>
+      <ul class="mt-5 space-y-2 text-sp-text-2">
+        <li><strong class="text-sp-text">Status:</strong> feature-complete MVP, hardening phase. Not 1.0. APIs and config keys may change between minor versions.</li>
+        <li><strong class="text-sp-text">Support:</strong> best-effort community support. No SLA, no promised response time, no compatibility commitment.</li>
+        <li><strong class="text-sp-text">Security:</strong> no external security audit has been performed. Run nrcc behind your firewall; treat it like any other self-hosted beta tool.</li>
+        <li><strong class="text-sp-text">Releases:</strong> tagged builds are published from <code class="font-mono text-sp-accent-hover">main</code>. Track them on the <a class="text-sp-accent-hover underline-offset-4 hover:underline" href="https://github.com/fgjcarlos/nrcc/releases" rel="noopener noreferrer" target="_blank">Releases page</a>.</li>
+      </ul>
     </section>
 
     <!-- Quick start -->
