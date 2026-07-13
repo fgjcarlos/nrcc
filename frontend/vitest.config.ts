@@ -13,6 +13,17 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
     exclude: ['e2e/**', 'node_modules/**', 'dist/**'],
+    // Node 26's built-in `globalThis.localStorage` requires the
+    // `--localstorage-file` CLI flag and otherwise shadows jsdom's
+    // window.localStorage by leaving it `undefined`. Asking jsdom for an
+    // explicit in-memory URL gives us a real Storage on both
+    // `globalThis.localStorage` and `window.localStorage` without depending
+    // on Node CLI flags.
+    environmentOptions: {
+      jsdom: {
+        url: 'http://localhost/',
+      },
+    },
   },
   resolve: {
     alias: {
