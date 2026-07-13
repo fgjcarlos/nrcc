@@ -238,4 +238,5 @@ Expected results:
    - `https://get.nrcc.dev/`
    - `https://get.nrcc.dev/install.sh`
    - installation with `NRCC_VERSION=<tag>`
-5. Officially announce the one-liner flow once the domain and release are stable.
+
+> Reminder for the project owner: this rollout guide assumes the operator is doing a self-hosted install of a beta release. There is no external "official announcement" planned for beta hardening; this document is the operator-facing checklist, not a release-readiness declaration.
