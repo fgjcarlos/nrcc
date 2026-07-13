@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useToasts } from '@/shared/hooks/useToasts';
+import { toast } from 'sonner';
 import { dashboardService } from '../services';
 
 import { queryKeys } from '@/shared/lib/queryKeys';
@@ -20,7 +20,6 @@ interface RuntimeActionOptions {
 
 export function useDashboardActions({ uiPort }: UseDashboardActionsOptions) {
   const queryClient = useQueryClient();
-  const { pushToast } = useToasts();
 
   const [pendingConfirm, setPendingConfirm] = useState(false);
   const [isRestarting, setIsRestarting] = useState(false);
@@ -34,18 +33,12 @@ export function useDashboardActions({ uiPort }: UseDashboardActionsOptions) {
     error instanceof Error ? error.message : 'Error desconocido';
 
   const pushRuntimeSuccessToast = (title: string, message: string) => {
-    pushToast({
-      tone: 'success',
-      title,
-      message,
-    });
+    toast.success(title, { description: message });
   };
 
   const pushRuntimeErrorToast = (title: string, error: unknown) => {
-    pushToast({
-      tone: 'error',
-      title,
-      message: getErrorMessage(error),
+    toast.error(title, {
+      description: getErrorMessage(error),
       duration: 8000,
     });
   };

@@ -1,10 +1,10 @@
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { backupService } from '@/features/backups/services';
 import { dashboardService } from '@/features/dashboard/services';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import { useToasts } from '@/shared/hooks/useToasts';
 import { queryKeys } from '@/shared/lib/queryKeys';
 import { cn } from '@/shared/lib/utils';
 
@@ -43,7 +43,6 @@ export function CommandPalette() {
     staleTime: 60_000,
   });
   const { user } = useAuth();
-  const { pushToast } = useToasts();
   const isAdmin = user?.role === 'admin';
   const uiPort = configResponse?.data?.data?.uiPort ?? nodeRedEditorPort;
 
@@ -277,17 +276,12 @@ export function CommandPalette() {
     setIsExecuting(true);
     try {
       await command.run();
-      pushToast({
-        tone: 'success',
-        title: 'Command executed',
-        message: command.title,
-      });
+      toast.success('Command executed', { description: command.title });
       closePalette();
     } catch (error) {
-      pushToast({
-        tone: 'error',
-        title: 'Command failed',
-        message: error instanceof Error ? error.message : 'Unable to complete the command.',
+      toast.error('Command failed', {
+        description:
+          error instanceof Error ? error.message : 'Unable to complete the command.',
         duration: 8000,
       });
     } finally {

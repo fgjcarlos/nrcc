@@ -35,9 +35,12 @@ vi.mock('@/features/auth/hooks/useAuth', () => ({
   }),
 }));
 
-const toastSpy = vi.fn();
-vi.mock('@/shared/hooks/useToasts', () => ({
-  useToasts: () => ({ pushToast: toastSpy }),
+const toastSpy = vi.hoisted(() => vi.fn());
+vi.mock('sonner', () => ({
+  toast: Object.assign(toastSpy, {
+    success: toastSpy,
+    error: toastSpy,
+  }),
 }));
 
 function LocationProbe() {
@@ -119,7 +122,7 @@ describe('CommandPalette', () => {
 
     await waitFor(() => expect(window.confirm).toHaveBeenCalledWith('Create a manual backup now?'));
     await waitFor(() => expect(backupService.create).toHaveBeenCalledWith('manual'));
-    expect(toastSpy).toHaveBeenCalledWith(expect.objectContaining({ title: 'Command executed' }));
+    expect(toastSpy).toHaveBeenCalledWith('Command executed', expect.objectContaining({ description: 'Backup Now' }));
   });
 
   it('hides admin-only service commands from viewers', async () => {
