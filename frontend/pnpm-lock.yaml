@@ -23,12 +23,6 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
-      date-fns:
-        specifier: ^4.4.0
-        version: 4.4.0
-      form-data:
-        specifier: ^4.0.6
-        version: 4.0.6
       lucide-react:
         specifier: ^1.17.0
         version: 1.17.0(react@19.2.7)
@@ -132,9 +126,6 @@ importers:
       typescript-eslint:
         specifier: ^8.61.0
         version: 8.61.0(eslint@10.4.1(jiti@1.21.7))(typescript@6.0.3)
-      undici:
-        specifier: ^7.28.0
-        version: 7.28.0
       vite:
         specifier: ^8.0.16
         version: 8.0.16(@types/node@25.9.2)(jiti@1.21.7)
@@ -1112,9 +1103,6 @@ packages:
   data-urls@7.0.0:
     resolution: {integrity: sha512-23XHcCF+coGYevirZceTVD7NdJOqVn+49IHyxgszm+JIiHLoB2TkmPtsYkNWT1pvRSGkc35L6NHs0yHkN2SumA==}
     engines: {node: ^20.19.0 || ^22.12.0 || >=24.0.0}
-
-  date-fns@4.4.0:
-    resolution: {integrity: sha512-+1UMbeh68lH1SegH83CGWwpb6OHHbpSgr3+s5Eww5M4CAgswBpoWS0AjTOfEJ33HiYKz1hdj/KTFprzXHmq/6w==}
 
   debug@2.6.9:
     resolution: {integrity: sha512-bC7ElrdJaJnPbAP+1EotYvqZsb3ecl5wi6Bfi6BJTUcNowp6cvspg0jXznRTKDjm/E7AdgFBVeAPVMNcKGsHMA==}
@@ -3524,8 +3512,6 @@ snapshots:
       whatwg-url: 16.0.1
     transitivePeerDependencies:
       - '@noble/hashes'
-
-  date-fns@4.4.0: {}
 
   debug@2.6.9:
     dependencies:

@@ -12,8 +12,6 @@ export const queryKeys = {
     listRoot: ['backup-list'] as const,
     list: (page: number, limit: number, sort: string, order: string) =>
       ['backup-list', page, limit, sort, order] as const,
-    legacyList: (page?: number, limit?: number, sort?: string, order?: string) =>
-      ['backups', page, limit, sort, order] as const,
     detail: (id?: string | null) => ['backup-detail', id] as const,
     storage: ['backups-storage'] as const,
   },
