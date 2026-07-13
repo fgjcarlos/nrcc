@@ -3,7 +3,11 @@
 # ─────────────────────────────────────────────────────────────────────────────
 FROM node:26-slim AS frontend-builder
 
-RUN npm install -g pnpm@^11
+# Pin pnpm via corepack so the build uses the exact version that
+# generated pnpm-lock.yaml. Matches the packageManager declaration in
+# frontend/package.json. node:26-slim needs npm install -g corepack
+# because corepack is not on PATH by default in slim images.
+RUN npm install -g corepack@latest && corepack enable && corepack prepare pnpm@11.12.0 --activate
 
 WORKDIR /build/frontend
 
