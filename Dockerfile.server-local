@@ -1,8 +1,11 @@
 # Local server build for NRCC using pnpm lockfile
 FROM node:26-slim AS frontend-builder
 WORKDIR /build/frontend
-# pnpm 11 to match the pnpm-lock.yaml format (and the main Dockerfile).
-RUN npm install -g pnpm@^11
+# Pin pnpm via corepack (matches packageManager in frontend/package.json).
+# Avoids the broken pnpm@^11 autoinstaller; pnpm 11.12.0 is the same
+# version used in CI workflows. node:26-slim needs npm install -g corepack
+# because corepack is not on PATH by default in slim images.
+RUN npm install -g corepack@latest && corepack enable && corepack prepare pnpm@11.12.0 --activate
 COPY frontend/package.json frontend/pnpm-lock.yaml ./
 # --ignore-scripts matches the main Dockerfile: under pnpm 11 unapproved build
 # scripts (msw, a test-only dep) otherwise fail the install with ERR_PNPM_IGNORED_BUILDS.
