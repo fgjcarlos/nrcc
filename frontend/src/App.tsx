@@ -6,7 +6,6 @@ import { Layout } from '@/shared/components/layout/Layout';
 import { ProtectedRoute } from '@/shared/components/ProtectedRoute';
 import { ErrorBoundary } from '@/shared/components/layout/ErrorBoundary';
 import { Button } from '@/shared/components/ui/Button';
-import { ToastViewport } from './shared/components/ui/ToastViewport';
 
 function lazyNamed<T extends ComponentType<object>>(
   importer: () => Promise<Record<string, T>>,
@@ -194,7 +193,6 @@ function App() {
       <ErrorBoundary>
         <NavigatorRegistrar />
         <AppRoutes />
-        <ToastViewport />
       </ErrorBoundary>
     </BrowserRouter>
   );
