@@ -261,21 +261,6 @@ func (s *UpdateService) ForceCheck(ctx context.Context) (model.UpdateCacheEntry,
 	return entry, nil
 }
 
-// CheckForUpdate checks if an update is available for Node-RED.
-// This method is retained for backward compatibility with cmd/ CLI usage.
-func (s *UpdateService) CheckForUpdate() (model.UpdateStatus, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), s.npmTimeout)
-	defer cancel()
-
-	entry := s.performCheckInternal(ctx)
-
-	return model.UpdateStatus{
-		CurrentVersion:  entry.CurrentVersion,
-		LatestVersion:   entry.LatestVersion,
-		UpdateAvailable: entry.UpdateAvailable,
-	}, nil
-}
-
 // GetFlowState returns a deep copy of the current update flow state.
 // Thread-safe: acquires read lock before reading flowState.
 func (s *UpdateService) GetFlowState() model.UpdateFlowState {

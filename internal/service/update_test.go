@@ -242,33 +242,6 @@ func TestStartStop(t *testing.T) {
 	}
 }
 
-// TestCheckForUpdate_BackwardCompatibility tests backward compat wrapper
-func TestCheckForUpdate_BackwardCompatibility(t *testing.T) {
-	tmpDir := t.TempDir()
-	svc := NewUpdateService(tmpDir)
-
-	svc.getInstalledVersionFn = func(ctx context.Context) string {
-		return "3.0.0"
-	}
-	svc.getLatestVersionFn = func(ctx context.Context) (string, error) {
-		return "3.1.0", nil
-	}
-
-	status, err := svc.CheckForUpdate()
-	if err != nil {
-		t.Errorf("CheckForUpdate should not error: %v", err)
-	}
-
-	if status.CurrentVersion != "3.0.0" {
-		t.Errorf("Expected CurrentVersion 3.0.0, got %s", status.CurrentVersion)
-	}
-	if status.LatestVersion != "3.1.0" {
-		t.Errorf("Expected LatestVersion 3.1.0, got %s", status.LatestVersion)
-	}
-	if !status.UpdateAvailable {
-		t.Error("Expected UpdateAvailable to be true")
-	}
-}
 
 // TestConcurrentForceCheck tests that concurrent force checks don't run concurrently
 func TestConcurrentForceCheck(t *testing.T) {
