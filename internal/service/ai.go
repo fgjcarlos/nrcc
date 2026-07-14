@@ -122,8 +122,19 @@ func (s *AIService) AssistFlow(ctx context.Context, req AIFlowRequest) (AIFlowRe
 	}
 
 	if s.cfg.Provider == "offline" {
-		resp.Summary = offlineSummary(req.Action)
-		resp.Suggestions = offlineSuggestions(req.Action)
+		switch req.Action {
+		case AIActionExplain:
+			resp.Summary = "Offline AI mode: redacted request constructed for flow explanation. Configure a provider to receive model output."
+		case AIActionSuggest:
+			resp.Summary = "Offline AI mode: redacted request constructed for improvement suggestions. Configure a provider to receive model output."
+		case AIActionAudit:
+			resp.Summary = "Offline AI mode: redacted request constructed for flow audit. Configure a provider to receive model output."
+		case AIActionGenerate:
+			resp.Summary = "Offline AI mode: redacted request constructed for candidate generation. Candidate output requires human review and manual import/apply."
+		default:
+			resp.Summary = "Offline AI mode: redacted request constructed."
+		}
+		resp.Suggestions = []string{"AI requests are disabled unless NRCC_AI_ENABLED=true.", "Secrets are redacted before provider request construction.", "Review any generated candidate flow JSON before importing or applying it."}
 		if req.Action == AIActionAudit {
 			resp.AuditFindings = []string{"Review credential nodes, debug nodes, and external HTTP endpoints before import/apply."}
 		}
@@ -169,7 +180,9 @@ func (s *AIService) AssistFlow(ctx context.Context, req AIFlowRequest) (AIFlowRe
 }
 
 func (s *AIService) BuildProviderRequest(req AIFlowRequest) (AIProviderRequest, error) {
-	if !validAIAction(req.Action) {
+	switch req.Action {
+	case AIActionExplain, AIActionSuggest, AIActionAudit, AIActionGenerate:
+	default:
 		return AIProviderRequest{}, fmt.Errorf("unsupported AI flow action: %s", req.Action)
 	}
 	redactedFlow := RedactSecrets(req.Flow)
@@ -186,34 +199,6 @@ func (s *AIService) BuildProviderRequest(req AIFlowRequest) (AIProviderRequest, 
 		Messages: []AIMessage{{Role: "system", Content: system}, {Role: "user", Content: user}},
 		Meta:     map[string]interface{}{"reviewOnly": true, "redacted": true},
 	}, nil
-}
-
-func validAIAction(action AIFlowAction) bool {
-	switch action {
-	case AIActionExplain, AIActionSuggest, AIActionAudit, AIActionGenerate:
-		return true
-	default:
-		return false
-	}
-}
-
-func offlineSummary(action AIFlowAction) string {
-	switch action {
-	case AIActionExplain:
-		return "Offline AI mode: redacted request constructed for flow explanation. Configure a provider to receive model output."
-	case AIActionSuggest:
-		return "Offline AI mode: redacted request constructed for improvement suggestions. Configure a provider to receive model output."
-	case AIActionAudit:
-		return "Offline AI mode: redacted request constructed for flow audit. Configure a provider to receive model output."
-	case AIActionGenerate:
-		return "Offline AI mode: redacted request constructed for candidate generation. Candidate output requires human review and manual import/apply."
-	default:
-		return "Offline AI mode: redacted request constructed."
-	}
-}
-
-func offlineSuggestions(action AIFlowAction) []string {
-	return []string{"AI requests are disabled unless NRCC_AI_ENABLED=true.", "Secrets are redacted before provider request construction.", "Review any generated candidate flow JSON before importing or applying it."}
 }
 
 var secretKeyPattern = regexp.MustCompile(`(?i)(password|passwd|secret|token|credential|credentials|apikey|api_key|access[_-]?key|refresh[_-]?token|private[_-]?key|authorization|bearer|cookie|session)`)
@@ -239,18 +224,14 @@ func RedactSecrets(v interface{}) interface{} {
 		}
 		return out
 	case string:
-		return redactSecretString(typed)
+		if strings.Contains(typed, "=") {
+			return envSecretLinePattern.ReplaceAllString(typed, "${1}"+redactedValue)
+		}
+		if strings.Contains(strings.ToLower(typed), "bearer ") {
+			return regexp.MustCompile(`(?i)bearer\s+[^\s,;]+`).ReplaceAllString(typed, "Bearer "+redactedValue)
+		}
+		return typed
 	default:
 		return typed
 	}
-}
-
-func redactSecretString(s string) string {
-	if strings.Contains(s, "=") {
-		return envSecretLinePattern.ReplaceAllString(s, "${1}"+redactedValue)
-	}
-	if strings.Contains(strings.ToLower(s), "bearer ") {
-		return regexp.MustCompile(`(?i)bearer\s+[^\s,;]+`).ReplaceAllString(s, "Bearer "+redactedValue)
-	}
-	return s
 }

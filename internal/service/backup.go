@@ -325,7 +325,7 @@ func (s *BackupService) GetConfig() (model.BackupConfig, error) {
 // SaveConfig persists backup config and returns the normalized result.
 func (s *BackupService) SaveConfig(cfg model.BackupConfig) (model.BackupConfig, error) {
 	normalized := normalizeBackupConfig(cfg)
-	if err := validateBackupConfig(normalized); err != nil {
+	if _, err := scheduleSpec(normalized); err != nil {
 		return model.BackupConfig{}, err
 	}
 	if err := os.MkdirAll(s.dataDir, 0755); err != nil {
@@ -378,7 +378,11 @@ func (s *BackupService) Restore(id string) error {
 	}
 	defer func() { _ = zipFile.Close() }()
 
-	zipReader, err := zip.NewReader(zipFile, int64(getFileSize(backupPath)))
+	info, err := os.Stat(backupPath)
+	if err != nil {
+		return fmt.Errorf("failed to stat backup: %w", err)
+	}
+	zipReader, err := zip.NewReader(zipFile, info.Size())
 	if err != nil {
 		return fmt.Errorf("failed to read backup: %w", err)
 	}
@@ -519,7 +523,13 @@ func (s *BackupService) createBackup(options createBackupOptions) (model.Backup,
 	createdAt := time.Now().UTC().Format(time.RFC3339Nano)
 	name := strings.TrimSpace(options.Name)
 	if name == "" {
-		name = defaultBackupName(backupType, createdAt)
+		suffix := strings.ReplaceAll(strings.ReplaceAll(createdAt, ":", "-"), "T", "_")
+		suffix = strings.TrimSuffix(suffix, "Z")
+		if backupType == model.BackupTypeManual {
+			name = "manual-" + suffix
+		} else {
+			name = string(backupType) + "-" + suffix
+		}
 	}
 
 	zipFile, err := os.Create(backupPath)
@@ -943,7 +953,13 @@ func sanitizeArchivePath(destDir, entryName string) (string, error) {
 func normalizeBackupConfig(cfg model.BackupConfig) model.BackupConfig {
 	normalized := defaultBackupConfig
 	normalized.Enabled = cfg.Enabled
-	normalized.Schedule = normalizeSchedule(cfg.Schedule)
+	value := strings.TrimSpace(strings.ToLower(cfg.Schedule))
+	switch value {
+	case "disabled", "hourly", "every6h", "daily", "weekly", "custom":
+		normalized.Schedule = value
+	default:
+		normalized.Schedule = defaultBackupConfig.Schedule
+	}
 	normalized.CustomSchedule = strings.TrimSpace(cfg.CustomSchedule)
 	normalized.RetentionManual = maxInt(1, cfg.RetentionManual, defaultBackupConfig.RetentionManual)
 	normalized.RetentionAuto = maxInt(1, cfg.RetentionAuto, defaultBackupConfig.RetentionAuto)
@@ -961,21 +977,6 @@ func normalizeBackupConfig(cfg model.BackupConfig) model.BackupConfig {
 	}
 
 	return normalized
-}
-
-func normalizeSchedule(schedule string) string {
-	value := strings.TrimSpace(strings.ToLower(schedule))
-	switch value {
-	case "disabled", "hourly", "every6h", "daily", "weekly", "custom":
-		return value
-	default:
-		return defaultBackupConfig.Schedule
-	}
-}
-
-func validateBackupConfig(cfg model.BackupConfig) error {
-	_, err := scheduleSpec(cfg)
-	return err
 }
 
 func scheduleSpec(cfg model.BackupConfig) (string, error) {
@@ -1026,15 +1027,6 @@ func inferBackupType(name string) model.BackupType {
 		return model.BackupTypeAuto
 	}
 	return model.BackupTypeManual
-}
-
-func defaultBackupName(backupType model.BackupType, createdAt string) string {
-	suffix := strings.ReplaceAll(strings.ReplaceAll(createdAt, ":", "-"), "T", "_")
-	suffix = strings.TrimSuffix(suffix, "Z")
-	if backupType == model.BackupTypeManual {
-		return "manual-" + suffix
-	}
-	return string(backupType) + "-" + suffix
 }
 
 func readBackupMetadata(file *zip.File) (backupMetadata, error) {
@@ -1105,14 +1097,6 @@ func retentionForType(cfg model.BackupConfig, backupType model.BackupType) int {
 	default:
 		return cfg.RetentionManual
 	}
-}
-
-func getFileSize(path string) int64 {
-	info, err := os.Stat(path)
-	if err != nil {
-		return 0
-	}
-	return info.Size()
 }
 
 // RecordSchedulerEvent records a single scheduler execution event in history.

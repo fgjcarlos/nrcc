@@ -102,39 +102,25 @@ func (s *LibraryService) enrichLibraryMetadata(lib *model.LibraryInfo) error {
 	lib.Keywords = pkg.Keywords
 	lib.Category = pkg.Category
 	lib.Homepage = pkg.Homepage
-	lib.Author = extractAuthorName(pkg.Author)
+	if name, ok := pkg.Author.(string); ok {
+		lib.Author = name
+	} else if obj, ok := pkg.Author.(map[string]interface{}); ok {
+		if n, ok := obj["name"].(string); ok {
+			lib.Author = n
+		}
+	}
 	lib.License = pkg.License
 
 	// Handle repository field — can be string or object with "url" property
-	lib.Repository = extractRepositoryURL(pkg.Repository)
+	if url, ok := pkg.Repository.(string); ok {
+		lib.Repository = url
+	} else if obj, ok := pkg.Repository.(map[string]interface{}); ok {
+		if u, ok := obj["url"].(string); ok {
+			lib.Repository = u
+		}
+	}
 
 	return nil
-}
-
-// extractRepositoryURL handles both string and object repository formats
-func extractRepositoryURL(repo interface{}) string {
-	switch v := repo.(type) {
-	case string:
-		return v
-	case map[string]interface{}:
-		if url, ok := v["url"].(string); ok {
-			return url
-		}
-	}
-	return ""
-}
-
-// extractAuthorName handles both string and object author formats.
-func extractAuthorName(author interface{}) string {
-	switch v := author.(type) {
-	case string:
-		return v
-	case map[string]interface{}:
-		if name, ok := v["name"].(string); ok {
-			return name
-		}
-	}
-	return ""
 }
 
 // Install installs a package using npm install
