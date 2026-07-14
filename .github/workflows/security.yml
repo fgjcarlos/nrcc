@@ -79,12 +79,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-        with:
-          driver: docker
       - name: Build image for scanning
-        run: docker buildx bake --load --set 'release.output=type=docker,name=nrcc-scan' release
+        # Build directly with `docker build` (no bake) so the result is
+        # guaranteed to be in the host daemon for the trivy scan. The
+        # shared base stages from Dockerfile.base are not used here because
+        # Trivy only needs the final image and we want this step to stay
+        # standalone. The release workflow still uses bake with the
+        # shared base for multi-arch publishing.
+        run: docker build -t nrcc:scan .
 
       # Non-blocking: base image (nodered/node-red) carries upstream CVEs
       # outside our control. Results are uploaded to GitHub Security tab.
