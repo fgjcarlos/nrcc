@@ -291,25 +291,25 @@ func renderSettingsJS(cfg model.NodeRedConfig) string {
 func generateSettingsJS(cfg model.NodeRedConfig) string {
 	var builder strings.Builder
 	builder.WriteString("module.exports = {\n")
-	builder.WriteString(fmt.Sprintf("  uiPort: %d,\n", cfg.Port))
+	fmt.Fprintf(&builder, "  uiPort: %d,\n", cfg.Port)
 	if cfg.UIHost != "" {
-		builder.WriteString(fmt.Sprintf("  uiHost: %q,\n", cfg.UIHost))
+		fmt.Fprintf(&builder, "  uiHost: %q,\n", cfg.UIHost)
 	}
-	builder.WriteString(fmt.Sprintf("  httpAdminRoot: %q,\n", cfg.HTTPAdminRoot))
-	builder.WriteString(fmt.Sprintf("  httpNodeRoot: %q,\n", cfg.HTTPNodeRoot))
+	fmt.Fprintf(&builder, "  httpAdminRoot: %q,\n", cfg.HTTPAdminRoot)
+	fmt.Fprintf(&builder, "  httpNodeRoot: %q,\n", cfg.HTTPNodeRoot)
 	if cfg.FlowFile != "" {
-		builder.WriteString(fmt.Sprintf("  flowFile: %q,\n", cfg.FlowFile))
+		fmt.Fprintf(&builder, "  flowFile: %q,\n", cfg.FlowFile)
 	}
 	if cfg.UserDir != "" {
-		builder.WriteString(fmt.Sprintf("  userDir: %q,\n", cfg.UserDir))
+		fmt.Fprintf(&builder, "  userDir: %q,\n", cfg.UserDir)
 	}
 	if cfg.NodesDir != "" {
-		builder.WriteString(fmt.Sprintf("  nodesDir: %q,\n", cfg.NodesDir))
+		fmt.Fprintf(&builder, "  nodesDir: %q,\n", cfg.NodesDir)
 	}
-	builder.WriteString(fmt.Sprintf("  disableEditor: %t,\n", cfg.DisableEditor))
-	builder.WriteString(fmt.Sprintf("  projectsEnabled: %t,\n", cfg.ProjectsEnabled))
+	fmt.Fprintf(&builder, "  disableEditor: %t,\n", cfg.DisableEditor)
+	fmt.Fprintf(&builder, "  projectsEnabled: %t,\n", cfg.ProjectsEnabled)
 	if cfg.Lang != "" {
-		builder.WriteString(fmt.Sprintf("  lang: %q,\n", cfg.Lang))
+		fmt.Fprintf(&builder, "  lang: %q,\n", cfg.Lang)
 	}
 	if block := renderEnvBlock(cfg); block != "" {
 		builder.WriteString(block)
@@ -318,18 +318,18 @@ func generateSettingsJS(cfg model.NodeRedConfig) string {
 	if cfg.AdminAuth != nil && len(cfg.AdminAuth.Users) > 0 {
 		user := cfg.AdminAuth.Users[0]
 		builder.WriteString("  adminAuth: {\n")
-		builder.WriteString(fmt.Sprintf("    type: %q,\n", cfg.AdminAuth.Type))
+		fmt.Fprintf(&builder, "    type: %q,\n", cfg.AdminAuth.Type)
 		builder.WriteString("    users: [{\n")
-		builder.WriteString(fmt.Sprintf("      username: %q,\n", user.Username))
-		builder.WriteString(fmt.Sprintf("      password: %q,\n", user.Password))
-		builder.WriteString(fmt.Sprintf("      permissions: %q,\n", user.Permissions))
+		fmt.Fprintf(&builder, "      username: %q,\n", user.Username)
+		fmt.Fprintf(&builder, "      password: %q,\n", user.Password)
+		fmt.Fprintf(&builder, "      permissions: %q,\n", user.Permissions)
 		builder.WriteString("    }],\n")
 		builder.WriteString("  },\n")
 	} else {
 		builder.WriteString("  adminAuth: null,\n")
 	}
 	builder.WriteString("  editorTheme: {\n")
-	builder.WriteString(fmt.Sprintf("    projects: { enabled: %t },\n", cfg.ProjectsEnabled))
+	fmt.Fprintf(&builder, "    projects: { enabled: %t },\n", cfg.ProjectsEnabled)
 	builder.WriteString("  },\n")
 	builder.WriteString("  logging: {\n")
 	builder.WriteString("    console: { level: 'info', metrics: false, audit: false },\n")
@@ -475,9 +475,9 @@ func renderEnvBlock(cfg model.NodeRedConfig) string {
 	builder.WriteString("  env: [\n")
 	for i, envVar := range vars {
 		builder.WriteString("    {\n")
-		builder.WriteString(fmt.Sprintf("      name: %q,\n", envVar.Key))
-		builder.WriteString(fmt.Sprintf("      value: %q,\n", envVar.Value))
-		builder.WriteString(fmt.Sprintf("      type: %q\n", envVar.Type))
+		fmt.Fprintf(&builder, "      name: %q,\n", envVar.Key)
+		fmt.Fprintf(&builder, "      value: %q,\n", envVar.Value)
+		fmt.Fprintf(&builder, "      type: %q\n", envVar.Type)
 		if i == len(vars)-1 {
 			builder.WriteString("    }\n")
 		} else {
@@ -497,11 +497,11 @@ func renderAdminAuthBlock(cfg model.NodeRedConfig) string {
 	var builder strings.Builder
 	builder.WriteString("  adminAuth: {\n")
 	user := cfg.AdminAuth.Users[0]
-	builder.WriteString(fmt.Sprintf("    type: %q,\n", cfg.AdminAuth.Type))
+	fmt.Fprintf(&builder, "    type: %q,\n", cfg.AdminAuth.Type)
 	builder.WriteString("    users: [{\n")
-	builder.WriteString(fmt.Sprintf("      username: %q,\n", user.Username))
-	builder.WriteString(fmt.Sprintf("      password: %q,\n", user.Password))
-	builder.WriteString(fmt.Sprintf("      permissions: %q,\n", user.Permissions))
+	fmt.Fprintf(&builder, "      username: %q,\n", user.Username)
+	fmt.Fprintf(&builder, "      password: %q,\n", user.Password)
+	fmt.Fprintf(&builder, "      permissions: %q,\n", user.Permissions)
 	builder.WriteString("    }],\n")
 	builder.WriteString("  },")
 	return builder.String()
@@ -511,7 +511,7 @@ func renderAdminAuthBlock(cfg model.NodeRedConfig) string {
 func renderEditorThemeBlock(cfg model.NodeRedConfig) string {
 	var builder strings.Builder
 	builder.WriteString("  editorTheme: {\n")
-	builder.WriteString(fmt.Sprintf("    projects: { enabled: %t },\n", cfg.ProjectsEnabled))
+	fmt.Fprintf(&builder, "    projects: { enabled: %t },\n", cfg.ProjectsEnabled)
 	builder.WriteString("  },")
 	return builder.String()
 }

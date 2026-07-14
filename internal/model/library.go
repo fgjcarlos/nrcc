@@ -17,7 +17,8 @@ type LibraryInfo struct {
 }
 
 // UpdateStatus represents the update status for Node-RED
-// Deprecated: Use model.UpdateCacheEntry instead (internal/model/update.go).
+// Deprecated: Use model.UpdateCacheEntry instead;
+// see internal/model/update.go.
 // This type is retained for backward compatibility with internal APIs.
 type UpdateStatus struct {
 	CurrentVersion  string `json:"currentVersion"`
