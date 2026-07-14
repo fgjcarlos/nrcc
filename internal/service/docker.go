@@ -40,10 +40,17 @@ func NewDockerService() *DockerService {
 	}
 }
 
-// WithLookPath overrides the binary-lookup function. It exists for
-// tests (which inject a stub) and for future integrations that need
-// a custom binary location. nil is a no-op so callers can chain it
-// without nil-checking.
+// WithLookPath overrides the binary-lookup function used to check that
+// the `docker` binary is available on the host.
+//
+// This helper is kept ONLY for the docker binary because its install
+// path is configurable in practice (system docker on /usr/bin/docker,
+// docker-desktop on /usr/local/bin/docker, custom installs under
+// /opt/docker/bin/docker). For systemd binaries (systemctl,
+// journalctl) and pgrep the well-known paths are used directly so
+// tests do not have to mock a lookup helper.
+//
+// nil is a no-op so callers can chain it without nil-checking.
 func (d *DockerService) WithLookPath(fn func(name string) (string, error)) *DockerService {
 	if d == nil || fn == nil {
 		return d
