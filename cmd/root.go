@@ -152,7 +152,6 @@ func printError(err error) error {
 	return nil
 }
 
-// getServices returns the initialized services (for use by subcommands)
-func getServices() *cliServices {
-	return svc
-}
+// getServices was previously exported as a helper for subcommands but
+// became unused when the cobra-style wiring moved into per-command
+// closures. Deleted in #396.

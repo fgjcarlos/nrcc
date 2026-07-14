@@ -18,7 +18,7 @@ func panicHandler(panicVal interface{}) http.HandlerFunc {
 // okHandler is a healthy handler that responds 200.
 func okHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("ok"))
+	_, _ = w.Write([]byte("ok"))
 }
 
 // TestRecoverer_PanickingHandler_Returns500 checks that a panicking handler
@@ -63,7 +63,7 @@ func TestRecoverer_ServerSurvivesPanic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first request failed: %v", err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if resp.StatusCode != http.StatusInternalServerError {
 		t.Errorf("panic request: status = %d, want %d", resp.StatusCode, http.StatusInternalServerError)
 	}
@@ -73,7 +73,7 @@ func TestRecoverer_ServerSurvivesPanic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("second request failed: %v", err)
 	}
-	resp2.Body.Close()
+	_ = resp2.Body.Close()
 	if resp2.StatusCode != http.StatusOK {
 		t.Errorf("healthy request after panic: status = %d, want %d", resp2.StatusCode, http.StatusOK)
 	}

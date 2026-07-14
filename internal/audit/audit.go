@@ -107,7 +107,7 @@ func (s *Service) openLog() error {
 	}
 	info, err := f.Stat()
 	if err != nil {
-		f.Close()
+		_ = f.Close()
 		return err
 	}
 	s.file = f
@@ -117,18 +117,24 @@ func (s *Service) openLog() error {
 
 func (s *Service) rotate() {
 	if s.file != nil {
-		s.file.Close()
+		_ = s.file.Close()
 		s.file = nil
 	}
 
 	current := filepath.Join(s.dir, fileName)
 	rotated := filepath.Join(s.dir, fmt.Sprintf("audit-%s.jsonl", time.Now().UTC().Format("20060102-150405")))
-	os.Rename(current, rotated)
+	if err := os.Rename(current, rotated); err != nil {
+		// best-effort rotation; audit appends reopen on next write
+		_ = err
+	}
 
 	s.pruneOld()
 
 	s.size = 0
-	s.openLog()
+	if err := s.openLog(); err != nil {
+		// rotation failure surfaces on next append; do not crash
+		_ = err
+	}
 }
 
 func (s *Service) pruneOld() {
@@ -151,7 +157,7 @@ func (s *Service) pruneOld() {
 
 	sort.Strings(rotated)
 	for _, name := range rotated[:len(rotated)-maxBackups] {
-		os.Remove(filepath.Join(s.dir, name))
+		_ = os.Remove(filepath.Join(s.dir, name))
 	}
 }
 

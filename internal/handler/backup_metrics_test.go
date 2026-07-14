@@ -2,7 +2,6 @@ package handler
 
 import (
 	"bytes"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -194,24 +193,5 @@ func newNoopAudit(t *testing.T) *audit.Service {
 	return svc
 }
 
-func setupBackupHandlerWithAudit(t *testing.T) (*BackupHandler, *stubBackupMetrics) {
-	t.Helper()
-	tempDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(tempDir, "flows.json"), []byte(`[{"id":"1"}]`), 0644); err != nil {
-		t.Fatalf("WriteFile: %v", err)
-	}
-	svc := service.NewBackupService(tempDir)
-	h := NewBackupHandler(svc)
-	stub := &stubBackupMetrics{}
-	h.SetBackupMetrics(stub)
-	return h, stub
-}
-
-func mustMarshal(t *testing.T, v interface{}) []byte {
-	t.Helper()
-	b, err := json.Marshal(v)
-	if err != nil {
-		t.Fatalf("json.Marshal: %v", err)
-	}
-	return b
-}
+// setupBackupHandlerWithAudit and mustMarshal were scaffolding helpers
+// that ended up unused after the audit metrics rewrite. Deleted in #396.

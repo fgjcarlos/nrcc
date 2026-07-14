@@ -190,5 +190,5 @@ func RespondTooManyRequests(w http.ResponseWriter, retryAfter time.Duration) {
 	w.Header().Set("Retry-After", fmt.Sprintf("%d", int(retryAfter.Seconds())))
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusTooManyRequests)
-	w.Write([]byte(`{"success":false,"error":{"code":"RATE_LIMITED","message":"Too many attempts. Please try again later."}}`))
+	_, _ = w.Write([]byte(`{"success":false,"error":{"code":"RATE_LIMITED","message":"Too many attempts. Please try again later."}}`))
 }

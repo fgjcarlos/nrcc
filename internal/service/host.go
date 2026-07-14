@@ -488,8 +488,8 @@ func isWritableDir(dir string) bool {
 	if err != nil {
 		return false
 	}
-	file.Close()
-	os.Remove(testFile)
+	_ = file.Close()
+	_ = os.Remove(testFile)
 	return true
 }
 
@@ -628,7 +628,7 @@ func (s *HostService) installNodeJS() error {
 		if !status.NPM.Installed {
 			missing = append(missing, "npm")
 		}
-		return fmt.Errorf("Node.js/npm installation appeared to succeed but verification failed; missing: %s", strings.Join(missing, ", "))
+		return fmt.Errorf("node.js/npm installation appeared to succeed but verification failed; missing: %s", strings.Join(missing, ", "))
 	}
 	ui.Info(fmt.Sprintf("✓ Node.js %s and npm %s installed successfully", status.NodeJS.Version, status.NPM.Version))
 	return nil
@@ -682,7 +682,7 @@ func (s *HostService) installDocker() error {
 
 	status := s.Detect()
 	if !status.Docker.Installed {
-		return fmt.Errorf("Docker installation appeared to succeed but verification failed")
+		return fmt.Errorf("docker installation appeared to succeed but verification failed")
 	}
 	if err := s.ensureDockerDaemon(status.Docker.Command); err != nil {
 		return err
@@ -700,7 +700,7 @@ func (s *HostService) ensureDockerAvailable() error {
 		status = s.Detect()
 	}
 	if !status.Docker.Installed {
-		return fmt.Errorf("Docker is required for Docker-based installation")
+		return fmt.Errorf("docker is required for Docker-based installation")
 	}
 	return s.ensureDockerDaemon(status.Docker.Command)
 }
@@ -718,7 +718,7 @@ func (s *HostService) ensureDockerDaemon(dockerCmd string) error {
 				return nil
 			}
 		}
-		return fmt.Errorf("Docker is installed but the daemon is not reachable; start Docker and retry: %w", err)
+		return fmt.Errorf("docker is installed but the daemon is not reachable; start Docker and retry: %w", err)
 	}
 	return nil
 }
@@ -790,7 +790,7 @@ func (s *HostService) InstallPortless() error {
 
 	status := s.Detect()
 	if !status.Portless.Installed {
-		return fmt.Errorf("Portless installation appeared to succeed but verification failed")
+		return fmt.Errorf("portless installation appeared to succeed but verification failed")
 	}
 	ui.Info(fmt.Sprintf("✓ Portless %s instalado correctamente", status.Portless.Version))
 	return nil
@@ -803,7 +803,7 @@ func (s *HostService) ExposePortlessAlias(name string, port int, force bool) err
 	}
 	status := s.Detect()
 	if !status.Portless.Installed {
-		return fmt.Errorf("Portless is not installed. Run: nrcc portless install")
+		return fmt.Errorf("portless is not installed. Run: nrcc portless install")
 	}
 
 	args := []string{"alias", name, strconv.Itoa(port)}
@@ -983,7 +983,7 @@ func canReachTCP(address string) bool {
 func (s *HostService) QuickSetupPortless(force bool) error {
 	status := s.Detect()
 	if !status.Portless.Installed {
-		return fmt.Errorf("Portless is not installed. Run: nrcc portless install")
+		return fmt.Errorf("portless is not installed. Run: nrcc portless install")
 	}
 
 	aliases, err := s.ReadPortlessAliases()
@@ -1023,7 +1023,7 @@ func (s *HostService) QuickSetupPortless(force bool) error {
 func (s *HostService) StartPortlessProxy() error {
 	status := s.Detect()
 	if !status.Portless.Installed {
-		return fmt.Errorf("Portless is not installed. Run: nrcc portless install")
+		return fmt.Errorf("portless is not installed. Run: nrcc portless install")
 	}
 
 	cmd := execCommand(status.Portless.Command, "proxy", "start")
@@ -1037,7 +1037,7 @@ func (s *HostService) StartPortlessProxy() error {
 func (s *HostService) SetupPortlessTrust() error {
 	status := s.Detect()
 	if !status.Portless.Installed {
-		return fmt.Errorf("Portless is not installed. Run: nrcc portless install")
+		return fmt.Errorf("portless is not installed. Run: nrcc portless install")
 	}
 
 	cmd := execCommand(status.Portless.Command, "trust")
@@ -1079,7 +1079,7 @@ func (s *HostService) UninstallPortless(cleanAliases bool) error {
 	// Verify uninstallation
 	newStatus := s.Detect()
 	if newStatus.Portless.Installed {
-		return fmt.Errorf("Portless uninstallation appeared to succeed but verification failed")
+		return fmt.Errorf("portless uninstallation appeared to succeed but verification failed")
 	}
 
 	// Clean up aliases directory if requested
@@ -1224,8 +1224,8 @@ func npmGlobalPrefixWritable(npmPath string) bool {
 	if err != nil {
 		return false
 	}
-	file.Close()
-	os.Remove(testFile)
+	_ = file.Close()
+	_ = os.Remove(testFile)
 	return true
 }
 
@@ -1289,7 +1289,7 @@ func (s *HostService) installNodeRedDocker() (err error) {
 	defer func() {
 		if dirCreated && err != nil {
 			ui.Info(fmt.Sprintf("[nrcc] cleaning up newly created directory: %s", targetDir))
-			os.RemoveAll(targetDir)
+			_ = os.RemoveAll(targetDir)
 		}
 	}()
 
@@ -1320,7 +1320,7 @@ func (s *HostService) installNodeRedDocker() (err error) {
 	); runErr != nil {
 		// Attempt cleanup of partially created container
 		ui.Info("[nrcc] docker run failed, attempting cleanup of partial container")
-		execCommand("docker", "rm", "-f", "nrcc-node-red").Run()
+		_ = execCommand("docker", "rm", "-f", "nrcc-node-red").Run()
 		err = fmt.Errorf("failed to run Docker container: %w", runErr)
 		return
 	}
@@ -1328,7 +1328,7 @@ func (s *HostService) installNodeRedDocker() (err error) {
 	// Verify installation
 	status := s.Detect()
 	if !status.Docker.Installed || !status.NodeRed.Detected {
-		err = fmt.Errorf("Docker Node-RED installation appeared to succeed but verification failed")
+		err = fmt.Errorf("docker Node-RED installation appeared to succeed but verification failed")
 		return
 	}
 	ui.Info("✓ Node-RED Docker container instalado y corriendo correctamente")

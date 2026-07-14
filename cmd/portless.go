@@ -61,7 +61,7 @@ var portlessInstallCmd = &cobra.Command{
 
 		if !isJSONMode(cmd) {
 			spinner := ui.StartSpinner("Instalando Portless...")
-			defer spinner.Stop()
+			defer func() { _ = spinner.Stop() }()
 			if err := svc.Host.InstallPortless(); err != nil {
 				spinner.Fail(fmt.Sprintf("Error: %v", err))
 				return err
@@ -157,7 +157,7 @@ Despues de registrar el alias, Portless enruta https://<name>.localhost al puert
 
 		if !isJSONMode(cmd) {
 			spinner := ui.StartSpinner("Registrando alias Portless...")
-			defer spinner.Stop()
+			defer func() { _ = spinner.Stop() }()
 			if err := svc.Host.ExposePortlessAlias(name, portlessExposePort, portlessExposeForce); err != nil {
 				spinner.Fail(fmt.Sprintf("Error: %v", err))
 				return err
@@ -190,7 +190,7 @@ https://*.localhost respondan.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		status := svc.Host.Detect()
 		if !status.Portless.Installed {
-			err := fmt.Errorf("Portless is not installed. Run: nrcc portless install")
+			err := fmt.Errorf("portless is not installed. Run: nrcc portless install")
 			if isJSONMode(cmd) {
 				return printError(err)
 			}
@@ -199,7 +199,7 @@ https://*.localhost respondan.`,
 
 		if !isJSONMode(cmd) {
 			spinner := ui.StartSpinner("Registrando aliases Portless...")
-			defer spinner.Stop()
+			defer func() { _ = spinner.Stop() }()
 			if err := svc.Host.QuickSetupPortless(portlessForce); err != nil {
 				spinner.Fail(fmt.Sprintf("Error: %v", err))
 				return err
@@ -258,7 +258,7 @@ var portlessUninstallCmd = &cobra.Command{
 
 		if !isJSONMode(cmd) {
 			spinner := ui.StartSpinner("Desinstalando Portless...")
-			defer spinner.Stop()
+			defer func() { _ = spinner.Stop() }()
 			if err := svc.Host.UninstallPortless(cleanAliases); err != nil {
 				spinner.Fail(fmt.Sprintf("Error: %v", err))
 				return err
@@ -284,7 +284,7 @@ var portlessSetupTrustCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		status := svc.Host.Detect()
 		if !status.Portless.Installed {
-			err := fmt.Errorf("Portless is not installed. Run: nrcc portless install")
+			err := fmt.Errorf("portless is not installed. Run: nrcc portless install")
 			if isJSONMode(cmd) {
 				return printError(err)
 			}

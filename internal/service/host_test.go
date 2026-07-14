@@ -413,7 +413,7 @@ func TestCanWrite_WithReadOnlyDir(t *testing.T) {
 	if err := os.Chmod(roDir, 0444); err != nil {
 		t.Fatalf("Failed to chmod: %v", err)
 	}
-	defer os.Chmod(roDir, 0755) // Restore for cleanup
+	defer func() { _ = os.Chmod(roDir, 0755) }() // Restore for cleanup
 
 	testPath := filepath.Join(roDir, "test.txt")
 	result := canWrite(testPath)
@@ -430,7 +430,7 @@ func TestLatestBackupFile_EmptyDir(t *testing.T) {
 
 	// Should return error or empty string when no files
 	if path != "" && err == nil {
-		// Either empty path or error is acceptable
+		t.Errorf("expected empty path or error for empty dir, got path=%q err=%v", path, err)
 	}
 }
 
@@ -1154,7 +1154,7 @@ func TestCheckPortlessAliasReachability(t *testing.T) {
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}
-	defer listener.Close()
+	defer func() { _ = listener.Close() }()
 
 	listeningPort := listener.Addr().(*net.TCPAddr).Port
 	unreachablePort := reserveClosedPort(t)

@@ -16,15 +16,14 @@ func TestLog_WritesJSONLEvent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewService: %v", err)
 	}
-	defer svc.Close()
+	defer func() { _ = svc.Close() }()
 
 	req := httptest.NewRequest("POST", "/api/auth/login", nil)
 	req.RemoteAddr = "192.168.1.10:12345"
 	req.Header.Set("User-Agent", "TestAgent/1.0")
 
 	svc.Log(req, "admin", "LOGIN", "", "ok", map[string]string{"method": "password"})
-
-	svc.Close()
+	_ = svc.Close()
 
 	data, err := os.ReadFile(filepath.Join(svc.dir, fileName))
 	if err != nil {
@@ -58,7 +57,7 @@ func TestLog_NilServiceIsNoop(t *testing.T) {
 
 func TestLog_MultipleEvents(t *testing.T) {
 	svc, _ := NewService(t.TempDir())
-	defer svc.Close()
+	defer func() { _ = svc.Close() }()
 
 	req := httptest.NewRequest("POST", "/test", nil)
 
@@ -66,10 +65,10 @@ func TestLog_MultipleEvents(t *testing.T) {
 		svc.Log(req, "user", fmt.Sprintf("ACTION_%d", i), "", "ok", nil)
 	}
 
-	svc.Close()
+	_ = svc.Close()
 
 	f, _ := os.Open(filepath.Join(svc.dir, fileName))
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	scanner := bufio.NewScanner(f)
 	count := 0
@@ -84,7 +83,7 @@ func TestLog_MultipleEvents(t *testing.T) {
 func TestLog_Rotation(t *testing.T) {
 	dir := t.TempDir()
 	svc, _ := NewService(dir)
-	defer svc.Close()
+	defer func() { _ = svc.Close() }()
 
 	req := httptest.NewRequest("POST", "/test", nil)
 	bigMeta := map[string]string{"data": strings.Repeat("x", 1024)}
@@ -93,7 +92,7 @@ func TestLog_Rotation(t *testing.T) {
 		svc.Log(req, "user", "BULK", "", "ok", bigMeta)
 	}
 
-	svc.Close()
+	_ = svc.Close()
 
 	entries, _ := os.ReadDir(filepath.Join(dir, "audit"))
 	jsonlCount := 0
@@ -111,7 +110,7 @@ func TestLog_Rotation(t *testing.T) {
 func TestLog_FilePermissions(t *testing.T) {
 	dir := t.TempDir()
 	svc, _ := NewService(dir)
-	defer svc.Close()
+	defer func() { _ = svc.Close() }()
 
 	req := httptest.NewRequest("POST", "/test", nil)
 	svc.Log(req, "user", "TEST", "", "ok", nil)
@@ -143,17 +142,17 @@ func TestLog_AuditDirPermissions(t *testing.T) {
 
 func TestLog_XForwardedFor(t *testing.T) {
 	svc, _ := NewService(t.TempDir())
-	defer svc.Close()
+	defer func() { _ = svc.Close() }()
 
 	req := httptest.NewRequest("POST", "/test", nil)
 	req.Header.Set("X-Forwarded-For", "10.0.0.1, 172.16.0.1")
 
 	svc.Log(req, "user", "TEST", "", "ok", nil)
-	svc.Close()
+	_ = svc.Close()
 
 	data, _ := os.ReadFile(filepath.Join(svc.dir, fileName))
 	var event Event
-	json.Unmarshal(data, &event)
+	_ = json.Unmarshal(data, &event)
 
 	if event.IP != "10.0.0.1" {
 		t.Errorf("IP = %q, want %q (first in X-Forwarded-For)", event.IP, "10.0.0.1")
@@ -162,14 +161,14 @@ func TestLog_XForwardedFor(t *testing.T) {
 
 func TestLog_SecretsNeverLogged(t *testing.T) {
 	svc, _ := NewService(t.TempDir())
-	defer svc.Close()
+	defer func() { _ = svc.Close() }()
 
 	req := httptest.NewRequest("POST", "/test", nil)
 	svc.Log(req, "admin", "ENV_SET", "DB_PASS", "ok", map[string]string{
 		"key":  "DB_PASS",
 		"type": "secret",
 	})
-	svc.Close()
+	_ = svc.Close()
 
 	data, _ := os.ReadFile(filepath.Join(svc.dir, fileName))
 	raw := string(data)

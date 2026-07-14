@@ -159,7 +159,7 @@ func (s *AIService) AssistFlow(ctx context.Context, req AIFlowRequest) (AIFlowRe
 	if err != nil {
 		return AIFlowResponse{}, err
 	}
-	defer httpResp.Body.Close()
+	defer func() { _ = httpResp.Body.Close() }()
 	payload, _ := io.ReadAll(io.LimitReader(httpResp.Body, 1<<20))
 	if httpResp.StatusCode < 200 || httpResp.StatusCode >= 300 {
 		return AIFlowResponse{}, fmt.Errorf("AI provider returned %s", httpResp.Status)

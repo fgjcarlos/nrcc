@@ -74,7 +74,12 @@ func printStatusHuman(status model.InstallStatus) error {
 
 	pterm.Println()
 
-	// Recommendations
+	// Recommendations. The first branch combines ServiceState and
+	// DataDirExists so it cannot be a plain tagged switch on
+	// ServiceState; the linter's ifElseChain hint does not apply
+	// cleanly. Keeping the if-else chain is clearer than a switch
+	// with a guard clause here.
+	//nolint:gocritic
 	if status.ServiceState == "active" && status.DataDirExists {
 		pterm.Success.Println("✓ nrcc is properly installed and running")
 		pterm.Printfln("  🌐 Access at: http://localhost:3001")

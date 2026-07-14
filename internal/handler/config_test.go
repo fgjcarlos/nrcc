@@ -233,7 +233,7 @@ func TestSaveConfigAdminAuthPreservePassword(t *testing.T) {
 			},
 		},
 	}
-	configSvc.Save(initialCfg)
+	_ = configSvc.Save(initialCfg)
 
 	// Now update with empty password (frontend sends empty to mean "don't change")
 	handler := NewConfigHandler(configSvc)

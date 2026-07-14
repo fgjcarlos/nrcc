@@ -69,7 +69,7 @@ func readCPUStat() (cpuStat, error) {
 	if err != nil {
 		return cpuStat{}, fmt.Errorf("open /proc/stat: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {

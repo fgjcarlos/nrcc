@@ -86,7 +86,7 @@ func TestBootstrapHandler_GetStatus_AllFieldsAccessible(t *testing.T) {
 	handler.GetStatus(w, req)
 
 	var status model.HostStatus
-	json.Unmarshal(w.Body.Bytes(), &status)
+	_ = json.Unmarshal(w.Body.Bytes(), &status)
 
 	// Verify all top-level fields are present and accessible
 	_ = status.Platform
@@ -125,7 +125,7 @@ func TestBootstrapHandler_GetStatus_MultipleRequests_Consistent(t *testing.T) {
 	handler.GetStatus(w1, req1)
 
 	var status1 model.HostStatus
-	json.Unmarshal(w1.Body.Bytes(), &status1)
+	_ = json.Unmarshal(w1.Body.Bytes(), &status1)
 
 	// Second request
 	req2 := httptest.NewRequest("GET", "/api/bootstrap/status", nil)
@@ -133,7 +133,7 @@ func TestBootstrapHandler_GetStatus_MultipleRequests_Consistent(t *testing.T) {
 	handler.GetStatus(w2, req2)
 
 	var status2 model.HostStatus
-	json.Unmarshal(w2.Body.Bytes(), &status2)
+	_ = json.Unmarshal(w2.Body.Bytes(), &status2)
 
 	// Platform should be same in both
 	if status1.Platform != status2.Platform {

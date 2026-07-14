@@ -138,9 +138,9 @@ jobs:
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.12.2
-          # Ratchet: only gate code changed in this PR; ~74 pre-existing issues
-          # are grandfathered. Remove once the backlog is burned down.
-          only-new-issues: true
+          # Repo-wide gate, not a ratchet: the prior ~72 findings were cleaned
+          # up in #396. Keep CI exit 0 = green.
+          only-new-issues: false
 
   scripts:
     name: Install script

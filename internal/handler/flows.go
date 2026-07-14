@@ -70,7 +70,7 @@ func (h *FlowHandler) ExportFlows(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Content-Disposition", "attachment; filename=\"flows.json\"")
 	w.WriteHeader(http.StatusOK)
-	w.Write(flowsData)
+	_, _ = w.Write(flowsData)
 }
 
 // GetVersions lists flow versions

@@ -641,7 +641,7 @@ func TestPostSchedulerConfigMultiplePresets(t *testing.T) {
 		}
 
 		var response model.ApiResponse[model.SchedulerConfigResponse]
-		json.Unmarshal(w.Body.Bytes(), &response)
+		_ = json.Unmarshal(w.Body.Bytes(), &response)
 		if response.Data.Cron != tc.cron {
 			t.Fatalf("test %s: expected cron %s, got %s", tc.name, tc.cron, response.Data.Cron)
 		}
@@ -675,7 +675,7 @@ func TestGetSchedulerHistoryPaginationSecondPage(t *testing.T) {
 	}
 
 	var response model.ApiResponse[model.PaginatedSchedulerHistory]
-	json.Unmarshal(w.Body.Bytes(), &response)
+	_ = json.Unmarshal(w.Body.Bytes(), &response)
 	result := response.Data
 
 	if result.Page != 2 {
@@ -713,7 +713,7 @@ func TestPatchStorageRetentionMinDays(t *testing.T) {
 	}
 
 	var response model.ApiResponse[model.RetentionConfigResponse]
-	json.Unmarshal(w.Body.Bytes(), &response)
+	_ = json.Unmarshal(w.Body.Bytes(), &response)
 	if response.Data.RetentionDays != 1 {
 		t.Fatalf("expected retentionDays=1, got %d", response.Data.RetentionDays)
 	}
@@ -781,7 +781,7 @@ func TestSchedulerConfigAndHistoryIntegration(t *testing.T) {
 	}
 
 	var response model.ApiResponse[model.PaginatedSchedulerHistory]
-	json.Unmarshal(w.Body.Bytes(), &response)
+	_ = json.Unmarshal(w.Body.Bytes(), &response)
 	result := response.Data
 
 	if result.Total != 1 {
@@ -828,7 +828,7 @@ func TestRetentionUpdateAndPersistence(t *testing.T) {
 	}
 
 	var response model.ApiResponse[model.BackupConfig]
-	json.Unmarshal(w.Body.Bytes(), &response)
+	_ = json.Unmarshal(w.Body.Bytes(), &response)
 	cfg := response.Data
 
 	if cfg.RetentionManual != 60 {

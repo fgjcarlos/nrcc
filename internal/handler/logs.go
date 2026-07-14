@@ -54,17 +54,17 @@ func (h *LogHandler) StreamLogs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send buffered count event
-	fmt.Fprintf(w, "event: connected\n")
+	_, _ = fmt.Fprintf(w, "event: connected\n")
 	data := map[string]int{"bufferedCount": h.logBuffer.Count()}
 	if buf, err := json.Marshal(data); err == nil {
-		fmt.Fprintf(w, "data: %s\n\n", string(buf))
+		_, _ = fmt.Fprintf(w, "data: %s\n\n", string(buf))
 	}
 
 	// Send recent entries
 	recentEntries := h.logBuffer.Recent(replay)
 	for _, entry := range recentEntries {
 		if buf, err := json.Marshal(entry); err == nil {
-			fmt.Fprintf(w, "event: log\ndata: %s\n\n", string(buf))
+			_, _ = fmt.Fprintf(w, "event: log\ndata: %s\n\n", string(buf))
 		}
 	}
 
@@ -88,7 +88,7 @@ func (h *LogHandler) StreamLogs(w http.ResponseWriter, r *http.Request) {
 				return // Channel closed
 			}
 			if buf, err := json.Marshal(entry); err == nil {
-				fmt.Fprintf(w, "event: log\ndata: %s\n\n", string(buf))
+				_, _ = fmt.Fprintf(w, "event: log\ndata: %s\n\n", string(buf))
 				if flusher, ok := w.(http.Flusher); ok {
 					flusher.Flush()
 				}
@@ -96,7 +96,7 @@ func (h *LogHandler) StreamLogs(w http.ResponseWriter, r *http.Request) {
 
 		case <-ticker.C:
 			// Send keepalive ping
-			fmt.Fprintf(w, ": ping\n\n")
+			_, _ = fmt.Fprintf(w, ": ping\n\n")
 			if flusher, ok := w.(http.Flusher); ok {
 				flusher.Flush()
 			}

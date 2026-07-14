@@ -26,7 +26,7 @@ func SPAHandler(fsys embed.FS) http.Handler {
 		// Try to serve the file as-is
 		f, err := sub.Open(path)
 		if err == nil {
-			f.Close()
+			_ = f.Close()
 			fileServer.ServeHTTP(w, r)
 			return
 		}

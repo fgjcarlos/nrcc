@@ -85,7 +85,7 @@ var nrStartCmd = &cobra.Command{
 		// Start Node-RED
 		if !isJSONMode(cmd) {
 			spinner := ui.StartSpinner("Iniciando Node-RED…")
-			defer spinner.Stop()
+			defer func() { _ = spinner.Stop() }()
 			err := pm.Start()
 			if err != nil {
 				spinner.Fail(fmt.Sprintf("Error al iniciar Node-RED: %v", err))
@@ -131,7 +131,7 @@ var nrStopCmd = &cobra.Command{
 		// Stop Node-RED
 		if !isJSONMode(cmd) {
 			spinner := ui.StartSpinner("Deteniendo Node-RED…")
-			defer spinner.Stop()
+			defer func() { _ = spinner.Stop() }()
 			err := pm.Stop()
 			if err != nil {
 				spinner.Fail(fmt.Sprintf("Error al detener Node-RED: %v", err))
@@ -176,8 +176,8 @@ var nrRestartCmd = &cobra.Command{
 		// Start Node-RED
 		if !isJSONMode(cmd) {
 			spinner := ui.StartSpinner("Iniciando Node-RED…")
-			defer spinner.Stop()
-			err := pm.Start()
+					defer func() { _ = spinner.Stop() }()
+					err := pm.Start()
 			if err != nil {
 				spinner.Fail(fmt.Sprintf("Error al iniciar Node-RED: %v", err))
 				return err
@@ -482,14 +482,15 @@ var nrInstallCmd = &cobra.Command{
 		// Perform installation
 		if !isJSONMode(cmd) {
 			spinner := ui.StartSpinner("Instalando Node-RED…")
-			defer spinner.Stop()
+			defer func() { _ = spinner.Stop() }()
 
 			var err error
-			if mode == "native" {
+			switch mode {
+			case "native":
 				err = svc.Host.InstallNodeRedNative()
-			} else if mode == "docker" {
-				err = fmt.Errorf("Docker mode not yet implemented")
-			} else {
+			case "docker":
+				err = fmt.Errorf("docker mode not yet implemented")
+			default:
 				err = fmt.Errorf("invalid mode: %s", mode)
 			}
 
@@ -502,11 +503,12 @@ var nrInstallCmd = &cobra.Command{
 			spinner.Success(fmt.Sprintf("Node-RED %s instalado", newStatus.NodeRedBinary.Version))
 		} else {
 			var err error
-			if mode == "native" {
+			switch mode {
+			case "native":
 				err = svc.Host.InstallNodeRedNative()
-			} else if mode == "docker" {
-				err = fmt.Errorf("Docker mode not yet implemented")
-			} else {
+			case "docker":
+				err = fmt.Errorf("docker mode not yet implemented")
+			default:
 				err = fmt.Errorf("invalid mode: %s", mode)
 			}
 
@@ -586,7 +588,7 @@ var nrUninstallCmd = &cobra.Command{
 		// Uninstall
 		if !isJSONMode(cmd) {
 			spinner := ui.StartSpinner("Desinstalando Node-RED…")
-			defer spinner.Stop()
+			defer func() { _ = spinner.Stop() }()
 			err := svc.Host.UninstallNodeRedNative()
 			if err != nil {
 				spinner.Fail(fmt.Sprintf("Error: %v", err))
@@ -616,7 +618,7 @@ var nrUpdateCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if !isJSONMode(cmd) {
 			spinner := ui.StartSpinner("Actualizando Node-RED…")
-			defer spinner.Stop()
+			defer func() { _ = spinner.Stop() }()
 			oldVersion, newVersion, err := svc.Host.UpdateNodeRedNative()
 			if err != nil {
 				spinner.Fail(fmt.Sprintf("Error: %v", err))

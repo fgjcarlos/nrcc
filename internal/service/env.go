@@ -82,9 +82,10 @@ func NormalizeValue(value string, typ string) (string, error) {
 	case "boolean":
 		// Booleans must be "true" or "false"
 		lower := strings.ToLower(strings.TrimSpace(value))
-		if lower == "true" {
+		switch lower {
+		case "true":
 			return "true", nil
-		} else if lower == "false" {
+		case "false":
 			return "false", nil
 		}
 		return "", fmt.Errorf("boolean values must be 'true' or 'false'")

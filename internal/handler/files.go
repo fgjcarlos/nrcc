@@ -40,7 +40,7 @@ func (h *FilesHandler) PostUpload(w http.ResponseWriter, r *http.Request) {
 		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "No file provided")
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Validate filename (prevent path traversal)
 	filename := filepath.Base(header.Filename)
@@ -63,11 +63,11 @@ func (h *FilesHandler) PostUpload(w http.ResponseWriter, r *http.Request) {
 		model.RespondError(w, http.StatusInternalServerError, "UPLOAD_ERROR", err.Error())
 		return
 	}
-	defer dst.Close()
+	defer func() { _ = dst.Close() }()
 
 	// Copy file data
 	if _, err := io.Copy(dst, file); err != nil {
-		os.Remove(uploadPath)
+		_ = os.Remove(uploadPath)
 		model.RespondError(w, http.StatusInternalServerError, "UPLOAD_ERROR", err.Error())
 		return
 	}

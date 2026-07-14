@@ -16,15 +16,6 @@ type LibraryInfo struct {
 	Date        string   `json:"date,omitempty"`
 }
 
-// UpdateStatus represents the update status for Node-RED
-// Deprecated: Use model.UpdateCacheEntry instead (internal/model/update.go).
-// This type is retained for backward compatibility with internal APIs.
-type UpdateStatus struct {
-	CurrentVersion  string `json:"currentVersion"`
-	LatestVersion   string `json:"latestVersion"`
-	UpdateAvailable bool   `json:"updateAvailable"`
-}
-
 // DockerStatus represents Docker information
 type DockerStatus struct {
 	Available bool   `json:"available"`

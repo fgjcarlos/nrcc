@@ -78,8 +78,8 @@ func TestIntegration_BackupFailureBlocks_6_2(t *testing.T) {
 
 	// Create a read-only backup store to simulate permission denied
 	readOnlyBackupPath := filepath.Join(tmpDir, "update_backups.json")
-	os.WriteFile(readOnlyBackupPath, []byte("[]"), 0444)
-	defer os.Chmod(readOnlyBackupPath, 0644) // Restore permissions for cleanup
+	_ = os.WriteFile(readOnlyBackupPath, []byte("[]"), 0444)
+	defer func() { _ = os.Chmod(readOnlyBackupPath, 0644) }() // Restore permissions for cleanup
 
 	// POST /api/updates/apply should still return 200 (async operation)
 	req := httptest.NewRequest("POST", "/api/updates/apply", nil)
@@ -455,7 +455,7 @@ func TestIntegration_BrowserRefreshRecovery(t *testing.T) {
 	handler.GetState(w1, req1)
 
 	var state1 map[string]interface{}
-	json.Unmarshal(w1.Body.Bytes(), &state1)
+	_ = json.Unmarshal(w1.Body.Bytes(), &state1)
 	t.Logf("First request: %v", state1)
 
 	// Simulate browser refresh (client disconnects and reconnects)
@@ -468,7 +468,7 @@ func TestIntegration_BrowserRefreshRecovery(t *testing.T) {
 	handler.GetState(w2, req2)
 
 	var state2 map[string]interface{}
-	json.Unmarshal(w2.Body.Bytes(), &state2)
+	_ = json.Unmarshal(w2.Body.Bytes(), &state2)
 	t.Logf("After refresh: %v", state2)
 
 	// States should match (no state lost)
@@ -553,7 +553,7 @@ func TestIntegration_PollingBehavior(t *testing.T) {
 		}
 
 		var resp map[string]interface{}
-		json.Unmarshal(w.Body.Bytes(), &resp)
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
 
 		// Small delay between polls (simulate 500ms frontend polling interval)
 		if i < 4 {
@@ -572,7 +572,7 @@ func TestIntegration_ErrorRecovery(t *testing.T) {
 
 	// Ensure cleanup by deferring removal
 	defer func() {
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir)
 	}()
 
 	// Simulate failed update
@@ -588,7 +588,7 @@ func TestIntegration_ErrorRecovery(t *testing.T) {
 	handler.GetState(w, req)
 
 	var resp map[string]interface{}
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 	data, ok := resp["data"].(map[string]interface{})
 	if ok {
 		if state, ok := data["state"].(string); ok && state == string(model.StateFailed) {
