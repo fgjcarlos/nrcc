@@ -99,7 +99,6 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 	dockerSvc := service.NewDockerService()
 	dockerHandler.SetDockerService(dockerSvc)
 	aiHandler := handler.NewAIHandler()
-	instanceHandler := handler.NewInstanceHandler(service.NewInstanceStore(dataDir))
 
 	// Initialize audit service
 	auditSvc, _ := audit.NewService(dataDir)
@@ -186,9 +185,6 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 		r.Get("/api/system/info", systemHandler.GetSystemInfo)
 		r.Get("/api/system/history", systemHandler.GetSystemHistory)
 		r.Get("/api/runtime/history", systemHandler.GetRuntimeHistory)
-
-		// Instances (read-only multi-instance slice — returns the default only)
-		r.Get("/api/instances", instanceHandler.GetInstances)
 
 		// Backup routes — reads are open to any authenticated user; all
 		// state-mutating operations require the admin role.

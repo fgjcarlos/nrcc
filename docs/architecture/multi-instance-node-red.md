@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed architecture for issue #144.
+Proposed architecture for issue #144. **Note (2026-07-14):** the first read-only slice (`Instance`, `InstanceStore`, `GET /api/instances`) shipped on `origin/main` at `5393042` was removed in PR #409 (issue #390). This document remains as the design rationale. Re-introduce the code only with a real consumer.
 
 ## Context
 

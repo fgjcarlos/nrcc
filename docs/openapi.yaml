@@ -43,8 +43,6 @@ tags:
     description: Node-RED configuration management
   - name: System
     description: Host and system information
-  - name: Instances
-    description: Managed Node-RED instances (read-only multi-instance slice)
   - name: Backups
     description: Backup creation, restore, and scheduler management
   - name: Environment
@@ -769,28 +767,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessEnvelope_SystemInfo"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-
-  /api/instances:
-    get:
-      tags: [Instances]
-      operationId: getInstances
-      summary: List managed Node-RED instances
-      description: >
-        Read-only, backwards-compatible first slice of the multi-instance model.
-        Returns the configured instances; currently only the synthesized
-        "default" instance that maps to the existing DATA_DIR. The single-instance
-        runtime is unchanged.
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Configured instances
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SuccessEnvelope_InstanceList"
         "401":
           $ref: "#/components/responses/Unauthorized"
 
@@ -2328,64 +2304,6 @@ components:
         status:
           type: string
           example: ok
-
-    Instance:
-      type: object
-      description: A managed Node-RED control boundary (see multi-instance architecture).
-      required: [id, name, kind, health, createdAt, updatedAt]
-      properties:
-        id:
-          type: string
-          description: Stable, URL-safe instance identifier.
-          example: default
-        name:
-          type: string
-          example: Default
-        kind:
-          type: string
-          enum: [local, docker, ssh, agent]
-          example: local
-        dataDir:
-          type: string
-          description: Data directory for local instances.
-          example: ./data
-        baseUrl:
-          type: string
-          description: Base URL for remote instances (read-only).
-        health:
-          type: string
-          enum: [unknown, healthy, unhealthy]
-          example: unknown
-        authContext:
-          type: string
-          description: Indirect reference to stored credentials; never an inline secret.
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-
-    InstanceList:
-      type: array
-      items:
-        $ref: "#/components/schemas/Instance"
-
-    SuccessEnvelope_InstanceList:
-      allOf:
-        - type: object
-          required: [success, data, timestamp]
-          properties:
-            success:
-              type: boolean
-              enum: [true]
-            timestamp:
-              type: string
-              format: date-time
-        - type: object
-          properties:
-            data:
-              $ref: "#/components/schemas/InstanceList"
 
     BoolSuccess:
       type: object
