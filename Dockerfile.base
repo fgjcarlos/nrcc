@@ -1,0 +1,59 @@
+# syntax=docker/dockerfile:1.7
+# ─────────────────────────────────────────────────────────────────────────────
+# Dockerfile.base — shared build stages for the nrcc images.
+#
+# This file is consumed by `docker buildx bake` (see docker-bake.hcl).
+# The `base` target builds the React frontend and the Go binary in two
+# named stages, then ends at the `go-builder` stage. Consumer Dockerfiles
+# (Dockerfile, Dockerfile.server-local) copy the binary from this image
+# via `COPY --from=base` (the bake `contexts` mechanism substitutes the
+# built image for the `base` context).
+#
+# Two Dockerfiles in the repo build the binary from source and consume
+# this base:
+#   - Dockerfile           (release + security scan)
+#   - Dockerfile.server-local (docker-compose.local.yml)
+#
+# The other two Dockerfiles do NOT extend this base:
+#   - Dockerfile.local     copies a pre-built binary (make release output)
+#   - Dockerfile.dev       is a development image with go + air + node-red;
+#                          source is mounted at runtime, nothing is built in
+#                          the image.
+# Extending this base from those two would be ceremony without a real
+# shared stage, so they stay self-contained.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Stage 1: build the React frontend ────────────────────────────────────────
+FROM node:26-slim AS frontend-builder
+
+# Pin pnpm via corepack so the build uses the exact version that
+# generated pnpm-lock.yaml. Matches the packageManager declaration in
+# frontend/package.json. node:26-slim needs npm install -g corepack
+# because corepack is not on PATH by default in slim images.
+RUN npm install -g corepack@latest && corepack enable && corepack prepare pnpm@11.12.0 --activate
+
+WORKDIR /build/frontend
+
+COPY frontend/package.json frontend/pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile --ignore-scripts
+
+COPY frontend/ ./
+RUN pnpm build
+
+# ── Stage 2: build the Go binary ─────────────────────────────────────────────
+# This is the final stage of the base; consumers `COPY --from=base` will
+# pick up the filesystem here, with the /build/nrcc binary inside.
+FROM golang:1.26-alpine AS go-builder
+
+WORKDIR /build
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy embedded frontend dist from stage 1
+COPY --from=frontend-builder /build/frontend/dist ./frontend/dist
+
+COPY . .
+
+RUN CGO_ENABLED=0 GOOS=linux \
+    go build -ldflags="-s -w" -o nrcc .

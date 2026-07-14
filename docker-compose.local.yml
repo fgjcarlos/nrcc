@@ -1,13 +1,21 @@
 # Local all-in-one build for running NRCC on a developer PC.
+#
 # Usage:
 #   docker compose -f docker-compose.local.yml up --build
 #   open http://localhost:3010 for NRCC and http://localhost:1881 for Node-RED
+#
+# The build references Dockerfile.server-local, which pulls the nrcc binary
+# from a shared base image built by `docker buildx bake base` (see
+# docker-bake.hcl). The bake action runs as an additional_context, so
+# compose reuses the base stages without a pre-baked image.
 services:
   nrcc:
-    image: nrcc-local:latest
+    image: nrcc-local:dev
     build:
       context: .
       dockerfile: Dockerfile.server-local
+      additional_contexts:
+        base: target:base
     container_name: nrcc-local
     ports:
       - "3010:3001"   # nrcc web UI + API (avoid clashing with dev server on 3001)

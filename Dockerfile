@@ -1,47 +1,11 @@
+# syntax=docker/dockerfile:1.7
 # ─────────────────────────────────────────────────────────────────────────────
-# Stage 1: Build React frontend
-# ─────────────────────────────────────────────────────────────────────────────
-FROM node:26-slim AS frontend-builder
-
-# Pin pnpm via corepack so the build uses the exact version that
-# generated pnpm-lock.yaml. Matches the packageManager declaration in
-# frontend/package.json. node:26-slim needs npm install -g corepack
-# because corepack is not on PATH by default in slim images.
-RUN npm install -g corepack@latest && corepack enable && corepack prepare pnpm@11.12.0 --activate
-
-WORKDIR /build/frontend
-
-COPY frontend/package.json frontend/pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile --ignore-scripts
-
-COPY frontend/ ./
-RUN pnpm build
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Stage 2: Build Go binary
-# Needs frontend/dist for go:embed
-# ─────────────────────────────────────────────────────────────────────────────
-FROM golang:1.26-alpine AS go-builder
-
-WORKDIR /build
-
-# Download deps first (cache layer)
-COPY go.mod go.sum ./
-RUN go mod download
-
-# Copy embedded frontend dist from stage 1
-COPY --from=frontend-builder /build/frontend/dist ./frontend/dist
-
-# Copy Go source
-COPY . .
-
-RUN CGO_ENABLED=0 GOOS=linux \
-    go build -ldflags="-s -w" -o nrcc .
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Stage 3: Runtime image
-# Uses official Node-RED image as base — Node.js + node-red pre-installed,
-# maintained by the Node-RED team, optimised for all target architectures.
+# Release / production image.
+#
+# The frontend + go build stages are in Dockerfile.base; this file only
+# carries the runtime image (Node-RED upstream) and the nrcc wiring.
+# Build with:
+#   docker buildx bake release
 # ─────────────────────────────────────────────────────────────────────────────
 FROM nodered/node-red:latest
 
@@ -51,8 +15,8 @@ LABEL org.opencontainers.image.source="https://github.com/fgjcarlos/nrcc"
 
 USER root
 
-# Copy nrcc binary from go-builder stage
-COPY --chmod=755 --from=go-builder /build/nrcc /usr/local/bin/nrcc
+# Copy nrcc binary from the base build (see docker-bake.hcl).
+COPY --chmod=755 --from=base /build/nrcc /usr/local/bin/nrcc
 
 USER node-red
 

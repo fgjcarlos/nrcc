@@ -45,16 +45,20 @@ jobs:
             type=raw,value=latest
 
       - name: Build and push
-        uses: docker/build-push-action@v7
+        uses: docker/bake-action@v7
         with:
-          context: .
-          file: ./Dockerfile
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          source: .
+          files: |
+            ./docker-bake.hcl
+            ./release-bake.hcl
+          targets: release
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          set: |
+            *.platform=linux/amd64,linux/arm64,linux/arm/v7
+            release.tags=${{ steps.meta.outputs.tags }}
+            release.labels=${{ steps.meta.outputs.labels }}
+            release.cache-from=type=gha
+            release.cache-to=type=gha,mode=max
 
   # ── Cross-compile binaries & attach to GitHub Release ───────────────────────
   binaries:
