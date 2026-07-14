@@ -6,8 +6,23 @@ import (
 	"github.com/fgjcarlos/nrcc/internal/model"
 )
 
-// restartTracker is a thread-safe ring buffer for RestartEvent entries.
-// It follows the same structural pattern as MetricsBuffer.
+// restartTracker is a thread-safe in-memory ring buffer for the most
+// recent Node-RED restart events. It is intentionally separate from
+// the durable persistent counter kept by `restartCountStore`:
+//
+//   - The ring buffer (`restartTracker`, this file) holds the last N
+//     events with their context (timestamp, reason, etc.) for the
+//     runtime history endpoint. Capacity is bounded so memory is
+//     finite; data is lost on process restart.
+//   - The persistent counter (`restartCountStore`) holds a single
+//     monotonic integer — total cumulative restarts since install —
+//     that survives process restarts and is exposed as
+//     `ProcessManager.CumulativeRestarts()`.
+//
+// The two sources answer different questions and have different
+// lifetimes. They are not a duplication; do not collapse them without
+// confirming the runtime history endpoint still has data to serve
+// after a restart.
 type restartTracker struct {
 	mu       sync.RWMutex
 	entries  []model.RestartEvent
