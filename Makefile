@@ -8,7 +8,7 @@ LDFLAGS     := -s -w -X main.Version=$(VERSION)
 IMAGE       ?= ghcr.io/fgjcarlos/nrcc
 PLATFORMS   ?= linux/amd64,linux/arm64,linux/arm/v7
 
-.PHONY: build frontend-build dev test release clean \
+.PHONY: build frontend-build dev dev-native dev-build dev-up dev-attach dev-logs dev-shell dev-down dev-reset test test-frontend e2e release clean \
         docker docker-local docker-push docker-run docker-compose-up docker-compose-down \
         dev-docker dev-docker-build dev-docker-down \
         reset reset-data \
@@ -23,9 +23,9 @@ build: frontend-build
 frontend-build:
 	cd frontend && pnpm install && pnpm run build
 
-## Development mode: run Go server + Vite dev server concurrently
-dev:
-	@echo "→ Starting dev mode (Go backend on :3001, Vite on :5173)"
+## Development mode: run Go server + Vite dev server concurrently (no Docker)
+dev-native:
+	@echo "→ Starting dev mode natively (Go backend on :3001, Vite on :5173)"
 	@trap 'kill 0' SIGINT; \
 	  (cd frontend && pnpm run dev) & \
 	  PORT=3001 go run . & \
@@ -34,6 +34,14 @@ dev:
 ## Run tests
 test:
 	go test ./...
+
+## Run frontend tests (Vitest) from the host
+test-frontend:
+	cd frontend && pnpm exec vitest run
+
+## Run Playwright e2e tests (Playwright boots its own preview server)
+e2e:
+	cd frontend && pnpm exec playwright test
 
 ## Cross-compile for all platforms
 release: frontend-build
@@ -105,22 +113,56 @@ docker-compose-down:
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Dev Docker targets (hot reload — for development)
+#
+# All targets run on the host and shell out to `docker compose -f
+# docker-compose.dev.yml`. The compose file mounts the repo into the
+# containers, so changes to Go source are rebuilt by air, and changes
+# to the React source are hot-reloaded by Vite. No image rebuild is
+# needed for normal dev work; only run `dev-build` after changing
+# `Dockerfile.dev` itself.
 # ─────────────────────────────────────────────────────────────────────────────
 
-## Build dev Docker image (run once, or after Dockerfile.dev changes)
-dev-docker-build:
+## Build the dev Docker image (run once, or after Dockerfile.dev changes)
+dev-build:
 	docker compose -f docker-compose.dev.yml build
 
-## Start dev environment with hot reload
-##   backend  → :3001  (Go + air, rebuilds on .go file changes)
-##   frontend → :5173  (Vite HMR)
-##   node-red → :1880  (child process of backend)
-dev-docker:
+## Bring the dev stack up in detached mode and stream logs
+dev-up: dev-build
+	docker compose -f docker-compose.dev.yml up -d
+	@echo ""
+	@echo "✓ Dev stack up. Open: http://localhost:5173 (UI), http://localhost:3001 (API), http://localhost:1880 (Node-RED)"
+	@echo "  Stream logs with: make dev-logs"
+	@echo "  Open backend shell with: make dev-shell"
+	@echo "  Stop with: make dev-down"
+
+## Start dev environment in foreground (attach + stream logs)
+dev-attach:
 	docker compose -f docker-compose.dev.yml up
 
-## Stop dev environment
-dev-docker-down:
+## Stream logs from the dev stack
+dev-logs:
+	docker compose -f docker-compose.dev.yml logs -f
+
+## Open an interactive shell in the backend container
+dev-shell:
+	docker compose -f docker-compose.dev.yml exec backend sh
+
+## Stop the dev stack (keeps volumes)
+dev-down:
 	docker compose -f docker-compose.dev.yml down
+
+## Tear down the dev stack AND remove its volumes (clean slate)
+dev-reset:
+	docker compose -f docker-compose.dev.yml down -v
+	-docker volume rm nrcc_dev_data nrcc_dev_backups nrcc_dev_node_modules 2>/dev/null || true
+	-docker volume rm nrcc_frontend_node_modules nrcc_go_mod_cache nrcc_go_build_cache 2>/dev/null || true
+
+# Backwards-compat aliases — `dev` is the long-standing native target; the
+# Docker stack is reached via `dev-up` / `dev-attach` / `dev-docker`.
+dev: dev-native
+dev-docker-build: dev-build
+dev-docker: dev-attach
+dev-docker-down: dev-down
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Reset targets — volver al punto 0
@@ -158,8 +200,11 @@ help:
 	@echo "Available targets:"
 	@echo "  build              - Build nrcc binary with embedded frontend"
 	@echo "  frontend-build     - Build React frontend only"
-	@echo "  dev                - Start dev servers natively (Go + Vite)"
+	@echo "  dev                - Start dev servers natively (alias for dev-native)"
+	@echo "  dev-native         - Start dev servers natively (no Docker)"
 	@echo "  test               - Run Go tests"
+	@echo "  test-frontend      - Run Vitest frontend tests"
+	@echo "  e2e                - Run Playwright e2e tests (boots its own preview server)"
 	@echo "  release            - Cross-compile for all platforms"
 	@echo "  install-local      - Build and install nrcc as a local systemd service"
 	@echo "  clean              - Remove build artifacts"
@@ -171,9 +216,18 @@ help:
 	@echo "  docker-compose-up  - Start production stack with docker compose"
 	@echo "  docker-compose-down- Stop production docker compose stack"
 	@echo ""
-	@echo "  dev-docker-build   - Build dev Docker image (once)"
-	@echo "  dev-docker         - Start hot-reload dev environment in Docker"
-	@echo "  dev-docker-down    - Stop dev Docker environment"
+	@echo "  dev-build          - Build the dev Docker image"
+	@echo "  dev-up             - Start dev stack (detached) + show URLs"
+	@echo "  dev-attach         - Start dev stack (foreground, attached logs)"
+	@echo "  dev-logs           - Stream dev stack logs"
+	@echo "  dev-shell          - Open shell in backend container"
+	@echo "  dev-down           - Stop dev stack (keep volumes)"
+	@echo "  dev-reset          - Stop dev stack + remove volumes"
+	@echo "  dev-native         - Start dev mode without Docker (alias for old 'dev')"
+	@echo "  dev                - Alias for dev-native"
+	@echo "  dev-docker-build   - Alias for dev-build"
+	@echo "  dev-docker         - Alias for dev-attach"
+	@echo "  dev-docker-down    - Alias for dev-down"
 	@echo ""
 	@echo "  reset              - ⚠️  Reset COMPLETO: contenedores + volúmenes + data/ + build"
 	@echo "  reset-data         - ⚠️  Reset solo datos locales (data/ y tmp/)"
