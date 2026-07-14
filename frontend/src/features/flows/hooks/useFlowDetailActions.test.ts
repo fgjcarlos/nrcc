@@ -21,27 +21,10 @@ vi.mock('@/features/flows', () => ({
   },
 }));
 
-vi.mock('@/features/patterns/services', () => ({
-  patternService: {
-    analyzePatterns: vi.fn(),
-  },
-}));
-
 import { toast } from 'sonner';
 import { flowService } from '@/features/flows';
-import { patternService } from '@/features/patterns/services';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function makeAxiosError(status: number): Error {
-  const err = new Error(`Request failed with status code ${status}`) as Error & {
-    isAxiosError: boolean;
-    response: { status: number };
-  };
-  err.isAxiosError = true;
-  err.response = { status };
-  return err;
-}
 
 function createWrapper() {
   const queryClient = new QueryClient({
@@ -83,112 +66,6 @@ describe('useFlowDetailActions', () => {
       });
 
       expect(toast.error).toHaveBeenCalledWith('Failed to analyze flow');
-    });
-  });
-
-  describe('detectPatternsMutation', () => {
-    it('calls patternService.analyzePatterns with the provided flowIds', async () => {
-      vi.mocked(patternService.analyzePatterns).mockResolvedValueOnce({
-        patternId: 'p1',
-        patterns: [{ id: 'pat1', name: 'P', description: '', frequency: 2, flows: [], nodeSuggestion: { name: 'n', category: 'c', inputs: 1, outputs: 1, properties: [] } }],
-        analyzedAt: '',
-        flowCount: 2,
-      });
-
-      const { result } = renderHook(() => useFlowDetailActions(), { wrapper: createWrapper() });
-
-      await act(async () => {
-        result.current.detectPatternsMutation.mutate(['f1', 'f2']);
-        await vi.waitFor(() => !result.current.detectPatternsMutation.isPending);
-      });
-
-      expect(patternService.analyzePatterns).toHaveBeenCalledWith({ flowIds: ['f1', 'f2'] });
-      expect(toast.success).toHaveBeenCalledWith('Found 1 pattern');
-    });
-
-    it('shows a plural success toast when multiple patterns are found', async () => {
-      vi.mocked(patternService.analyzePatterns).mockResolvedValueOnce({
-        patternId: 'p1',
-        patterns: [
-          { id: 'a', name: 'A', description: '', frequency: 1, flows: [], nodeSuggestion: { name: 'n', category: 'c', inputs: 1, outputs: 1, properties: [] } },
-          { id: 'b', name: 'B', description: '', frequency: 1, flows: [], nodeSuggestion: { name: 'n', category: 'c', inputs: 1, outputs: 1, properties: [] } },
-        ],
-        analyzedAt: '',
-        flowCount: 2,
-      });
-
-      const { result } = renderHook(() => useFlowDetailActions(), { wrapper: createWrapper() });
-
-      await act(async () => {
-        result.current.detectPatternsMutation.mutate(['f1', 'f2']);
-        await vi.waitFor(() => !result.current.detectPatternsMutation.isPending);
-      });
-
-      expect(toast.success).toHaveBeenCalledWith('Found 2 patterns');
-    });
-
-    it('shows an info toast when no patterns are found', async () => {
-      vi.mocked(patternService.analyzePatterns).mockResolvedValueOnce({
-        patternId: 'p1',
-        patterns: [],
-        analyzedAt: '',
-        flowCount: 2,
-        message: 'Nothing to see here',
-      });
-
-      const { result } = renderHook(() => useFlowDetailActions(), { wrapper: createWrapper() });
-
-      await act(async () => {
-        result.current.detectPatternsMutation.mutate(['f1', 'f2']);
-        await vi.waitFor(() => !result.current.detectPatternsMutation.isPending);
-      });
-
-      expect(toast.info).toHaveBeenCalledWith('Nothing to see here');
-    });
-
-    it('shows "coming soon" info toast when the endpoint returns 501 NOT_IMPLEMENTED', async () => {
-      vi.mocked(patternService.analyzePatterns).mockRejectedValueOnce(makeAxiosError(501));
-
-      const { result } = renderHook(() => useFlowDetailActions(), { wrapper: createWrapper() });
-
-      await act(async () => {
-        result.current.detectPatternsMutation.mutate(['f1']);
-        await vi.waitFor(() => result.current.detectPatternsMutation.isError);
-      });
-
-      expect(toast.info).toHaveBeenCalledWith(
-        'Pattern detection is not yet available — coming soon'
-      );
-      expect(toast.error).not.toHaveBeenCalled();
-    });
-
-    it('shows a generic error toast for non-501 errors', async () => {
-      vi.mocked(patternService.analyzePatterns).mockRejectedValueOnce(makeAxiosError(500));
-
-      const { result } = renderHook(() => useFlowDetailActions(), { wrapper: createWrapper() });
-
-      await act(async () => {
-        result.current.detectPatternsMutation.mutate(['f1']);
-        await vi.waitFor(() => result.current.detectPatternsMutation.isError);
-      });
-
-      expect(toast.error).toHaveBeenCalled();
-      expect(toast.info).not.toHaveBeenCalledWith(
-        'Pattern detection is not yet available — coming soon'
-      );
-    });
-
-    it('shows a generic error toast for plain network errors (no status code)', async () => {
-      vi.mocked(patternService.analyzePatterns).mockRejectedValueOnce(new Error('connection refused'));
-
-      const { result } = renderHook(() => useFlowDetailActions(), { wrapper: createWrapper() });
-
-      await act(async () => {
-        result.current.detectPatternsMutation.mutate(['f1']);
-        await vi.waitFor(() => result.current.detectPatternsMutation.isError);
-      });
-
-      expect(toast.error).toHaveBeenCalledWith('connection refused');
     });
   });
 

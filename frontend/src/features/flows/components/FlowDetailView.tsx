@@ -1,11 +1,7 @@
 import { useState } from 'react';
-import { isAxiosError } from 'axios';
 import { useParams, Link } from 'react-router-dom';
-import { type PatternAnalysisResult } from '@/features/patterns/services';
-import { PatternCard } from '@/features/patterns/components';
 import { useFlowDetailData, useFlowDetailActions } from '@/features/flows/hooks';
 import type { AIFlowAction } from '@/features/flows/types';
-import { UI_COPY, FEATURES } from '@/shared/constants';
 import { MetricCard } from './MetricCard';
 import { AnalysisResultView } from './AnalysisResultView';
 import {
@@ -14,58 +10,24 @@ import {
   AlertTriangle,
   Lightbulb,
   Loader2,
-  GitBranch,
-  CheckSquare,
-  Square,
   Bot,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { cn } from '@/shared/lib';
 
 export function FlowDetailView() {
   const { id } = useParams<{ id: string }>();
 
   // Hooks for data and actions
-  const { flow, metrics, allFlows, isLoading, flowError, refetchFlow } = useFlowDetailData({
+  const { flow, metrics, isLoading, flowError, refetchFlow } = useFlowDetailData({
     flowId: id,
   });
-  const { analyzeFlowMutation, detectPatternsMutation, aiFlowMutation } = useFlowDetailActions();
+  const { analyzeFlowMutation, aiFlowMutation } = useFlowDetailActions();
 
   // UI State
   const [showRawJson, setShowRawJson] = useState(false);
-  const [showPatternSelector, setShowPatternSelector] = useState(false);
-  const [selectedPatternFlows, setSelectedPatternFlows] = useState<Set<string>>(
-    new Set()
-  );
-  const [patternResult, setPatternResult] = useState<PatternAnalysisResult | null>(
-    null
-  );
   const [aiPrompt, setAiPrompt] = useState('');
 
   // Handlers
-  const togglePatternFlow = (flowId: string) => {
-    const next = new Set(selectedPatternFlows);
-    if (next.has(flowId)) {
-      next.delete(flowId);
-    } else {
-      next.add(flowId);
-    }
-    setSelectedPatternFlows(next);
-  };
-
-  const handleDetectPatterns = () => {
-    if (selectedPatternFlows.size < 1) {
-      toast.error('Select at least 1 flow');
-      return;
-    }
-    detectPatternsMutation.mutate(Array.from(selectedPatternFlows), {
-      onSuccess: (data) => {
-        setPatternResult(data);
-        setShowPatternSelector(false);
-      },
-    });
-  };
-
   const handleAIAction = (action: AIFlowAction) => {
     const loadedFlow = flow;
     if (!loadedFlow) {
@@ -187,160 +149,6 @@ export function FlowDetailView() {
         {(analyzeFlowMutation.data || analyzeFlowMutation.isPending) && (
           <div className="border-t ghost-divider" />
         )}
-
-        {/* Detect Patterns Section */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <GitBranch className="w-4 h-4 text-base-content/60" />
-              <span className="text-sm text-base-content/60">
-                Detect Reusable Patterns
-              </span>
-            </div>
-            {FEATURES.patternDetection ? (
-              <button
-                onClick={() => setShowPatternSelector(!showPatternSelector)}
-                className="action-btn-ghost text-sm"
-              >
-                <GitBranch className="w-4 h-4" />
-                {showPatternSelector ? 'Hide' : 'Detect Patterns'}
-              </button>
-            ) : (
-              <span className="rounded-full border ghost-divider px-2.5 py-0.5 text-xs text-base-content/60">
-                Coming soon
-              </span>
-            )}
-          </div>
-
-          {/* Pattern detection backend is a 501 stub (see issue #295) — advertise
-              it as upcoming instead of exposing controls that always error. */}
-          {!FEATURES.patternDetection && (
-            <p className="text-sm text-base-content/60">
-              Automatic detection of reusable patterns across your flows is on the
-              way. This feature will light up here once it ships.
-            </p>
-          )}
-
-          {/* Flow Selector */}
-          {FEATURES.patternDetection && showPatternSelector && (
-            <div className="surface-panel space-y-4 p-4">
-              <p className="text-sm text-base-content/60">
-                Select flows to compare and detect reusable patterns. The
-                current flow is automatically selected.
-              </p>
-
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {allFlows?.flows.map((f) => (
-                  <div
-                    key={f.id}
-                    className={cn(
-                      'flex cursor-pointer items-center gap-3 rounded-xl p-2 transition-colors',
-                      'hover:skeleton-dark',
-                      selectedPatternFlows.has(f.id) && 'bg-primary/10'
-                    )}
-                    onClick={() => togglePatternFlow(f.id)}
-                  >
-                    <button
-                      className="shrink-0 text-base-content/60 hover:text-primary"
-                      aria-label={
-                        selectedPatternFlows.has(f.id)
-                          ? UI_COPY.deselect
-                          : UI_COPY.select
-                      }
-                    >
-                      {selectedPatternFlows.has(f.id) ? (
-                        <CheckSquare className="w-4 h-4 text-primary" />
-                      ) : (
-                        <Square className="w-4 h-4" />
-                      )}
-                    </button>
-                    <div className="flex-1 min-w-0">
-                      <span className="text-sm font-medium text-base-content">
-                        {f.label}
-                      </span>
-                    </div>
-                    <span className="text-xs text-base-content/60">
-                      {f.nodes} nodes
-                    </span>
-                    {f.id === id && (
-                      <span className="rounded px-1.5 py-0.5 text-xs bg-primary/20 text-primary">
-                        Current
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex items-center justify-between border-t ghost-divider pt-2">
-                <span className="text-sm text-base-content/60">
-                  {selectedPatternFlows.size} flow
-                  {selectedPatternFlows.size !== 1 ? 's' : ''} selected
-                </span>
-                <button
-                  onClick={handleDetectPatterns}
-                  disabled={
-                    detectPatternsMutation.isPending ||
-                    selectedPatternFlows.size < 1
-                  }
-                  className="action-btn-primary text-sm"
-                >
-                  {detectPatternsMutation.isPending && (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  )}
-                  {detectPatternsMutation.isPending ? 'Analyzing...' : 'Detect Patterns'}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Pattern Detection Loading */}
-          {detectPatternsMutation.isPending && (
-            <div className="flex items-center gap-2 text-base-content/60">
-              <Loader2 className="w-5 h-5 animate-spin" />
-              Detecting patterns across {selectedPatternFlows.size} flow
-              {selectedPatternFlows.size !== 1 ? 's' : ''}...
-            </div>
-          )}
-
-          {/* Coming Soon — endpoint returns 501 */}
-          {detectPatternsMutation.isError &&
-            isAxiosError(detectPatternsMutation.error) &&
-            detectPatternsMutation.error.response?.status === 501 && (
-              <div className="surface-panel border border-info/20 p-4">
-                <p className="text-sm text-info">
-                  Pattern detection is not yet available. This feature is under active development — check back soon.
-                </p>
-              </div>
-            )}
-
-          {/* No Patterns Found */}
-           {patternResult && patternResult.patterns.length === 0 && (
-             <div className="surface-panel border border-warning/20 p-4">
-               <p className="text-sm text-warning">
-                {patternResult.message ||
-                  "No patterns detected in the selected flow(s). Try selecting flows with similar structures or data transformations."}
-              </p>
-            </div>
-          )}
-
-          {/* Pattern Results */}
-          {patternResult && patternResult.patterns.length > 0 && (
-            <div className="space-y-4 border-t ghost-divider pt-4">
-              <h3 className="font-medium text-base-content">
-                Detected Patterns ({patternResult.patterns.length})
-              </h3>
-              <div className="grid gap-4">
-                {patternResult.patterns.map((pattern) => (
-                  <PatternCard
-                    key={pattern.id}
-                    pattern={pattern}
-                    analysisId={patternResult.patternId}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
       </div>
 
       {/* AI Flow Copilot */}

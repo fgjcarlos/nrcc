@@ -75,13 +75,4 @@ func (s *FlowService) ExportFlows() ([]byte, error) {
 	return data, nil
 }
 
-// Analyze analyzes a flow (stub for now)
-func (s *FlowService) Analyze() (map[string]interface{}, error) {
-	return map[string]interface{}{
-		"success": false,
-		"error": map[string]interface{}{
-			"code":    "NOT_IMPLEMENTED",
-			"message": "Flow analysis is not yet implemented",
-		},
-	}, nil
-}
+// FlowService methods (ExportFlows shown above) — Analyze was removed in #395.

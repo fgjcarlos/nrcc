@@ -73,17 +73,6 @@ func (h *FlowHandler) ExportFlows(w http.ResponseWriter, r *http.Request) {
 	w.Write(flowsData)
 }
 
-// AnalyzeFlows analyzes flows (stub)
-// POST /api/flows/analyze
-func (h *FlowHandler) AnalyzeFlows(w http.ResponseWriter, r *http.Request) {
-	result, err := h.svc.Analyze()
-	if err != nil {
-		model.RespondError(w, http.StatusInternalServerError, "FLOW_ANALYZE_ERROR", err.Error())
-		return
-	}
-	model.RespondJSON(w, http.StatusOK, result)
-}
-
 // GetVersions lists flow versions
 // GET /api/flows/versions
 func (h *FlowHandler) GetVersions(w http.ResponseWriter, r *http.Request) {
