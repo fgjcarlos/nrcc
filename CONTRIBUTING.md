@@ -74,6 +74,7 @@ If the bug involves backups, configuration, or anything that touches stored stat
 
 - **Go**: idiomatic Go, `gofmt`, `go vet`. Tests follow table-driven patterns where useful.
 - **TypeScript / React**: feature-folders under `frontend/src/features/`, shared primitives under `frontend/src/shared/`. Avoid `any` — if you reach for it, that's a signal to reshape the type. Tests use Vitest + Testing Library; mocks for `useAuth` go through the helpers in `features/auth/__test-utils__/`.
+- **Installer script**: `scripts/install.sh` is the canonical copy. `docs/install.sh` is a byte-identical copy served by GitHub Pages at `get.nrcc.dev/install.sh`. When you change the installer, run `scripts/sync-install.sh --write` to refresh the copy and commit the result. CI runs `scripts/sync-install.sh --check` and fails the PR on drift.
 
 ## Security
 

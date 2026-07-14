@@ -153,16 +153,18 @@ jobs:
       - name: ShellCheck
         run: |
           shellcheck scripts/install.sh
+          shellcheck scripts/sync-install.sh
           shellcheck docs/install.sh
 
       - name: POSIX sh syntax check
         run: |
           sh -n scripts/install.sh
+          sh -n scripts/sync-install.sh
           sh -n docs/install.sh
 
       - name: docs/install.sh in sync with scripts/install.sh
-        run: |
-          if ! diff -q scripts/install.sh docs/install.sh; then
-            echo "::error::docs/install.sh (served by GitHub Pages at get.nrcc.dev) is out of sync with scripts/install.sh"
-            exit 1
-          fi
+        # docs/install.sh is served by GitHub Pages at get.nrcc.dev/install.sh;
+        # it must be byte-identical with scripts/install.sh. The check is
+        # delegated to scripts/sync-install.sh so contributors and CI run the
+        # same logic; use --check for non-mutating validation.
+        run: scripts/sync-install.sh --check
