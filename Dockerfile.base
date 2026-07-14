@@ -14,12 +14,16 @@
 #   - Dockerfile           (release + security scan)
 #   - Dockerfile.server-local (docker-compose.local.yml)
 #
-# The other two Dockerfiles do NOT extend this base:
+# Not consumed by:
 #   - Dockerfile.local     copies a pre-built binary (make release output)
 #   - Dockerfile.dev       is a development image with go + air + node-red;
 #                          source is mounted at runtime, nothing is built in
 #                          the image.
-# Extending this base from those two would be ceremony without a real
+#   - Dockerfile.scan      standalone copy of the build stages, used by the
+#                          Trivy security workflow. The scan runs once per
+#                          CI on a single arch and does not need the bake
+#                          cache reuse, so it stays self-contained.
+# Extending this base from those three would be ceremony without a real
 # shared stage, so they stay self-contained.
 # ─────────────────────────────────────────────────────────────────────────────
 

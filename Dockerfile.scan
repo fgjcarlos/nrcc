@@ -1,0 +1,44 @@
+# syntax=docker/dockerfile:1.7
+# Trivy scan image. Standalone variant of the release image that does not
+# depend on the shared `base` image from Dockerfile.base, so it can be
+# built with plain `docker build` in environments (like the security
+# workflow) where the bake orchestration is not run.
+#
+# This duplicates ~12 lines of build logic from Dockerfile.base. The
+# duplication is intentional: the scan runs once per CI on a single
+# platform and does not need the cache reuse that bake provides. Build
+# duration cost is ~15 s of redundancy vs. the cost of refactoring
+# the security workflow to use bake (see PR #415 follow-up).
+#
+# ── Stage 1: build the React frontend ────────────────────────────────────────
+FROM node:26-slim AS frontend-builder
+RUN npm install -g corepack@latest && corepack enable && corepack prepare pnpm@11.12.0 --activate
+WORKDIR /build/frontend
+COPY frontend/package.json frontend/pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile --ignore-scripts
+COPY frontend/ ./
+RUN pnpm build
+
+# ── Stage 2: build the Go binary ─────────────────────────────────────────────
+FROM golang:1.26-alpine AS go-builder
+WORKDIR /build
+COPY go.mod go.sum ./
+RUN go mod download
+COPY --from=frontend-builder /build/frontend/dist ./frontend/dist
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux \
+    go build -ldflags="-s -w" -o nrcc .
+
+# ── Stage 3: runtime ─────────────────────────────────────────────────────────
+FROM nodered/node-red:latest
+LABEL org.opencontainers.image.title="nrcc-scan"
+LABEL org.opencontainers.image.description="nrcc image built for Trivy vulnerability scanning"
+USER root
+COPY --chmod=755 --from=go-builder /build/nrcc /usr/local/bin/nrcc
+USER node-red
+VOLUME ["/data"]
+ENV DATA_DIR=/data \
+    NODE_RED_CMD=node-red \
+    PORT=3001
+EXPOSE 3001 1880
+ENTRYPOINT ["/usr/local/bin/nrcc"]
