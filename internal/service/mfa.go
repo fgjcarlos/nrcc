@@ -430,19 +430,6 @@ func (s *MfaService) ConsumeRecoveryCode(userID, code string) (bool, error) {
 	return false, nil
 }
 
-// PruneExpiredTokens removes pending mfaTokens that have passed
-// their TTL. Safe to call from a background ticker.
-func (s *MfaService) PruneExpiredTokens() {
-	now := time.Now()
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for k, v := range s.pendingTokens {
-		if now.After(v.expiresAt) {
-			delete(s.pendingTokens, k)
-		}
-	}
-}
-
 // LookupUsernameByMfaToken returns the username associated with a
 // pending mfaToken, or "" if the token is unknown / expired / used.
 // Used by the verify handler to enrich audit events and rate-limit
