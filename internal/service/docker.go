@@ -87,15 +87,18 @@ type DockerStatus struct {
 
 // ContainerInfo is the shape the frontend's DockerView consumes.
 // Fields mirror the TypeScript ContainerInfo in
-// frontend/src/shared/types/index.ts.
+// frontend/src/shared/types/index.ts. InDocker is set by the HTTP
+// layer when the response is synthesised from the running nrcc
+// process itself rather than from `docker inspect`.
 type ContainerInfo struct {
-	ID      string          `json:"id"`
-	Name    string          `json:"name"`
-	Image   string          `json:"image"`
-	Status  string          `json:"status"`
-	Created string          `json:"created"`
-	Ports   []ContainerPort `json:"ports"`
-	State   ContainerState  `json:"state"`
+	ID       string          `json:"id"`
+	Name     string          `json:"name"`
+	Image    string          `json:"image"`
+	Status   string          `json:"status"`
+	Created  string          `json:"created"`
+	Ports    []ContainerPort `json:"ports"`
+	State    ContainerState  `json:"state"`
+	InDocker bool            `json:"inDocker,omitempty"`
 }
 
 // ContainerPort mirrors frontend PortMapping.
