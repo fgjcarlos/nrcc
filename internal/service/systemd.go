@@ -7,7 +7,16 @@ import (
 	"strings"
 )
 
-// SystemdManager provides an interface for systemd operations
+// SystemdManager provides an interface for systemd operations.
+//
+// All exec.Command calls below use the well-known binary paths
+// ("systemctl" / "journalctl") directly. Earlier revisions wrapped
+// these in a configurable LookPath helper, but those wrappers added
+// ceremony to every test (mock setup) without protecting against real
+// failures: if systemctl is not on PATH on a supported host, the
+// install is broken and the user must fix it. The current shape
+// keeps the code simple; users with custom systemd paths can
+// override the binary lookup at the DockerService layer if needed.
 type SystemdManager interface {
 	IsAvailable() bool
 	DaemonReload() error
