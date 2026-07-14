@@ -111,7 +111,7 @@ func TestSetRefreshCookie_SecureAttribute(t *testing.T) {
 
 			// Call the method under test: setRefreshCookie must accept *http.Request
 			// to determine the Secure flag.
-			h.setRefreshCookie(w, r, "test-user-id")
+			_ = h.setRefreshCookie(w, r, "test-user-id")
 
 			// Parse the Set-Cookie header to inspect the Secure attribute.
 			resp := w.Result()

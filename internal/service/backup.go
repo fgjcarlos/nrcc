@@ -173,16 +173,16 @@ func (s *BackupService) ListPaginated(opts model.PaginationOpts) (model.Paginate
 		opts.Order = "desc"
 	}
 
-	// Apply sorting (overrides the default sort.Slice from List())
-	// Re-sort based on opts.Sort if not "date"
-	if opts.Sort == "size" {
+	// Apply sorting (overrides the default sort.Slice from List()).
+	switch opts.Sort {
+	case "size":
 		sort.Slice(allBackups, func(i, j int) bool {
 			if opts.Order == "asc" {
 				return allBackups[i].SizeBytes < allBackups[j].SizeBytes
 			}
 			return allBackups[i].SizeBytes > allBackups[j].SizeBytes
 		})
-	} else if opts.Sort == "status" {
+	case "status":
 		// Sort by Type (status proxy)
 		sort.Slice(allBackups, func(i, j int) bool {
 			if opts.Order == "asc" {
@@ -190,7 +190,7 @@ func (s *BackupService) ListPaginated(opts model.PaginationOpts) (model.Paginate
 			}
 			return allBackups[i].Type > allBackups[j].Type
 		})
-	} else {
+	default:
 		// Default: sort by date
 		sort.Slice(allBackups, func(i, j int) bool {
 			if opts.Order == "asc" {
@@ -220,11 +220,9 @@ func (s *BackupService) ListPaginated(opts model.PaginationOpts) (model.Paginate
 		end = total
 	}
 
-	items := allBackups
+	items := []model.Backup{}
 	if offset < total {
 		items = allBackups[offset:end]
-	} else {
-		items = []model.Backup{}
 	}
 
 	return model.PaginatedBackups{
@@ -378,7 +376,7 @@ func (s *BackupService) Restore(id string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open backup: %w", err)
 	}
-	defer zipFile.Close()
+	defer func() { _ = zipFile.Close() }()
 
 	zipReader, err := zip.NewReader(zipFile, int64(getFileSize(backupPath)))
 	if err != nil {
@@ -491,7 +489,7 @@ func (s *BackupService) Download(id string, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 
 	if _, err := io.Copy(w, rc); err != nil {
 		return fmt.Errorf("failed to download backup: %w", err)
@@ -528,10 +526,10 @@ func (s *BackupService) createBackup(options createBackupOptions) (model.Backup,
 	if err != nil {
 		return model.Backup{}, fmt.Errorf("failed to create backup file: %w", err)
 	}
-	defer zipFile.Close()
+	defer func() { _ = zipFile.Close() }()
 
 	zipWriter := zip.NewWriter(zipFile)
-	defer zipWriter.Close()
+	defer func() { _ = zipWriter.Close() }()
 
 	metadata := backupMetadata{
 		ID:          backupID,
@@ -544,7 +542,7 @@ func (s *BackupService) createBackup(options createBackupOptions) (model.Backup,
 	filesToBackup := s.filesForBackup(config)
 
 	if err := s.addMetadataToZip(zipWriter, metadata); err != nil {
-		os.Remove(backupPath)
+		_ = os.Remove(backupPath)
 		return model.Backup{}, err
 	}
 
@@ -552,7 +550,7 @@ func (s *BackupService) createBackup(options createBackupOptions) (model.Backup,
 	for _, file := range filesToBackup {
 		added, err := s.addFileToZip(zipWriter, file.src, file.dst)
 		if err != nil {
-			os.Remove(backupPath)
+			_ = os.Remove(backupPath)
 			return model.Backup{}, err
 		}
 		if added {
@@ -561,7 +559,7 @@ func (s *BackupService) createBackup(options createBackupOptions) (model.Backup,
 	}
 
 	if err := zipWriter.Close(); err != nil {
-		os.Remove(backupPath)
+		_ = os.Remove(backupPath)
 		return model.Backup{}, fmt.Errorf("failed to finalize backup: %w", err)
 	}
 
@@ -750,7 +748,7 @@ func (s *BackupService) inspectBackup(backupPath string) (model.BackupManifest, 
 	if err != nil {
 		return model.BackupManifest{}, fmt.Errorf("failed to open backup: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	reader, err := zip.NewReader(file, info.Size())
 	if err != nil {
@@ -836,7 +834,7 @@ func (s *BackupService) addFileToZip(zipWriter *zip.Writer, srcPath, dstPath str
 		}
 		return false, fmt.Errorf("failed to open %s: %w", srcPath, err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	info, err := file.Stat()
 	if err != nil {
@@ -896,13 +894,13 @@ func (s *BackupService) extractFileFromZip(file *zip.File, destDir string) error
 	if err != nil {
 		return err
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	writer, err := os.Create(destPath)
 	if err != nil {
 		return err
 	}
-	defer writer.Close()
+	defer func() { _ = writer.Close() }()
 
 	// The declared size can lie; cap the actual bytes copied. Reading one byte
 	// past the limit means the entry is oversized.
@@ -911,8 +909,8 @@ func (s *BackupService) extractFileFromZip(file *zip.File, destDir string) error
 		return err
 	}
 	if written > maxBackupEntrySize {
-		writer.Close()
-		os.Remove(destPath)
+		_ = writer.Close()
+		_ = os.Remove(destPath)
 		return fmt.Errorf("archive entry %s exceeds maximum allowed size", file.Name)
 	}
 	return nil
@@ -1044,7 +1042,7 @@ func readBackupMetadata(file *zip.File) (backupMetadata, error) {
 	if err != nil {
 		return backupMetadata{}, err
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	var metadata backupMetadata
 	if err := json.NewDecoder(reader).Decode(&metadata); err != nil {
@@ -1060,7 +1058,7 @@ func checksumZipFile(file *zip.File) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	hasher := sha256.New()
 	if _, err := io.Copy(hasher, reader); err != nil {

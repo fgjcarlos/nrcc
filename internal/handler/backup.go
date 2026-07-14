@@ -113,9 +113,7 @@ func (h *BackupHandler) PostBackup(w http.ResponseWriter, r *http.Request) {
 
 	// Try to parse JSON body if present
 	if r.ContentLength > 0 {
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			// Continue with empty name on parse error
-		}
+		_ = json.NewDecoder(r.Body).Decode(&req) // best-effort; empty name on parse error
 	}
 
 	backup, err := h.svc.CreateTyped(model.BackupType(req.Type), req.Name)
@@ -186,7 +184,7 @@ func (h *BackupHandler) DownloadBackup(w http.ResponseWriter, r *http.Request) {
 		model.RespondError(w, status, code, "Backup not found")
 		return
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Content-Disposition", "attachment; filename=\"backup-"+id+".zip\"")
@@ -371,9 +369,7 @@ func (h *BackupHandler) PatchStorageRetention(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	response := model.RetentionConfigResponse{
-		RetentionDays: req.RetentionDays,
-	}
+	response := model.RetentionConfigResponse(req)
 
 	model.RespondJSON(w, http.StatusOK, response)
 }

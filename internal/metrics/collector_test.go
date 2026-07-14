@@ -24,6 +24,11 @@ func TestCollector_Handler_ReturnsNonNil(t *testing.T) {
 		t.Fatal("Handler() returned nil, expected non-nil http.Handler")
 	}
 	// Verify the handler implements the http.Handler interface.
+// The explicit type assertion is intentional: it documents at a
+// glance that Handler() returns an http.Handler, not some other
+// interface. QF1011's omission suggestion would defeat that
+// documentation.
+//nolint:staticcheck
 	var _ http.Handler = h
 }
 

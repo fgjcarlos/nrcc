@@ -290,12 +290,12 @@ func TestConcurrentForceCheck(t *testing.T) {
 	// Start two concurrent force checks
 	done := make(chan struct{})
 	go func() {
-		svc.ForceCheck(ctx)
+		_, _ = svc.ForceCheck(ctx)
 		close(done)
 	}()
 
 	time.Sleep(50 * time.Millisecond) // Let first one start
-	svc.ForceCheck(ctx)               // This should block until first completes
+	_, _ = svc.ForceCheck(ctx)             // This should block until first completes
 
 	<-done
 

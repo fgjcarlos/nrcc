@@ -1,9 +1,7 @@
 # golangci-lint v2 configuration.
 #
-# Introduced as a RATCHET: the CI job (.github/workflows/pr.yml) runs with
-# only-new-issues, so the ~74 pre-existing findings are grandfathered and only
-# new or changed code is gated. Burn the existing backlog down in follow-up PRs,
-# then drop only-new-issues to enforce repo-wide.
+# The CI job (.github/workflows/pr.yml) runs `golangci-lint run ./...` (no
+# only-new-issues) so the gate is repo-wide. Closes #396.
 version: "2"
 
 linters:

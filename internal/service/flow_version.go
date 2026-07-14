@@ -56,7 +56,10 @@ type FlowVersionService struct {
 
 func NewFlowVersionService(dataDir string) *FlowVersionService {
 	dir := filepath.Join(dataDir, versionDir)
-	os.MkdirAll(dir, 0700)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		// best-effort; CaptureNow will surface a clearer error later
+		_ = err
+	}
 	return &FlowVersionService{dataDir: dataDir, stopCh: make(chan struct{})}
 }
 
@@ -99,7 +102,7 @@ func (s *FlowVersionService) captureIfChanged() {
 	}
 	s.lastHash = hash
 
-	s.saveVersion(data, hash)
+	_ = s.saveVersion(data, hash)
 }
 
 func (s *FlowVersionService) CaptureNow() error {
@@ -277,7 +280,7 @@ func (s *FlowVersionService) pruneOld() {
 
 	sort.Strings(files)
 	for _, name := range files[:len(files)-maxVersions] {
-		os.Remove(filepath.Join(dir, name))
+		_ = os.Remove(filepath.Join(dir, name))
 	}
 }
 

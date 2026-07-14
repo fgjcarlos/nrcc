@@ -54,7 +54,7 @@ func TestBootstrapHandler_GetStatus_HasRequiredFields(t *testing.T) {
 	handler.GetStatus(w, req)
 
 	var status model.HostStatus
-	json.Unmarshal(w.Body.Bytes(), &status)
+	_ = json.Unmarshal(w.Body.Bytes(), &status)
 
 	// Verify basic fields are accessible
 	_ = status.Platform
@@ -72,7 +72,7 @@ func TestBootstrapHandler_GetStatus_Dependencies(t *testing.T) {
 	handler.GetStatus(w, req)
 
 	var status model.HostStatus
-	json.Unmarshal(w.Body.Bytes(), &status)
+	_ = json.Unmarshal(w.Body.Bytes(), &status)
 
 	// Verify dependency fields are accessible and structured correctly
 	_ = status.NodeJS.Installed
@@ -90,7 +90,7 @@ func TestBootstrapHandler_GetStatus_NodeRedEnvironment(t *testing.T) {
 	handler.GetStatus(w, req)
 
 	var status model.HostStatus
-	json.Unmarshal(w.Body.Bytes(), &status)
+	_ = json.Unmarshal(w.Body.Bytes(), &status)
 
 	// NodeRed should be populated as a struct
 	_ = status.NodeRed.Mode
@@ -398,7 +398,7 @@ func TestSettingsHandler_SaveRaw_CreatesBackup(t *testing.T) {
 		w := httptest.NewRecorder()
 		handler.SaveRaw(w, req)
 		var resp model.ApiResponse[model.SettingsDocument]
-		json.Unmarshal(w.Body.Bytes(), &resp)
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
 		return resp
 	}
 

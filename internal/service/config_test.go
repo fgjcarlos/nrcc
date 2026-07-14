@@ -549,7 +549,7 @@ func TestConfigService_PreserveAdminAuthPasswords(t *testing.T) {
 			},
 		},
 	}
-	svc.Save(initial)
+	_ = svc.Save(initial)
 
 	// Now create update with empty password (meaning don't change)
 	updated := model.NodeRedConfig{

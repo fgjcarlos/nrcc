@@ -163,9 +163,8 @@ func TestClaimsFromContext_WithValidClaims(t *testing.T) {
 	req = req.WithContext(ctx)
 
 	retrieved := ClaimsFromContext(req)
-
 	if retrieved == nil {
-		t.Error("ClaimsFromContext should not return nil")
+		t.Fatal("ClaimsFromContext should not return nil")
 	}
 	if retrieved.Username != "testuser" {
 		t.Errorf("Expected username 'testuser', got %s", retrieved.Username)

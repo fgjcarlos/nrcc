@@ -286,8 +286,8 @@ func TestParseEnvFile_EmptyFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmpfile.Name())
-	tmpfile.Close()
+	defer func() { _ = os.Remove(tmpfile.Name()) }()
+	_ = tmpfile.Close()
 
 	result, err := parseEnvFile(tmpfile.Name())
 	if err != nil {
@@ -304,7 +304,7 @@ func TestParseEnvFile_SimpleKeyValues(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmpfile.Name())
+	defer func() { _ = os.Remove(tmpfile.Name()) }()
 
 	content := `KEY1=value1
 KEY2=value2
@@ -312,7 +312,7 @@ KEY3=value3`
 	if _, err := tmpfile.WriteString(content); err != nil {
 		t.Fatal(err)
 	}
-	tmpfile.Close()
+	_ = tmpfile.Close()
 
 	result, err := parseEnvFile(tmpfile.Name())
 	if err != nil {
@@ -338,7 +338,7 @@ func TestParseEnvFile_WithComments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmpfile.Name())
+	defer func() { _ = os.Remove(tmpfile.Name()) }()
 
 	content := `# This is a comment
 KEY1=value1
@@ -347,7 +347,7 @@ KEY2=value2`
 	if _, err := tmpfile.WriteString(content); err != nil {
 		t.Fatal(err)
 	}
-	tmpfile.Close()
+	_ = tmpfile.Close()
 
 	result, err := parseEnvFile(tmpfile.Name())
 	if err != nil {
@@ -368,7 +368,7 @@ func TestParseEnvFile_WithQuotes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmpfile.Name())
+	defer func() { _ = os.Remove(tmpfile.Name()) }()
 
 	content := `KEY1="value with spaces"
 KEY2=simple
@@ -376,7 +376,7 @@ KEY3="another quoted value"`
 	if _, err := tmpfile.WriteString(content); err != nil {
 		t.Fatal(err)
 	}
-	tmpfile.Close()
+	_ = tmpfile.Close()
 
 	result, err := parseEnvFile(tmpfile.Name())
 	if err != nil {
@@ -400,14 +400,14 @@ func TestParseEnvFile_ValueWithEquals(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmpfile.Name())
+	defer func() { _ = os.Remove(tmpfile.Name()) }()
 
 	content := `KEY1=value=with=equals
 CONNECTION_STRING=user=admin;pass=secret123`
 	if _, err := tmpfile.WriteString(content); err != nil {
 		t.Fatal(err)
 	}
-	tmpfile.Close()
+	_ = tmpfile.Close()
 
 	result, err := parseEnvFile(tmpfile.Name())
 	if err != nil {
@@ -428,7 +428,7 @@ func TestParseEnvFile_EmptyLines(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmpfile.Name())
+	defer func() { _ = os.Remove(tmpfile.Name()) }()
 
 	content := `KEY1=value1
 
@@ -438,7 +438,7 @@ KEY3=value3`
 	if _, err := tmpfile.WriteString(content); err != nil {
 		t.Fatal(err)
 	}
-	tmpfile.Close()
+	_ = tmpfile.Close()
 
 	result, err := parseEnvFile(tmpfile.Name())
 	if err != nil {
@@ -467,7 +467,7 @@ func TestParseEnvFile_WhitespaceHandling(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmpfile.Name())
+	defer func() { _ = os.Remove(tmpfile.Name()) }()
 
 	content := `  KEY1  =  value1  
 KEY2=value2
@@ -475,7 +475,7 @@ KEY2=value2
 	if _, err := tmpfile.WriteString(content); err != nil {
 		t.Fatal(err)
 	}
-	tmpfile.Close()
+	_ = tmpfile.Close()
 
 	result, err := parseEnvFile(tmpfile.Name())
 	if err != nil {

@@ -62,11 +62,10 @@ func (s *LibraryService) List() ([]model.LibraryInfo, error) {
 				Version: verStr,
 			}
 
-			// Enrich with metadata from node_modules
-			if err := s.enrichLibraryMetadata(&lib); err != nil {
-				// Log error but continue; metadata is optional
-				// fmt.Printf("warning: failed to enrich metadata for %s: %v\n", name, err)
-			}
+			// Enrich with metadata from node_modules; ignore errors because
+					// metadata is optional and the caller already has the package
+					// name and version from the directory listing.
+					_ = s.enrichLibraryMetadata(&lib)
 
 			libraries = append(libraries, lib)
 		}
@@ -184,7 +183,7 @@ func (s *LibraryService) Search(query string) ([]model.LibraryInfo, error) {
 	if err != nil {
 		return []model.LibraryInfo{}, nil
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return []model.LibraryInfo{}, nil

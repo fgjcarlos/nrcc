@@ -37,7 +37,7 @@ func RespondJSON[T any](w http.ResponseWriter, status int, data T) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(resp)
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
 // RespondError writes an error response as JSON
@@ -49,7 +49,7 @@ func RespondError(w http.ResponseWriter, status int, code, message string) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(resp)
+	_ = json.NewEncoder(w).Encode(resp)
 }
 
 // NowISO8601 returns current time in ISO8601 format

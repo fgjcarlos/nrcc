@@ -79,13 +79,13 @@ func TestInitializeServices_SkipsDataDirCreationForDoctor(t *testing.T) {
 		mkdirAll = oldMkdirAll
 		svc = oldSvc
 		if oldDataDir == "" {
-			os.Unsetenv("DATA_DIR")
+			_ = os.Unsetenv("DATA_DIR")
 		} else {
-			os.Setenv("DATA_DIR", oldDataDir)
+			_ = os.Setenv("DATA_DIR", oldDataDir)
 		}
 	}()
 
-	os.Setenv("DATA_DIR", "/var/lib/nrcc")
+	_ = os.Setenv("DATA_DIR", "/var/lib/nrcc")
 	mkdirAll = func(path string, perm os.FileMode) error {
 		return errors.New("mkdir should not be called for doctor")
 	}
@@ -104,13 +104,13 @@ func TestInitializeServices_CreatesDataDirForWriteCommands(t *testing.T) {
 		mkdirAll = oldMkdirAll
 		svc = oldSvc
 		if oldDataDir == "" {
-			os.Unsetenv("DATA_DIR")
+			_ = os.Unsetenv("DATA_DIR")
 		} else {
-			os.Setenv("DATA_DIR", oldDataDir)
+			_ = os.Setenv("DATA_DIR", oldDataDir)
 		}
 	}()
 
-	os.Setenv("DATA_DIR", t.TempDir())
+	_ = os.Setenv("DATA_DIR", t.TempDir())
 	called := false
 	mkdirAll = func(path string, perm os.FileMode) error {
 		called = true
@@ -495,7 +495,7 @@ func TestNodeRedStatusJSONStructure(t *testing.T) {
 	// Call printJSON
 	err := printJSON(testData)
 
-	w.Close()
+	_ = w.Close()
 	os.Stdout = oldStdout
 
 	if err != nil {

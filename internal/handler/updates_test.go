@@ -177,12 +177,13 @@ func TestUpdateHandler_GetCheck_ValidJSON(t *testing.T) {
 	handler.GetCheck(w, req)
 
 	// Response should be JSON regardless of success/error
-	if w.Code == http.StatusOK {
+	switch w.Code {
+	case http.StatusOK:
 		var entry model.UpdateCacheEntry
 		if err := json.Unmarshal(w.Body.Bytes(), &entry); err != nil {
 			t.Fatalf("Response must be valid JSON on 200: %v", err)
 		}
-	} else if w.Code == http.StatusInternalServerError {
+	case http.StatusInternalServerError:
 		// Error response is also JSON
 		var errResp map[string]interface{}
 		if err := json.Unmarshal(w.Body.Bytes(), &errResp); err != nil {

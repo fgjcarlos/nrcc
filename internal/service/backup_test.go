@@ -764,7 +764,7 @@ func TestExtractFileFromZipRejectsMaliciousEntries(t *testing.T) {
 			if err != nil {
 				t.Fatalf("open zip: %v", err)
 			}
-			defer reader.Close()
+			defer func() { _ = reader.Close() }()
 
 			svc := NewBackupService(restoreDir)
 			for _, f := range reader.File {
@@ -793,7 +793,7 @@ func TestExtractFileFromZipRestoresValidArchive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open zip: %v", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	svc := NewBackupService(restoreDir)
 	for _, f := range reader.File {
@@ -830,7 +830,7 @@ func TestExtractFileFromZip_RejectsOversizedEntry(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open zip: %v", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	svc := NewBackupService(restoreDir)
 	for _, f := range reader.File {
@@ -861,7 +861,7 @@ func TestExtractFileFromZip_AllowsEntryWithinLimit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open zip: %v", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	svc := NewBackupService(restoreDir)
 	for _, f := range reader.File {
@@ -883,13 +883,13 @@ func createZipWithEntry(t *testing.T, zipPath, entryName, content string) {
 	w := zip.NewWriter(f)
 
 	meta, _ := w.Create("backup-metadata.json")
-	meta.Write([]byte(`{"id":"test","name":"test","type":"manual","createdAt":"2026-01-01T00:00:00Z","triggeredBy":"test"}`))
+	_, _ = meta.Write([]byte(`{"id":"test","name":"test","type":"manual","createdAt":"2026-01-01T00:00:00Z","triggeredBy":"test"}`))
 
 	entry, err := w.Create(entryName)
 	if err != nil {
 		t.Fatalf("create entry: %v", err)
 	}
-	entry.Write([]byte(content))
+	_, _ = entry.Write([]byte(content))
 
 	if err := w.Close(); err != nil {
 		t.Fatalf("close zip writer: %v", err)

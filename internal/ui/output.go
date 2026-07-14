@@ -94,7 +94,7 @@ func DoctorTable(rows []DoctorRow) {
 
 	// Render table with pterm
 	table := pterm.DefaultTable.WithHasHeader().WithBoxed().WithData(tableData)
-	table.Render()
+	_ = table.Render()
 }
 
 // StartSpinner starts and returns a spinner with the given message.

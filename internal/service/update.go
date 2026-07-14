@@ -512,7 +512,7 @@ func (s *UpdateService) postInstallAudit(ctx context.Context, version string) er
 	if err != nil {
 		return nil // cannot stage audit workspace → do not block
 	}
-	defer os.RemoveAll(auditDir)
+	defer func() { _ = os.RemoveAll(auditDir) }()
 
 	manifest := fmt.Sprintf(`{"name":"nrcc-audit","version":"0.0.0","private":true,"dependencies":{"node-red":"%s"}}`, version)
 	if err := os.WriteFile(filepath.Join(auditDir, "package.json"), []byte(manifest), 0o600); err != nil {
@@ -638,8 +638,8 @@ func (s *UpdateService) compareVersions(v1, v2 string) int {
 
 	for i := 0; i < len(v1Parts); i++ {
 		var v1Num, v2Num int
-		fmt.Sscanf(v1Parts[i], "%d", &v1Num)
-		fmt.Sscanf(v2Parts[i], "%d", &v2Num)
+		_, _ = fmt.Sscanf(v1Parts[i], "%d", &v1Num)
+		_, _ = fmt.Sscanf(v2Parts[i], "%d", &v2Num)
 
 		if v1Num < v2Num {
 			return -1

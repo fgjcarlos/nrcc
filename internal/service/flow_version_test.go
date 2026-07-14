@@ -75,12 +75,12 @@ func TestFlowVersion_DiffAddedRemoved(t *testing.T) {
 	svc := NewFlowVersionService(dir)
 
 	writeTestFlows(t, dir, `[{"id":"n1","type":"inject","label":"Start"}]`)
-	svc.CaptureNow()
+	_ = svc.CaptureNow()
 	v1, _ := svc.ListVersions()
 	firstID := v1[0].ID
 
 	writeTestFlows(t, dir, `[{"id":"n2","type":"debug","label":"End"}]`)
-	svc.CaptureNow()
+	_ = svc.CaptureNow()
 	v2, _ := svc.ListVersions()
 
 	// Find the new version ID (the one that's not firstID)
@@ -110,12 +110,12 @@ func TestFlowVersion_DiffModified(t *testing.T) {
 	svc := NewFlowVersionService(dir)
 
 	writeTestFlows(t, dir, `[{"id":"n1","type":"inject","name":"old"}]`)
-	svc.CaptureNow()
+	_ = svc.CaptureNow()
 	v1, _ := svc.ListVersions()
 	firstID := v1[0].ID
 
 	writeTestFlows(t, dir, `[{"id":"n1","type":"inject","name":"new"}]`)
-	svc.CaptureNow()
+	_ = svc.CaptureNow()
 	v2, _ := svc.ListVersions()
 
 	var secondID string
@@ -145,12 +145,12 @@ func TestFlowVersion_Revert(t *testing.T) {
 
 	original := `[{"id":"n1","type":"inject"}]`
 	writeTestFlows(t, dir, original)
-	svc.CaptureNow()
+	_ = svc.CaptureNow()
 	versions, _ := svc.ListVersions()
 	originalID := versions[0].ID
 
 	writeTestFlows(t, dir, `[{"id":"n1","type":"inject"},{"id":"n2","type":"debug"}]`)
-	svc.CaptureNow()
+	_ = svc.CaptureNow()
 
 	if err := svc.Revert(originalID); err != nil {
 		t.Fatalf("Revert: %v", err)
@@ -177,7 +177,7 @@ func TestFlowVersion_VersionFilePermissions(t *testing.T) {
 	writeTestFlows(t, dir, `[{"id":"n1","type":"tab"}]`)
 
 	svc := NewFlowVersionService(dir)
-	svc.CaptureNow()
+	_ = svc.CaptureNow()
 
 	entries, _ := os.ReadDir(filepath.Join(dir, versionDir))
 	for _, e := range entries {

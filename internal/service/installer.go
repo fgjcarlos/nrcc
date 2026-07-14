@@ -167,7 +167,7 @@ func (s *InstallerService) InstallPlan(ctx context.Context, plan model.InstallPl
 
 	// Ensure systemd is available
 	if !s.systemd.IsAvailable() {
-		return fmt.Errorf("systemd not available on this system. Only systemd is supported.")
+		return fmt.Errorf("systemd not available on this system; only systemd is supported")
 	}
 
 	rollback := &installRollback{}
@@ -596,14 +596,14 @@ func copyExecutable(source string, destination string) error {
 	if err != nil {
 		return fmt.Errorf("open current executable: %w", err)
 	}
-	defer in.Close()
+	defer func() { _ = in.Close() }()
 
 	tmp, err := os.CreateTemp(filepath.Dir(destination), ".nrcc-install-*")
 	if err != nil {
 		return fmt.Errorf("create temporary binary: %w", err)
 	}
 	tmpPath := tmp.Name()
-	defer os.Remove(tmpPath)
+	defer func() { _ = os.Remove(tmpPath) }()
 
 	if _, err := io.Copy(tmp, in); err != nil {
 		_ = tmp.Close()
@@ -622,11 +622,9 @@ func copyExecutable(source string, destination string) error {
 	return nil
 }
 
-// createDirectories creates the required installation directories
-func (s *InstallerService) createDirectories() error {
-	return s.createDirectoriesWithRollback(nil)
-}
-
+// createDirectoriesWithRollback is the canonical installer entry point;
+// createDirectories (the no-rollback wrapper) became unused after the
+// rollback-aware path landed. Deleted in #396.
 func (s *InstallerService) createDirectoriesWithRollback(rollback *installRollback) error {
 	configExisted := pathExists(s.layout.ConfigDir)
 	dataExisted := pathExists(s.layout.DataDir)
