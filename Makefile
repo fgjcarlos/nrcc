@@ -65,23 +65,25 @@ clean:
 # ─────────────────────────────────────────────────────────────────────────────
 
 ## Build Docker image for current platform (local dev/test)
+## Uses docker buildx bake (see docker-bake.hcl) so the shared frontend + go
+## build stages in Dockerfile.base are built once and consumed by the
+## release and server-local targets.
 docker:
-	docker build -t $(IMAGE):$(VERSION) -t $(IMAGE):latest .
+	docker buildx bake --load release
 
 ## Build Docker image using local images (no registry pull needed)
 ## Requires: make release first (produces dist/nrcc-linux-amd64)
 docker-local: release
-	docker build -f Dockerfile.local -t nrcc:local .
+	docker buildx bake --load local
 
 ## Build and push multi-arch image to registry (requires docker buildx + login)
 docker-push:
-	docker buildx build \
-	  --platform $(PLATFORMS) \
-	  --build-arg VERSION=$(VERSION) \
-	  -t $(IMAGE):$(VERSION) \
-	  -t $(IMAGE):latest \
+	docker buildx bake \
+	  --set '*.platform=linux/amd64,linux/arm64,linux/arm/v7' \
 	  --push \
-	  .
+	  release \
+	  --tag $(IMAGE):$(VERSION) \
+	  --tag $(IMAGE):latest
 
 ## Run nrcc container locally (quick test)
 docker-run:
