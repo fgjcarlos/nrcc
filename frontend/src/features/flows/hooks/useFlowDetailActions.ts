@@ -1,9 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
-import { isAxiosError } from 'axios';
 import { toast } from 'sonner';
 import { flowService } from '@/features/flows';
 import type { AIFlowAction, FlowDetail } from '@/features/flows/types';
-import { patternService, type PatternAnalysisResult } from '@/features/patterns/services';
 
 export function useFlowDetailActions() {
   // Analyze flow mutation
@@ -14,34 +12,6 @@ export function useFlowDetailActions() {
     },
     onError: () => {
       toast.error('Failed to analyze flow');
-    },
-  });
-
-  // Detect patterns mutation
-  const detectPatternsMutation = useMutation({
-    mutationFn: (flowIds: string[]) =>
-      patternService.analyzePatterns({ flowIds }),
-    onSuccess: (data: PatternAnalysisResult) => {
-      if (data.patterns.length === 0) {
-        toast.info(
-          data.message || 'No patterns detected in the selected flows'
-        );
-      } else {
-        toast.success(
-          `Found ${data.patterns.length} pattern${
-            data.patterns.length !== 1 ? 's' : ''
-          }`
-        );
-      }
-    },
-    onError: (error: Error) => {
-      if (isAxiosError(error) && error.response?.status === 501) {
-        toast.info('Pattern detection is not yet available — coming soon');
-      } else {
-        toast.error(
-          (error as Error).message || 'Failed to detect patterns'
-        );
-      }
     },
   });
 
@@ -62,7 +32,6 @@ export function useFlowDetailActions() {
 
   return {
     analyzeFlowMutation,
-    detectPatternsMutation,
     aiFlowMutation,
   };
 }

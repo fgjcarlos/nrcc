@@ -54,21 +54,3 @@ func (h *AIHandler) PostAnalyzeFlow(w http.ResponseWriter, r *http.Request) {
 
 	model.RespondJSON(w, http.StatusOK, resp)
 }
-
-// PostAnalyzePatterns analyzes patterns with AI (stub)
-// POST /api/ai/analyze/patterns
-func (h *AIHandler) PostAnalyzePatterns(w http.ResponseWriter, r *http.Request) {
-	model.RespondError(w, http.StatusNotImplemented, "NOT_IMPLEMENTED", "Pattern analysis is not yet implemented")
-}
-
-// GetPatternReadme gets pattern documentation (stub)
-// GET /api/ai/patterns/{id}/readme
-func (h *AIHandler) GetPatternReadme(w http.ResponseWriter, r *http.Request) {
-	model.RespondError(w, http.StatusNotImplemented, "NOT_IMPLEMENTED", "Pattern documentation is not yet available")
-}
-
-// DownloadPattern downloads a pattern (stub)
-// GET /api/ai/patterns/{id}/download
-func (h *AIHandler) DownloadPattern(w http.ResponseWriter, r *http.Request) {
-	model.RespondError(w, http.StatusNotImplemented, "NOT_IMPLEMENTED", "Pattern download is not yet available")
-}

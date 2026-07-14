@@ -230,7 +230,6 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 		r.Route("/api/flows", func(r chi.Router) {
 			r.Get("/", flowHandler.GetFlows)
 			r.Get("/export", flowHandler.ExportFlows)
-			r.Post("/analyze", flowHandler.AnalyzeFlows)
 			r.Get("/versions", flowHandler.GetVersions)
 			r.With(middleware.RequireAdmin).Post("/versions", flowHandler.PostSnapshot)
 			r.Get("/versions/{from}/diff/{to}", flowHandler.GetVersionDiff)
@@ -275,9 +274,6 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 		// AI routes
 		r.Route("/api/ai", func(r chi.Router) {
 			r.Post("/analyze/flow", aiHandler.PostAnalyzeFlow)
-			r.Post("/analyze/patterns", aiHandler.PostAnalyzePatterns)
-			r.Get("/patterns/{id}/readme", aiHandler.GetPatternReadme)
-			r.Get("/patterns/{id}/download", aiHandler.DownloadPattern)
 		})
 	})
 

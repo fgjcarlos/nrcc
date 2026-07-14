@@ -1,1 +1,0 @@
-export { PatternCard } from './PatternCard';
