@@ -343,14 +343,6 @@ func (s *MfaService) VerifyAndIssueSession(token, code string) (*model.CCUser, s
 	return user, method, nil
 }
 
-// Enforcer returns a pure MfaEnforcer that reads the enrollment table
-// through a snapshot at call time. The snapshot keeps the enforcer
-// trivially unit-testable and lets future exposure handlers pass
-// their own snapshot if they already hold a lock.
-func (s *MfaService) Enforcer() MfaEnforcer {
-	return MfaEnforcer{IsEnrolled: s.IsEnrolled}
-}
-
 // verifyCodeForUser accepts a 6-digit TOTP code OR a recovery code
 // formatted xxxx-xxxx-xxxx (case-insensitive). Returns the method
 // that succeeded.
@@ -451,34 +443,6 @@ func (s *MfaService) LookupUsernameByMfaToken(token string) string {
 // need to seed extra users (e.g. a viewer to test admin-only
 // branches). Production code does not use this.
 func (s *MfaService) AuthService() *AuthService { return s.authSvc }
-
-// MfaEnforcer is a pure, side-effect-free gate for exposure
-// controls. Construct via MfaService.Enforcer; tests can construct
-// one with a fake IsEnrolled.
-type MfaEnforcer struct {
-	IsEnrolled func(userID string) bool
-}
-
-// CanExpose returns whether the user is allowed to perform an
-// exposure action. Actions outside "public" are always allowed;
-// "public" requires a committed TOTP enrollment.
-//
-// The reason string is non-empty exactly when allowed is false and
-// is safe to surface to the operator (it is generic on purpose —
-// it does not leak the user state, only the policy).
-func (e MfaEnforcer) CanExpose(userID, action string) (bool, string) {
-	switch action {
-	case "public":
-		if e.IsEnrolled == nil || !e.IsEnrolled(userID) {
-			return false, "MFA enrollment required for public exposure"
-		}
-		return true, ""
-	case "tailnet", "local", "":
-		return true, ""
-	default:
-		return false, "unknown exposure action"
-	}
-}
 
 // ─── helpers ───────────────────────────────────────────────────────
 

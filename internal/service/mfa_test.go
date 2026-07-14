@@ -337,40 +337,6 @@ func TestMfaService_MfaTokenExpires(t *testing.T) {
 	}
 }
 
-func TestMfaEnforcer_CanExpose(t *testing.T) {
-	cases := []struct {
-		enrolled bool
-		action   string
-		want     bool
-	}{
-		{false, "public", false},
-		{true, "public", true},
-		{false, "tailnet", true},
-		{true, "tailnet", true},
-		{false, "local", true},
-		{true, "local", true},
-		{false, "", true},
-		{false, "weird", false},
-	}
-	for _, c := range cases {
-		e := MfaEnforcer{IsEnrolled: func(string) bool { return c.enrolled }}
-		got, _ := e.CanExpose("u1", c.action)
-		if got != c.want {
-			t.Errorf("enrolled=%v action=%q: want %v, got %v", c.enrolled, c.action, c.want, got)
-		}
-	}
-}
-
-func TestMfaEnforcer_NilIsEnrolledIsSafe(t *testing.T) {
-	e := MfaEnforcer{IsEnrolled: nil}
-	if ok, _ := e.CanExpose("u1", "public"); ok {
-		t.Error("nil IsEnrolled must not allow public exposure")
-	}
-	if ok, _ := e.CanExpose("u1", "local"); !ok {
-		t.Error("nil IsEnrolled must still allow local exposure")
-	}
-}
-
 func TestMfaService_VerifyAndIssueSessionRecoveryBranch(t *testing.T) {
 	svc, _ := newMfaTestSetup(t)
 	uid := svc.authSvc.GetUserByUsername("admin").ID
