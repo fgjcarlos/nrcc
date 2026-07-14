@@ -79,6 +79,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+        with:
+          driver: docker
       - name: Build image for scanning
         run: docker buildx bake --load --set 'release.output=type=docker,name=nrcc-scan' release
 
