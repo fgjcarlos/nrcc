@@ -75,6 +75,11 @@ func NewProcessManager(cmd, dataDir string, logBuffer *LogBuffer) *ProcessManage
 		maxRestarts:        10,
 		restartDelay:       2 * time.Second,
 		doneCh:             closedChan(), // sentinel so Stop() doesn't block when nothing is running
+		// Two sources of truth about restarts, on purpose (see restart_tracker.go):
+		//   - tracker: in-memory ring buffer of recent events for the
+		//     runtime history endpoint; bounded, ephemeral.
+		//   - restartStore: persistent monotonic counter that survives
+		//     process restarts; exposed as CumulativeRestarts().
 		tracker:            newRestartTracker(50),
 		restartStore:       store,
 		cumulativeRestarts: store.Load(),
