@@ -280,11 +280,35 @@ make dev
 
 The dev server proxies API requests to the Go backend.
 
+### Local development (Docker)
+
+If you don't want to install Go and Node on the host, the dev stack runs end-to-end in Docker with hot reload:
+
+```bash
+make dev-up        # build the dev image + start stack in detached mode
+make dev-logs      # stream backend + frontend logs
+make dev-shell     # open a shell in the backend container
+make dev-down      # stop the stack (keeps volumes)
+make dev-reset     # stop the stack AND remove volumes (clean slate)
+```
+
+Open in browser:
+
+| URL | What |
+| --- | --- |
+| <http://localhost:5173> | React UI (Vite HMR) |
+| <http://localhost:3001> | Go API + Node-RED control plane |
+| <http://localhost:1880> | Node-RED editor |
+
+Source is bind-mounted into the containers, so edits to `*.go` (rebuilt by `air`) and `frontend/**` (HMR via Vite) show up without rebuilding the image. Run `make dev-build` only after changing `Dockerfile.dev` itself.
+
 ### Run tests
 
 ```bash
-make test           # Run all Go tests
-go run -race .      # Run with race detector
+make test            # Go test suite
+make test-frontend   # Vitest frontend suite
+make e2e             # Playwright e2e suite (boots its own preview server)
+go run -race .       # Go with race detector
 ```
 
 Frontend quality gates live under `frontend/`:
