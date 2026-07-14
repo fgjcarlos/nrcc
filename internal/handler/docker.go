@@ -80,36 +80,6 @@ func isInDocker() bool {
 	return err == nil
 }
 
-// containerInfo is the lightweight shape returned by GetStatus when in
-// Docker. It has the same fields the frontend ContainerInfo type
-// reads (id/name/image/status/created/ports/state), plus a synthesised
-// id and created timestamp so the existing UI renders without
-// special-casing the in-Docker path.
-type containerInfo struct {
-	ID       string          `json:"id"`
-	Name     string          `json:"name"`
-	Image    string          `json:"image"`
-	Status   string          `json:"status"`
-	Created  string          `json:"created"`
-	Ports    []containerPort `json:"ports,omitempty"`
-	State    containerState  `json:"state"`
-	InDocker bool            `json:"inDocker"`
-}
-
-type containerPort struct {
-	PrivatePort int    `json:"privatePort"`
-	PublicPort  int    `json:"publicPort,omitempty"`
-	Type        string `json:"type"`
-}
-
-type containerState struct {
-	Running      bool    `json:"running"`
-	Paused       bool    `json:"paused"`
-	RestartCount int     `json:"restartCount"`
-	Memory       int64   `json:"memory"`
-	CPU          float64 `json:"cpu"`
-}
-
 // GetStatus returns container status.
 // GET /api/docker/status
 func (h *DockerHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
@@ -118,38 +88,22 @@ func (h *DockerHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 		if image == "" {
 			image = "nrcc"
 		}
-		model.RespondJSON(w, http.StatusOK, containerInfo{
+		model.RespondJSON(w, http.StatusOK, &service.ContainerInfo{
 			Name:     "nrcc",
 			Image:    image,
 			Status:   "running",
 			InDocker: true,
-			State: containerState{
+			State: service.ContainerState{
 				Running: true,
 			},
 		})
 		return
 	}
-	// Native path: defer to the DockerService and unwrap to the
-	// full containerInfo shape so the frontend doesn't need a
-	// separate code path.
 	h.refreshDockerStatus()
 	if h.dockerStatus.Container != nil {
 		c := h.dockerStatus.Container
-		model.RespondJSON(w, http.StatusOK, containerInfo{
-			ID:      c.ID,
-			Name:    c.Name,
-			Image:   c.Image,
-			Status:  c.Status,
-			Created: c.Created,
-			Ports:   toHandlerPorts(c.Ports),
-			State: containerState{
-				Running:      c.State.Running,
-				Paused:       c.State.Paused,
-				RestartCount: c.State.RestartCount,
-				Memory:       c.State.Memory,
-				CPU:          c.State.CPU,
-			},
-		})
+		c.InDocker = false
+		model.RespondJSON(w, http.StatusOK, c)
 		return
 	}
 	model.RespondJSON(w, http.StatusOK, model.DockerStatus{
@@ -256,24 +210,6 @@ func (h *DockerHandler) PostStop(w http.ResponseWriter, r *http.Request) {
 	}
 	h.audit.Log(r, "", "CONTAINER_STOP", "", "ok", nil)
 	model.RespondJSON(w, http.StatusOK, map[string]string{"message": "Container stopping…"})
-}
-
-// toHandlerPorts converts service-level ContainerPort values to the
-// handler-level containerPort struct. Kept local so the JSON output
-// stays stable when the service grows new fields.
-func toHandlerPorts(in []service.ContainerPort) []containerPort {
-	if len(in) == 0 {
-		return nil
-	}
-	out := make([]containerPort, 0, len(in))
-	for _, p := range in {
-		out = append(out, containerPort{
-			PrivatePort: p.PrivatePort,
-			PublicPort:  p.PublicPort,
-			Type:        p.Type,
-		})
-	}
-	return out
 }
 
 // dockerNotAvailableMessage returns a human-readable message for the
