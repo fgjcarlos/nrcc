@@ -59,7 +59,7 @@ services:
     environment:
       # Proxy /api calls to backend container
       VITE_API_TARGET: "http://backend:3001"
-    command: sh -c "npm install -g pnpm@^11 && pnpm install && pnpm run dev"
+    command: sh -c "npm install -g pnpm@11.12.0 && pnpm install && pnpm run dev"
     depends_on:
       - backend
     restart: unless-stopped

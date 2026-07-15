@@ -34,3 +34,11 @@ package-lock.json
 .atl/
 frontend/.agents/
 frontend/skills-lock.json
+
+# pnpm content-addressable store created on the host by `pnpm install`
+# (root-owned when produced inside the docker dev container — do not track).
+.pnpm-store/
+frontend/.pnpm-store/
+
+# Pi subagent runtime scratch (per-session, never tracked).
+.pi-subagents/
