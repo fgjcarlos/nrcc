@@ -3,7 +3,7 @@ tmp_dir = "tmp"
 
 [build]
   # Command to build the binary
-  cmd = "go build -o ./tmp/nrcc ."
+  cmd = "go build -buildvcs=false -o ./tmp/nrcc ."
   # Binary to run after build
   bin = "./tmp/nrcc"
   # Arguments passed to the binary
