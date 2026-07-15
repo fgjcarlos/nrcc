@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -112,12 +113,103 @@ func isPortInUse(port string) bool {
 	return true
 }
 
+// nodeRedRuntime holds the explicit Node-RED runtime contract honored by
+// ProcessManager (issue #429). One runtime per container/instance:
+//   - Port:       NODE_RED_PORT  (default 1880)
+//   - UserDir:    NODE_RED_USER_DIR (default dataDir)
+//   - Settings:   NODE_RED_SETTINGS (default <userDir>/settings.js)
+type nodeRedRuntime struct {
+	Port         string
+	UserDir      string
+	SettingsPath string
+}
+
+// resolveNodeRedRuntime builds the Node-RED runtime contract from the
+// env precedence layers ProcessManager.Start already uses (OS env +
+// stored .env). dataDir is the fallback userDir and settings parent.
+//
+// Validation:
+//   - Port: integer 1-65535.
+//   - UserDir: non-empty (resolved to absolute relative to cwd if needed).
+//   - Settings: must resolve inside UserDir unless an absolute override
+//     is provided.
+func resolveNodeRedRuntime(env map[string]string, dataDir string) (nodeRedRuntime, error) {
+	dataDir, err := filepath.Abs(dataDir)
+	if err != nil {
+		return nodeRedRuntime{}, fmt.Errorf("resolve dataDir: %w", err)
+	}
+
+	rt := nodeRedRuntime{
+		Port:    "1880",
+		UserDir: dataDir,
+	}
+
+	if v := strings.TrimSpace(env["NODE_RED_PORT"]); v != "" {
+		n, perr := strconv.Atoi(v)
+		if perr != nil || n < 1 || n > 65535 {
+			return nodeRedRuntime{}, fmt.Errorf("invalid NODE_RED_PORT %q: must be integer 1-65535", v)
+		}
+		rt.Port = v
+	}
+
+	if v := strings.TrimSpace(env["NODE_RED_USER_DIR"]); v != "" {
+		abs := v
+		if !filepath.IsAbs(abs) {
+			abs, err = filepath.Abs(abs)
+			if err != nil {
+				return nodeRedRuntime{}, fmt.Errorf("resolve NODE_RED_USER_DIR: %w", err)
+			}
+		}
+		rt.UserDir = abs
+	}
+
+	settings := filepath.Join(rt.UserDir, "settings.js")
+	if v := strings.TrimSpace(env["NODE_RED_SETTINGS"]); v != "" {
+		settings = v
+		if !filepath.IsAbs(settings) {
+			settings = filepath.Join(rt.UserDir, settings)
+		}
+	}
+	rt.SettingsPath = settings
+
+	return rt, nil
+}
+
 // SetEnvService wires an EnvService so stored variables are injected into
 // the node-red process environment on every Start().
 func (pm *ProcessManager) SetEnvService(svc *EnvService) {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 	pm.envSvc = svc
+}
+
+// envForChild builds the environment map that will be passed to the
+// Node-RED child process, with the precedence:
+//   1. OS environ (base)
+//   2. config.json vars (EnvService)
+//   3. .env file in dataDir (highest)
+func (pm *ProcessManager) envForChild() map[string]string {
+	envMap := make(map[string]string)
+	for _, pair := range os.Environ() {
+		parts := strings.SplitN(pair, "=", 2)
+		if len(parts) == 2 {
+			envMap[parts[0]] = parts[1]
+		}
+	}
+	if pm.envSvc != nil {
+		if stored, err := pm.envSvc.GetAll(); err == nil {
+			for k, v := range stored {
+				envMap[k] = v
+			}
+		}
+	}
+	dotenvPath := filepath.Join(pm.dataDir, ".env")
+	if dotenvVars, err := parseEnvFile(dotenvPath); err == nil {
+		for k, v := range dotenvVars {
+			envMap[k] = v
+		}
+	}
+	return envMap
 }
 
 // IsExternalMode returns true if ProcessManager is attached to an externally managed Node-RED.
@@ -143,9 +235,15 @@ func (pm *ProcessManager) startLocked(resetCounter bool) error {
 		return fmt.Errorf("process already running (PID: %d)", pid)
 	}
 
-	// Check if Node-RED is already running externally
-	nodeRedPort := "1880"
-	if isPortInUse(nodeRedPort) {
+	// Resolve explicit Node-RED runtime contract (NODE_RED_PORT/USER_DIR/SETTINGS).
+	// See resolveNodeRedRuntime for precedence and validation.
+	rt, err := resolveNodeRedRuntime(pm.envForChild(), pm.dataDir)
+	if err != nil {
+		return fmt.Errorf("invalid Node-RED runtime: %w", err)
+	}
+
+	// Check if Node-RED is already running externally on the configured port
+	if isPortInUse(rt.Port) {
 		// Attach to existing instance
 		pm.externalMode = true
 		pm.running = true
@@ -154,7 +252,7 @@ func (pm *ProcessManager) startLocked(resetCounter bool) error {
 		if running {
 			ui.Info(fmt.Sprintf("Node-RED already running (PID: %d) — attaching", pid))
 		} else {
-			ui.Info("Node-RED already running on :1880 — attaching")
+			ui.Info(fmt.Sprintf("Node-RED already running on :%s — attaching", rt.Port))
 		}
 		// Push a synthetic log entry to the buffer so the UI shows context
 		pm.logBuffer.Push(model.LogEntry{
@@ -162,7 +260,7 @@ func (pm *ProcessManager) startLocked(resetCounter bool) error {
 			Timestamp: time.Now().UTC().Format(time.RFC3339),
 			Level:     "info",
 			Source:    "nrcc",
-			Message:   "Attached to existing Node-RED instance on :1880",
+			Message:   fmt.Sprintf("Attached to existing Node-RED instance on :%s", rt.Port),
 		})
 		return nil
 	}
@@ -170,47 +268,21 @@ func (pm *ProcessManager) startLocked(resetCounter bool) error {
 	// Normal path: start as child process
 	pm.externalMode = false
 
-	settingsPath := filepath.Join(pm.dataDir, "settings.js")
-	if err := ensureSettings(settingsPath); err != nil {
+	if err := ensureSettings(rt.SettingsPath); err != nil {
 		return fmt.Errorf("failed to create settings.js: %w", err)
 	}
 
 	cmd := exec.Command(pm.nodeRedCmd,
-		"--userDir", pm.dataDir,
-		"--settings", settingsPath,
-		"--port", "1880",
+		"--userDir", rt.UserDir,
+		"--settings", rt.SettingsPath,
+		"--port", rt.Port,
 	)
 
 	// Build environment with proper precedence:
 	// Layer 1: OS environ (base)
 	// Layer 2: config.json vars (stored in configSvc)
 	// Layer 3: .env vars (highest priority)
-	envMap := make(map[string]string)
-
-	// Layer 1: OS environ
-	for _, pair := range os.Environ() {
-		parts := strings.SplitN(pair, "=", 2)
-		if len(parts) == 2 {
-			envMap[parts[0]] = parts[1]
-		}
-	}
-
-	// Layer 2: config.json vars
-	if pm.envSvc != nil {
-		if stored, err := pm.envSvc.GetAll(); err == nil {
-			for k, v := range stored {
-				envMap[k] = v
-			}
-		}
-	}
-
-	// Layer 3: .env vars (highest priority — TAREA 2b)
-	dotenvPath := filepath.Join(pm.dataDir, ".env")
-	if dotenvVars, err := parseEnvFile(dotenvPath); err == nil {
-		for k, v := range dotenvVars {
-			envMap[k] = v
-		}
-	}
+	envMap := pm.envForChild()
 
 	// Convert map to env slice
 	cmd.Env = make([]string, 0, len(envMap))
