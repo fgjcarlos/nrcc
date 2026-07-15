@@ -79,6 +79,15 @@ For the manual production rollout steps for GitHub Pages, DNS, and release valid
 
 Architecture decisions for future implementation slices live in [docs/adr/](docs/adr/). Additional architecture notes live in [docs/architecture/](docs/architecture/), including the [multi-instance Node-RED management model](docs/architecture/multi-instance-node-red.md).
 
+### Deployment model
+
+The canonical deployment unit is **one Compose stack = one `nrcc` + one
+Node-RED process** ([ADR 0003](docs/adr/0003-docker-first-one-stack-per-node-red.md)).
+To run a second Node-RED on the same host, copy [`docker-compose.yml`](docker-compose.yml)
+and remap the host ports (`3001`, `1880`) and the volume names. NRCC does
+not orchestrate sibling containers, the host Node-RED, or remote Node-RED
+from inside a container.
+
 ### Uninstall
 
 To remove nrcc service and clean up:

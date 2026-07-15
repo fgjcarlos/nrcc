@@ -4,6 +4,12 @@
 
 Proposed architecture for issue #144. **Note (2026-07-14):** the first read-only slice (`Instance`, `InstanceStore`, `GET /api/instances`) shipped on `origin/main` at `5393042` was removed in PR #409 (issue #390). This document remains as the design rationale. Re-introduce the code only with a real consumer.
 
+**Note (2026-07-15):** the canonical deployment unit is now locked by
+[ADR 0003 — Docker-first: one Compose stack per Node-RED](../adr/0003-docker-first-one-stack-per-node-red.md),
+which closes #428. Multi-instance behavior will compose N copies of that
+unit; this document continues to describe the eventual control plane
+behind them.
+
 ## Context
 
 NRCC currently manages one local Node-RED runtime. The existing implementation is intentionally simple:

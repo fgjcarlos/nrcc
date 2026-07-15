@@ -2,6 +2,11 @@
 # nrcc — Node-RED Control Center
 # Docker Compose: nrcc + Node-RED all-in-one
 #
+# Canonical deployment unit (ADR 0003 / #428): one Compose service owns
+# exactly one `nrcc` binary and exactly one Node-RED process. To run a
+# second Node-RED on the same host, copy this file and remap the host
+# ports (`3001`, `1880`) plus the volume name.
+#
 # Usage:
 #   docker compose up -d
 #   docker compose logs -f
