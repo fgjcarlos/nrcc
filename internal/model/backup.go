@@ -44,6 +44,20 @@ type BackupFileEntry struct {
 	Checksum string `json:"checksum"`
 }
 
+// BackupManifestV1 is the on-disk manifest embedded as `backup-metadata.json`
+// inside each backup archive. The Algorithm field pins the checksum scheme so
+// older backups remain verifiable when the default algorithm changes.
+type BackupManifestV1 struct {
+	Version      int              `json:"version"`
+	Algorithm    string           `json:"algorithm"`
+	ID           string           `json:"id"`
+	Name         string           `json:"name"`
+	Type         BackupType       `json:"type"`
+	CreatedAt    string           `json:"createdAt"`
+	TriggeredBy  string           `json:"triggeredBy"`
+	Files        []BackupFileEntry `json:"files"`
+}
+
 // BackupManifest represents backup metadata.
 type BackupManifest struct {
 	ID          string            `json:"id"`

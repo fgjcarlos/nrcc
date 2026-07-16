@@ -154,6 +154,7 @@ cp .env.example .env
 |----------|---------|-------------|
 | `PORT` | 3001 | HTTP server port |
 | `DATA_DIR` | `./data` | Directory for config, users, backups |
+| `NRCC_BACKUP_DIR` | `<DATA_DIR>/backups` | Dedicated per-instance volume for backup archives |
 | `EDGE_MODE` | `false` | Opt-in edge mode for constrained deployments (resource-safe defaults). See [ADR 0002](docs/adr/0002-edge-mode-defaults-and-exposure-ux.md) |
 | `JWT_SECRET` | (insecure) | ⚠️ **Must set in production** |
 | `NODE_RED_CMD` | `node-red` | Path to node-red executable |
@@ -269,13 +270,25 @@ data/
 ├── flows.json               # Node-RED flows (managed by Node-RED)
 ├── settings.js              # Generated Node-RED settings
 ├── backup-settings.json     # Backup scheduler configuration
-├── backups/                 # Timestamped backup archives (tar.gz)
-│   ├── backup-20260424-100234.tar.gz
-│   └── backup-20260424-110456.tar.gz
+├── backups/                 # Per-instance backup archives (zip)
+│   ├── <uuid>.zip           # Manual / scheduled / pre-restore snapshots
+│   └── ...
 └── uploads/                 # User-uploaded files
 ```
 
-**Backup strategy:** Backups are complete snapshots. Store backups in a safe location (S3, NFS, etc.).
+**Backup strategy:** Backups are complete snapshots of Node-RED source-of-truth
+files (`flows.json`, `flows_cred.json`, `settings.js`, `package.json`, plus
+optional `config.json` and `cc-users.json`), stored as `.zip` archives with an
+embedded `backup-metadata.json` manifest that pins per-entry sha256 checksums
+and the archive algorithm. Restore validates every entry against the manifest
+*before* touching `dataDir`, extracts to a staging directory, and atomically
+swaps files in place. To place backups on a dedicated volume, set
+`NRCC_BACKUP_DIR=/path/to/volume` (defaults to `./data/backups`).
+
+**Encrypted download:** `GET /api/backups/{id}/download?password=…` wraps the
+zip with AES-256-GCM using the supplied passphrase (decrypt with the same
+passphrase to recover the archive). The raw download path stays unencrypted
+for back-compat with existing tooling.
 
 ## Development
 

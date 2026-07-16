@@ -2,6 +2,7 @@ package service
 
 import (
 	"archive/zip"
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -13,13 +14,18 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/fgjcarlos/nrcc/internal/model"
 	"github.com/google/uuid"
 )
 
-const backupConfigFile = "backup_config.json"
+const (
+	backupConfigFile       = "backup_config.json"
+	defaultChecksumAlgo    = "sha256"
+	currentManifestVersion = 1
+)
 
 var defaultBackupConfig = model.BackupConfig{
 	Enabled:             false,
@@ -35,11 +41,20 @@ var defaultBackupConfig = model.BackupConfig{
 
 var ErrInvalidBackupConfig = errors.New("invalid backup config")
 
+// ErrBackupCorrupt is returned when an archive's manifest or a payload entry
+// fails integrity validation during restore.
+var ErrBackupCorrupt = errors.New("backup integrity check failed")
+
 // BackupService handles backup operations.
 type BackupService struct {
 	dataDir    string
+	backupDir  string
 	scheduler  *backupScheduler
 	eventStore *backupEventStore
+
+	mu           sync.Mutex
+	quiesceFunc  func() error
+	restartFunc  func() error
 }
 
 type createBackupOptions struct {
@@ -47,20 +62,48 @@ type createBackupOptions struct {
 	Name string
 }
 
+// backupMetadata is the in-process shape used during creation. The on-disk
+// shape is model.BackupManifestV1; this struct mirrors only the creator-side
+// fields and is converted when written into the zip.
 type backupMetadata struct {
-	ID          string           `json:"id"`
-	Name        string           `json:"name"`
-	Type        model.BackupType `json:"type"`
-	CreatedAt   string           `json:"createdAt"`
-	TriggeredBy string           `json:"triggeredBy"`
+	ID          string              `json:"id"`
+	Name        string              `json:"name"`
+	Type        model.BackupType    `json:"type"`
+	CreatedAt   string              `json:"createdAt"`
+	TriggeredBy string              `json:"triggeredBy"`
+	Algorithm   string              `json:"algorithm"`
+	Version     int                 `json:"version"`
+	Files       []model.BackupFileEntry `json:"files"`
 }
 
-// NewBackupService creates a new backup service.
+// NewBackupService creates a new backup service that stores archives under
+// <dataDir>/backups. Use NewBackupServiceWithBackupDir to override the
+// archive directory (e.g. to point at a dedicated per-instance volume via the
+// NRCC_BACKUP_DIR env var).
 func NewBackupService(dataDir string) *BackupService {
-	svc := &BackupService{dataDir: dataDir}
+	return NewBackupServiceWithBackupDir(dataDir, os.Getenv("NRCC_BACKUP_DIR"))
+}
+
+// NewBackupServiceWithBackupDir is NewBackupService plus an explicit archive
+// directory. An empty backupDir falls back to <dataDir>/backups.
+func NewBackupServiceWithBackupDir(dataDir, backupDir string) *BackupService {
+	if strings.TrimSpace(backupDir) == "" {
+		backupDir = filepath.Join(dataDir, "backups")
+	}
+	svc := &BackupService{dataDir: dataDir, backupDir: backupDir}
 	svc.eventStore = newBackupEventStore(dataDir)
 	svc.scheduler = newBackupScheduler(svc)
 	return svc
+}
+
+// SetRestoreHooks wires optional Node-RED lifecycle hooks so the service can
+// quiesce the runtime during a restore and (best-effort) restart it after.
+// Both funcs may be nil; in that case restore skips the corresponding step.
+func (s *BackupService) SetRestoreHooks(quiesce, restart func() error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.quiesceFunc = quiesce
+	s.restartFunc = restart
 }
 
 // Start begins background scheduler processing for automatic backups.
@@ -113,7 +156,7 @@ func (s *BackupService) Observability() (model.BackupObservability, error) {
 
 // List returns all available backups.
 func (s *BackupService) List() ([]model.Backup, error) {
-	backupDir := filepath.Join(s.dataDir, "backups")
+	backupDir := s.backupDir
 	if err := os.MkdirAll(backupDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create backups directory: %w", err)
 	}
@@ -125,7 +168,7 @@ func (s *BackupService) List() ([]model.Backup, error) {
 
 	backups := make([]model.Backup, 0, len(entries))
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".zip") {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".zip") || strings.HasSuffix(entry.Name(), ".zip.tmp") {
 			continue
 		}
 
@@ -258,7 +301,7 @@ func (s *BackupService) Detail(id string) (model.BackupManifest, error) {
 	if err := ValidateBackupID(id); err != nil {
 		return model.BackupManifest{}, err
 	}
-	backupPath := filepath.Join(s.dataDir, "backups", id+".zip")
+	backupPath := filepath.Join(s.backupDir, id+".zip")
 	manifest, err := s.inspectBackup(backupPath)
 	if err != nil {
 		return model.BackupManifest{}, err
@@ -360,39 +403,49 @@ func (s *BackupService) SaveConfig(cfg model.BackupConfig) (model.BackupConfig, 
 	return normalized, nil
 }
 
-// Restore restores a backup by ID.
+// Restore restores a backup by ID. The archive is validated (manifest +
+// per-entry checksum) before any dataDir file is overwritten. Files are
+// extracted to a staging directory and only swapped into dataDir after the
+// full archive is verified intact. On validation failure the staging tree
+// is removed and dataDir is untouched.
 func (s *BackupService) Restore(id string) error {
 	if err := ValidateBackupID(id); err != nil {
 		return err
 	}
-	backupDir := filepath.Join(s.dataDir, "backups")
-	backupPath := filepath.Join(backupDir, id+".zip")
+	backupPath := filepath.Join(s.backupDir, id+".zip")
 
 	if _, err := os.Stat(backupPath); err != nil {
 		return fmt.Errorf("backup not found: %w", err)
 	}
 
-	zipFile, err := os.Open(backupPath)
-	if err != nil {
-		return fmt.Errorf("failed to open backup: %w", err)
-	}
-	defer func() { _ = zipFile.Close() }()
-
-	info, err := os.Stat(backupPath)
-	if err != nil {
-		return fmt.Errorf("failed to stat backup: %w", err)
-	}
-	zipReader, err := zip.NewReader(zipFile, info.Size())
+	// Read the archive into memory in one pass so we can both verify
+	// checksums and stream files into staging. Backups are bounded by the
+	// per-entry size cap (see extractFileFromZip); the full archive is small
+	// enough to keep the implementation linear and atomic at the swap step.
+	data, err := os.ReadFile(backupPath)
 	if err != nil {
 		return fmt.Errorf("failed to read backup: %w", err)
 	}
 
-	for _, file := range zipReader.File {
-		if err := s.extractFileFromZip(file, s.dataDir); err != nil {
-			return fmt.Errorf("failed to extract file from backup: %w", err)
-		}
+	zipReader, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		return fmt.Errorf("failed to parse backup: %w", err)
 	}
 
+	manifest, err := verifyArchiveManifest(zipReader)
+	if err != nil {
+		return fmt.Errorf("%w: %v", ErrBackupCorrupt, err)
+	}
+
+	stagingDir, err := s.stageRestore(zipReader, manifest)
+	if err != nil {
+		return err
+	}
+
+	if err := s.swapStagingIntoDataDir(stagingDir, manifest); err != nil {
+		_ = os.RemoveAll(stagingDir)
+		return err
+	}
 	return nil
 }
 
@@ -401,11 +454,51 @@ func (s *BackupService) RestoreWithSafetyBackup(id string) (string, error) {
 	if err := ValidateBackupID(id); err != nil {
 		return "", err
 	}
-	backupPath := filepath.Join(s.dataDir, "backups", id+".zip")
+	backupPath := filepath.Join(s.backupDir, id+".zip")
 	if _, err := os.Stat(backupPath); err != nil {
 		return "", fmt.Errorf("backup not found: %w", err)
 	}
 	restoredBackup, _ := s.describeBackup(backupPath)
+
+	s.mu.Lock()
+	quiesce := s.quiesceFunc
+	restart := s.restartFunc
+	s.mu.Unlock()
+
+	// Quiesce Node-RED before touching its files so we never observe a
+	// partially-restored on-disk state from a running process. The hooks
+	// are best-effort: if no hook is wired (e.g. external Node-RED) we
+	// proceed. The defer below always fires on the way out so Node-RED
+	// picks up the restored flows on the success path AND recovers from
+	// any restore error. The defer is registered before quiesce() so a
+	// future edit that adds an early return between this point and the
+	// pre-restore create still triggers the restart path.
+	if quiesce != nil {
+		if err := quiesce(); err != nil {
+			s.recordEvent(model.BackupEvent{
+				Type:    model.BackupEventTypeRestore,
+				Status:  "error",
+				Message: "Failed to quiesce Node-RED before restore",
+				Trigger: "restore",
+				Error:   err.Error(),
+			})
+			return "", fmt.Errorf("quiesce before restore: %w", err)
+		}
+	}
+	defer func() {
+		if restart == nil {
+			return
+		}
+		if rerr := restart(); rerr != nil {
+			s.recordEvent(model.BackupEvent{
+				Type:    model.BackupEventTypeRestore,
+				Status:  "error",
+				Message: "Failed to restart Node-RED after restore",
+				Trigger: "restore",
+				Error:   rerr.Error(),
+			})
+		}
+	}()
 
 	preRestore, err := s.CreateTyped(model.BackupTypePreRestore, "pre-restore")
 	if err != nil {
@@ -444,8 +537,7 @@ func (s *BackupService) Delete(id string) error {
 	if err := ValidateBackupID(id); err != nil {
 		return err
 	}
-	backupDir := filepath.Join(s.dataDir, "backups")
-	backupPath := filepath.Join(backupDir, id+".zip")
+	backupPath := filepath.Join(s.backupDir, id+".zip")
 	backup, _ := s.describeBackup(backupPath)
 
 	if err := os.Remove(backupPath); err != nil {
@@ -473,7 +565,7 @@ func (s *BackupService) OpenForDownload(id string) (io.ReadCloser, int64, error)
 	if err := ValidateBackupID(id); err != nil {
 		return nil, 0, err
 	}
-	backupPath := filepath.Join(s.dataDir, "backups", id+".zip")
+	backupPath := filepath.Join(s.backupDir, id+".zip")
 
 	info, err := os.Stat(backupPath)
 	if err != nil {
@@ -487,24 +579,42 @@ func (s *BackupService) OpenForDownload(id string) (io.ReadCloser, int64, error)
 	return file, info.Size(), nil
 }
 
-// Download streams a backup file to the response writer.
-func (s *BackupService) Download(id string, w io.Writer) error {
+// Download streams a backup file to the response writer. If password is
+// non-empty the zip bytes are wrapped with AES-256-GCM (see Encrypt); the
+// client decrypts with the same passphrase. This lets an operator transfer a
+// backup containing credentials/secrets off-host without exposing them in the
+// raw archive.
+func (s *BackupService) Download(id string, w io.Writer, password string) error {
 	rc, _, err := s.OpenForDownload(id)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = rc.Close() }()
 
-	if _, err := io.Copy(w, rc); err != nil {
-		return fmt.Errorf("failed to download backup: %w", err)
+	if password == "" {
+		_, err := io.Copy(w, rc)
+		if err != nil {
+			return fmt.Errorf("failed to download backup: %w", err)
+		}
+		return nil
 	}
 
+	data, err := io.ReadAll(rc)
+	if err != nil {
+		return fmt.Errorf("failed to read backup: %w", err)
+	}
+	encrypted, err := EncryptBytes(data, password)
+	if err != nil {
+		return fmt.Errorf("failed to encrypt backup: %w", err)
+	}
+	if _, err := io.WriteString(w, encrypted); err != nil {
+		return fmt.Errorf("failed to stream encrypted backup: %w", err)
+	}
 	return nil
 }
 
 func (s *BackupService) createBackup(options createBackupOptions) (model.Backup, error) {
-	backupDir := filepath.Join(s.dataDir, "backups")
-	if err := os.MkdirAll(backupDir, 0755); err != nil {
+	if err := os.MkdirAll(s.backupDir, 0755); err != nil {
 		return model.Backup{}, fmt.Errorf("failed to create backups directory: %w", err)
 	}
 
@@ -519,7 +629,7 @@ func (s *BackupService) createBackup(options createBackupOptions) (model.Backup,
 	}
 
 	backupID := uuid.New().String()
-	backupPath := filepath.Join(backupDir, backupID+".zip")
+	backupPath := filepath.Join(s.backupDir, backupID+".zip")
 	createdAt := time.Now().UTC().Format(time.RFC3339Nano)
 	name := strings.TrimSpace(options.Name)
 	if name == "" {
@@ -532,45 +642,84 @@ func (s *BackupService) createBackup(options createBackupOptions) (model.Backup,
 		}
 	}
 
-	zipFile, err := os.Create(backupPath)
-	if err != nil {
-		return model.Backup{}, fmt.Errorf("failed to create backup file: %w", err)
-	}
-	defer func() { _ = zipFile.Close() }()
-
-	zipWriter := zip.NewWriter(zipFile)
-	defer func() { _ = zipWriter.Close() }()
-
-	metadata := backupMetadata{
+	filesToBackup := s.filesForBackup(config)
+	manifest := backupMetadata{
 		ID:          backupID,
 		Name:        name,
 		Type:        backupType,
 		CreatedAt:   createdAt,
 		TriggeredBy: name,
+		Algorithm:   defaultChecksumAlgo,
+		Version:     currentManifestVersion,
+		Files:       make([]model.BackupFileEntry, 0, len(filesToBackup)),
 	}
 
-	filesToBackup := s.filesForBackup(config)
+	// Write to a sibling temp file in the same directory so the final
+	// os.Rename below is atomic on POSIX (rename within a filesystem).
+	// ponytail: relies on the temp file living in s.backupDir; if a caller
+	// ever points s.backupDir at a special tmpfs without rename support,
+	// upgrade to fsync + explicit fsync-of-directory.
+	tmpPath := backupPath + ".tmp"
+	zipFile, err := os.Create(tmpPath)
+	if err != nil {
+		return model.Backup{}, fmt.Errorf("failed to create backup file: %w", err)
+	}
+	zipWriter := zip.NewWriter(zipFile)
 
-	if err := s.addMetadataToZip(zipWriter, metadata); err != nil {
-		_ = os.Remove(backupPath)
+	if err := s.addMetadataToZip(zipWriter, manifest); err != nil {
+		_ = zipWriter.Close()
+		_ = zipFile.Close()
+		_ = os.Remove(tmpPath)
 		return model.Backup{}, err
 	}
 
 	fileCount := 1
 	for _, file := range filesToBackup {
-		added, err := s.addFileToZip(zipWriter, file.src, file.dst)
+		entry, added, err := s.addFileToZip(zipWriter, file.src, file.dst)
 		if err != nil {
-			_ = os.Remove(backupPath)
+			_ = zipWriter.Close()
+			_ = zipFile.Close()
+			_ = os.Remove(tmpPath)
 			return model.Backup{}, err
 		}
 		if added {
+			manifest.Files = append(manifest.Files, entry)
 			fileCount++
 		}
 	}
 
+	// Re-write the manifest with the populated Files slice so the on-disk
+	// manifest carries the per-entry checksums.
 	if err := zipWriter.Close(); err != nil {
-		_ = os.Remove(backupPath)
+		_ = zipFile.Close()
+		_ = os.Remove(tmpPath)
 		return model.Backup{}, fmt.Errorf("failed to finalize backup: %w", err)
+	}
+	// Force the OS to flush the archive to durable storage before we
+	// publish it via rename. Without fsync, a crash between close and
+	// rename can leave the published file empty on disk despite the
+	// "atomic" claim. ponytail: no dir-fsync; in practice the rename +
+	// the next open on the published path is enough to surface any
+	// missing data. Upgrade to dir-fsync if a deployment needs
+	// power-loss guarantees.
+	if err := zipFile.Sync(); err != nil {
+		_ = zipFile.Close()
+		_ = os.Remove(tmpPath)
+		return model.Backup{}, fmt.Errorf("failed to flush backup: %w", err)
+	}
+	if err := zipFile.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+		return model.Backup{}, fmt.Errorf("failed to close backup file: %w", err)
+	}
+
+	if err := s.patchManifestChecksums(tmpPath, manifest); err != nil {
+		_ = os.Remove(tmpPath)
+		return model.Backup{}, fmt.Errorf("failed to write manifest checksums: %w", err)
+	}
+
+	if err := os.Rename(tmpPath, backupPath); err != nil {
+		_ = os.Remove(tmpPath)
+		return model.Backup{}, fmt.Errorf("failed to publish backup: %w", err)
 	}
 
 	info, err := os.Stat(backupPath)
@@ -593,6 +742,81 @@ func (s *BackupService) createBackup(options createBackupOptions) (model.Backup,
 	s.recordBackupCreated(backup, prunedIDs)
 
 	return backup, pruneErr
+}
+
+// patchManifestChecksums rewrites the on-disk archive's manifest entry to
+// include the per-entry checksums computed during zip creation. We do this as a
+// second pass over the just-written file because the manifest must be written
+// before any payload entry (zip readers scan in order) but checksums are only
+// known once the payload has been streamed.
+func (s *BackupService) patchManifestChecksums(zipPath string, manifest backupMetadata) error {
+	// ponytail: small backup, full rewrite is fine. If archives grow past
+	// tens of MiB, switch to a streaming rewrite that only re-encodes the
+	// manifest entry while copying the rest.
+	updated, err := json.Marshal(manifest)
+	if err != nil {
+		return err
+	}
+
+	in, err := os.Open(zipPath)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = in.Close() }()
+
+	info, err := in.Stat()
+	if err != nil {
+		return err
+	}
+	reader, err := zip.NewReader(in, info.Size())
+	if err != nil {
+		return err
+	}
+
+	out, err := os.CreateTemp(filepath.Dir(zipPath), filepath.Base(zipPath)+".rewriting-")
+	if err != nil {
+		return err
+	}
+	tmpOut := out.Name()
+	defer func() {
+		_ = out.Close()
+		_ = os.Remove(tmpOut)
+	}()
+
+	zw := zip.NewWriter(out)
+	for _, f := range reader.File {
+		header := &zip.FileHeader{
+			Name:     f.Name,
+			Method:   f.Method,
+			Modified: f.Modified,
+		}
+		w, err := zw.CreateHeader(header)
+		if err != nil {
+			return err
+		}
+		if f.Name == "backup-metadata.json" {
+			if _, err := w.Write(updated); err != nil {
+				return err
+			}
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			return err
+		}
+		if _, err := io.Copy(w, rc); err != nil {
+			_ = rc.Close()
+			return err
+		}
+		_ = rc.Close()
+	}
+	if err := zw.Close(); err != nil {
+		return err
+	}
+	if err := out.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmpOut, zipPath)
 }
 
 func (s *BackupService) filesForBackup(cfg model.BackupConfig) []struct {
@@ -836,38 +1060,185 @@ func (s *BackupService) addMetadataToZip(zipWriter *zip.Writer, metadata backupM
 	return nil
 }
 
-func (s *BackupService) addFileToZip(zipWriter *zip.Writer, srcPath, dstPath string) (bool, error) {
+func (s *BackupService) addFileToZip(zipWriter *zip.Writer, srcPath, dstPath string) (model.BackupFileEntry, bool, error) {
 	file, err := os.Open(srcPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return false, nil
+			return model.BackupFileEntry{}, false, nil
 		}
-		return false, fmt.Errorf("failed to open %s: %w", srcPath, err)
+		return model.BackupFileEntry{}, false, fmt.Errorf("failed to open %s: %w", srcPath, err)
 	}
 	defer func() { _ = file.Close() }()
 
 	info, err := file.Stat()
 	if err != nil {
-		return false, fmt.Errorf("failed to stat %s: %w", srcPath, err)
+		return model.BackupFileEntry{}, false, fmt.Errorf("failed to stat %s: %w", srcPath, err)
 	}
 
 	header, err := zip.FileInfoHeader(info)
 	if err != nil {
-		return false, fmt.Errorf("failed to build zip header for %s: %w", srcPath, err)
+		return model.BackupFileEntry{}, false, fmt.Errorf("failed to build zip header for %s: %w", srcPath, err)
 	}
 	header.Name = dstPath
 	header.Method = zip.Deflate
 
 	writer, err := zipWriter.CreateHeader(header)
 	if err != nil {
-		return false, fmt.Errorf("failed to add %s to zip: %w", srcPath, err)
+		return model.BackupFileEntry{}, false, fmt.Errorf("failed to add %s to zip: %w", srcPath, err)
 	}
 
-	if _, err := io.Copy(writer, file); err != nil {
-		return false, fmt.Errorf("failed to write %s to zip: %w", srcPath, err)
+	hasher := sha256.New()
+	mw := io.MultiWriter(writer, hasher)
+	if _, err := io.Copy(mw, file); err != nil {
+		return model.BackupFileEntry{}, false, fmt.Errorf("failed to write %s to zip: %w", srcPath, err)
 	}
 
-	return true, nil
+	return model.BackupFileEntry{
+		Path:     dstPath,
+		Size:     info.Size(),
+		Checksum: hex.EncodeToString(hasher.Sum(nil)),
+	}, true, nil
+}
+
+// verifyArchiveManifest reads the embedded manifest, validates every payload
+// entry against its recorded sha256, and returns the parsed manifest. A
+// missing, malformed, or mismatched archive is rejected before any file
+// touches disk.
+func verifyArchiveManifest(zipReader *zip.Reader) (backupMetadata, error) {
+	// ponytail: single read of every entry. Acceptable for backups bounded
+	// by the per-entry size cap; switch to streaming + selective verification
+	// only if backups grow past hundreds of MiB.
+	var manifest backupMetadata
+	manifestSeen := false
+	for _, f := range zipReader.File {
+		if f.Name != "backup-metadata.json" {
+			continue
+		}
+		manifestSeen = true
+		rc, err := f.Open()
+		if err != nil {
+			return backupMetadata{}, fmt.Errorf("open manifest: %w", err)
+		}
+		err = json.NewDecoder(rc).Decode(&manifest)
+		_ = rc.Close()
+		if err != nil {
+			return backupMetadata{}, fmt.Errorf("decode manifest: %w", err)
+		}
+		break
+	}
+	if !manifestSeen {
+		return backupMetadata{}, errors.New("missing backup-metadata.json")
+	}
+	if manifest.Version != currentManifestVersion {
+		return backupMetadata{}, fmt.Errorf("unsupported manifest version %d", manifest.Version)
+	}
+	if manifest.Algorithm != defaultChecksumAlgo {
+		return backupMetadata{}, fmt.Errorf("unsupported checksum algorithm %q", manifest.Algorithm)
+	}
+
+	expected := make(map[string]string, len(manifest.Files))
+	expectedSize := make(map[string]int64, len(manifest.Files))
+	for _, entry := range manifest.Files {
+		expected[entry.Path] = entry.Checksum
+		expectedSize[entry.Path] = entry.Size
+	}
+
+	for _, f := range zipReader.File {
+		if f.FileInfo().IsDir() || f.Name == "backup-metadata.json" {
+			continue
+		}
+		want, ok := expected[f.Name]
+		if !ok {
+			return backupMetadata{}, fmt.Errorf("unexpected entry %s not in manifest", f.Name)
+		}
+		if f.UncompressedSize64 != 0 && expectedSize[f.Name] != 0 && int64(f.UncompressedSize64) != expectedSize[f.Name] {
+			return backupMetadata{}, fmt.Errorf("size mismatch for %s: manifest=%d zip=%d", f.Name, expectedSize[f.Name], int64(f.UncompressedSize64))
+		}
+		got, err := checksumZipFile(f)
+		if err != nil {
+			return backupMetadata{}, fmt.Errorf("checksum %s: %w", f.Name, err)
+		}
+		if got != want {
+			return backupMetadata{}, fmt.Errorf("checksum mismatch for %s", f.Name)
+		}
+	}
+
+	return manifest, nil
+}
+
+// stageRestore extracts the verified archive into a fresh staging directory
+// under dataDir. The destination tree is only created if every entry passes
+// the per-entry size cap. Only entries listed in the verified manifest are
+// extracted, so the staging tree mirrors exactly what swap will publish.
+func (s *BackupService) stageRestore(zipReader *zip.Reader, manifest backupMetadata) (string, error) {
+	stagingDir, err := os.MkdirTemp(s.dataDir, "restore-staging-")
+	if err != nil {
+		return "", fmt.Errorf("create staging dir: %w", err)
+	}
+
+	// Build a lookup so we skip zip entries that the manifest did not
+	// authorize (defense in depth: verifyArchiveManifest already rejected
+	// mismatched archives, but filtering here keeps staging clean).
+	want := make(map[string]struct{}, len(manifest.Files))
+	for _, entry := range manifest.Files {
+		want[entry.Path] = struct{}{}
+	}
+
+	for _, file := range zipReader.File {
+		if file.FileInfo().IsDir() || file.Name == "backup-metadata.json" {
+			continue
+		}
+		if _, ok := want[file.Name]; !ok {
+			continue
+		}
+		if err := s.extractFileFromZip(file, stagingDir); err != nil {
+			_ = os.RemoveAll(stagingDir)
+			return "", fmt.Errorf("extract %s: %w", file.Name, err)
+		}
+	}
+
+	if len(manifest.Files) == 0 {
+		// No payload files in manifest; nothing to swap. Staging is empty but
+		// should not exist as a leftover; remove and return a sentinel path
+		// that swapStagingIntoDataDir will treat as a no-op.
+		_ = os.RemoveAll(stagingDir)
+		return "", nil
+	}
+
+	return stagingDir, nil
+}
+
+// swapStagingIntoDataDir atomically moves every file extracted under
+// stagingDir into s.dataDir. The set of files moved is derived from the
+// verified manifest (not from os.ReadDir of stagingDir) so nested paths
+// cannot collide with siblings and extra residue in staging can never be
+// published. Staging lives on the same filesystem as dataDir by
+// construction (os.MkdirTemp on s.dataDir), so os.Rename is atomic per file.
+func (s *BackupService) swapStagingIntoDataDir(stagingDir string, manifest backupMetadata) error {
+	if stagingDir == "" {
+		return nil
+	}
+	for _, entry := range manifest.Files {
+		rel := entry.Path
+		if rel == "" || strings.ContainsRune(rel, 0) {
+			return fmt.Errorf("manifest entry has invalid path: %q", rel)
+		}
+		srcPath := filepath.Join(stagingDir, filepath.FromSlash(rel))
+		dstPath := filepath.Join(s.dataDir, filepath.FromSlash(rel))
+		if _, err := os.Stat(srcPath); err != nil {
+			return fmt.Errorf("swap %s: missing in staging: %w", rel, err)
+		}
+		if err := os.MkdirAll(filepath.Dir(dstPath), 0755); err != nil {
+			return fmt.Errorf("swap %s: mkdir: %w", rel, err)
+		}
+		if err := os.Rename(srcPath, dstPath); err != nil {
+			return fmt.Errorf("swap %s: %w", rel, err)
+		}
+	}
+	// Cleanup is unconditional: if swap left residue we still want the
+	// staging directory gone so the next MkdirTemp pass can't collide.
+	_ = os.RemoveAll(stagingDir)
+	return nil
 }
 
 // maxBackupEntrySize caps the uncompressed size of a single backup entry to

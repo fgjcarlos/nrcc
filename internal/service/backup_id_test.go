@@ -26,7 +26,7 @@ func TestBackupService_RejectsTraversalID(t *testing.T) {
 		if err := svc.Delete(id); err == nil {
 			t.Errorf("Delete(%q): expected error", id)
 		}
-		if err := svc.Download(id, io.Discard); err == nil {
+		if err := svc.Download(id, io.Discard, ""); err == nil {
 			t.Errorf("Download(%q): expected error", id)
 		}
 	}
