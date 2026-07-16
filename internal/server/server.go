@@ -26,6 +26,7 @@ type Server struct {
 	envSvc           *service.EnvService
 	updateSvc        *service.UpdateService
 	backupSvc        *service.BackupService
+	librarySvc       *service.LibraryService
 	envHandler       *handler.EnvHandler
 	dockerHandler    *handler.DockerHandler
 	systemHandler    *handler.SystemHandler
@@ -291,6 +292,7 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 		envSvc:           envSvc,
 		updateSvc:        updateSvc,
 		backupSvc:        backupSvc,
+		librarySvc:       librarySvc,
 		envHandler:       envHandler,
 		dockerHandler:    dockerHandler,
 		systemHandler:    systemHandler,
@@ -370,6 +372,19 @@ func (s *Server) SetProcessManager(pm *service.ProcessManager) {
 				return err
 			}
 			return nil
+		})
+	}
+	// Wire the library service so npm install/uninstall triggers a Node-RED
+	// restart and the editor picks up new nodes without a container
+	// recreation. The restart is best-effort: a failing hook must not turn
+	// into an HTTP 500 on the install endpoint.
+	if s.librarySvc != nil {
+		start := pm.Start
+		s.librarySvc.SetNodeRedRestart(func() error {
+			if err := pm.Stop(); err != nil {
+				return err
+			}
+			return start()
 		})
 	}
 }

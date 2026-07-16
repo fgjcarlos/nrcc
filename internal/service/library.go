@@ -13,10 +13,17 @@ import (
 	"github.com/fgjcarlos/nrcc/internal/model"
 )
 
-// LibraryService handles package library operations with npm
+// LibraryService handles package library operations with npm.
 type LibraryService struct {
 	dataDir string
 	pm      PackageManager
+	// restart is an optional Node-RED restart hook fired after Install /
+	// Uninstall so the new set of nodes is picked up by the running
+	// process. nil disables the restart (external-Node-RED setups or
+	// tests). ponytail: full Stop+Start on every install — fine while
+	// installs are operator-initiated and infrequent; switch to a
+	// debounced signal if installs become background-driven.
+	restart func() error
 }
 
 // NewLibraryService creates a new library service with default npm package manager
@@ -30,6 +37,44 @@ func NewLibraryServiceWithPackageManager(dataDir string, pm PackageManager) *Lib
 		dataDir: dataDir,
 		pm:      pm,
 	}
+}
+
+// SetNodeRedRestart wires an optional Node-RED restart hook. Call this once
+// during startup with the ProcessManager's restart closure so Install /
+// Uninstall can pick up new nodes without restarting the container.
+func (s *LibraryService) SetNodeRedRestart(restart func() error) {
+	s.restart = restart
+}
+
+// Install installs a package using npm install and (best-effort) restarts
+// Node-RED so the running editor picks up the new node.
+func (s *LibraryService) Install(pkg string) error {
+	if err := s.pm.Install(pkg); err != nil {
+		return err
+	}
+	s.fireRestart()
+	return nil
+}
+
+// Uninstall uninstalls a package using npm uninstall and (best-effort)
+// restarts Node-RED.
+func (s *LibraryService) Uninstall(pkg string) error {
+	if err := s.pm.Uninstall(pkg); err != nil {
+		return err
+	}
+	s.fireRestart()
+	return nil
+}
+
+// fireRestart invokes the configured restart hook, ignoring the error.
+// Install/Uninstall must not fail when the runtime is unavailable
+// (external Node-RED, tests, dev loop with no running NR); the operator
+// can always restart manually.
+func (s *LibraryService) fireRestart() {
+	if s.restart == nil {
+		return
+	}
+	_ = s.restart()
 }
 
 // List returns installed npm packages with metadata from node_modules
@@ -121,16 +166,6 @@ func (s *LibraryService) enrichLibraryMetadata(lib *model.LibraryInfo) error {
 	}
 
 	return nil
-}
-
-// Install installs a package using npm install
-func (s *LibraryService) Install(pkg string) error {
-	return s.pm.Install(pkg)
-}
-
-// Uninstall uninstalls a package using npm uninstall
-func (s *LibraryService) Uninstall(pkg string) error {
-	return s.pm.Uninstall(pkg)
 }
 
 // searchRegistry represents the npm registry search response structure

@@ -305,6 +305,30 @@ and pull one to a chosen directory via
 retention-on-remote, and cloud-specific credential wiring are intentionally
 skipped — add when an operator asks for them.
 
+### Custom Node-RED nodes (npm library)
+
+The operator workflow promised by ADR 0003 — extend Node-RED without
+recompiling — is wired through three pieces that all share the per-instance
+volume:
+
+- `nrcc_node_modules` volume keeps `<DATA_DIR>/node_modules` (and the
+  matching `package.json` + lockfile) across container recreation and
+  image upgrades.
+- `NODE_RED_USER_DIR` (when set) tells Node-RED to read its userDir from a
+  path inside the same volume; default falls back to `DATA_DIR`.
+- `POST /api/libraries/install` (admin) calls `npm install` inside that
+  directory and triggers a Node-RED restart so the editor picks up the new
+  node without a container bounce.
+
+**What stays on the operator:** Function nodes, custom flows, credentials
+files in `flows_cred.json`, and any third-party node installed through the
+library UI. None of these require rebuilding the NRCC image.
+
+**What needs a new NRCC image:** behaviour added to the NRCC backend (a new
+endpoint, a different scheduler, a new off-host provider, etc.). Operators
+should pin `ghcr.io/fgjcarlos/nrcc:<version>` per instance rather than
+floating `:latest` when reproducibility matters.
+
 ## Development
 
 ### Start dev servers
