@@ -20,9 +20,13 @@
 
 services:
   nrcc:
+    # Default to building locally so a fresh clone works without a public
+    # GHCR tag. `docker compose pull && up` still uses the pinned image
+    # when a public `ghcr.io/fgjcarlos/nrcc:latest` exists (closes #442).
     image: ghcr.io/fgjcarlos/nrcc:latest
-    # Uncomment to build locally instead:
-    # build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: nrcc
     restart: unless-stopped
 
