@@ -1,0 +1,48 @@
+version: "3"
+# nrcc — single entry point. Replaces the old Makefile + per-stack compose files.
+# Install task: https://taskfile.dev/installation/
+#   task build    # build the image
+#   task up       # start the stack (--build on first run)
+#   task down     # stop the stack (keeps volumes)
+#   task logs     # stream logs
+#   task test     # go test ./...
+#   task clean    # remove image + stopped containers
+
+vars:
+  COMPOSE: docker compose
+
+tasks:
+  default:
+    cmds:
+      - task -l
+
+  build:
+    desc: Build the nrcc image
+    cmds:
+      - "{{.COMPOSE}} build"
+
+  up:
+    desc: Start the stack in the background
+    cmds:
+      - "{{.COMPOSE}} up -d --build"
+      - 'echo "nrcc UI: http://localhost:3001  Node-RED: http://localhost:1880"'
+
+  down:
+    desc: Stop the stack (volumes preserved)
+    cmds:
+      - "{{.COMPOSE}} down"
+
+  logs:
+    desc: Stream container logs
+    cmds:
+      - "{{.COMPOSE}} logs -f"
+
+  test:
+    desc: Run Go tests
+    cmds:
+      - go test ./...
+
+  clean:
+    desc: Remove the image and stopped containers
+    cmds:
+      - "{{.COMPOSE}} down --rmi local"
