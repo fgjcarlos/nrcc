@@ -1,0 +1,68 @@
+name: Acceptance (Docker stacks)
+
+# Issue #434 — proves the one-stack-per-Node-RED model holds across
+# multiple Compose projects on the same host (ADR 0003).
+#
+# This job boots two stacks, recreates one, and restores a backup into a
+# third. It only runs on PR (manual gate via label) and on main, never
+# on push-from-fork (where secrets and Docker Hub rate limits apply).
+
+on:
+  pull_request:
+    branches: [main]
+    # Limit which PRs kick this off; label-driven so we don't burn CI
+    # minutes on every docs PR.
+    types: [opened, synchronize, reopened, labeled]
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+# Cancel previous in-flight runs on the same ref so a force-push doesn't
+# queue duplicate stacks on the runner host.
+concurrency:
+  group: acceptance-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  acceptance:
+    name: Docker stack acceptance (#434)
+    runs-on: ubuntu-latest
+    # Skip on PRs from forks — the bake step requires registry auth we
+    # don't want to expose to untrusted contributors.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Build the canonical release image and load it into the runner's
+      # local daemon (no registry push). The `release` target reuses the
+      # `base` builder stage so we don't double-compile. The compose
+      # file hard-codes `image: ghcr.io/fgjcarlos/nrcc:latest`, so the
+      # bake output tag must match — which it does by default.
+      - name: Build release image (buildx bake --load)
+        run: docker buildx bake --load release
+
+      - name: Install jq for JSON parsing
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends jq
+
+      - name: Run acceptance suite
+        run: bash scripts/acceptance/docker-stacks.sh
+
+      - name: Upload compose logs on failure
+        if: failure()
+        run: |
+          for project in nrcc-acc-a nrcc-acc-b nrcc-acc-c; do
+            echo "=== logs for ${project} ==="
+            docker compose -p "$project" -f docker-compose.yml logs \
+              --no-color --tail=200 || true
+            docker compose -p "$project" -f docker-compose.yml down -v \
+              --remove-orphans || true
+          done
+        continue-on-error: true
