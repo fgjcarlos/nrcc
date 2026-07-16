@@ -1034,6 +1034,112 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /api/backups/provider:
+    get:
+      tags: [Backups]
+      operationId: getBackupProvider
+      summary: Get the active off-host backup provider
+      description: Returns the provider name (`restic` when NRCC_RESTIC_REPO is set, `local` otherwise).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Provider name
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  provider:
+                    type: string
+                    enum: [local, restic]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/backups/provider/snapshots:
+    get:
+      tags: [Backups]
+      operationId: listProviderSnapshots
+      summary: List remote-provider snapshots
+      description: |
+        Returns the snapshots held by the configured off-host provider
+        (Restic). Returns 503 when no provider is configured.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Snapshots (newest first)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  provider:
+                    type: string
+                  snapshots:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        time: { type: string, format: date-time }
+                        size: { type: integer, format: int64 }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          description: No remote provider configured
+        "502":
+          description: Provider call failed (network, auth, etc.)
+
+  /api/backups/provider/restore:
+    post:
+      tags: [Backups]
+      operationId: restoreProviderSnapshot
+      summary: Pull a remote snapshot to a local destination
+      description: |
+        Pulls the snapshot identified by `id` from the configured off-host
+        provider into `destination` (an absolute directory path). The
+        restored tree preserves the source path layout of the remote
+        snapshot; the handler does not swap files into the live runtime.
+        To actually swap, use the local ZIP path:
+        create/import a local archive from the restored files and call
+        `POST /api/backups/{local-id}/restore`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id]
+              properties:
+                id:
+                  type: string
+                  description: Remote snapshot id
+                destination:
+                  type: string
+                  description: Absolute path on the host filesystem
+      responses:
+        "200":
+          description: Restore completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  provider: { type: string }
+                  id: { type: string }
+                  destination: { type: string }
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "502":
+          description: Provider call failed
+        "503":
+          description: No remote provider configured
+
   /api/scheduler/config:
     post:
       tags: [Backups]

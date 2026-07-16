@@ -51,6 +51,7 @@ type BackupService struct {
 	backupDir  string
 	scheduler  *backupScheduler
 	eventStore *backupEventStore
+	provider   BackupProvider
 
 	mu           sync.Mutex
 	quiesceFunc  func() error
@@ -104,6 +105,25 @@ func (s *BackupService) SetRestoreHooks(quiesce, restart func() error) {
 	defer s.mu.Unlock()
 	s.quiesceFunc = quiesce
 	s.restartFunc = restart
+}
+
+// SetBackupProvider installs the optional off-host provider. nil disables
+// remote uploads (the default). Safe to call once at startup; subsequent
+// calls overwrite the previous provider without coordination.
+func (s *BackupService) SetBackupProvider(p BackupProvider) {
+	s.mu.Lock()
+	s.provider = p
+	s.mu.Unlock()
+}
+
+// BackupProvider returns the currently installed provider or NoopProvider{}.
+func (s *BackupService) BackupProvider() BackupProvider {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.provider == nil {
+		return NoopProvider{}
+	}
+	return s.provider
 }
 
 // Start begins background scheduler processing for automatic backups.
@@ -741,7 +761,54 @@ func (s *BackupService) createBackup(options createBackupOptions) (model.Backup,
 	prunedIDs, pruneErr := s.pruneBackups(config, backupType, backupID)
 	s.recordBackupCreated(backup, prunedIDs)
 
+	// Best-effort off-host push. The local snapshot is authoritative; a
+	// remote failure is recorded as an observability event but does not
+	// fail the call.
+	//
+	// ponytail: dispatched in a goroutine to keep HTTP responses snappy on
+	// slow remotes (S3, rest-server behind WAN). The goroutine has no
+	// bounded queue today — if many snapshots pile up before init finishes
+	// the restic cache dir will serialize them anyway. Upgrade by routing
+	// through a worker pool when concurrent upload rates start hurting.
+	go s.pushToProviderIfConfigured(context.Background(), backup)
+
 	return backup, pruneErr
+}
+
+// pushToProviderIfConfigured uploads the local archive to the configured
+// remote provider. Failures are recorded as observability events; the local
+// backup is never rolled back.
+func (s *BackupService) pushToProviderIfConfigured(ctx context.Context, backup model.Backup) {
+	provider := s.BackupProvider()
+	if _, ok := provider.(NoopProvider); ok {
+		return
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	remoteID, err := provider.Snapshot(ctx, backup.Path)
+	if err != nil {
+		s.recordEvent(model.BackupEvent{
+			Type:       model.BackupEventTypeProviderPush,
+			Status:     "error",
+			BackupID:   backup.ID,
+			BackupName: backup.Name,
+			BackupType: backup.Type,
+			Message:    fmt.Sprintf("Remote push to %s failed", provider.Name()),
+			Trigger:    "provider-push",
+			Error:      err.Error(),
+		})
+		return
+	}
+	s.recordEvent(model.BackupEvent{
+		Type:       model.BackupEventTypeProviderPush,
+		Status:     "success",
+		BackupID:   backup.ID,
+		BackupName: backup.Name,
+		BackupType: backup.Type,
+		Message:    fmt.Sprintf("Remote push to %s ok (%s)", provider.Name(), remoteID),
+		Trigger:    "provider-push",
+	})
 }
 
 // patchManifestChecksums rewrites the on-disk archive's manifest entry to

@@ -119,6 +119,7 @@ const (
 	BackupEventTypeSchedulerConfig  BackupEventType = "scheduler-config"
 	BackupEventTypeSchedulerRun     BackupEventType = "scheduler-run"
 	BackupEventTypeSchedulerError   BackupEventType = "scheduler-error"
+	BackupEventTypeProviderPush     BackupEventType = "provider-push"
 )
 
 // BackupEvent captures a recent backup/scheduler event for observability.

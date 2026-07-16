@@ -6,7 +6,9 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/fgjcarlos/nrcc/internal/audit"
 	"github.com/fgjcarlos/nrcc/internal/model"
@@ -401,6 +403,99 @@ func (h *BackupHandler) PatchStorageRetention(w http.ResponseWriter, r *http.Req
 	response := model.RetentionConfigResponse(req)
 
 	model.RespondJSON(w, http.StatusOK, response)
+}
+
+// GetBackupProvider returns the currently configured backup provider name.
+// GET /api/backups/provider
+func (h *BackupHandler) GetBackupProvider(w http.ResponseWriter, r *http.Request) {
+	provider := h.svc.BackupProvider()
+	model.RespondJSON(w, http.StatusOK, map[string]string{
+		"provider": provider.Name(),
+	})
+}
+
+// ListProviderSnapshots returns the remote provider's snapshots.
+// GET /api/backups/provider/snapshots
+func (h *BackupHandler) ListProviderSnapshots(w http.ResponseWriter, r *http.Request) {
+	provider := h.svc.BackupProvider()
+	if _, ok := provider.(service.NoopProvider); ok {
+		model.RespondError(w, http.StatusServiceUnavailable, "PROVIDER_DISABLED", "No remote backup provider is configured")
+		return
+	}
+	snaps, err := provider.List(r.Context())
+	if err != nil {
+		model.RespondError(w, http.StatusBadGateway, "PROVIDER_ERROR", err.Error())
+		return
+	}
+	model.RespondJSON(w, http.StatusOK, map[string]interface{}{
+		"provider":  provider.Name(),
+		"snapshots": snaps,
+	})
+}
+
+// RestoreProviderSnapshot pulls a remote snapshot into the data directory.
+// POST /api/backups/provider/restore
+// body: { "id": "<remote-id>", "destination": "<absolute path>" }
+//
+// `destination` is required and must be an absolute path with no `..`
+// segments (the handler refuses to follow symlinks out of the destination).
+// When omitted or empty the handler returns 400 — restic itself accepts a
+// relative target and the operator would otherwise end up writing inside
+// the NRCC working directory, which is rarely what they want.
+func (h *BackupHandler) RestoreProviderSnapshot(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ID          string `json:"id"`
+		Destination string `json:"destination"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+		return
+	}
+	if req.ID == "" {
+		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "id is required")
+		return
+	}
+	if !isSafeAbsoluteDestination(req.Destination) {
+		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "destination must be an absolute path with no '..' segments")
+		return
+	}
+	provider := h.svc.BackupProvider()
+	if _, ok := provider.(service.NoopProvider); ok {
+		model.RespondError(w, http.StatusServiceUnavailable, "PROVIDER_DISABLED", "No remote backup provider is configured")
+		return
+	}
+	if err := provider.Restore(r.Context(), req.ID, req.Destination); err != nil {
+		model.RespondError(w, http.StatusBadGateway, "PROVIDER_ERROR", err.Error())
+		return
+	}
+	model.RespondJSON(w, http.StatusOK, map[string]string{
+		"provider":    provider.Name(),
+		"id":          req.ID,
+		"destination": req.Destination,
+	})
+}
+
+// isSafeAbsoluteDestination returns true when dest is an absolute path
+// without parent-directory traversal segments. Symlinks are not resolved
+// here; the provider layer uses the path verbatim and the operator is
+// trusted to point at a safe location on the host.
+func isSafeAbsoluteDestination(dest string) bool {
+	if dest == "" {
+		return false
+	}
+	if !filepath.IsAbs(dest) {
+		return false
+	}
+	cleaned := filepath.Clean(dest)
+	if cleaned != dest {
+		return false
+	}
+	for _, seg := range strings.Split(cleaned, string(filepath.Separator)) {
+		if seg == ".." {
+			return false
+		}
+	}
+	return true
 }
 
 // Helper functions
