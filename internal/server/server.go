@@ -24,6 +24,7 @@ type Server struct {
 	hostSvc          *service.HostService
 	envSvc           *service.EnvService
 	updateSvc        *service.UpdateService
+	backupSvc        *service.BackupService
 	envHandler       *handler.EnvHandler
 	dockerHandler    *handler.DockerHandler
 	systemHandler    *handler.SystemHandler
@@ -279,6 +280,7 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 		hostSvc:          hostSvc,
 		envSvc:           envSvc,
 		updateSvc:        updateSvc,
+		backupSvc:        backupSvc,
 		envHandler:       envHandler,
 		dockerHandler:    dockerHandler,
 		systemHandler:    systemHandler,
@@ -345,6 +347,20 @@ func (s *Server) SetProcessManager(pm *service.ProcessManager) {
 	// Wire process manager into system handler for runtime history endpoint
 	if s.systemHandler != nil {
 		s.systemHandler.SetProcessManager(pm)
+	}
+	// Wire the lifecycle hooks into the backup service so a restore can
+	// quiesce Node-RED and restart it after files are swapped into dataDir.
+	// Both stops are best-effort; failure is recorded in the backup event
+	// stream but does not roll back a successful restore.
+	if s.backupSvc != nil {
+		stop := pm.Stop
+		start := pm.Start
+		s.backupSvc.SetRestoreHooks(stop, func() error {
+			if err := start(); err != nil {
+				return err
+			}
+			return nil
+		})
 	}
 }
 

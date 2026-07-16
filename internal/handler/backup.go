@@ -159,9 +159,15 @@ func (h *BackupHandler) DeleteBackup(w http.ResponseWriter, r *http.Request) {
 }
 
 // DownloadBackup downloads a backup
-// GET /api/backups/{id}/download
+// GET /api/backups/{id}/download[?password=...]
+//
+// If `password` is supplied, the zip bytes are wrapped with AES-256-GCM using
+// the operator's passphrase; the client must decrypt with the same passphrase
+// to recover the original archive. Without a password the raw zip is streamed
+// unchanged for back-compat with existing callers.
 func (h *BackupHandler) DownloadBackup(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+	password := r.URL.Query().Get("password")
 
 	// Validate before writing any headers so a malicious id never reaches the
 	// Content-Disposition filename and never resolves to a path outside backups.
@@ -186,13 +192,36 @@ func (h *BackupHandler) DownloadBackup(w http.ResponseWriter, r *http.Request) {
 	}
 	defer func() { _ = rc.Close() }()
 
-	w.Header().Set("Content-Type", "application/zip")
-	w.Header().Set("Content-Disposition", "attachment; filename=\"backup-"+id+".zip\"")
-	w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
+	// Raw path keeps Content-Length so a client can detect a truncated
+	// stream. The encrypted path computes Content-Length up-front so a
+	// mid-stream error becomes a 500, not an HTTP 200 with truncated
+	// ciphertext.
+	if password == "" {
+		w.Header().Set("Content-Type", "application/zip")
+		w.Header().Set("Content-Disposition", "attachment; filename=\"backup-"+id+".zip\"")
+		w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
+		_, _ = io.Copy(w, rc)
+		return
+	}
 
-	// Headers are now committed; a mid-stream copy error can no longer change the
-	// status, but Content-Length lets the client detect a truncated download.
-	_, _ = io.Copy(w, rc)
+	data, err := io.ReadAll(rc)
+	if err != nil {
+		model.RespondError(w, http.StatusInternalServerError, "BACKUP_ERROR", "Failed to read backup")
+		return
+	}
+	encrypted, err := service.EncryptForDownload(data, password)
+	if err != nil {
+		model.RespondError(w, http.StatusInternalServerError, "BACKUP_ERROR", "Failed to encrypt backup")
+		return
+	}
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", "attachment; filename=\"backup-"+id+".zip.enc\"")
+	w.Header().Set("Content-Length", strconv.Itoa(len(encrypted)))
+	if _, err := w.Write(encrypted); err != nil {
+		// Headers already sent; the client will see Content-Length mismatch.
+		// The error is best-effort logged elsewhere.
+		return
+	}
 }
 
 // RestoreBackup restores a backup
