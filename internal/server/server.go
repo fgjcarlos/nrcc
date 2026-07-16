@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -78,6 +79,12 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 	// Phase 6 handlers
 	backupSvc := service.NewBackupService(dataDir)
 	backupHandler := handler.NewBackupHandler(backupSvc)
+	if provider, perr := service.NewResticProviderFromEnv(); perr != nil {
+		log.Printf("backup: restic provider misconfigured: %v", perr)
+	} else if provider != nil {
+		backupSvc.SetBackupProvider(provider)
+		log.Printf("backup: restic provider configured (%s)", provider.Repo)
+	}
 	envSvc := service.NewEnvService(configSvc, os.Getenv("NRCC_ENCRYPTION_KEY"))
 	envHandler := handler.NewEnvHandler(envSvc, dataDir) // TAREA 2c: Pass dataDir
 	flowSvc := service.NewFlowService(dataDir)
@@ -197,6 +204,9 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 			r.Get("/storage", backupHandler.GetBackupStorage)
 			r.Get("/config", backupHandler.GetBackupConfig)
 			r.With(middleware.RequireAdmin).Post("/config", backupHandler.PostBackupConfig)
+			r.Get("/provider", backupHandler.GetBackupProvider)
+			r.Get("/provider/snapshots", backupHandler.ListProviderSnapshots)
+			r.With(middleware.RequireAdmin).Post("/provider/restore", backupHandler.RestoreProviderSnapshot)
 			r.Get("/{id}", backupHandler.GetBackupDetail)
 			r.With(middleware.RequireAdmin).Delete("/{id}", backupHandler.DeleteBackup)
 			r.Get("/{id}/download", backupHandler.DownloadBackup)

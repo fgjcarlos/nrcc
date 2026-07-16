@@ -155,6 +155,11 @@ cp .env.example .env
 | `PORT` | 3001 | HTTP server port |
 | `DATA_DIR` | `./data` | Directory for config, users, backups |
 | `NRCC_BACKUP_DIR` | `<DATA_DIR>/backups` | Dedicated per-instance volume for backup archives |
+| `NRCC_RESTIC_REPO` | (disabled) | When set, enables the Restic off-host provider. Value is `RESTIC_REPOSITORY` (path, `local:/path`, `s3:bucket`, etc.). |
+| `NRCC_RESTIC_PASSWORD` | (unset) | Passphrase for the Restic repository. Required if `NRCC_RESTIC_PASSWORD_FILE` is unset. |
+| `NRCC_RESTIC_PASSWORD_FILE` | (unset) | Path to a file containing the Restic passphrase (preferred in production; mount a Docker secret). |
+| `NRCC_RESTIC_BINARY` | `restic` | Absolute path to the restic binary when it isn't on `$PATH`. |
+| `NRCC_RESTIC_CACHE_DIR` | `<tmp>/nrcc-restic-cache` | Local cache directory restic uses for blob storage. |
 | `EDGE_MODE` | `false` | Opt-in edge mode for constrained deployments (resource-safe defaults). See [ADR 0002](docs/adr/0002-edge-mode-defaults-and-exposure-ux.md) |
 | `JWT_SECRET` | (insecure) | ⚠️ **Must set in production** |
 | `NODE_RED_CMD` | `node-red` | Path to node-red executable |
@@ -289,6 +294,16 @@ swaps files in place. To place backups on a dedicated volume, set
 zip with AES-256-GCM using the supplied passphrase (decrypt with the same
 passphrase to recover the archive). The raw download path stays unencrypted
 for back-compat with existing tooling.
+
+**Off-host provider (Restic):** Set `NRCC_RESTIC_REPO` (plus a passphrase via
+`NRCC_RESTIC_PASSWORD` or `NRCC_RESTIC_PASSWORD_FILE`) to mirror every local
+backup to a Restic repository. The local ZIP is still authoritative; a remote
+push failure is recorded as a `provider-push` event and does not roll back the
+local archive. List remote snapshots via `GET /api/backups/provider/snapshots`
+and pull one to a chosen directory via
+`POST /api/backups/provider/restore` (admin). ponytail: prune, check,
+retention-on-remote, and cloud-specific credential wiring are intentionally
+skipped — add when an operator asks for them.
 
 ## Development
 
