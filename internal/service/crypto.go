@@ -12,6 +12,16 @@ import (
 
 const encPrefix = "enc:"
 
+// GenerateJWTSecret returns 32 random bytes hex-encoded. Moved here from
+// the removed installer package; only main.go's JWT bootstrap uses it.
+func GenerateJWTSecret() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("failed to generate JWT secret: %w", err)
+	}
+	return fmt.Sprintf("%x", b), nil
+}
+
 func deriveKey(passphrase string) []byte {
 	hash := sha256.Sum256([]byte(passphrase))
 	return hash[:]

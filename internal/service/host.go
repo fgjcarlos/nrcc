@@ -565,6 +565,20 @@ func runtimeState(running, detected bool) string {
 	}
 }
 
+// availableNodeRedInstallOptions returns the Node-RED install modes the host
+// can run, filtered by what's actually installed. Kept here after the
+// installer package was removed (was internal/service/installer.go).
+func availableNodeRedInstallOptions(status model.HostStatus) []string {
+	options := []string{"skip"}
+	if status.NPM.Installed {
+		options = append(options, "native")
+	}
+	if status.Docker.Installed {
+		options = append(options, "docker")
+	}
+	return options
+}
+
 func buildBootstrapOptionsDisplay(options []string) string {
 	var optionTexts []string
 	optionMap := map[string]string{

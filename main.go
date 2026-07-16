@@ -12,7 +12,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/fgjcarlos/nrcc/cmd"
 	"github.com/fgjcarlos/nrcc/internal/middleware"
 	"github.com/fgjcarlos/nrcc/internal/model"
 	"github.com/fgjcarlos/nrcc/internal/server"
@@ -27,15 +26,7 @@ func main() {
 	// Initialize UI (pterm configuration)
 	ui.Init()
 
-	// If arguments provided, route to CLI
-	if len(os.Args) > 1 {
-		if err := cmd.Execute(); err != nil {
-			os.Exit(1)
-		}
-		return
-	}
-
-	// No arguments: run server
+	// The nrcc binary is server-only (ADR 0003 / Docker-first).
 	runServer()
 }
 
