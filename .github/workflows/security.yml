@@ -80,9 +80,8 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Build image for scanning
-        # Use the standalone Dockerfile.scan to keep this step independent
-        # of the bake orchestration (see Dockerfile.scan comment for why).
-        run: docker build -f Dockerfile.scan -t nrcc:scan .
+        # Single Dockerfile now — same target as compose's local build.
+        run: docker build -f Dockerfile -t nrcc:scan .
 
       # Non-blocking: base image (nodered/node-red) carries upstream CVEs
       # outside our control. Results are uploaded to GitHub Security tab.

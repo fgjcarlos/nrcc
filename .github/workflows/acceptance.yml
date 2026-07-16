@@ -41,13 +41,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Build the canonical release image and load it into the runner's
-      # local daemon (no registry push). The `release` target reuses the
-      # `base` builder stage so we don't double-compile. The compose
-      # file hard-codes `image: ghcr.io/fgjcarlos/nrcc:latest`, so the
-      # bake output tag must match — which it does by default.
-      - name: Build release image (buildx bake --load)
-        run: docker buildx bake --load release
+      # Build the canonical release image via plain `docker compose build`
+      # (no separate `bake` target anymore) and load it into the runner's
+      # local daemon. The compose file tags the build as the project-default
+      # image name.
+      - name: Build release image
+        run: docker compose build
 
       - name: Install jq for JSON parsing
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends jq

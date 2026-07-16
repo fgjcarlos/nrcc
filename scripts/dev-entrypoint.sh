@@ -2,7 +2,7 @@
 # dev-entrypoint.sh — installs Go + air if not present, then starts air
 set -e
 
-# Keep in sync with go.mod, CI, and Dockerfile.dev.
+# Keep in sync with go.mod and the frontend dev instructions in README.md.
 GO_VERSION="${GO_VERSION:-1.25.12}"
 GO_ARCH="amd64"
 GO_TAR="go${GO_VERSION}.linux-${GO_ARCH}.tar.gz"

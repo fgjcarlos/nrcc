@@ -42,3 +42,10 @@ frontend/.pnpm-store/
 
 # Pi subagent runtime scratch (per-session, never tracked).
 .pi-subagents/
+
+# Host-private compose overrides and one-off backup snapshots must
+# never leak into a PR — use explicit `git add <path>` only.
+docker-compose.override.yml
+docker-compose.*.yml
+*.bak-*
+*.bak
