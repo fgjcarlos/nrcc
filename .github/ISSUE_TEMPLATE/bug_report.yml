@@ -1,0 +1,106 @@
+name: Bug report
+description: Report something that is broken, unexpected, or unsafe.
+title: "fix(scope): short imperative description"
+labels:
+  - "bug"
+  - "status:needs-review"
+body:
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Pre-flight checks
+      description: Confirm before opening so the issue can be triaged.
+      options:
+        - label: I have searched existing issues and this is not a duplicate.
+          required: true
+        - label: I understand this issue needs `status:approved` from a maintainer before any PR can be opened.
+          required: true
+        - label: I am reporting a bug (not a feature request). Feature requests use the Feature Request template.
+          required: true
+  - type: markdown
+    attributes:
+      value: |
+        **Issue label** — Issues are auto-labelled `bug` and `status:needs-review`.
+        A maintainer must add `status:approved` before a PR can be opened.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Bug summary
+      description: One or two sentences describing what is broken.
+      placeholder: |
+        `nrcc config save` succeeds but the resulting `settings.js` loses the existing adminAuth section.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Minimal sequence that reproduces the bug. Numbered list, please.
+      placeholder: |
+        1. Open the Configuration view in the UI.
+        2. Toggle "Projects enabled" and save.
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should have happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What actually happened. Include relevant error text and stack traces.
+    validations:
+      required: true
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Deployment mode
+      description: Which NRCC deployment model are you running?
+      options:
+        - Docker Compose (canonical)
+        - Docker (custom)
+        - Native (systemd)
+        - Native (binary)
+        - Other / not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Linux
+        - macOS
+        - Windows
+        - WSL
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: NRCC version
+      description: Output of `nrcc --version`, or the image tag you are running.
+      placeholder: v0.1.0 / ghcr.io/fgjcarlos/nrcc:v0.1.0
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Paste logs from the UI, `docker compose logs`, or `nrcc install` output. Wrap in a fenced code block.
+    validations:
+      required: false
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Screenshots, workarounds, related issues, or anything else relevant.
+    validations:
+      required: false

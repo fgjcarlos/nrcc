@@ -1,6 +1,7 @@
 # NRCC Color Reference — Quick Lookup
 
 ## Dark Theme (corporateDark)
+
 ```css
 /* Primary (Signal Red) */
 #ff3b30  primary
@@ -33,6 +34,7 @@
 ```
 
 ## Light Theme (corporateLight)
+
 ```css
 /* Primary (Corporate Red) */
 #d92d20  primary
@@ -65,6 +67,7 @@
 ```
 
 ## Shadow Definitions
+
 ```css
 /* Custom shadows in tailwind.config.js */
 shadow-glow:       0 24px 60px rgba(0, 0, 0, 0.42), 0 0 0 1px rgba(148, 163, 184, 0.08)
@@ -74,6 +77,7 @@ shadow-glow-light: 0 24px 48px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(15, 23, 42
 ```
 
 ## Background Gradients
+
 ```css
 /* Dark Mode Body Background */
 linear-gradient(90deg, rgba(56, 189, 248, 0.04) 1px, transparent 1px),     /* Grid X */
@@ -91,6 +95,7 @@ linear-gradient(180deg, #fbfcfd 0%, #f7f9fb 48%, #edf2f6 100%);              /* 
 ```
 
 ## Opacity Rules (Dark Mode)
+
 ```
 Borders:           14-16% opacity
 Hover backgrounds: 6-8% opacity
@@ -102,6 +107,7 @@ Glass panel:       68-78% opacity (gradient stop)
 ```
 
 ## Border Radius Values
+
 ```css
 --radius-selector: .375rem  (6px)    /* Button/card corners — UNUSED */
 --radius-field:    .25rem   (4px)    /* Input corners — UNUSED */
@@ -114,6 +120,7 @@ rounded-2xl  →  16px (warning banner)
 ```
 
 ## Typography CSS Utilities
+
 ```css
 .text-display       font-weight: 700, letter-spacing: -0.02em, line-height: 1.1
 .text-headline      font-weight: 600, letter-spacing: -0.01em, line-height: 1.25, margin-top: 3rem
@@ -130,6 +137,7 @@ rounded-2xl  →  16px (warning banner)
 ## Component Class Variants
 
 ### Button Classes
+
 ```css
 .btn-primary    Red gradient (dark) / Red solid (light)
 .btn-secondary  Ghost border with sky/blue hover
@@ -142,6 +150,7 @@ rounded-2xl  →  16px (warning banner)
 ```
 
 ### Semantic Surface Classes
+
 ```css
 .glass-panel       Glassmorphism: blur 18px + gradient + glow shadow
 .surface-panel     Filled panel: gradient background + border
@@ -151,12 +160,14 @@ rounded-2xl  →  16px (warning banner)
 ```
 
 ### Input Focus States
+
 ```css
 .input-focus-glow  4px box-shadow with primary color
 .input-error-glow  4px box-shadow with error red
 ```
 
 ## Overlay & Modals
+
 ```css
 .modal-overlay      Backdrop: 75% dark (dark), 25% dark (light)
 .modal-inner        Inner panel: subtle background
@@ -166,7 +177,7 @@ rounded-2xl  →  16px (warning banner)
 ## Key Properties Used in Components
 
 | Component | Primary Hex | Accent Hex | Border | Shadow |
-|-----------|------------|-----------|--------|--------|
+| ----------- | ------------ | ----------- | -------- | -------- |
 | Button (dark) | #ff3b30 | N/A | rgba(255,59,48, 0.32) | glow |
 | Button (light) | #d92d20 | N/A | rgba(217,45,32, 0.18) | glow-light |
 | Input (dark) | #38bdf8 (focus) | N/A | none | input-focus-glow |
@@ -177,4 +188,4 @@ rounded-2xl  →  16px (warning banner)
 ---
 
 **Last Updated**: 14/05/2026  
-**Analysis**: See `frontend/FRONTEND_ANALYSIS.md` for full report
+**Token reference**: See [`frontend/docs/SIGNAL_PRIME_TOKENS.md`](docs/SIGNAL_PRIME_TOKENS.md) for the canonical Signal Prime design token reference.

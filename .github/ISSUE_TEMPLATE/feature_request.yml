@@ -1,0 +1,80 @@
+name: Feature request
+description: Propose a new feature or an enhancement to an existing one.
+title: "<type(scope): short imperative description>"
+labels:
+  - "enhancement"
+  - "status:needs-review"
+body:
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Pre-flight checks
+      description: Confirm before opening so the issue can be triaged.
+      options:
+        - label: I have searched existing issues and this is not a duplicate.
+          required: true
+        - label: I understand this issue needs `status:approved` from a maintainer before any PR can be opened.
+          required: true
+        - label: I am proposing a feature request (not a bug report). Bug reports use the Bug Report template.
+          required: true
+  - type: markdown
+    attributes:
+      value: |
+        **Issue label** — Issues are auto-labelled `enhancement` and `status:needs-review`.
+        A maintainer must add `status:approved` before a PR can be opened.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem description
+      description: What is the pain point this feature would solve? Be specific about who is affected and how often.
+      placeholder: |
+        Operators today have to SSH into the host and hand-edit ...
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How should the feature work from the user's perspective? Sketch the user-visible behavior, not the implementation.
+      placeholder: |
+        Add an env-vars page that shows live values, decrypted ...
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      description: Which surface of NRCC does this feature touch?
+      options:
+        - Backend (Go services / API)
+        - Frontend (React UI)
+        - Docker image / compose
+        - CLI / installer
+        - Auth / RBAC / MFA
+        - Backups / restore
+        - Configuration (settings.js)
+        - Environment variables
+        - npm library management
+        - Flow viewer / export / versioning
+        - System monitoring / metrics
+        - Files / uploads
+        - Docs (README / GitHub Pages)
+        - CI / workflows
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other options you thought about, and why this one is the right call.
+    validations:
+      required: false
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Mockups, links to PRs/issues, screenshots, logs, or any other supporting material.
+    validations:
+      required: false

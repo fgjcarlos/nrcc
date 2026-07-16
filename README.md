@@ -5,7 +5,7 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Go 1.25+](https://img.shields.io/badge/Go-1.25%2B-00ADD8?logo=go)](go.mod)
 
-A single-binary management UI for Node-RED. Run it alongside Node-RED to get a web dashboard for configuration, backups, logs, and more.
+A single-binary management UI for one Node-RED instance. The canonical deployment model is **one Docker Compose service containing one NRCC and one Node-RED runtime**, backed by persistent per-instance volumes. Spin up multiple stacks to run multiple Node-RED instances; each stack has its own credentials, settings, backups, and host ports.
 
 > **Status: Beta · hardening phase.**
 > nrcc is feature-complete for its MVP scope but it is **not** 1.0. There is no SLA, no promised compatibility between minor versions, and no external security audit has been performed. Run it behind your firewall and review the security notes in [`SECURITY.md`](SECURITY.md) before exposing it publicly. Tag releases are published from `main` — see the [Releases page](https://github.com/fgjcarlos/nrcc/releases).
@@ -13,134 +13,82 @@ A single-binary management UI for Node-RED. Run it alongside Node-RED to get a w
 ## Features
 
 - **Authentication** — JWT-based auth with multi-user support (admin/user roles)
-- **Process Management** — Start, stop, restart Node-RED remotely
+- **Process Management** — Start, stop, restart Node-RED inside the stack
 - **Live Logs** — near-real-time view of Node-RED output (polled)
-- **Configuration Editor** — Edit Node-RED config with validation
-- **Backup & Restore** — One-click backups, timestamped archives, restore with integrity checks
-- **Environment Management** — Manage Node-RED environment variables
-- **npm Library Management** — Install/update/remove npm packages
+- **Configuration Editor** — Edit Node-RED `settings.js` with validation
+- **Backup & Restore** — One-click backups, timestamped archives on a persistent volume
+- **Environment Management** — Manage Node-RED environment variables from the UI
+- **npm Library Management** — Install/update/remove npm packages into the persistent Node-RED userDir
 - **Flow Viewer & Export** — View and export Node-RED flows
 - **System Monitoring** — CPU, memory, disk, uptime stats
 - **File Upload/Download** — Manage user files and uploads
-- **Portless integration** — Install Portless and expose nrcc or Node-RED with named local HTTPS URLs
 
 ## Requirements
 
+- Docker 24+ and Docker Compose (canonical stack deployment)
 - Go 1.25+ (to build from source)
 - For source/frontend builds: Node.js 22+ and pnpm 11+
-- For `nrcc install`: a supported Linux package manager when dependencies must be installed automatically (`apt-get`, `dnf`, `yum`, `pacman`, `zypper`, or `apk`)
 
-## Quick Install
+## Quick Start — Docker (canonical)
 
-The fastest way to get nrcc running as a system service:
+One stack = one NRCC + one Node-RED + one persistent volume. Distinct host ports per stack:
 
-### Prerequisites
+```yaml
+services:
+  nodered:
+    image: ghcr.io/fgjcarlos/nrcc:latest
+    ports:
+      - "3001:3001"   # nrcc UI / API
+      - "1880:1880"   # Node-RED editor
+    environment:
+      PORT: "3001"
+      DATA_DIR: /data
+      NODE_RED_PORT: "1880"
+    volumes:
+      - nrcc_data:/data
+      - nrcc_backups:/data/backups
+      - nrcc_node_modules:/data/node_modules
 
-- `curl` — for downloading the installer
-- `sha256sum` (Linux) or `shasum` (macOS) — for checksum verification (part of GNU coreutils)
-
-### One-Liner Install
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/fgjcarlos/nrcc/main/scripts/install.sh | sh
+volumes:
+  nrcc_data:
+  nrcc_backups:
+  nrcc_node_modules:
 ```
 
-Then set up the system service:
+A second instance = a second Compose service with different host ports and its own volume:
 
-```bash
-sudo nrcc install
+```yaml
+  nodered-b:
+    image: ghcr.io/fgjcarlos/nrcc:latest
+    ports:
+      - "3002:3001"
+      - "1881:1880"
+    volumes:
+      - nrcc_data_b:/data
+      - nrcc_backups_b:/data/backups
+      - nrcc_node_modules_b:/data/node_modules
 ```
 
-In an interactive terminal, `sudo nrcc install` opens a guided wizard that detects the host, lets you choose the Node-RED path, and can configure Portless local HTTPS in-flow. If you select Portless quick setup, open **https://nrcc.localhost**; otherwise open **http://localhost:3001** and set up your admin user.
+Open the first instance at **<http://localhost:3001>** → set up the admin user → log in.
 
-### Version Pinning
+### What persists per instance
 
-Install a specific version:
+Each stack owns its own persistent data:
 
-```bash
-NRCC_VERSION=v0.1.0 curl -fsSL https://raw.githubusercontent.com/fgjcarlos/nrcc/main/scripts/install.sh | sh
-```
+- Node-RED flows, credentials, `settings.js`, projects, function nodes
+- Installed npm nodes (`node_modules`)
+- NRCC users, configuration, encrypted secrets
+- Local backup snapshots
 
-### Custom Install Directory
+### Customizing Node-RED inside a stack
 
-Install to a non-root directory (no `sudo` needed):
+You do **not** need a new NRCC image to extend Node-RED functionality:
 
-```bash
-INSTALL_DIR=$HOME/.local/bin curl -fsSL https://raw.githubusercontent.com/fgjcarlos/nrcc/main/scripts/install.sh | sh
-```
+- Function node code lives inside the persistent flow files.
+- npm nodes install into the persistent `node_modules` volume via the UI's Library section.
+- `settings.js` edits persist in the same volume.
 
-Make sure `$HOME/.local/bin` is in your `$PATH`:
-
-```bash
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-For the manual production rollout steps for GitHub Pages, DNS, and release validation, see [docs/production-install-launch-guide.md](docs/production-install-launch-guide.md).
-
-Architecture decisions for future implementation slices live in [docs/adr/](docs/adr/). Additional architecture notes live in [docs/architecture/](docs/architecture/), including the [multi-instance Node-RED management model](docs/architecture/multi-instance-node-red.md).
-
-### Deployment model
-
-The canonical deployment unit is **one Compose stack = one `nrcc` + one
-Node-RED process** ([ADR 0003](docs/adr/0003-docker-first-one-stack-per-node-red.md)).
-To run a second Node-RED on the same host, copy [`docker-compose.yml`](docker-compose.yml)
-and remap the host ports (`3001`, `1880`) and the volume names. NRCC does
-not orchestrate sibling containers, the host Node-RED, or remote Node-RED
-from inside a container.
-
-### Uninstall
-
-To remove nrcc service and clean up:
-
-```bash
-sudo nrcc uninstall          # Remove service and binary
-sudo nrcc uninstall --purge  # Also remove config and data files
-```
-
-## Quick Start
-
-### Build from source
-```bash
-git clone https://github.com/fgjcarlos/nrcc.git
-cd nrcc
-make build        # builds frontend + Go binary (~30s)
-./nrcc            # local one-shot run on :3001
-```
-
-Visit **http://localhost:3001** → Set up admin user → Login
-
-To install the locally built binary as a managed Ubuntu/systemd service, run:
-
-```bash
-sudo ./nrcc install
-# or: make install-local
-```
-
-`nrcc install` copies the currently running binary to `/usr/local/bin/nrcc`, checks the host, prepares Node-RED according to the selected/detected mode, writes `/etc/nrcc/nrcc.env`, installs the systemd unit, and starts the service. Interactive TTY installs use the guided wizard; non-TTY installs or any explicit install flag keep the existing flag-driven path. For automation, pass flags such as `--node-red skip|native|docker`, `--with-portless`, `--portless-quick-setup`, and `--portless-trust`.
-
-Dependency handling by Node-RED mode:
-
-- `native`: if Node.js or npm is missing, nrcc installs both with the detected Linux package manager before running `npm install -g node-red`.
-- `docker`: if Docker is missing, nrcc installs Docker with the detected Linux package manager and verifies that the Docker daemon is reachable before pulling/running Node-RED.
-- `skip`: nrcc does not install Node-RED or Node-RED-specific dependencies.
-- `--with-portless`: if Portless is requested and Node.js/npm is missing, nrcc prepares Node.js/npm before installing the Portless CLI globally.
-
-If the host has no supported package manager, or Docker installs but its daemon cannot be reached, the installer fails with an explicit prerequisite error instead of continuing with a broken service setup.
-
-### Binary release
-
-Download the binary for your platform from [Releases](https://github.com/fgjcarlos/nrcc/releases).
-
-```bash
-chmod +x nrcc-linux-amd64
-sudo ./nrcc-linux-amd64 install
-```
-
-For a local one-shot run without system service installation:
-
-```bash
-./nrcc-linux-amd64
-```
+To change NRCC's own behavior you still rebuild and publish a new NRCC image.
 
 ## Configuration
 
@@ -151,183 +99,56 @@ cp .env.example .env
 ```
 
 | Variable | Default | Description |
-|----------|---------|-------------|
+| ---------- | --------- | ------------- |
 | `PORT` | 3001 | HTTP server port |
 | `DATA_DIR` | `./data` | Directory for config, users, backups |
-| `NRCC_BACKUP_DIR` | `<DATA_DIR>/backups` | Dedicated per-instance volume for backup archives |
-| `NRCC_RESTIC_REPO` | (disabled) | When set, enables the Restic off-host provider. Value is `RESTIC_REPOSITORY` (path, `local:/path`, `s3:bucket`, etc.). |
-| `NRCC_RESTIC_PASSWORD` | (unset) | Passphrase for the Restic repository. Required if `NRCC_RESTIC_PASSWORD_FILE` is unset. |
-| `NRCC_RESTIC_PASSWORD_FILE` | (unset) | Path to a file containing the Restic passphrase (preferred in production; mount a Docker secret). |
-| `NRCC_RESTIC_BINARY` | `restic` | Absolute path to the restic binary when it isn't on `$PATH`. |
-| `NRCC_RESTIC_CACHE_DIR` | `<tmp>/nrcc-restic-cache` | Local cache directory restic uses for blob storage. |
-| `EDGE_MODE` | `false` | Opt-in edge mode for constrained deployments (resource-safe defaults). See [ADR 0002](docs/adr/0002-edge-mode-defaults-and-exposure-ux.md) |
-| `JWT_SECRET` | (insecure) | ⚠️ **Must set in production** |
 | `NODE_RED_CMD` | `node-red` | Path to node-red executable |
-| `NODE_RED_PORT` | 1880 | Node-RED HTTP port (for health checks) |
-| `ENCRYPTION_KEY` | (insecure) | For encrypted env vars |
-| `CORS_ORIGINS` | `*` | CORS allowed origins |
+| `NODE_RED_PORT` | 1880 | Target Node-RED HTTP port; runtime override is tracked in [#429](https://github.com/fgjcarlos/nrcc/issues/429) |
+| `JWT_SECRET` | (insecure) | ⚠️ **Must set in production** |
+| `NRCC_ENCRYPTION_KEY` | (insecure) | Encryption key for secret environment values |
+| `NRCC_CORS_ORIGINS` | `*` | CORS allowed origins |
+| `EDGE_MODE` | `false` | Opt-in edge mode for constrained deployments (resource-safe defaults). See [ADR 0002](docs/adr/0002-edge-mode-defaults-and-exposure-ux.md) |
 
-## Portless
+> **Runtime configuration note.** The canonical Compose example keeps Node-RED on `1880` today. Making `NODE_RED_PORT`, `NODE_RED_USER_DIR`, and `NODE_RED_SETTINGS` true runtime overrides is tracked in [#429](https://github.com/fgjcarlos/nrcc/issues/429).
 
-nrcc can install and use [Portless](https://portless.sh) to expose local services with stable names instead of raw ports. Portless provides HTTPS `.localhost` URLs by default, optional LAN `.local` URLs, and Tailscale/Funnel sharing when the Tailscale CLI is installed and connected.
-
-### Quick Start with Portless
-
-Prerequisites: nrcc is installed and `npm` is available on the host.
-
-Install Portless, register the default aliases, start the Portless proxy, and trust local HTTPS:
-
-```bash
-nrcc portless install
-nrcc portless quick-setup
-nrcc portless setup-trust
-```
-
-After setup, open:
-
-- `https://nrcc.localhost`
-- `https://node-red.localhost`
-
-When installing nrcc as a systemd service, choose the level of Portless automation you want:
-
-```bash
-sudo nrcc install
-sudo nrcc install --node-red native
-sudo nrcc install --node-red docker
-sudo nrcc install --node-red skip
-sudo nrcc install --with-portless
-sudo nrcc install --with-portless --portless-quick-setup
-sudo nrcc install --with-portless --portless-quick-setup --portless-trust
-```
-
-`nrcc install` now decides how to handle Node-RED before starting the service:
-
-- It runs host detection first, before install side effects, so the installer can adopt an existing Node-RED instead of reinstalling it.
-- Existing native Node-RED installs are frozen into `/etc/nrcc/nrcc.env` with `NODE_RED_CMD`, `NODE_RED_USER_DIR`, and `NODE_RED_SETTINGS` so systemd uses the same detected paths.
-- If `--node-red skip|native|docker` is provided, that mode is used without prompting.
-- If Node-RED is already detected on the host, install continues without prompting.
-- If Node-RED is missing and the install runs in an interactive terminal, nrcc prompts for `skip`, `native`, or `docker`.
-- If Node-RED is missing and there is no interactive terminal, nrcc falls back to `--node-red skip` and prints a warning.
-
-The install flow is normalized into an `InstallPlan` before mutations start. Pre-systemd steps use a rollback stack and the commit point is the systemd unit write, so an abort before that point cleans up newly-created install files/directories where possible. The guided installer model lives under `internal/wizard/`; its pure model is the TTY-gated foundation for future richer huh/Bubble Tea rendering while preserving the same `InstallPlan` execution path.
-
-`--portless-quick-setup` registers `nrcc -> 3001` and `node-red -> 1880`, then starts the Portless proxy required for `https://*.localhost` to respond. `--portless-trust` is explicit because it may prompt for permission to install the local HTTPS CA.
-
-For advanced LAN, Tailscale, or Funnel usage, follow the official [Portless documentation](https://portless.sh) and run Portless directly. nrcc only prints guidance for public exposure: verify `tailscaled` is running, MagicDNS is enabled, and HTTPS certificates are enabled in the Tailscale admin console before turning on Tailscale Funnel. These prerequisites are outside nrcc's local installer and are not automated by `nrcc install`.
-
-### HTTPS Trust & Certificate Errors
-
-Portless uses a local CA certificate for HTTPS on `*.localhost`. On first use, your browser may show a certificate warning until that local CA is trusted.
-
-Run the nrcc wrapper:
-
-```bash
-nrcc portless setup-trust
-```
-
-You can also run Portless directly with `portless trust`. Browser or OS certificate stores may require a browser restart before certificate warnings disappear.
-
-### Managing Aliases
-
-View registered aliases:
-
-```bash
-nrcc portless status
-```
-
-Expose additional services:
-
-```bash
-nrcc portless expose --name <name> --port <port>
-```
-
-Re-run the default setup and overwrite existing definitions:
-
-```bash
-nrcc portless quick-setup --force
-```
-
-Uninstall Portless:
-
-```bash
-nrcc portless uninstall
-nrcc portless uninstall --clean-aliases
-```
-
-### Before deploying
-
-This is an operator self-check, not a vendor production-readiness claim. nrcc is in beta hardening — confirm these before you put it on the public internet.
-
-1. Set `JWT_SECRET` to a strong random value
-2. Set `ENCRYPTION_KEY` to a strong random value
-3. Use `DATA_DIR` on persistent storage (not `/tmp`)
-4. Run behind a reverse proxy with HTTPS
-5. Set restrictive `CORS_ORIGINS` if needed
+> **Operator self-check.** nrcc is in beta hardening — confirm these before you put it on the public internet: set strong `JWT_SECRET` and `NRCC_ENCRYPTION_KEY`, persist `DATA_DIR` on durable storage, place it behind a reverse proxy with HTTPS, and restrict `NRCC_CORS_ORIGINS`.
 
 ## Data Directory Layout
 
-nrcc stores all data in `DATA_DIR/`:
+Within the persistent volume, NRCC stores all runtime state under `DATA_DIR/`:
 
 ```
 data/
-├── config.json              # Node-RED configuration
-├── cc-users.json            # Control Center user accounts (bcrypt-hashed)
+├── config.json              # NRCC configuration
+├── cc-users.json            # NRCC user accounts (bcrypt-hashed)
 ├── flows.json               # Node-RED flows (managed by Node-RED)
 ├── settings.js              # Generated Node-RED settings
 ├── backup-settings.json     # Backup scheduler configuration
-├── backups/                 # Per-instance backup archives (zip)
-│   ├── <uuid>.zip           # Manual / scheduled / pre-restore snapshots
-│   └── ...
-└── uploads/                 # User-uploaded files
+├── backups/                 # Timestamped backup archives (.zip)
+│   ├── backup-20260424-100234.zip
+│   └── backup-20260424-110456.zip
+└── node_modules/            # Installed npm nodes (persistent)
 ```
 
-**Backup strategy:** Backups are complete snapshots of Node-RED source-of-truth
-files (`flows.json`, `flows_cred.json`, `settings.js`, `package.json`, plus
-optional `config.json` and `cc-users.json`), stored as `.zip` archives with an
-embedded `backup-metadata.json` manifest that pins per-entry sha256 checksums
-and the archive algorithm. Restore validates every entry against the manifest
-*before* touching `dataDir`, extracts to a staging directory, and atomically
-swaps files in place. To place backups on a dedicated volume, set
-`NRCC_BACKUP_DIR=/path/to/volume` (defaults to `./data/backups`).
+**Backup strategy.** Backups are complete snapshots stored inside the persistent volume. Mount the backups subdirectory on a separate volume (or copy to an external location such as S3 or NFS) so they survive a stack recreation.
 
-**Encrypted download:** `GET /api/backups/{id}/download?password=…` wraps the
-zip with AES-256-GCM using the supplied passphrase (decrypt with the same
-passphrase to recover the archive). The raw download path stays unencrypted
-for back-compat with existing tooling.
+## Future Work (not in MVP)
 
-**Off-host provider (Restic):** Set `NRCC_RESTIC_REPO` (plus a passphrase via
-`NRCC_RESTIC_PASSWORD` or `NRCC_RESTIC_PASSWORD_FILE`) to mirror every local
-backup to a Restic repository. The local ZIP is still authoritative; a remote
-push failure is recorded as a `provider-push` event and does not roll back the
-local archive. List remote snapshots via `GET /api/backups/provider/snapshots`
-and pull one to a chosen directory via
-`POST /api/backups/provider/restore` (admin). ponytail: prune, check,
-retention-on-remote, and cloud-specific credential wiring are intentionally
-skipped — add when an operator asks for them.
+These are **not** part of the current release. Treat the following as backlog, not as documented behavior:
 
-### Custom Node-RED nodes (npm library)
+- **Central multi-instance control plane.** A single NRCC that orchestrates multiple remote Node-RED instances. The design rationale is preserved in [`docs/architecture/multi-instance-node-red.md`](docs/architecture/multi-instance-node-red.md) and implementation is tracked in [#428](https://github.com/fgjcarlos/nrcc/issues/428).
+- **Restic as an off-host backup provider.** Encrypted, deduplicated, incremental backups to S3/SFTP/B2. Phase 2, tracked in [#432](https://github.com/fgjcarlos/nrcc/issues/432). The current shipped backup is the local ZIP snapshot stored inside the persistent volume.
+- **Sibling-container / Docker socket management.** NRCC in one container does not control other containers, and the image does not mount `/var/run/docker.sock`.
+- **Native-host Node-RED control from containerized NRCC.** Cross-host wiring is out of scope.
 
-The operator workflow promised by ADR 0003 — extend Node-RED without
-recompiling — is wired through three pieces that all share the per-instance
-volume:
+## Data Directory Cross-references
 
-- `nrcc_node_modules` volume keeps `<DATA_DIR>/node_modules` (and the
-  matching `package.json` + lockfile) across container recreation and
-  image upgrades.
-- `NODE_RED_USER_DIR` (when set) tells Node-RED to read its userDir from a
-  path inside the same volume; default falls back to `DATA_DIR`.
-- `POST /api/libraries/install` (admin) calls `npm install` inside that
-  directory and triggers a Node-RED restart so the editor picks up the new
-  node without a container bounce.
+- The model that current routes assume is defined by [ADR 0001 — Tenant-ready seams](docs/adr/0001-tenant-ready-seams.md).
+- Edge-friendly defaults and exposure UX are defined by [ADR 0002](docs/adr/0002-edge-mode-defaults-and-exposure-ux.md).
 
-**What stays on the operator:** Function nodes, custom flows, credentials
-files in `flows_cred.json`, and any third-party node installed through the
-library UI. None of these require rebuilding the NRCC image.
+## Production rollout
 
-**What needs a new NRCC image:** behaviour added to the NRCC backend (a new
-endpoint, a different scheduler, a new off-host provider, etc.). Operators
-should pin `ghcr.io/fgjcarlos/nrcc:<version>` per instance rather than
-floating `:latest` when reproducibility matters.
+Manual GitHub Pages, DNS, and release validation steps live in [docs/production-install-launch-guide.md](docs/production-install-launch-guide.md).
 
 ## Development
 
@@ -343,7 +164,7 @@ The dev server proxies API requests to the Go backend.
 
 ### Local development (Docker)
 
-If you don't want to install Go and Node on the host, the dev stack runs end-to-end in Docker with hot reload:
+End-to-end dev stack with hot reload:
 
 ```bash
 make dev-up        # build the dev image + start stack in detached mode
@@ -353,155 +174,34 @@ make dev-down      # stop the stack (keeps volumes)
 make dev-reset     # stop the stack AND remove volumes (clean slate)
 ```
 
-Open in browser:
-
-| URL | What |
-| --- | --- |
-| <http://localhost:5173> | React UI (Vite HMR) |
-| <http://localhost:3001> | Go API + Node-RED control plane |
-| <http://localhost:1880> | Node-RED editor |
-
-Source is bind-mounted into the containers, so edits to `*.go` (rebuilt by `air`) and `frontend/**` (HMR via Vite) show up without rebuilding the image. Run `make dev-build` only after changing `Dockerfile.dev` itself.
-
 ### Run tests
 
 ```bash
 make test            # Go test suite
 make test-frontend   # Vitest frontend suite
 make e2e             # Playwright e2e suite (boots its own preview server)
-go run -race .       # Go with race detector
 ```
 
-Frontend quality gates live under `frontend/`:
+Frontend gates:
 
 ```bash
 cd frontend
 pnpm install --frozen-lockfile
-pnpm run typecheck          # TypeScript project check
-pnpm test -- --run          # Vitest unit/integration tests; MSW starts from vitest.setup.ts
-pnpm run test:e2e           # Playwright Chromium smoke tests with fixture API responses
+pnpm run typecheck          # tsc --noEmit
+pnpm test -- --run          # Vitest
+pnpm run test:e2e           # Playwright Chromium smoke
 pnpm run build              # Production Vite build
-```
-
-Test layering:
-
-- Unit tests cover pure utilities, hooks, and isolated components.
-- Integration tests render feature flows against MSW handlers in `frontend/src/test/msw/`, so auth, setup, status, backups, libraries, files, and runtime endpoints never call a real host.
-- E2E smoke tests live in `frontend/e2e/` and exercise setup/login, runtime start/stop, backup create, restore dry path, and critical navigation with Playwright route fixtures instead of destructive host operations.
-
-### Build frontend only
-
-```bash
-make frontend-build
-```
-
-### Cross-compile for all platforms
-
-```bash
-make release
-# Output: dist/
-#   ├── nrcc-linux-amd64
-#   ├── nrcc-linux-arm64
-#   ├── nrcc-darwin-amd64
-#   ├── nrcc-darwin-arm64
-#   └── nrcc-windows-amd64.exe
-```
-
-## Project Structure
-
-```
-nrcc/
-├── main.go                      # Entry point, CLI setup
-├── embed.go                     # Frontend embedding directive
-├── go.mod / go.sum              # Go dependencies
-├── Makefile                     # Build, dev, release targets
-├── README.md                    # This file
-├── .env.example                 # Example environment config
-│
-├── frontend/                    # React 19 + Vite + TS SPA (feature-folders layout)
-│   ├── src/
-│   │   ├── App.tsx              # Root component, routing
-│   │   ├── main.tsx             # Entry point
-│   │   ├── features/            # One folder per domain
-│   │   │   ├── auth/            # login, setup, users, profile
-│   │   │   ├── backups/         # list, schedule, retention, restore
-│   │   │   ├── bootstrap/       # first-run wizard
-│   │   │   ├── configuration/   # Node-RED settings editor
-│   │   │   ├── dashboard/       # overview, host/system metrics
-│   │   │   ├── docker/          # container status & control
-│   │   │   ├── env-vars/        # environment variables editor
-│   │   │   ├── flows/           # flow viewer & export
-│   │   │   ├── libraries/       # npm package management
-│   │   │   ├── logs/            # streaming logs viewer
-│   │   │   ├── patterns/        # flow pattern analysis
-│   │   │   └── updates/         # self-update checker
-│   │   │       Each feature contains: components/, hooks/, services/, types/, lib/
-│   │   └── shared/              # Cross-feature primitives
-│   │       ├── components/      # ui/, layout/, ConfirmationDialog, StateContainer
-│   │       ├── hooks/           # shared React hooks
-│   │       ├── lib/             # api client, formatters
-│   │       ├── types/           # cross-feature TypeScript types
-│   │       └── constants/       # UI copy, defaults
-│   ├── package.json
-│   ├── pnpm-lock.yaml
-│   ├── vite.config.ts
-│   ├── vitest.config.ts
-│   └── dist/                    # Built SPA (embedded into binary)
-│
-├── internal/
-│   ├── model/                   # Data types (User, Config, etc.)
-│   │   ├── user.go
-│   │   ├── response.go
-│   │   └── ...
-│   │
-│   ├── store/                   # JSON file storage
-│   │   ├── json_store.go        # Generic JSON store with file locks
-│   │   └── ...
-│   │
-│   ├── service/                 # Business logic
-│   │   ├── auth.go              # JWT, user management
-│   │   ├── process_manager.go   # Node-RED process control
-│   │   ├── config.go            # Configuration management
-│   │   ├── backup.go            # Backup/restore
-│   │   ├── env.go               # Environment variables
-│   │   ├── flow.go              # Flow viewer/export
-│   │   ├── library.go           # npm library management
-│   │   ├── update.go            # Self-update checks
-│   │   ├── log_buffer.go        # Ring buffer for logs
-│   │   └── ...
-│   │
-│   ├── handler/                 # HTTP request handlers
-│   │   ├── auth.go
-│   │   ├── config.go
-│   │   ├── backup.go
-│   │   └── ...
-│   │
-│   ├── middleware/              # HTTP middleware
-│   │   ├── auth.go              # JWT verification
-│   │   ├── logger.go            # Request logging
-│   │   └── ...
-│   │
-│   └── server/                  # Chi router setup, SPA handler
-│       └── server.go
-│
-└── data/                        # Runtime data (gitignored)
-    ├── config.json
-    ├── cc-users.json
-    ├── flows.json
-    ├── settings.js
-    ├── backups/
-    └── uploads/
 ```
 
 ## API Reference
 
-The complete API is documented in [docs/openapi.yaml](docs/openapi.yaml) (OpenAPI 3.1). To browse it interactively, paste the file into [Swagger Editor](https://editor.swagger.io) or run a local viewer:
+The complete API lives in [docs/openapi.yaml](docs/openapi.yaml) (OpenAPI 3.1). Preview locally:
 
 ```bash
 npx @redocly/cli preview-docs docs/openapi.yaml
 ```
 
-All responses use a standard envelope:
+All responses use the standard envelope:
 
 ```json
 {"success": true, "data": {}, "timestamp": "2026-05-24T10:00:00Z"}
@@ -510,85 +210,29 @@ All responses use a standard envelope:
 
 Authentication: `Authorization: Bearer <jwt-token>` header (short-lived JWT, refreshed via httpOnly cookie).
 
-### Generated TypeScript Client (future)
-
-The OpenAPI spec enables generating a type-safe frontend client via [orval](https://orval.dev) or [openapi-typescript](https://github.com/openapi-ts/openapi-typescript). Adoption path:
-
-1. `pnpm add -D @openapitools/openapi-generator-cli` or `pnpm add -D orval`
-2. Generate client from `docs/openapi.yaml`
-3. Replace manual Axios calls in `frontend/src/shared/lib/api.ts` incrementally
-
-This is tracked but not yet adopted — the current frontend uses hand-written Axios services per feature.
-
-## Deployment
-
-### Systemd service (Linux)
-
-Create `/etc/systemd/system/nrcc.service`:
-
-```ini
-[Unit]
-Description=Node-RED Control Center
-After=network.target
-
-[Service]
-Type=simple
-User=nrcc
-WorkingDirectory=/home/nrcc/nrcc
-Environment="PORT=3001"
-Environment="DATA_DIR=/var/lib/nrcc"
-Environment="JWT_SECRET=your-secret-here"
-ExecStart=/home/nrcc/nrcc-linux-amd64
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Enable and start:
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable nrcc
-sudo systemctl start nrcc
-```
-
-### Docker (optional)
-
-```dockerfile
-FROM golang:1.25 as builder
-WORKDIR /build
-COPY . .
-RUN make release
-
-FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y node-red && rm -rf /var/lib/apt/lists/*
-COPY --from=builder /build/dist/nrcc-linux-amd64 /usr/local/bin/nrcc
-EXPOSE 3001 1880
-CMD ["nrcc"]
-```
-
 ## Troubleshooting
 
 **Q: Node-RED process won't start**
-- Check `NODE_RED_CMD` points to a valid executable
-- Verify `node-red` is installed: `which node-red`
-- Check logs: `tail -f data/*.log`
+
+- Check `NODE_RED_CMD` points to a valid executable inside the container.
+- Verify `node-red` is on PATH inside the container image.
+- Check logs: the Logs view in the UI, or `docker compose logs`.
 
 **Q: "JWT_SECRET not set" warning**
-- Set `JWT_SECRET` env var before running in production
-- Default insecure value is for development only
 
-**Q: Can't access frontend**
-- Verify port is open: `netstat -tlnp | grep 3001`
-- Check logs: `./nrcc 2>&1 | tail -20`
-- Clear browser cache and reload
+- Set `JWT_SECRET` env var before running in production.
+- Default insecure value is for development only.
+
+**Q: Backups disappear on `docker compose down`**
+
+- Confirm `nrcc_backups` is a named volume rather than a container-local path.
+- Re-run the stack; backups return once the volume is mounted.
 
 **Q: Backup/restore fails**
-- Ensure `DATA_DIR` has write permissions
-- Check disk space: `df -h $(DATA_DIR)`
-- Review error in UI or logs
+
+- Ensure `DATA_DIR` has write permissions.
+- Check disk space: `df -h $(DATA_DIR)`.
+- Review errors in the UI or logs.
 
 ## License
 

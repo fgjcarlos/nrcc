@@ -1,180 +1,118 @@
-# Multi-instance Node-RED management model
+# NRCC deployment model
+
+> Canonical model for the current release. The earlier "multi-instance" framing for one
+> NRCC managing multiple Node-REDs was removed in #390 and is preserved in the git
+> history of this file for traceability. New work should follow the model below.
 
 ## Status
 
-Proposed architecture for issue #144. **Note (2026-07-14):** the first read-only slice (`Instance`, `InstanceStore`, `GET /api/instances`) shipped on `origin/main` at `5393042` was removed in PR #409 (issue #390). This document remains as the design rationale. Re-introduce the code only with a real consumer.
+**Accepted** for the current beta line. Encoded in the shipped `docker-compose.yml` and
+the production Docker image.
 
-**Note (2026-07-15):** the canonical deployment unit is now locked by
-[ADR 0003 — Docker-first: one Compose stack per Node-RED](../adr/0003-docker-first-one-stack-per-node-red.md),
-which closes #428. Multi-instance behavior will compose N copies of that
-unit; this document continues to describe the eventual control plane
-behind them.
+## One stack per Node-RED
 
-## Context
+The unit of deployment is a single Docker Compose service containing exactly one
+NRCC binary supervising one Node-RED process:
 
-NRCC currently manages one local Node-RED runtime. The existing implementation is intentionally simple:
-
-- `main.go` wires one `dataDir` into the service graph.
-- `internal/service/process.go` owns one `ProcessManager` for one Node-RED process.
-- `internal/service/config.go`, backups, env vars, flows, logs, and library management operate against the current data directory.
-- Frontend routes assume one active runtime and one set of status/configuration resources.
-
-That model should remain the default. Multi-instance support should be added through explicit instance boundaries rather than by making every service infer global mutable state.
-
-## Goals
-
-- Let one NRCC manage more than one Node-RED instance over time.
-- Preserve today's single-instance local deployment as the zero-config path.
-- Support local instances first, then leave room for Docker, SSH, and agent-managed remote instances.
-- Keep secrets, logs, backups, and lifecycle operations scoped to a selected instance.
-
-## Non-goals
-
-- Do not turn the current release into a SaaS control plane.
-- Do not require tenants or organizations to support local multi-instance use.
-- Do not auto-discover and control arbitrary Node-RED processes without operator approval.
-- Do not share one data directory across writable instances.
-
-## Instance model
-
-A future `Instance` record should describe the control boundary:
-
-```go
-type InstanceKind string
-
-const (
-    InstanceKindLocal  InstanceKind = "local"
-    InstanceKindDocker InstanceKind = "docker"
-    InstanceKindSSH    InstanceKind = "ssh"
-    InstanceKindAgent  InstanceKind = "agent"
-)
-
-type Instance struct {
-    ID          string       `json:"id"`
-    Name        string       `json:"name"`
-    Kind        InstanceKind `json:"kind"`
-    DataDir     string       `json:"dataDir,omitempty"`
-    BaseURL     string       `json:"baseUrl,omitempty"`
-    Health      string       `json:"health"`
-    AuthContext string       `json:"authContext,omitempty"`
-    CreatedAt   time.Time    `json:"createdAt"`
-    UpdatedAt   time.Time    `json:"updatedAt"`
-}
+```text
+Compose service: nodered
+┌────────────────────────────────────────────────────────┐
+│  Container: nrcc                                        │
+│  ┌──────────────────┐   ┌───────────────────────────┐   │
+│  │  nrcc binary      │──▶│  node-red process         │   │
+│  │  (HTTP / UI / API)│   │  (editor + flows)         │   │
+│  └──────────────────┘   └───────────────────────────┘   │
+│                                                        │
+│  Ports (host): 3001 → :3001 (NRCC)                     │
+│                 1880 → :1880 (Node-RED)                 │
+│  Volume:       /data  ← persistent volume              │
+│  Workdir:      DATA_DIR = /data                        │
+└────────────────────────────────────────────────────────┘
 ```
 
-Recommended constraints:
+Multiple Node-RED instances = multiple Compose services, each with its own host ports
+and its own persistent volume. There is no central control plane in MVP.
 
-- `ID` should be stable, URL-safe, and validated.
-- `DataDir` must resolve inside an allowed root unless explicitly configured by an admin.
-- `BaseURL` should be read-only for remote instances until write operations are designed safely.
-- `AuthContext` should reference stored credentials indirectly, never inline secrets.
+## Per-instance boundaries
 
-## Process abstraction
+Each stack owns its own state and must never share it with another stack:
 
-Do not make the existing `ProcessManager` internally multi-instance. Instead, introduce a registry that owns one manager per local writable instance:
+| Boundary | Owned per stack |
+| ---------- | ----------------- |
+| Node-RED `userDir` (flows, `settings.js`, `flows_cred.json`, projects) | yes |
+| Node-RED `node_modules` | yes |
+| NRCC users, sessions, audit log | yes |
+| NRCC config, schedule, encrypted secrets | yes |
+| Local backup archive volume | yes (recommended isolated sub-path) |
+| Host ports `3001` / `1880` | yes (unique per stack) |
+| Logs, restart counters, runtime status | yes |
+| Container name and Compose project | yes |
 
-```go
-type InstanceProcessRegistry struct {
-    managers map[string]*ProcessManager
-}
-```
+Two writable stacks that share a `DATA_DIR` corrupt each other; this is treated as a
+configuration error and must be blocked at setup time.
 
-Each local instance gets its own:
+## MVP non-goals (scope fence)
 
-- `ProcessManager`
-- data directory
-- env service
-- log buffer
-- restart tracker
-- backup/config/flow services scoped to that instance
+The following are intentionally out of scope and must not be implemented as part of the
+core flow:
 
-Remote instances should use a different controller interface rather than pretending to be local processes:
+- **Mounting `/var/run/docker.sock` in the container.** NRCC must not be able to manage
+  arbitrary other containers on the host.
+- **Managing sibling containers from inside the NRCC container.** Other Compose services
+  in the same project are not part of the MVP control plane.
+- **Discovering and managing a Node-RED that already runs natively on the Docker host.**
+  Native-host Node-RED control is a separate adapter and is not in MVP.
+- **Central multi-instance control.** A single NRCC orchestrating several remote
+  Node-REDs is deferred. The original design is kept in git history for traceability.
+- **Restic / off-host backup provider.** Local ZIP snapshots on a persistent volume are
+  the only shipped backup. Restic is planned as a Phase 2 provider.
+- **SSH / agent-managed remote Node-RED.** Same reasoning: deferred.
 
-```go
-type InstanceController interface {
-    Status(ctx context.Context, instanceID string) (ProcessStatus, error)
-    Start(ctx context.Context, instanceID string) error
-    Stop(ctx context.Context, instanceID string) error
-    Restart(ctx context.Context, instanceID string) error
-}
-```
+## Customizing the runtime without rebuilding Node-RED
 
-Local, Docker, SSH, and agent controllers can then implement only the operations that are safe for their transport.
+Node-RED does not need a new NRCC image to gain functionality:
 
-## Data and service boundaries
+- **Function nodes** — code lives inside `flows.json`, persisted by the volume.
+- **npm nodes** — installed via the UI's Library section into the persistent
+  `node_modules` volume.
+- **`settings.js`** — edited from the UI; the previous file is backed up before each save. A Node-RED restart may be required for runtime changes to take effect.
 
-Current service constructors should remain available for the default instance. Multi-instance work should add resolver/factory layers around them:
+To change NRCC behavior itself (new endpoints, new policies, new UI), publish a new
+NRCC image — there is no plugin system in MVP.
 
-- `InstanceStore` — persists the list of configured instances.
-- `InstanceResolver` — validates instance IDs and returns metadata.
-- `InstanceServices` — builds per-instance service dependencies.
-- `InstanceController` — performs runtime lifecycle operations.
+## Backups in MVP
 
-For the default path, `default` maps to today's current `DATA_DIR`. This avoids a forced migration for existing installs.
+- **Storage:** local ZIP archives inside the persistent volume at
+  `DATA_DIR/backups/*.zip`.
+- **Schedule:** manual + cron, configured in the UI.
+- **Pre-restore:** a snapshot of the current state is taken automatically before any
+  restore to keep recovery possible if the restore goes wrong.
+- **Retention:** configurable per type (manual, auto, pre-restore).
+- **Isolation:** bind the `backups` sub-path on its own volume (or copy externally)
+  so a `docker compose down` does not destroy snapshots.
+- **Off-host copy** is the operator's responsibility (S3, NFS, etc.); NRCC does not push
+  backups to remote destinations in MVP.
 
-## API routing model
+## Companion documents
 
-Recommended routing shape:
+- [`README.md`](../../README.md) — the operator-facing canonical deployment model.
+- [`docs/index.html`](../index.html) — the GitHub Pages landing page that mirrors the
+  same model.
+- [`docs/adr/0001-tenant-ready-seams.md`](../adr/0001-tenant-ready-seams.md) — store,
+  auth, and process seams that keep mono-tenant deployments simple.
+- [`docs/adr/0002-edge-mode-defaults-and-exposure-ux.md`](../adr/0002-edge-mode-defaults-and-exposure-ux.md) —
+  edge-friendly defaults and exposure UX for self-hosted deployments.
 
-- Existing routes remain valid and operate on the default instance.
-- New multi-instance routes use `/api/instances` and `/api/instances/{id}/...`.
-- Mutating operations must verify permissions and instance capabilities.
+## Migrating from the old model
 
-Examples:
+Existing single-instance deployments (native or single Docker stack) keep working
+without changes. The shipped `docker-compose.yml` already encodes this model. To move
+from a native install to the canonical Docker deployment:
 
-- `GET /api/instances`
-- `POST /api/instances`
-- `GET /api/instances/{id}/status`
-- `POST /api/instances/{id}/process/start`
-- `GET /api/instances/{id}/logs`
-- `POST /api/instances/{id}/backups`
+1. Stop the existing nrcc service (systemd, native process, or remove the previous Docker container).
+2. `docker compose up -d` from the project's `docker-compose.yml`.
+3. Confirm the persistent volume carries the existing `DATA_DIR` content (mount it
+   explicitly if you want to reuse it).
+4. Open `http://localhost:3001`, log in, validate the migrated settings.
 
-Compatibility rule: existing routes should not gain a required `instanceId` parameter until the UI and API clients have a migration path.
-
-## UI navigation model
-
-The first UI version should use an instance switcher in the app shell:
-
-- Show the active instance name and health.
-- Keep `default` selected for existing users.
-- Persist the selected instance in URL/search params or local storage.
-- Disable actions that the selected instance cannot perform.
-- Show clear labels for local, Docker, SSH, and agent-managed targets.
-
-Recommended path strategy:
-
-- Keep current routes for the default instance.
-- Later add `/instances/:instanceId/...` only when deep-linking and permissions are designed.
-
-## Migration path
-
-1. Add instance model, store, and read-only API.
-2. Seed a `default` instance that points to the existing `DATA_DIR`.
-3. Add a read-only instance switcher that always shows `default` first.
-4. Introduce local multi-instance process registry behind feature flags.
-5. Add Docker/remote read-only status before any remote lifecycle mutations.
-
-## Risks and mitigations
-
-- **Secrets leakage:** store remote credentials by reference and redact values in logs and UI.
-- **Wrong-target operations:** every destructive action should display the target instance and require confirmation where appropriate.
-- **Shared data directories:** validate local instance paths and block two writable instances from using the same directory.
-- **Partial controller support:** expose capabilities per instance so UI does not offer unsupported actions.
-- **Process collisions:** local instances need explicit ports and preflight checks before start.
-- **Permission confusion:** role checks should apply per operation and eventually per instance.
-
-## First implementation slice
-
-A safe first PR should be read-only and backwards-compatible:
-
-- Add `Instance` model and validation tests.
-- Add `InstanceStore` that seeds the default instance from existing config.
-- Add `GET /api/instances` returning the default instance only.
-- Add a small UI switcher/status chip that displays the default instance.
-- Do not add multi-process start/stop behavior yet.
-
-This proves the model without changing the current single-instance runtime.
-
-## Related issue
-
-Resolves #144.
+No centralized migration tool is shipped; the volume bind is the contract.
