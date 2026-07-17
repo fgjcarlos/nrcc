@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"syscall"
 	"runtime"
 	"sort"
 	"strconv"
@@ -517,7 +518,7 @@ func latestBackupFile(dir string) (string, error) {
 }
 
 func isInteractiveTerminal() bool {
-	if interactiveDisabledByEnv() || runningUnderSystemd() {
+	if interactiveDisabledByEnv() || runningUnderSystemd() || runningInsideContainer() {
 		return false
 	}
 
@@ -525,7 +526,60 @@ func isInteractiveTerminal() bool {
 	if err != nil {
 		return false
 	}
-	return (info.Mode() & os.ModeCharDevice) != 0
+	// A regular file, pipe, socket, or /dev/null is not an interactive TTY.
+	// Only a real terminal (PTY) shows up as ModeCharDevice on a non-/dev/null inode.
+	if info.Mode()&os.ModeCharDevice == 0 || isDevNull(info) {
+		return false
+	}
+	return true
+}
+
+// isDevNull reports whether the given file info points at /dev/null.
+// /dev/null is a character device, so a naive ModeCharDevice check would
+// treat `docker run` (which redirects stdin from /dev/null) as interactive
+// and hang the bootstrap wizard on `pterm.DefaultInteractiveConfirm`.
+func isDevNull(info os.FileInfo) bool {
+	if info == nil {
+		return false
+	}
+	if info.Mode()&os.ModeDevice == 0 {
+		return false
+	}
+	// Stat the device so we can compare against the kernel-reported dev number.
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	if !ok || stat == nil {
+		return false
+	}
+	devNullStat, err := os.Stat(os.DevNull)
+	if err != nil {
+		return false
+	}
+	dst, ok := devNullStat.Sys().(*syscall.Stat_t)
+	if !ok || dst == nil {
+		return false
+	}
+	return stat.Dev == dst.Dev && stat.Ino == dst.Ino
+}
+
+// runningInsideContainer is a cheap best-effort detection: if the process
+// is running under Docker / Podman / generic OCI, never go interactive.
+// We only use this to guard BootstrapCLI; the docker-first runtime never
+// needs the setup wizard.
+func runningInsideContainer() bool {
+	if _, err := os.Stat("/.dockerenv"); err == nil {
+		return true
+	}
+	if os.Getenv("DOCKER_CONTAINER") != "" || os.Getenv("KUBERNETES_SERVICE_HOST") != "" {
+		return true
+	}
+	if data, err := os.ReadFile("/proc/1/cgroup"); err == nil {
+		s := string(data)
+		return strings.Contains(s, "docker") ||
+			strings.Contains(s, "kubepods") ||
+			strings.Contains(s, "containerd") ||
+			strings.Contains(s, "podman")
+	}
+	return false
 }
 
 func interactiveDisabledByEnv() bool {
