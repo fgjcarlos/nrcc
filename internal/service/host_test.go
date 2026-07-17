@@ -389,27 +389,40 @@ func TestHostService_InspectNodeRed_UsesManagedDataDirWhenHomeInvalid(t *testing
 	}
 }
 
-func TestBuildRecommendations_DockerNamedVolumeMessage(t *testing.T) {
+func TestBuildRecommendations_NoBareMetalInstallHints(t *testing.T) {
 	svc := NewHostService(t.TempDir())
 
+	// Worst-case input that, pre-ADR-0003, used to light up every
+	// bare-metal-flavored suggestion. Post-#454 none of those fire.
 	recommendations := svc.buildRecommendations(model.HostStatus{
-		NodeJS: model.DependencyStatus{Installed: true},
+		NodeJS: model.DependencyStatus{Installed: false},
 		NodeRed: model.NodeRedEnvironment{
-			Detected: true,
+			Detected: false,
 			Mode:     model.InstallationModeDocker,
-		},
-		Settings: model.SettingsDocument{
-			Path:     filepath.Join(t.TempDir(), "settings.js"),
-			Writable: true,
 		},
 	})
 
-	joined := strings.Join(recommendations, " ")
-	if !strings.Contains(joined, "bind mount") {
-		t.Fatalf("buildRecommendations() = %q, want docker bind mount guidance", joined)
+	for _, banned := range []string{
+		"Instala Node.js",
+		"Instala Node-RED",
+		"bind mount",
+	} {
+		for _, line := range recommendations {
+			if strings.Contains(line, banned) {
+				t.Fatalf("buildRecommendations() = %q, must not include %q", recommendations, banned)
+			}
+		}
 	}
-	if strings.Contains(joined, "Otorga permisos de escritura") {
-		t.Fatalf("buildRecommendations() unexpectedly included writability warning: %q", joined)
+}
+
+func TestBuildRecommendations_PortlessOptional(t *testing.T) {
+	svc := NewHostService(t.TempDir())
+	recommendations := svc.buildRecommendations(model.HostStatus{
+		NodeRed: model.NodeRedEnvironment{Detected: true},
+	})
+	joined := strings.Join(recommendations, " ")
+	if !strings.Contains(joined, "Portless") {
+		t.Fatalf("buildRecommendations() = %q, want Portless hint when Node-RED is detected and Portless is missing", recommendations)
 	}
 }
 
