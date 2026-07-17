@@ -72,10 +72,9 @@ func runServer() {
 
 	hostSvc := service.NewHostService(dataDir)
 
-	ui.SectionHeader("Bootstrap")
-	if err := hostSvc.BootstrapCLI(); err != nil {
-		ui.Infof("Bootstrap warning: %v", err)
-	}
+	// docker-first (ADR 0003): no bootstrap step. `docker compose up` is
+	// the bootstrap; HostService.Detect() powers the /bootstrap read-only
+	// status page once the stack is up.
 
 	// Initialize process manager
 	nodeRedCmd := os.Getenv("NODE_RED_CMD")
