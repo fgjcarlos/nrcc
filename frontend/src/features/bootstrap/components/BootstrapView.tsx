@@ -1,6 +1,5 @@
 import { useEnvironment } from '@/features/environment/hooks/useEnvironment';
 import {
-  Package,
   AlertCircle,
   CheckCircle2,
   AlertTriangle,
@@ -10,35 +9,7 @@ import {
   Container,
 } from 'lucide-react';
 import { cn } from '@/shared/lib';
-import type { DependencyStatus, NodeRedEnvironment, SettingsDocument } from '@/shared/types';
-
-const StatusIcon = ({ installed }: { installed: boolean }) => {
-  if (installed) {
-    return <CheckCircle2 className="w-5 h-5 text-success" />;
-  }
-  return <AlertCircle className="w-5 h-5 text-error" />;
-};
-
-const DependencyRow = ({ dep }: { dep: DependencyStatus }) => (
-  <div className="flex items-center justify-between p-4 border-b border-border last:border-b-0 hover:bg-base-200/50 transition-colors">
-    <div className="flex items-center gap-3 flex-1">
-      <StatusIcon installed={dep.installed} />
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-base-content">{dep.name}</p>
-        {dep.details && (
-          <p className="text-xs text-base-content/60 truncate">{dep.details}</p>
-        )}
-      </div>
-    </div>
-    <div className="text-right ml-4">
-      {dep.version ? (
-        <p className="text-sm font-medium text-base-content">{dep.version}</p>
-      ) : (
-        <p className="text-xs text-error font-medium">Not found</p>
-      )}
-    </div>
-  </div>
-);
+import type { NodeRedEnvironment, SettingsDocument } from '@/shared/types';
 
 const NodeRedEnvironmentCard = ({ env }: { env: NodeRedEnvironment }) => {
   const modeLabel = {
@@ -228,7 +199,7 @@ export function BootstrapView() {
               <h2 className="text-xl font-semibold text-base-content">System Status</h2>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <p className="text-xs uppercase tracking-wider text-base-content/50 mb-1">Platform</p>
                 <p className="text-lg font-semibold text-base-content">{hostStatus.platform}</p>
@@ -250,39 +221,6 @@ export function BootstrapView() {
                   )}
                 </div>
               </div>
-
-              <div>
-                <p className="text-xs uppercase tracking-wider text-base-content/50 mb-1">Interactive Mode</p>
-                <div className="flex items-center gap-2">
-                  {hostStatus.interactive ? (
-                    <>
-                      <CheckCircle2 className="w-5 h-5 text-success" />
-                      <span className="text-lg font-semibold text-success">Enabled</span>
-                    </>
-                  ) : (
-                    <>
-                      <AlertCircle className="w-5 h-5 text-warning" />
-                      <span className="text-lg font-semibold text-warning">Disabled</span>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Dependencies */}
-          <div className="surface-card border border-border rounded-lg overflow-hidden">
-            <div className="flex items-center gap-3 p-6 border-b border-border">
-              <Package className="w-5 h-5 text-body-secondary" />
-              <h2 className="text-xl font-semibold text-base-content">Dependencies</h2>
-            </div>
-            
-            <div className="divide-y divide-border">
-              <DependencyRow dep={hostStatus.nodejs} />
-              <DependencyRow dep={hostStatus.npm} />
-              <DependencyRow dep={hostStatus.nodeRedBinary} />
-              <DependencyRow dep={hostStatus.docker} />
-              <DependencyRow dep={hostStatus.dockerCompose} />
             </div>
           </div>
 
