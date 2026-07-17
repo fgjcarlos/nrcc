@@ -1,144 +1,43 @@
 #!/bin/sh
-set -e
+# nrcc docker-first installer (ADR 0003).
+# Usage: curl -fsSL https://get.nrcc.dev/install.sh | sh
+# Optional: NRCC_VERSION=<git ref> curl -fsSL … | sh
 
-# nrcc One-Liner Installer
-# Usage: curl https://get.nrcc.dev | sh
-# Or pinned version: NRCC_VERSION=v1.0.0 curl https://get.nrcc.dev | sh
+set -euo pipefail
 
-REPO="fgjcarlos/nrcc"
-VERSION="${NRCC_VERSION:-latest}"
-INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
+REPO="${NRCC_REPO:-fgjcarlos/nrcc}"
+VERSION="${NRCC_VERSION:-main}"
+INSTALL_DIR="${INSTALL_DIR:-$HOME/.nrcc}"
 
-# Step 1: Check dependencies
-echo "→ Checking dependencies…"
-
-# Check for curl
-if ! command -v curl >/dev/null 2>&1; then
-	echo "Error: curl is required but not installed. Install curl and retry."
-	exit 1
-fi
-
-# Check for sha256sum (Linux) or shasum (macOS)
-if command -v sha256sum >/dev/null 2>&1; then
-	SHA256_CMD="sha256sum"
-elif command -v shasum >/dev/null 2>&1; then
-	SHA256_CMD="shasum -a 256"
-else
-	echo "Error: sha256sum or shasum not found. Install GNU coreutils or coreutils package to enable checksum verification."
-	exit 1
-fi
-
-# Step 2: Detect OS and architecture
-OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-ARCH=$(uname -m)
-
-case "$ARCH" in
-	x86_64) ARCH="amd64" ;;
-	aarch64) ARCH="arm64" ;;
-	arm64) ARCH="arm64" ;;
-	armv7l) ARCH="armv7" ;;
-	*)
-		echo "Error: Unsupported architecture: $ARCH. Please download manually from https://github.com/fgjcarlos/nrcc/releases"
-		exit 1
-		;;
-esac
-
-# Normalize OS names and check for support
-case "$OS" in
-	linux) OS="linux" ;;
-	darwin) OS="darwin" ;;
-	*)
-		echo "Error: Unsupported OS: $OS. Please download manually from https://github.com/fgjcarlos/nrcc/releases"
-		exit 1
-		;;
-esac
-
-echo "→ Detected OS: $OS, Architecture: $ARCH"
-
-# Step 3: Resolve version (latest or pinned)
-if [ "$VERSION" = "latest" ]; then
-	echo "→ Resolving latest version…"
-	VERSION=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name"' | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/' | head -1)
-	if [ -z "$VERSION" ]; then
-		echo "Error: Could not resolve latest version from GitHub API. Set NRCC_VERSION explicitly, e.g.: NRCC_VERSION=v1.0.0 curl -fsSL https://get.nrcc.dev/install.sh | sh"
+for cmd in docker git; do
+	if ! command -v "$cmd" >/dev/null 2>&1; then
+		echo "Error: '$cmd' is required. Install it and retry."
 		exit 1
 	fi
-fi
+done
 
-echo "Installing nrcc ${VERSION}…"
-
-# Step 3a: Construct binary and checksum URLs
-BINARY="nrcc-${OS}-${ARCH}"
-if [ "$OS" = "windows" ]; then
-	BINARY="${BINARY}.exe"
-fi
-
-BINARY_URL="https://github.com/${REPO}/releases/download/${VERSION}/${BINARY}"
-CHECKSUM_URL="https://github.com/${REPO}/releases/download/${VERSION}/${BINARY}.sha256"
-
-# Step 3b: Validate install directory
-echo "→ Installing to ${INSTALL_DIR}/nrcc"
-if [ ! -d "$INSTALL_DIR" ]; then
-	echo "Error: Install directory $INSTALL_DIR does not exist. Create it first or choose another directory."
+if ! docker info >/dev/null 2>&1; then
+	echo "Error: docker daemon is not reachable. Start Docker and retry."
 	exit 1
 fi
 
-# Step 4: Download to temp directory
-TMP_DIR=$(mktemp -d)
-trap 'rm -rf "$TMP_DIR"' EXIT
-
-echo "→ Downloading binary…"
-curl -fsSL -o "$TMP_DIR/nrcc" "$BINARY_URL" || {
-	echo "Error: Failed to download ${BINARY} from ${BINARY_URL}. Check your network connection and retry."
-	exit 1
-}
-
-echo "→ Downloading checksum…"
-CHECKSUM_AVAILABLE=1
-curl -fsSL -o "$TMP_DIR/nrcc.sha256" "$CHECKSUM_URL" || CHECKSUM_AVAILABLE=0
-
-# Step 5: Verify checksum — verification is mandatory by default. A missing
-# checksum file aborts the install unless the operator opts out explicitly
-# (NRCC_SKIP_CHECKSUM=1), so a network/CDN failure can never silently downgrade
-# the install to an unverified binary.
-echo "→ Verifying checksum…"
-cd "$TMP_DIR"
-if [ "$CHECKSUM_AVAILABLE" = "1" ] && [ -f "nrcc.sha256" ]; then
-	if ! $SHA256_CMD -c nrcc.sha256 >/dev/null 2>&1; then
-		echo "Error: Checksum verification failed for ${BINARY}. The downloaded file may be corrupt. Please retry or download manually from https://github.com/fgjcarlos/nrcc/releases"
-		exit 1
-	fi
-	echo "✓ Checksum verified"
-elif [ "${NRCC_SKIP_CHECKSUM:-0}" = "1" ]; then
-	echo "Warning: SHA256 checksum unavailable for ${VERSION}; skipping verification because NRCC_SKIP_CHECKSUM=1."
-else
-	echo "Error: SHA256 checksum could not be downloaded for ${VERSION}; refusing to install an unverified binary."
-	echo "If this is a legacy release without checksums, re-run with NRCC_SKIP_CHECKSUM=1 to bypass (not recommended)."
+echo "→ Cloning $REPO @ $VERSION into $INSTALL_DIR"
+mkdir -p "$(dirname "$INSTALL_DIR")"
+if [ -d "$INSTALL_DIR" ]; then
+	echo "Error: $INSTALL_DIR already exists. Remove it or set INSTALL_DIR to a new path."
 	exit 1
 fi
+git clone --depth 1 --branch "$VERSION" "https://github.com/$REPO.git" "$INSTALL_DIR"
 
-# Step 6: Make executable
-chmod 0755 "$TMP_DIR/nrcc"
+cd "$INSTALL_DIR"
 
-# Step 7: Install binary
-echo "→ Installing to $INSTALL_DIR/nrcc…"
-if [ "$(id -u)" -eq 0 ]; then
-	# Running as root
-	install -m 755 "$TMP_DIR/nrcc" "$INSTALL_DIR/nrcc"
-else
-	# Not root, use sudo
-	if ! command -v sudo >/dev/null 2>&1; then
-		echo "Error: Running as non-root user but 'sudo' is not available"
-		exit 1
-	fi
-	sudo install -m 755 "$TMP_DIR/nrcc" "$INSTALL_DIR/nrcc"
-fi
+echo "→ Pulling base image (nodered/node-red:4.1) and starting stack"
+docker compose pull
+docker compose up -d
 
-# Step 8: Print success and next steps
 echo ""
-echo "✓ nrcc ${VERSION} installed to ${INSTALL_DIR}/nrcc"
+echo "✓ nrcc stack is up."
+echo "  nrcc UI:   http://localhost:3001"
+echo "  Node-RED:  http://localhost:1880"
 echo ""
-echo "Next step — set up as a system service:"
-echo "  sudo nrcc install"
-echo ""
-echo "Then open http://localhost:3001 in your browser."
+echo "Manage the stack from $INSTALL_DIR with 'docker compose [up|down|logs|ps]'."
