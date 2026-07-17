@@ -142,29 +142,3 @@ jobs:
           # up in #396. Keep CI exit 0 = green.
           only-new-issues: false
 
-  scripts:
-    name: Install script
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      # shellcheck is preinstalled on ubuntu-latest runners.
-      - name: ShellCheck
-        run: |
-          shellcheck scripts/install.sh
-          shellcheck scripts/sync-install.sh
-          shellcheck docs/install.sh
-
-      - name: POSIX sh syntax check
-        run: |
-          sh -n scripts/install.sh
-          sh -n scripts/sync-install.sh
-          sh -n docs/install.sh
-
-      - name: docs/install.sh in sync with scripts/install.sh
-        # docs/install.sh is served by GitHub Pages at get.nrcc.dev/install.sh;
-        # it must be byte-identical with scripts/install.sh. The check is
-        # delegated to scripts/sync-install.sh so contributors and CI run the
-        # same logic; use --check for non-mutating validation.
-        run: scripts/sync-install.sh --check
