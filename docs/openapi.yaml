@@ -3373,7 +3373,7 @@ components:
           example: nrcc-node-red
         image:
           type: string
-          example: nodered/node-red:latest
+          example: nodered/node-red:4.1
         status:
           type: string
           example: running

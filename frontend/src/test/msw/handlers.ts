@@ -40,7 +40,7 @@ export function createNrccApiHandlers(scenario: NrccMswScenario = 'initialized')
         container: {
           id: 'nrcc-smoke',
           name: 'nrcc-smoke-node-red',
-          image: 'nodered/node-red:latest',
+          image: 'nodered/node-red:4.1',
           status: 'running',
           created: '2026-01-01T00:00:00.000Z',
           ports: [{ privatePort: 1880, publicPort: 1880, type: 'tcp' }],

@@ -2115,7 +2115,7 @@ export interface components {
              * @example nrcc-node-red
              */
             name?: string;
-            /** @example nodered/node-red:latest */
+            /** @example nodered/node-red:4.1 */
             image?: string;
             /** @example running */
             status: string;

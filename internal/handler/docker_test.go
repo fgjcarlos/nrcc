@@ -82,7 +82,7 @@ func TestDockerHandler_GetStatus_NativeNotAvailable(t *testing.T) {
 func TestDockerHandler_GetStatus_NativeWithContainer(t *testing.T) {
 	h := NewDockerHandler()
 	c := &capturedCmd{
-		psOutput:      "iii999	nodered/node-red:latest	nrcc-node-red	Up 1 minute	2026-05-01 00:00:00 +0000 UTC\n",
+		psOutput:      "iii999	nodered/node-red:4.1	nrcc-node-red	Up 1 minute	2026-05-01 00:00:00 +0000 UTC\n",
 		inspectOutput: "true	false	2\n",
 	}
 	h.SetDockerService(newDockerServiceWith(t, c))
@@ -122,7 +122,7 @@ func TestDockerHandler_GetStatus_NativeWithContainer(t *testing.T) {
 func TestDockerHandler_GetInfo_NativeWithContainer(t *testing.T) {
 	h := NewDockerHandler()
 	c := &capturedCmd{
-		psOutput:      "jjj000	nodered/node-red:latest	nrcc-node-red	Up 1 minute	2026-05-01 00:00:00 +0000 UTC\n",
+		psOutput:      "jjj000	nodered/node-red:4.1	nrcc-node-red	Up 1 minute	2026-05-01 00:00:00 +0000 UTC\n",
 		inspectOutput: "true	false	0\n",
 	}
 	h.SetDockerService(newDockerServiceWith(t, c))
@@ -177,7 +177,7 @@ func TestDockerHandler_PostStop_NativeMissingService(t *testing.T) {
 func TestDockerHandler_PostRestart_NativeSuccess(t *testing.T) {
 	h := NewDockerHandler()
 	c := &capturedCmd{
-		psOutput:      "kkk111	nodered/node-red:latest	nrcc-node-red	Up 1 minute	2026-05-01 00:00:00 +0000 UTC\n",
+		psOutput:      "kkk111	nodered/node-red:4.1	nrcc-node-red	Up 1 minute	2026-05-01 00:00:00 +0000 UTC\n",
 		inspectOutput: "true	false	0\n",
 	}
 	h.SetDockerService(newDockerServiceWith(t, c))
@@ -203,7 +203,7 @@ func TestDockerHandler_PostRestart_NativeSuccess(t *testing.T) {
 func TestDockerHandler_PostStop_NativeSuccess(t *testing.T) {
 	h := NewDockerHandler()
 	c := &capturedCmd{
-		psOutput:      "lll222	nodered/node-red:latest	nrcc-node-red	Up 1 minute	2026-05-01 00:00:00 +0000 UTC\n",
+		psOutput:      "lll222	nodered/node-red:4.1	nrcc-node-red	Up 1 minute	2026-05-01 00:00:00 +0000 UTC\n",
 		inspectOutput: "true	false	0\n",
 	}
 	h.SetDockerService(newDockerServiceWith(t, c))
