@@ -411,17 +411,8 @@ func (s *HostService) resolveSettings(status model.HostStatus) model.SettingsDoc
 
 func (s *HostService) buildRecommendations(status model.HostStatus) []string {
 	var items []string
-	if !status.NodeJS.Installed {
-		items = append(items, "Instala Node.js y npm para soportar una instalacion nativa de Node-RED.")
-	}
-	if !status.NodeRed.Detected {
-		items = append(items, "Instala Node-RED en modo nativo o Docker antes de usar las funciones operativas.")
-	}
 	if status.NodeRed.Detected && !status.Portless.Installed {
 		items = append(items, "Opcional: instala Portless para exponer nrcc o Node-RED con URLs HTTPS .localhost, LAN o Tailscale.")
-	}
-	if status.NodeRed.Mode == model.InstallationModeDocker && status.NodeRed.SettingsPath == "" {
-		items = append(items, "Node-RED en Docker no expone /data como bind mount accesible; nrcc gestionara settings.js en su propio data dir. Usa -v /host/path:/data para editarlo directamente.")
 	}
 	if status.Settings.Path != "" && !status.Settings.Writable {
 		items = append(items, "Otorga permisos de escritura sobre settings.js para que nrcc pueda guardar cambios.")
