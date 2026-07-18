@@ -5,7 +5,9 @@ import type { LogLevel } from '@/shared/types';
 
 import { queryKeys } from '@/shared/lib/queryKeys';
 export function useLogsData() {
-  const [levelFilter, setLevelFilter] = useState<LogLevel[]>(['info', 'warn', 'error']);
+  // Start with every level enabled — fresh pages should show whatever
+  // Node-RED emits (debug included), per issue #461.
+  const [levelFilter, setLevelFilter] = useState<LogLevel[]>(['debug', 'info', 'warn', 'error']);
   const [isPaused, setIsPaused] = useState(false);
 
   const { data, isLoading, isError, error, refetch } = useQuery({

@@ -1,64 +1,85 @@
 import { cn } from '@/shared/lib';
 import { StateContainer } from '@/shared/components';
-import { Trash2, Download, Play, Pause } from 'lucide-react';
-import type { LogLevel } from '@/shared/types';
+import { Trash2, Download, Play, Pause, Copy, FileJson, RefreshCw } from 'lucide-react';
+import type { LogEntry, LogLevel } from '@/shared/types';
 import { useLogsData, useLogsActions } from '../hooks';
+
+const LEVELS: LogLevel[] = ['debug', 'info', 'warn', 'error'];
 
 export function LogsView() {
   const { logs, isLoading, isError, levelFilter, setLevelFilter, isPaused, setIsPaused, refetch } = useLogsData();
-  const { handleClear, handleDownload, getLevelColor } = useLogsActions();
+  const { handleClear, handleCopy, handleDownload, handleDownloadJSON, toggleLevel, getLevelColor } = useLogsActions();
 
   return (
     <div className="flex h-full flex-col space-y-6 p-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-[0.28em] text-base-content/50">Observability</p>
-          <h1 className="text-3xl font-bold tracking-tight text-base-content">Logs</h1>
-          <p className="mt-2 max-w-2xl text-sm text-base-content/65">
-            Stream Node-RED runtime logs, filter by level and export a snapshot when needed.
-          </p>
+      <div>
+        <p className="text-xs uppercase tracking-[0.28em] text-base-content/50">Observability</p>
+        <h1 className="text-3xl font-bold tracking-tight text-base-content">Logs</h1>
+        <p className="mt-2 max-w-2xl text-sm text-base-content/65">
+          Stream Node-RED runtime logs, filter by level and export a snapshot when needed.
+        </p>
+      </div>
+
+      <div className="surface-panel flex flex-col gap-3 border border-border p-3 md:flex-row md:flex-wrap md:items-center">
+        {/* Level chips */}
+        <div role="group" aria-label="Filter logs by level" className="flex flex-wrap items-center gap-2">
+          {LEVELS.map(level => {
+            const active = levelFilter.includes(level);
+            return (
+              <button
+                key={level}
+                type="button"
+                role="switch"
+                aria-checked={active}
+                aria-label={`Toggle ${level} level`}
+                onClick={() => setLevelFilter(toggleLevel(levelFilter, level))}
+                className={cn(
+                  'rounded-full border border-border px-3 py-1 text-xs font-medium uppercase tracking-wide transition-colors',
+                  active
+                    ? 'bg-primary/15 text-primary border-primary/40'
+                    : 'bg-base-300/40 text-base-content/55 hover:bg-base-300/70',
+                )}
+              >
+                {level}
+              </button>
+            );
+          })}
         </div>
-        
-        <div className="surface-panel flex flex-wrap items-center gap-2 border border-border p-3">
-          <select
-            multiple
-            aria-label="Filter logs by level"
-            value={levelFilter}
-            onChange={(e) => setLevelFilter(Array.from(e.target.selectedOptions, o => o.value as LogLevel))}
-            className="min-h-11 rounded-xl border border-border bg-base-100/70 px-3 py-2 text-sm text-base-content focus:outline-none focus:ring-2 focus:ring-primary"
-          >
-            <option value="debug">Debug</option>
-            <option value="info">Info</option>
-            <option value="warn">Warn</option>
-            <option value="error">Error</option>
-          </select>
 
-          <button
+        {/* Action buttons. Order matters for LogsView.test.tsx — first three
+            buttons map to Pause, Clear, Download respectively. */}
+        <div className="flex flex-wrap items-center gap-2 md:ml-auto">
+          <IconButton
             onClick={() => setIsPaused(!isPaused)}
-            aria-label={isPaused ? 'Resume log updates' : 'Pause log updates'}
-            className={cn(
-              'rounded-xl border border-border p-3 transition-colors',
-              isPaused ? 'bg-warning/10 text-warning' : 'bg-base-300/60 text-base-content hover:bg-base-300/80'
-            )}
-          >
-            {isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
-          </button>
-
-          <button
+            label={isPaused ? 'Resume' : 'Pause'}
+            icon={isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+            tone={isPaused ? 'warning' : 'default'}
+          />
+          <IconButton
             onClick={() => handleClear(refetch)}
-            aria-label="Clear logs"
-            className="rounded-xl border border-border p-3 text-base-content transition-colors hover:bg-base-300/60"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-
-          <button
+            label="Clear"
+            icon={<Trash2 className="h-4 w-4" />}
+          />
+          <IconButton
             onClick={() => handleDownload(logs)}
-            aria-label="Download logs"
-            className="rounded-xl border border-border p-3 text-base-content transition-colors hover:bg-base-300/60"
-          >
-            <Download className="w-4 h-4" />
-          </button>
+            label=".txt"
+            icon={<Download className="h-4 w-4" />}
+          />
+          <IconButton
+            onClick={() => handleDownloadJSON(logs)}
+            label=".json"
+            icon={<FileJson className="h-4 w-4" />}
+          />
+          <IconButton
+            onClick={() => handleCopy(logs)}
+            label="Copy"
+            icon={<Copy className="h-4 w-4" />}
+          />
+          <IconButton
+            onClick={() => refetch()}
+            label="Refresh"
+            icon={<RefreshCw className="h-4 w-4" />}
+          />
         </div>
       </div>
 
@@ -75,20 +96,45 @@ export function LogsView() {
           }
         >
           <div className="space-y-1">
-            {logs.map((log) => (
+            {logs.map((log: LogEntry) => (
               <div key={log.id} className="flex gap-2 rounded-xl px-2 py-2 transition-colors hover:bg-base-300/50">
                 <span className="shrink-0 text-base-content/55">
                   {new Date(log.timestamp).toLocaleTimeString()}
                 </span>
-                <span className={cn('font-bold shrink-0 w-12', getLevelColor(log.level))}>
+                <span className={cn('w-14 shrink-0 font-bold', getLevelColor(log.level))}>
                   {log.level.toUpperCase()}
                 </span>
-                <span className="text-base-content">{log.message}</span>
+                <span className="whitespace-pre-wrap break-words text-base-content">{log.message}</span>
               </div>
             ))}
           </div>
         </StateContainer>
       </div>
     </div>
+  );
+}
+
+type IconButtonProps = {
+  onClick: () => void;
+  label: string;
+  icon: React.ReactNode;
+  tone?: 'default' | 'warning';
+};
+
+function IconButton({ onClick, label, icon, tone = 'default' }: IconButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'inline-flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm transition-colors',
+        tone === 'warning'
+          ? 'bg-warning/10 text-warning hover:bg-warning/20'
+          : 'bg-base-300/60 text-base-content hover:bg-base-300/80',
+      )}
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
   );
 }
