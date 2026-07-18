@@ -303,6 +303,18 @@ func (pm *ProcessManager) startLocked(resetCounter bool) error {
 		return fmt.Errorf("failed to start node-red: %w", err)
 	}
 
+	// Surface the start in the logs buffer so /logs isn't empty when Node-RED
+	// boots silently (the welcome banner can race with consumeLogs and is easy
+	// to lose across the pipe boundary). One synthetic line is enough; real
+	// lines from node-red's stdout arrive via consumeLogs afterwards.
+	pm.logBuffer.Push(model.LogEntry{
+		ID:        "nrcc-start-" + fmt.Sprintf("%d", time.Now().UnixNano()),
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		Level:     "info",
+		Source:    "nrcc",
+		Message:   "nrcc: starting Node-RED on :" + rt.Port,
+	})
+
 	// Fresh channels for this process lifetime.
 	stopCh := make(chan struct{})
 	doneCh := make(chan struct{})
