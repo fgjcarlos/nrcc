@@ -90,8 +90,13 @@ export function LogsView() {
           isError={isError}
           isEmpty={logs.length === 0}
           emptySlot={
-            <div className="flex h-full min-h-48 items-center justify-center rounded-2xl border border-dashed border-border py-8 text-center text-base-content/60">
-              No logs available
+            <div className="flex h-full min-h-48 flex-col items-center justify-center gap-1 rounded-2xl border border-dashed border-border px-6 py-8 text-center text-base-content/60">
+              <p className="text-sm font-medium text-base-content/80">No logs available</p>
+              <p className="max-w-md text-xs text-base-content/50">
+                Node-RED hasn't emitted any log lines yet. This is normal when there are no flows
+                deployed, when the runtime is idle, or right after the page loads. Deploy or trigger
+                a flow to see entries here.
+              </p>
             </div>
           }
         >
