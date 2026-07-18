@@ -14,6 +14,12 @@ nrcc-*
 # ── Frontend dev artifacts ────────────────────────────────────────────────────
 # node_modules excluded — Docker stages install their own deps
 frontend/node_modules/
+# frontend/dist excluded so the go-builder stage always picks up the freshly
+# pnpm-built bundle from the builder stage (line 21 of the Dockerfile) and the
+# `COPY . .` on line 22 does not silently overwrite it with a stale host build.
+# If you ever need to embed a pre-built dist from the host, delete this line.
+# See issue #459 for context and repro recipe.
+frontend/dist/
 
 # ── Test & dev data ───────────────────────────────────────────────────────────
 data/
