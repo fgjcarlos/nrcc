@@ -543,14 +543,6 @@ export interface HostStatus {
   recommendations?: string[];
 }
 
-export interface DockerInfo {
-  version: string;
-  containersRunning: number;
-  containersPaused: number;
-  containersStopped: number;
-  images: number;
-}
-
 // ============================================
 // SYSTEM TYPES
 // ============================================
