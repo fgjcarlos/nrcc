@@ -39,7 +39,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       # Build the canonical release image via plain `docker compose build`
       # (no separate `bake` target anymore) and load it into the runner's
