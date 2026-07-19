@@ -130,7 +130,7 @@ export function BackupsView() {
 
   const downloadBackup = async (backup: BackupSummary) => {
     if (!backup.id) {
-      toast.error('El backup no tiene un identificador valido');
+      toast.error(UI_COPY.backupIdentifierInvalid);
       return;
     }
 
@@ -144,15 +144,15 @@ export function BackupsView() {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      toast.success('Descarga iniciada');
+      toast.success(UI_COPY.backupDownloadStarted);
     } catch {
-      toast.error('No se pudo descargar el backup');
+      toast.error(UI_COPY.backupDownloadFailed);
     }
   };
 
   const handleSaveConfig = () => {
     if (configDraft.schedule === 'custom' && !configDraft.customSchedule.trim()) {
-      toast.error('Ingresá una expresión cron para el scheduler personalizado');
+      toast.error(UI_COPY.backupCronRequired);
       return;
     }
     actions.saveConfigMutation.mutate(configDraft);
