@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Archive } from 'lucide-react';
+import { Archive, RefreshCw, AlertTriangle } from 'lucide-react';
 import { ConfirmationDialog } from '@/shared/components';
 import {
   BackupSummaryCards,
@@ -128,6 +128,15 @@ export function BackupsView() {
   const schedulerTone = getSchedulerTone(effectiveSchedulerStatus);
   const schedulerLabel = getSchedulerLabel(effectiveSchedulerStatus);
 
+  // #483: surface a sync error banner when the live status / observability
+  // queries failed. The cards below still render with cached or fallback
+  // data, but the operator now sees that the view is stale and can retry.
+  const dataSyncError: 'status' | 'observability' | null = backupsData.statusError
+    ? 'status'
+    : backupsData.observabilityError
+      ? 'observability'
+      : null;
+
   const downloadBackup = async (backup: BackupSummary) => {
     if (!backup.id) {
       toast.error(UI_COPY.backupIdentifierInvalid);
@@ -206,6 +215,35 @@ export function BackupsView() {
           Crear backup ahora
         </button>
       </div>
+
+      {dataSyncError && (
+        <div
+          role="alert"
+          className="flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/10 p-3 mb-6"
+        >
+          <AlertTriangle className="h-5 w-5 text-warning flex-shrink-0 mt-0.5" />
+          <div className="flex-1 text-sm">
+            <p className="font-medium text-base-content">
+              Última sincronización con el backend falló
+              {dataSyncError === 'status' ? ' (estado del scheduler)' : ' (observabilidad)'}.
+            </p>
+            <p className="text-base-content/70 mt-1">
+              Los datos en pantalla pueden estar desactualizados. Reintentá manualmente o recargá la página.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              void backupsData.refetchStatus();
+              window.location.reload();
+            }}
+            className="flex items-center gap-1.5 rounded-md border border-base-content/20 px-2.5 py-1.5 text-xs font-medium hover:bg-base-content/5"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Reintentar
+          </button>
+        </div>
+      )}
 
       {/* Summary Cards Component */}
       <BackupSummaryCards

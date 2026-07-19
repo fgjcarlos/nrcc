@@ -67,9 +67,11 @@ export function useBackupsData({
 
     status: statusQuery.data,
     statusLoading: statusQuery.isLoading,
+    statusError: statusQuery.isError,
 
     observability: observabilityQuery.data,
     observabilityLoading: observabilityQuery.isLoading,
+    observabilityError: observabilityQuery.isError,
 
     backupList: backupListQuery.data,
     backupsLoading: backupListQuery.isLoading,
