@@ -74,12 +74,18 @@ export function BackupsView() {
 
   const actions = useBackupsActions();
 
-  // Sync config from query to draft
+  // Sync config from query to draft — but only when the operator has no
+  // pending edits. `saveConfig` / `retention` invalidate the config query,
+  // and a refetch mid-edit would silently overwrite the draft. We compute
+  // `configDirty` here (rather than at the JSX site below) so this guard
+  // sees the current value, not a stale reference.
+  const configDirty = isConfigDirty(configDraft, backupsData.config);
+
   useEffect(() => {
-    if (backupsData.config) {
+    if (backupsData.config && !configDirty) {
       setConfigDraft(backupsData.config);
     }
-  }, [backupsData.config]);
+  }, [backupsData.config, configDirty]);
 
   // Clear selected backup if not in list
   useEffect(() => {
@@ -121,7 +127,6 @@ export function BackupsView() {
   };
   const schedulerTone = getSchedulerTone(effectiveSchedulerStatus);
   const schedulerLabel = getSchedulerLabel(effectiveSchedulerStatus);
-  const configDirty = isConfigDirty(configDraft, backupsData.config);
 
   const downloadBackup = async (backup: BackupSummary) => {
     if (!backup.id) {
