@@ -15,11 +15,11 @@ export function useBackupsActions() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.backups.config });
       await queryClient.invalidateQueries({ queryKey: queryKeys.backups.status });
       await queryClient.invalidateQueries({ queryKey: queryKeys.backups.observability });
-      toast.success('Backup configuration saved');
+      toast.success(UI_COPY.backupConfigurationSaved);
       return savedConfig;
     },
     onError: (error) => {
-      toast.error(getErrorMessage(error, 'Could not save backup configuration'));
+      toast.error(getErrorMessage(error, UI_COPY.couldNotSaveBackupConfiguration));
     },
   });
 
@@ -31,7 +31,7 @@ export function useBackupsActions() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.backups.storage });
       await queryClient.invalidateQueries({ queryKey: queryKeys.backups.status });
       await queryClient.invalidateQueries({ queryKey: queryKeys.backups.observability });
-      toast.success('Backup creado correctamente');
+      toast.success(UI_COPY.backupCreated);
     },
      onError: (error) => {
        toast.error(getErrorMessage(error, UI_COPY.couldNotCreateBackup));
@@ -46,9 +46,9 @@ export function useBackupsActions() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.backups.storage });
       await queryClient.invalidateQueries({ queryKey: queryKeys.backups.status });
       await queryClient.invalidateQueries({ queryKey: queryKeys.backups.observability });
-      toast.success(result.message || 'Backup restaurado correctamente');
+      toast.success(result.message || UI_COPY.backupRestored);
       if (result.preRestoreId) {
-        toast.info(`Se creó un backup de seguridad: ${result.preRestoreId}`);
+        toast.info(UI_COPY.preRestoreBackupNotice(result.preRestoreId));
       }
     },
      onError: (error) => {
@@ -64,7 +64,7 @@ export function useBackupsActions() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.backups.storage });
       await queryClient.invalidateQueries({ queryKey: queryKeys.backups.status });
       await queryClient.invalidateQueries({ queryKey: queryKeys.backups.observability });
-      toast.success('Backup eliminado');
+      toast.success(UI_COPY.backupDeleted);
     },
      onError: (error) => {
        toast.error(getErrorMessage(error, UI_COPY.couldNotDeleteBackup));
@@ -77,7 +77,7 @@ export function useBackupsActions() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.backups.config });
       await queryClient.invalidateQueries({ queryKey: queryKeys.backups.storage });
-      toast.success('Política de retención guardada');
+      toast.success(UI_COPY.retentionPolicySaved);
     },
      onError: (error) => {
        toast.error(getErrorMessage(error, UI_COPY.couldNotSaveRetentionPolicy));
