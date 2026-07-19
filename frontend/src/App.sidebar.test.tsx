@@ -23,10 +23,6 @@ vi.mock('@/features/configuration/components/ConfigurationView', () => ({
   ConfigurationView: () => <div>Configuration page</div>,
 }));
 
-vi.mock('@/features/docker/components/DockerView', () => ({
-  DockerView: () => <div>Docker page</div>,
-}));
-
 vi.mock('@/features/auth/components/ProfileView', () => ({
   ProfileView: () => <div>Profile page</div>,
 }));

@@ -58,8 +58,6 @@ var mutatingRoutes = []struct{ method, path string }{
 	{http.MethodPost, "/api/updates/apply"},
 	{http.MethodPost, "/api/files/upload"},
 	{http.MethodDelete, "/api/files/some-file"},
-	{http.MethodPost, "/api/docker/restart"},
-	{http.MethodPost, "/api/docker/stop"},
 }
 
 // TestAuthz_ViewerForbiddenOnMutatingRoutes is the #274 regression: a viewer

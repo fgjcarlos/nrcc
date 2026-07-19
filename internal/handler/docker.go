@@ -3,35 +3,17 @@ package handler
 import (
 	"net/http"
 	"os"
-	"time"
 
-	"github.com/fgjcarlos/nrcc/internal/audit"
 	"github.com/fgjcarlos/nrcc/internal/model"
 	"github.com/fgjcarlos/nrcc/internal/service"
 )
 
-// DockerHandler handles Docker-related endpoints.
-//
-// Two code paths share the same HTTP surface:
-//
-//  1. In-Docker path — nrcc itself runs inside a container. Status
-//     answers with a synthetic running container (the parent
-//     container); restart/stop signal the parent process so Docker's
-//     restart policy can re-create the container.
-//
-//  2. Native path — nrcc runs natively on a host that has a
-//     Node-RED container managed by the `docker` CLI. Status, info,
-//     restart, and stop are routed to a DockerService that drives
-//     the docker binary directly. The full ContainerInfo shape
-//     (id, name, image, status, created, ports, state) is returned
-//     so the existing frontend DockerView renders unchanged.
-//
-// In both cases the UI gets a usable response; the previous behaviour
-// — always 503 for native hosts — is what issue #308 fixes.
+// DockerHandler serves the lightweight container-status read the dashboard
+// uses. Mutating endpoints (restart/stop) and the engine-info endpoint were
+// removed in #477 — restart/stop on nrcc's own container is structurally
+// meaningless under the docker-first model, and the engine-info response
+// was never consumed outside the (also-removed) /docker page.
 type DockerHandler struct {
-	pm           *service.ProcessManager
-	shutdownCh   chan struct{}
-	audit        *audit.Service
 	dockerSvc    *service.DockerService
 	dockerStatus service.DockerStatus
 }
@@ -41,25 +23,9 @@ func NewDockerHandler() *DockerHandler {
 	return &DockerHandler{}
 }
 
-// SetAuditService injects the audit logger.
-func (h *DockerHandler) SetAuditService(a *audit.Service) { h.audit = a }
-
-// SetProcessManager injects the process manager so container restarts
-// can stop Node-RED gracefully before exiting.
-func (h *DockerHandler) SetProcessManager(pm *service.ProcessManager) {
-	h.pm = pm
-}
-
-// SetShutdownChannel injects the shutdown channel so handlers can
-// signal graceful shutdown instead of calling os.Exit.
-func (h *DockerHandler) SetShutdownChannel(ch chan struct{}) {
-	h.shutdownCh = ch
-}
-
 // SetDockerService injects the DockerService that powers the native
-// path. The handler caches the latest Status() result so the
-// synchronous restart/stop handlers can read the discovered container
-// name without re-running discovery.
+// path. The handler caches the latest Status() result so subsequent
+// calls don't pay the docker-cli discovery cost.
 func (h *DockerHandler) SetDockerService(svc *service.DockerService) {
 	h.dockerSvc = svc
 }
@@ -110,106 +76,6 @@ func (h *DockerHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 		Available: false,
 		Message:   dockerNotAvailableMessage(h.dockerStatus),
 	})
-}
-
-// GetInfo returns Docker engine info.
-// GET /api/docker/info
-func (h *DockerHandler) GetInfo(w http.ResponseWriter, r *http.Request) {
-	if isInDocker() {
-		model.RespondJSON(w, http.StatusOK, map[string]interface{}{
-			"inDocker": true,
-		})
-		return
-	}
-	h.refreshDockerStatus()
-	if h.dockerStatus.Container != nil {
-		model.RespondJSON(w, http.StatusOK, map[string]interface{}{
-			"available":     true,
-			"inDocker":      false,
-			"source":        h.dockerStatus.Source,
-			"containerName": h.dockerStatus.Container.Name,
-		})
-		return
-	}
-	model.RespondJSON(w, http.StatusOK, model.DockerStatus{
-		Available: false,
-		Message:   dockerNotAvailableMessage(h.dockerStatus),
-	})
-}
-
-// PostRestart restarts the container.
-//   - In-Docker: stops Node-RED and signals shutdown so Docker's
-//     restart policy brings everything back up.
-//   - Native: runs `docker restart <name>` against the discovered
-//     container and audit-logs the result.
-//
-// POST /api/docker/restart
-func (h *DockerHandler) PostRestart(w http.ResponseWriter, r *http.Request) {
-	if isInDocker() {
-		h.audit.Log(r, "", "CONTAINER_RESTART", "", "ok", nil)
-		model.RespondJSON(w, http.StatusOK, map[string]string{"message": "Container restarting…"})
-		go func() {
-			if h.pm != nil {
-				_ = h.pm.Stop()
-			}
-			time.Sleep(300 * time.Millisecond)
-			if h.shutdownCh != nil {
-				h.shutdownCh <- struct{}{}
-			}
-		}()
-		return
-	}
-	if h.dockerSvc == nil {
-		model.RespondError(w, http.StatusServiceUnavailable, "DOCKER_NOT_AVAILABLE",
-			"Docker management is not configured on this host")
-		return
-	}
-	if err := h.dockerSvc.Restart(); err != nil {
-		h.audit.Log(r, "", "CONTAINER_RESTART", "", "error",
-			map[string]string{"error": err.Error()})
-		model.RespondError(w, http.StatusServiceUnavailable, "DOCKER_NOT_AVAILABLE",
-			err.Error())
-		return
-	}
-	h.audit.Log(r, "", "CONTAINER_RESTART", "", "ok", nil)
-	model.RespondJSON(w, http.StatusOK, map[string]string{"message": "Container restarting…"})
-}
-
-// PostStop stops the container.
-//   - In-Docker: stops Node-RED and signals shutdown.
-//   - Native: runs `docker stop <name>` against the discovered
-//     container and audit-logs the result.
-//
-// POST /api/docker/stop
-func (h *DockerHandler) PostStop(w http.ResponseWriter, r *http.Request) {
-	if isInDocker() {
-		h.audit.Log(r, "", "CONTAINER_STOP", "", "ok", nil)
-		model.RespondJSON(w, http.StatusOK, map[string]string{"message": "Container stopping…"})
-		go func() {
-			if h.pm != nil {
-				_ = h.pm.Stop()
-			}
-			time.Sleep(300 * time.Millisecond)
-			if h.shutdownCh != nil {
-				h.shutdownCh <- struct{}{}
-			}
-		}()
-		return
-	}
-	if h.dockerSvc == nil {
-		model.RespondError(w, http.StatusServiceUnavailable, "DOCKER_NOT_AVAILABLE",
-			"Docker management is not configured on this host")
-		return
-	}
-	if err := h.dockerSvc.Stop(); err != nil {
-		h.audit.Log(r, "", "CONTAINER_STOP", "", "error",
-			map[string]string{"error": err.Error()})
-		model.RespondError(w, http.StatusServiceUnavailable, "DOCKER_NOT_AVAILABLE",
-			err.Error())
-		return
-	}
-	h.audit.Log(r, "", "CONTAINER_STOP", "", "ok", nil)
-	model.RespondJSON(w, http.StatusOK, map[string]string{"message": "Container stopping…"})
 }
 
 // dockerNotAvailableMessage returns a human-readable message for the

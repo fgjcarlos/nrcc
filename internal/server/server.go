@@ -117,7 +117,6 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 	envHandler.SetAuditService(auditSvc)
 	updateHandler.SetAuditService(auditSvc)
 	filesHandler.SetAuditService(auditSvc)
-	dockerHandler.SetAuditService(auditSvc)
 	flowHandler.SetAuditService(auditSvc)
 	authHandler.SetRateLimiter(middleware.NewRateLimiter(dataDir))
 	mfaHandler.SetAuditService(auditSvc)
@@ -270,12 +269,12 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 			r.With(middleware.RequireAdmin).Delete("/{name}", filesHandler.DeleteFile)
 		})
 
-		// Docker routes
+		// Docker routes — only the read-only /status endpoint survives
+		// after #477; the dashboard's status card consumes it. Restart,
+		// stop and engine-info endpoints were structurally meaningless
+		// under the docker-first model (nrcc would kill its own host).
 		r.Route("/api/docker", func(r chi.Router) {
 			r.Get("/status", dockerHandler.GetStatus)
-			r.Get("/info", dockerHandler.GetInfo)
-			r.With(middleware.RequireAdmin).Post("/restart", dockerHandler.PostRestart)
-			r.With(middleware.RequireAdmin).Post("/stop", dockerHandler.PostStop)
 		})
 
 		// AI routes
@@ -347,10 +346,6 @@ func (s *Server) SetProcessManager(pm *service.ProcessManager) {
 	pm.SetEnvService(s.envSvc)
 	// Wire process manager into env handler so it restarts node-red on env changes
 	s.envHandler.SetProcessManager(pm)
-	// Wire process manager into docker handler so container restart stops node-red first
-	s.dockerHandler.SetProcessManager(pm)
-	// Wire shutdown channel into docker handler for graceful shutdown signaling
-	s.dockerHandler.SetShutdownChannel(s.shutdownCh)
 	// Wire process manager into metrics collector for runtime status gauges
 	if s.metricsCollector != nil {
 		s.metricsCollector.SetProcessManager(pm)
