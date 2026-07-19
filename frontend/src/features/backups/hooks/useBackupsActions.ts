@@ -31,6 +31,9 @@ export function useBackupsActions() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.backups.storage });
       await queryClient.invalidateQueries({ queryKey: queryKeys.backups.status });
       await queryClient.invalidateQueries({ queryKey: queryKeys.backups.observability });
+      // #483: the detail panel for any backup that may have shifted
+      // (pre-restore snapshots, deleted rows) needs to refetch.
+      await queryClient.invalidateQueries({ queryKey: ['backup-detail'] });
       toast.success(UI_COPY.backupCreated);
     },
      onError: (error) => {
@@ -46,6 +49,9 @@ export function useBackupsActions() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.backups.storage });
       await queryClient.invalidateQueries({ queryKey: queryKeys.backups.status });
       await queryClient.invalidateQueries({ queryKey: queryKeys.backups.observability });
+      // #483: restore may create or modify related rows (pre-restore
+      // snapshot); refetch any open detail panel.
+      await queryClient.invalidateQueries({ queryKey: ['backup-detail'] });
       toast.success(result.message || UI_COPY.backupRestored);
       if (result.preRestoreId) {
         toast.info(UI_COPY.preRestoreBackupNotice(result.preRestoreId));
@@ -64,6 +70,9 @@ export function useBackupsActions() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.backups.storage });
       await queryClient.invalidateQueries({ queryKey: queryKeys.backups.status });
       await queryClient.invalidateQueries({ queryKey: queryKeys.backups.observability });
+      // #483: the deleted row's detail panel needs to refetch so it
+      // surfaces the missing entry instead of a stale manifest.
+      await queryClient.invalidateQueries({ queryKey: ['backup-detail'] });
       toast.success(UI_COPY.backupDeleted);
     },
      onError: (error) => {
