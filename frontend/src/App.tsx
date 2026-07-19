@@ -37,10 +37,6 @@ const ConfigurationView = lazyNamed(
   () => import('@/features/configuration/components/ConfigurationView'),
   'ConfigurationView',
 );
-const LogsView = lazyNamed(
-  () => import('@/features/logs/components/LogsView'),
-  'LogsView',
-);
 const DockerView = lazyNamed(
   () => import('@/features/docker/components/DockerView'),
   'DockerView',
@@ -158,7 +154,6 @@ function AppRoutes() {
       <Route path="/" element={<Layout />}>
         <Route path="dashboard" element={routeElement('dashboard', <DashboardView />)} />
         <Route path="configuration" element={routeElement('configuration', <ConfigurationView />)} />
-        <Route path="logs" element={routeElement('logs', <LogsView />)} />
         <Route path="docker" element={routeElement('docker', <DockerView />)} />
         <Route path="profile" element={routeElement('profile', <ProfileView />)} />
         <Route path="settings/users" element={routeElement('users', <UsersView />, 'admin')} />

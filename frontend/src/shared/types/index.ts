@@ -582,13 +582,3 @@ export interface SystemInfo {
 // ============================================
 // LOG TYPES
 // ============================================
-
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
-
-export interface LogEntry {
-  id: string;
-  timestamp: string;
-  level: LogLevel;
-  message: string;
-  source?: string;
-}

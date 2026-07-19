@@ -113,8 +113,7 @@ func TestGetHealth_RestartCountReflectsCumulativeNotBackoff(t *testing.T) {
 	dir := t.TempDir()
 	seedRestartCountFile(t, dir, 7)
 
-	logBuf := service.NewLogBuffer(100)
-	pm := service.NewProcessManager("node-red", dir, logBuf)
+	pm := service.NewProcessManager("node-red", dir)
 
 	h := NewSystemHandler()
 	h.SetProcessManager(pm)

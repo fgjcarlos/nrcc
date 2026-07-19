@@ -3,7 +3,7 @@ package service
 import "testing"
 
 func TestProcessManagerStatus_UsesCumulativeRestartCount(t *testing.T) {
-	pm := NewProcessManager("node-red", t.TempDir(), NewLogBuffer(10))
+	pm := NewProcessManager("node-red", t.TempDir())
 	pm.mu.Lock()
 	pm.restartCount = 2
 	pm.cumulativeRestarts = 7

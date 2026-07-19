@@ -23,10 +23,6 @@ vi.mock('@/features/configuration/components/ConfigurationView', () => ({
   ConfigurationView: () => <div>Configuration page</div>,
 }));
 
-vi.mock('@/features/logs/components/LogsView', () => ({
-  LogsView: () => <div>Logs page</div>,
-}));
-
 vi.mock('@/features/docker/components/DockerView', () => ({
   DockerView: () => <div>Docker page</div>,
 }));
@@ -180,26 +176,6 @@ describe('sidebar navigation (#365)', () => {
       expect(screen.getByText('Configuration page')).toBeInTheDocument();
     });
     expect(screen.queryByText('Dashboard page')).not.toBeInTheDocument();
-  });
-
-  it('navigates Configuration -> Logs -> Configuration in quick succession', async () => {
-    mockAuthenticated();
-    window.history.pushState({}, '', '/configuration');
-    render(<App />);
-
-    expect(await screen.findByText('Configuration page')).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('link', { name: /Logs/ }));
-    await waitFor(() => {
-      expect(screen.getByText('Logs page')).toBeInTheDocument();
-    });
-    expect(screen.queryByText('Configuration page')).not.toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('link', { name: /Configuration/ }));
-    await waitFor(() => {
-      expect(screen.getByText('Configuration page')).toBeInTheDocument();
-    });
-    expect(screen.queryByText('Logs page')).not.toBeInTheDocument();
   });
 
   it('also routes through the admin Users link', async () => {
