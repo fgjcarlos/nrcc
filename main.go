@@ -67,9 +67,6 @@ func runServer() {
 	// Initialize auth service
 	authSvc := service.NewAuthService(jwtSecret, usersStore, sessionStore)
 
-	// Initialize log buffer (1000 max entries)
-	logBuffer := service.NewLogBuffer(1000)
-
 	hostSvc := service.NewHostService(dataDir)
 
 	// docker-first (ADR 0003): no bootstrap step. `docker compose up` is
@@ -81,7 +78,7 @@ func runServer() {
 	if nodeRedCmd == "" {
 		nodeRedCmd = "node-red"
 	}
-	pm := service.NewProcessManager(nodeRedCmd, dataDir, logBuffer)
+	pm := service.NewProcessManager(nodeRedCmd, dataDir)
 	configSvc := service.NewConfigServiceWithHost(dataDir, hostSvc)
 	pm.SetEnvService(service.NewEnvService(configSvc, os.Getenv("NRCC_ENCRYPTION_KEY")))
 
@@ -120,7 +117,6 @@ func runServer() {
 	if manageRuntime {
 		srv.SetProcessManager(pm)
 	}
-	srv.SetLogBuffer(logBuffer)
 
 	// Create HTTP server
 	ui.SectionHeader("Server Starting")

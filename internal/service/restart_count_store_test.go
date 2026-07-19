@@ -86,8 +86,7 @@ func TestRestartCountStore_CountSurvivesNewPM(t *testing.T) {
 	}
 
 	// Second PM — must reload the count.
-	logBuf := NewLogBuffer(100)
-	pm2 := NewProcessManager("node-red", dir, logBuf)
+	pm2 := NewProcessManager("node-red", dir)
 
 	got := pm2.CumulativeRestarts()
 	if got != 5 {
@@ -99,8 +98,7 @@ func TestRestartCountStore_CountSurvivesNewPM(t *testing.T) {
 // startLocked(true) (user-initiated start) does NOT alter CumulativeRestarts.
 func TestRestartCountStore_UserStartDoesNotChangeCumulative(t *testing.T) {
 	dir := t.TempDir()
-	logBuf := NewLogBuffer(100)
-	pm := NewProcessManager("node-red", dir, logBuf)
+	pm := NewProcessManager("node-red", dir)
 
 	// Manually set cumulative count via the store so we have a known baseline.
 	store := newRestartCountStore(dir)
@@ -108,7 +106,7 @@ func TestRestartCountStore_UserStartDoesNotChangeCumulative(t *testing.T) {
 		t.Fatalf("seed Save: %v", err)
 	}
 	// Reload into a fresh PM.
-	pm2 := NewProcessManager("node-red", dir, logBuf)
+	pm2 := NewProcessManager("node-red", dir)
 
 	before := pm2.CumulativeRestarts()
 	if before != 3 {

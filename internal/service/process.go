@@ -1,7 +1,6 @@
 package service
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"net"
@@ -30,7 +29,6 @@ type ProcessManager struct {
 	// immutable after construction
 	nodeRedCmd   string
 	dataDir      string
-	logBuffer    *LogBuffer
 	maxRestarts  int
 	restartDelay time.Duration
 
@@ -64,7 +62,7 @@ type ProcessManager struct {
 
 // NewProcessManager creates a ProcessManager. cmd is the node-red executable
 // path; if empty "node-red" is used.
-func NewProcessManager(cmd, dataDir string, logBuffer *LogBuffer) *ProcessManager {
+func NewProcessManager(cmd, dataDir string) *ProcessManager {
 	if cmd == "" {
 		cmd = "node-red"
 	}
@@ -72,7 +70,6 @@ func NewProcessManager(cmd, dataDir string, logBuffer *LogBuffer) *ProcessManage
 	return &ProcessManager{
 		nodeRedCmd:         cmd,
 		dataDir:            dataDir,
-		logBuffer:          logBuffer,
 		maxRestarts:        10,
 		restartDelay:       2 * time.Second,
 		doneCh:             closedChan(), // sentinel so Stop() doesn't block when nothing is running
@@ -254,14 +251,6 @@ func (pm *ProcessManager) startLocked(resetCounter bool) error {
 		} else {
 			ui.Info(fmt.Sprintf("Node-RED already running on :%s — attaching", rt.Port))
 		}
-		// Push a synthetic log entry to the buffer so the UI shows context
-		pm.logBuffer.Push(model.LogEntry{
-			ID:        "nrcc-attach-" + fmt.Sprintf("%d", time.Now().UnixNano()),
-			Timestamp: time.Now().UTC().Format(time.RFC3339),
-			Level:     "info",
-			Source:    "nrcc",
-			Message:   fmt.Sprintf("Attached to existing Node-RED instance on :%s", rt.Port),
-		})
 		return nil
 	}
 
@@ -303,18 +292,6 @@ func (pm *ProcessManager) startLocked(resetCounter bool) error {
 		return fmt.Errorf("failed to start node-red: %w", err)
 	}
 
-	// Surface the start in the logs buffer so /logs isn't empty when Node-RED
-	// boots silently (the welcome banner can race with consumeLogs and is easy
-	// to lose across the pipe boundary). One synthetic line is enough; real
-	// lines from node-red's stdout arrive via consumeLogs afterwards.
-	pm.logBuffer.Push(model.LogEntry{
-		ID:        "nrcc-start-" + fmt.Sprintf("%d", time.Now().UnixNano()),
-		Timestamp: time.Now().UTC().Format(time.RFC3339),
-		Level:     "info",
-		Source:    "nrcc",
-		Message:   "nrcc: starting Node-RED on :" + rt.Port,
-	})
-
 	// Fresh channels for this process lifetime.
 	stopCh := make(chan struct{})
 	doneCh := make(chan struct{})
@@ -329,11 +306,23 @@ func (pm *ProcessManager) startLocked(resetCounter bool) error {
 		pm.restartCount = 0
 	}
 
-	go pm.consumeLogs(stdoutPipe, "stdout")
-	go pm.consumeLogs(stderrPipe, "stderr")
+	// Drain the child stdout/stderr into io.Discard so the kernel pipe buffer
+	// never fills and `cmd.Wait()` exits cleanly. The captured lines are no
+	// longer exposed via a /logs page; Node-RED's own stdout is still visible
+	// in `docker logs nrcc`.
+	drainDone := make(chan struct{}, 2)
+	go func() { _, _ = io.Copy(io.Discard, stdoutPipe); drainDone <- struct{}{} }()
+	go func() { _, _ = io.Copy(io.Discard, stderrPipe); drainDone <- struct{}{} }()
 	// Pass local copies of the channels — waitForExit must not read pm.stopCh/doneCh
 	// after the lock is released, as a new Start() could replace them.
 	go pm.waitForExit(cmd, stopCh, doneCh)
+	// Best-effort wait for the drainers to finish when the child exits, so
+	// their goroutines don't leak past the lifetime of the cmd.
+	go func() {
+		<-doneCh
+		<-drainDone
+		<-drainDone
+	}()
 
 	return nil
 }
@@ -439,35 +428,6 @@ func (pm *ProcessManager) Version() string {
 	return pm.version
 }
 
-// consumeLogs reads lines from a pipe and pushes them to the log buffer.
-func (pm *ProcessManager) consumeLogs(r io.Reader, stream string) {
-	scanner := bufio.NewScanner(r)
-	for scanner.Scan() {
-		line := scanner.Text()
-		pm.logBuffer.Push(model.LogEntry{
-			ID:        fmt.Sprintf("%s-%d", stream, time.Now().UnixNano()),
-			Timestamp: time.Now().UTC().Format(time.RFC3339),
-			Level:     parseLogLevel(line),
-			Source:    stream,
-			Message:   line,
-		})
-	}
-}
-
-// parseLogLevel extracts the log level from a node-red output line.
-func parseLogLevel(line string) string {
-	switch {
-	case strings.Contains(line, "[error]"):
-		return "error"
-	case strings.Contains(line, "[warn]"):
-		return "warn"
-	case strings.Contains(line, "[debug]"):
-		return "debug"
-	default:
-		return "info"
-	}
-}
-
 // waitForExit is the sole goroutine that calls cmd.Wait(). It handles
 // auto-restart with exponential backoff on unexpected exits.
 //
@@ -506,13 +466,7 @@ func (pm *ProcessManager) waitForExit(cmd *exec.Cmd, stopCh, doneCh chan struct{
 
 	// Unexpected crash — attempt auto-restart with exponential backoff.
 	if restartCount >= pm.maxRestarts {
-		pm.logBuffer.Push(model.LogEntry{
-			ID:        fmt.Sprintf("nrcc-%d", time.Now().UnixNano()),
-			Timestamp: time.Now().UTC().Format(time.RFC3339),
-			Level:     "error",
-			Source:    "nrcc",
-			Message:   fmt.Sprintf("node-red crashed %d times — giving up automatic restarts", restartCount),
-		})
+		ui.Errorf("node-red crashed %d times — giving up automatic restarts", restartCount)
 		return
 	}
 
@@ -522,13 +476,7 @@ func (pm *ProcessManager) waitForExit(cmd *exec.Cmd, stopCh, doneCh chan struct{
 		delay = 60 * time.Second
 	}
 
-	pm.logBuffer.Push(model.LogEntry{
-		ID:        fmt.Sprintf("nrcc-%d", time.Now().UnixNano()),
-		Timestamp: time.Now().UTC().Format(time.RFC3339),
-		Level:     "warn",
-		Source:    "nrcc",
-		Message:   fmt.Sprintf("node-red exited unexpectedly (attempt %d/%d) — restarting in %s", restartCount+1, pm.maxRestarts, delay),
-	})
+	ui.Warnf("node-red exited unexpectedly (attempt %d/%d) — restarting in %s", restartCount+1, pm.maxRestarts, delay)
 
 	time.Sleep(delay)
 
@@ -543,28 +491,6 @@ func (pm *ProcessManager) waitForExit(cmd *exec.Cmd, stopCh, doneCh chan struct{
 		pm.lastError = startErr
 	}
 	pm.mu.Unlock()
-}
-
-// GetLogs returns the last `limit` log lines as []string.
-// If limit <= 0, returns all available logs.
-// If logBuffer is nil or empty, returns empty slice.
-func (pm *ProcessManager) GetLogs(limit int) []string {
-	if pm.logBuffer == nil {
-		return []string{}
-	}
-
-	var logEntries []model.LogEntry
-	if limit <= 0 {
-		logEntries = pm.logBuffer.All()
-	} else {
-		logEntries = pm.logBuffer.Recent(limit)
-	}
-
-	result := make([]string, len(logEntries))
-	for i, entry := range logEntries {
-		result[i] = entry.Message
-	}
-	return result
 }
 
 // RestartEvents returns the recorded unexpected-exit events in chronological

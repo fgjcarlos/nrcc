@@ -19,8 +19,8 @@ type runtimeHistoryResponse struct {
 }
 
 func TestGetRuntimeHistory_Returns200WithEmptyEvents(t *testing.T) {
-	logBuf := service.NewLogBuffer(100)
-	pm := service.NewProcessManager("node-red", t.TempDir(), logBuf)
+
+	pm := service.NewProcessManager("node-red", t.TempDir())
 
 	h := NewSystemHandler()
 	h.SetProcessManager(pm)
@@ -55,8 +55,8 @@ func TestGetRuntimeHistory_Returns200WithEmptyEvents(t *testing.T) {
 }
 
 func TestGetRuntimeHistory_StatusReflectsProcessManagerState(t *testing.T) {
-	logBuf := service.NewLogBuffer(100)
-	pm := service.NewProcessManager("node-red", t.TempDir(), logBuf)
+
+	pm := service.NewProcessManager("node-red", t.TempDir())
 
 	h := NewSystemHandler()
 	h.SetProcessManager(pm)
@@ -100,9 +100,7 @@ func TestGetRuntimeHistory_StatusRestartCountIsCumulativeNotBackoff(t *testing.T
 	if err := os.WriteFile(filepath.Join(dataDir, "restart_count.json"), seed, 0600); err != nil {
 		t.Fatalf("seeding restart_count.json: %v", err)
 	}
-
-	logBuf := service.NewLogBuffer(100)
-	pm := service.NewProcessManager("node-red", dataDir, logBuf)
+	pm := service.NewProcessManager("node-red", dataDir)
 
 	h := NewSystemHandler()
 	h.SetProcessManager(pm)
@@ -133,8 +131,8 @@ func TestGetRuntimeHistory_StatusRestartCountIsCumulativeNotBackoff(t *testing.T
 }
 
 func TestGetRuntimeHistory_ContentTypeIsJSON(t *testing.T) {
-	logBuf := service.NewLogBuffer(100)
-	pm := service.NewProcessManager("node-red", t.TempDir(), logBuf)
+
+	pm := service.NewProcessManager("node-red", t.TempDir())
 
 	h := NewSystemHandler()
 	h.SetProcessManager(pm)

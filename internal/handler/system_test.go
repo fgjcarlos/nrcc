@@ -18,7 +18,7 @@ func TestSystemHandler_NodeRedVersion(t *testing.T) {
 
 	// With a process manager, the version is resolved from the command output
 	// (here `echo --version` prints "--version") — proving it is not hardcoded.
-	pm := service.NewProcessManager("echo", t.TempDir(), service.NewLogBuffer(10))
+	pm := service.NewProcessManager("echo", t.TempDir())
 	h.SetProcessManager(pm)
 
 	v := h.nodeRedVersion()

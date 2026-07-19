@@ -21,7 +21,6 @@ type Server struct {
 	router           *chi.Mux
 	authSvc          *service.AuthService
 	processManager   *service.ProcessManager
-	logBuffer        *service.LogBuffer
 	hostSvc          *service.HostService
 	envSvc           *service.EnvService
 	updateSvc        *service.UpdateService
@@ -388,28 +387,6 @@ func (s *Server) SetProcessManager(pm *service.ProcessManager) {
 		})
 	}
 }
-
-// SetLogBuffer sets the LogBuffer for log streaming routes
-func (s *Server) SetLogBuffer(lb *service.LogBuffer) {
-	s.logBuffer = lb
-	// Re-wire routes with log buffer
-	s.wireLogRoutes()
-}
-
-// wireLogRoutes adds log routes to the existing router
-func (s *Server) wireLogRoutes() {
-	if s.logBuffer == nil {
-		return
-	}
-	logHandler := handler.NewLogHandler(s.logBuffer)
-	s.router.Route("/api/logs", func(r chi.Router) {
-		r.Use(middleware.Auth(s.authSvc))
-		r.Get("/", logHandler.GetLogs)
-		r.Get("/stream", logHandler.StreamLogs)
-		r.Delete("/", logHandler.DeleteLogs)
-	})
-}
-
 // ServeHTTP implements http.Handler
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.router.ServeHTTP(w, r)

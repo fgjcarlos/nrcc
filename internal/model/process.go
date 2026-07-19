@@ -22,12 +22,3 @@ type ProcessMemory struct {
 	HeapUsed  int64 `json:"heapUsed"`
 	External  int64 `json:"external"`
 }
-
-// LogEntry represents a single log line
-type LogEntry struct {
-	ID        string `json:"id"`
-	Timestamp string `json:"timestamp"` // ISO-8601
-	Level     string `json:"level"`     // info, warn, error, debug
-	Source    string `json:"source"`    // stdout, stderr
-	Message   string `json:"message"`
-}

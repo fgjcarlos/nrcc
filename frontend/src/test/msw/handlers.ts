@@ -55,7 +55,6 @@ export function createNrccApiHandlers(scenario: NrccMswScenario = 'initialized')
     http.post('/api/runtime/start', () => ok({ message: 'Node-RED start requested in test mode' })),
     http.post('/api/runtime/stop', () => ok({ message: 'Node-RED stop requested in test mode' })),
     http.post('/api/runtime/restart', () => ok({ message: 'Node-RED restart requested in test mode' })),
-    http.get('/api/runtime/logs', () => ok([{ id: 'log-1', timestamp: new Date(0).toISOString(), level: 'info', message: 'Fixture log entry' }])),
 
     http.get('/api/backups/status', () => ok(backupSchedulerStatus)),
     http.get('/api/backups/observability', () => ok(backupObservability)),
