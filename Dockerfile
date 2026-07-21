@@ -9,7 +9,7 @@ FROM node:26-slim AS builder
 RUN npm install -g corepack@latest && corepack enable && corepack prepare pnpm@11.12.0 --activate
 
 WORKDIR /build/frontend
-COPY frontend/package.json frontend/pnpm-lock.yaml ./
+COPY frontend/package.json frontend/pnpm-lock.yaml frontend/pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile --ignore-scripts
 COPY frontend/ ./
 RUN pnpm build
