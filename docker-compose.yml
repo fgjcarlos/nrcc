@@ -1,12 +1,18 @@
 # nrcc — single compose, single Dockerfile, builds locally.
 #
-# One service, one nrcc + one Node-RED process. To run more stacks on the
-# same host, copy this file and remap ports + volume name.
+# One service, one nrcc + one Node-RED process. To run more stacks on
+# the same host, copy this file and remap ports + volume name.
 #
 #   docker compose up --build
 #   open http://localhost:3001 (nrcc UI) and http://localhost:1880 (Node-RED)
 #
 # Set JWT_SECRET via .env or host env; if absent nrcc generates one in /data.
+#
+# Ports are bound to 127.0.0.1 (loopback) by default. On a host with
+# Tailscale installed the same ports are reachable via the Tailscale
+# IP of this host (e.g. http://100.x.y.z:3001) without exposing them
+# to the LAN. To expose to the LAN, change the host binding to
+# "0.0.0.0" or remove the prefix.
 services:
   nrcc:
     build:
@@ -15,8 +21,8 @@ services:
     container_name: nrcc
     restart: unless-stopped
     ports:
-      - "3001:3001"   # nrcc web UI + API
-      - "1880:1880"   # Node-RED editor
+      - "127.0.0.1:3001:3001"   # nrcc web UI + API (Tailscale-reachable)
+      - "127.0.0.1:1880:1880"   # Node-RED editor (Tailscale-reachable)
     environment:
       PORT: "3001"
       DATA_DIR: /data
