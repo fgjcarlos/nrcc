@@ -78,7 +78,7 @@ func TestDockerHandler_GetStatus_NativeNotAvailable(t *testing.T) {
 func TestDockerHandler_GetStatus_NativeWithContainer(t *testing.T) {
 	h := NewDockerHandler()
 	c := &capturedCmd{
-		psOutput:      "iii999\tnodered/node-red:4.1\tnrcc-node-red\tUp 1 minute\t2026-05-01 00:00:00 +0000 UTC\n",
+		psOutput:      "iii999\tnodered/node-red:5.0\tnrcc-node-red\tUp 1 minute\t2026-05-01 00:00:00 +0000 UTC\n",
 		inspectOutput: "true\tfalse\t2\n",
 	}
 	h.SetDockerService(newDockerServiceWith(t, c))
