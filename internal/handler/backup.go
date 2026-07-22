@@ -199,9 +199,9 @@ func (h *BackupHandler) DownloadBackup(w http.ResponseWriter, r *http.Request) {
 	defer func() { _ = rc.Close() }()
 
 	// Raw path keeps Content-Length so a client can detect a truncated
-	// stream. The encrypted path computes Content-Length up-front so a
-	// mid-stream error becomes a 500, not an HTTP 200 with truncated
-	// ciphertext.
+	// stream. The encrypted path streams in 64 KiB chunks via the
+	// service's EncryptStream helper; without an up-front ciphertext
+	// size we drop Content-Length and rely on HTTP chunked transfer.
 	if password == "" {
 		w.Header().Set("Content-Type", "application/zip")
 		w.Header().Set("Content-Disposition", "attachment; filename=\"backup-"+id+".zip\"")
@@ -210,22 +210,12 @@ func (h *BackupHandler) DownloadBackup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data, err := io.ReadAll(rc)
-	if err != nil {
-		model.RespondError(w, http.StatusInternalServerError, "BACKUP_ERROR", "Failed to read backup")
-		return
-	}
-	encrypted, err := service.EncryptForDownload(data, password)
-	if err != nil {
-		model.RespondError(w, http.StatusInternalServerError, "BACKUP_ERROR", "Failed to encrypt backup")
-		return
-	}
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Content-Disposition", "attachment; filename=\"backup-"+id+".zip.enc\"")
-	w.Header().Set("Content-Length", strconv.Itoa(len(encrypted)))
-	if _, err := w.Write(encrypted); err != nil {
-		// Headers already sent; the client will see Content-Length mismatch.
-		// The error is best-effort logged elsewhere.
+	w.WriteHeader(http.StatusOK)
+	if err := h.svc.Download(id, w, password); err != nil {
+		// Headers already sent; the client will see a truncated stream
+		// under HTTP 200 — same property as the legacy path.
 		return
 	}
 }

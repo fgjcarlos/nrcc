@@ -454,21 +454,26 @@ func TestBackupServiceDownloadEncryptsWithPassword(t *testing.T) {
 		t.Fatalf("Download: %v", err)
 	}
 
-	// Round-trip via the public Decrypt helper.
-	decoded, err := Decrypt(buf.String(), "hunter2")
-	if err != nil {
-		t.Fatalf("Decrypt with right password: %v", err)
+	// Round-trip via the streaming Decrypt helper.
+	var decoded bytes.Buffer
+	if err := DecryptStream(&buf, "hunter2", &decoded); err != nil {
+		t.Fatalf("DecryptStream: %v", err)
 	}
 	// The decrypted bytes must be a valid zip whose manifest entry is intact.
-	zr, err := zip.NewReader(bytes.NewReader([]byte(decoded)), int64(len(decoded)))
+	zr, err := zip.NewReader(bytes.NewReader(decoded.Bytes()), int64(decoded.Len()))
 	if err != nil {
 		t.Fatalf("decrypted bytes are not a zip: %v", err)
 	}
 	if len(zr.File) == 0 {
 		t.Fatal("decrypted zip is empty")
 	}
-	if _, err := Decrypt(buf.String(), "wrong-password"); err == nil {
-		t.Fatal("Decrypt with wrong password must fail")
+
+	// Wrong password must fail tag verification on the first chunk.
+	if err := func() error {
+		var out bytes.Buffer
+		return DecryptStream(bytes.NewReader(buf.Bytes()), "wrong-password", &out)
+	}(); err == nil {
+		t.Fatal("DecryptStream with wrong password must fail")
 	}
 }
 
