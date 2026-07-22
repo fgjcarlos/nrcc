@@ -37,3 +37,13 @@ Thumbs.db
 *.md
 LICENSE
 docs/
+
+# ── Specs / agent registry ───────────────────────────────────────────────────
+openspec/
+.agents/
+skills-lock.json
+
+# ── Frontend noise (dev caches, lockfile siblings) ───────────────────────────
+frontend/coverage/
+frontend/.vite/
+frontend/.pnpm-store/

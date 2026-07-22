@@ -97,7 +97,7 @@ func TestDockerService_DiscoverNodeRed(t *testing.T) {
 	t.Run("finds node-red container and reads state", func(t *testing.T) {
 		c := &capturedCmd{
 			psOutput: "aaa111\tredis:latest\tredis\tExited (0) 1 minute ago\t2026-01-01 00:00:00 +0000 UTC\n" +
-				"bbb222\tnodered/node-red:5.0\tnrcc-node-red\tUp 5 minutes\t2026-01-02 00:00:00 +0000 UTC\n",
+				"bbb222\tnodered/node-red:5.0.1-minimal\tnrcc-node-red\tUp 5 minutes\t2026-01-02 00:00:00 +0000 UTC\n",
 			inspectOutput: "true\tfalse\t3\n",
 		}
 		svc := newServiceWithDocker(t, c)
@@ -111,8 +111,8 @@ func TestDockerService_DiscoverNodeRed(t *testing.T) {
 		if info.Name != "nrcc-node-red" {
 			t.Fatalf("expected name nrcc-node-red, got %q", info.Name)
 		}
-		if info.Image != "nodered/node-red:5.0" {
-			t.Fatalf("expected image nodered/node-red:5.0, got %q", info.Image)
+		if info.Image != "nodered/node-red:5.0.1-minimal" {
+			t.Fatalf("expected image nodered/node-red:5.0.1-minimal, got %q", info.Image)
 		}
 		if info.Status != "running" {
 			t.Fatalf("expected status running, got %q", info.Status)
@@ -175,7 +175,7 @@ func TestDockerService_Status(t *testing.T) {
 
 	t.Run("returns full payload with container", func(t *testing.T) {
 		c := &capturedCmd{
-			psOutput:      "ddd444\tnodered/node-red:5.0\tnrcc-node-red\tUp 1 minute\t2026-03-01 00:00:00 +0000 UTC\n",
+			psOutput:      "ddd444\tnodered/node-red:5.0.1-minimal\tnrcc-node-red\tUp 1 minute\t2026-03-01 00:00:00 +0000 UTC\n",
 			inspectOutput: "true\tfalse\t0\n",
 		}
 		svc := newServiceWithDocker(t, c)
@@ -195,7 +195,7 @@ func TestDockerService_Status(t *testing.T) {
 func TestDockerService_RestartAndStop(t *testing.T) {
 	t.Run("restart runs docker restart on the discovered name", func(t *testing.T) {
 		c := &capturedCmd{
-			psOutput:      "eee555\tnodered/node-red:5.0\tnrcc-node-red\tUp 1 minute\t2026-04-01 00:00:00 +0000 UTC\n",
+			psOutput:      "eee555\tnodered/node-red:5.0.1-minimal\tnrcc-node-red\tUp 1 minute\t2026-04-01 00:00:00 +0000 UTC\n",
 			inspectOutput: "true\tfalse\t0\n",
 		}
 		svc := newServiceWithDocker(t, c)
@@ -219,7 +219,7 @@ func TestDockerService_RestartAndStop(t *testing.T) {
 
 	t.Run("stop runs docker stop on the discovered name", func(t *testing.T) {
 		c := &capturedCmd{
-			psOutput:      "fff666\tnodered/node-red:5.0\tnrcc-node-red\tUp 1 minute\t2026-04-01 00:00:00 +0000 UTC\n",
+			psOutput:      "fff666\tnodered/node-red:5.0.1-minimal\tnrcc-node-red\tUp 1 minute\t2026-04-01 00:00:00 +0000 UTC\n",
 			inspectOutput: "true\tfalse\t0\n",
 		}
 		svc := newServiceWithDocker(t, c)
@@ -253,7 +253,7 @@ func TestDockerService_RestartAndStop(t *testing.T) {
 
 	t.Run("action failure when docker CLI exits non-zero", func(t *testing.T) {
 		c := &capturedCmd{
-			psOutput:      "hhhh888\tnodered/node-red:5.0\tnrcc-node-red\tUp 1 minute\t2026-04-01 00:00:00 +0000 UTC\n",
+			psOutput:      "hhhh888\tnodered/node-red:5.0.1-minimal\tnrcc-node-red\tUp 1 minute\t2026-04-01 00:00:00 +0000 UTC\n",
 			inspectOutput: "true\tfalse\t0\n",
 			failOn:        map[string]bool{"restart": true},
 		}
