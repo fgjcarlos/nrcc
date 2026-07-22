@@ -38,4 +38,10 @@ VOLUME ["/data"]
 ENV DATA_DIR=/data NODE_RED_CMD=node-red PORT=3001
 EXPOSE 3001 1880
 
+# ponytail: wget is present in the nodered/node-red:5.0 base image, so we
+# reuse it instead of pulling curl. Bump start-period if the runtime
+# ever grows heavier initialization.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -qO- http://localhost:3001/healthz || exit 1
+
 ENTRYPOINT ["/usr/local/bin/nrcc-entrypoint.sh"]
