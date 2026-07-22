@@ -124,3 +124,27 @@ func TestEncryptStreamHeaderMagic(t *testing.T) {
 		t.Fatal("DecryptStream must reject non-streaming input")
 	}
 }
+
+// TestV2EnvelopeIsNotLegacy is a structural pin against silent
+// regressions: EncryptStream must NOT produce an `enc:base64(...)`
+// envelope, and Encrypt must NOT produce the binary `enc:v2:` header.
+// If a future refactor unifies the two envelopes under the SHA-256
+// derivation (or under argon2id without the magic), one of these
+// round-trips breaks loudly.
+func TestV2EnvelopeIsNotLegacy(t *testing.T) {
+	var stream bytes.Buffer
+	if err := EncryptStream(bytes.NewReader([]byte("a-legacy-string-of-modest-length")), "pin", &stream); err != nil {
+		t.Fatalf("EncryptStream: %v", err)
+	}
+	if !bytes.HasPrefix(stream.Bytes(), []byte(encV2Magic)) {
+		t.Fatalf("EncryptStream envelope must start with %q, got %q", encV2Magic, stream.Bytes()[:7])
+	}
+
+	legacy, err := EncryptBytes([]byte("a-legacy-string-of-modest-length"), "pin")
+	if err != nil {
+		t.Fatalf("EncryptBytes: %v", err)
+	}
+	if !strings.HasPrefix(legacy, encPrefix) || strings.HasPrefix(legacy, encV2Magic) {
+		t.Fatalf("EncryptBytes must produce legacy enc: envelope, got %q", legacy[:min(8, len(legacy))])
+	}
+}
