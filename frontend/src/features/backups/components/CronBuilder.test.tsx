@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { CronBuilder } from './CronBuilder';
+import {
+  CronBuilder,
+  cronFromDateTime,
+  dateTimeFromCron,
+  type PresetType,
+} from './CronBuilder';
 import { validateCron } from '@/features/backups/lib/cronUtils';
 
 describe('validateCron', () => {
@@ -23,230 +28,181 @@ describe('validateCron', () => {
   });
 });
 
+describe('cronFromDateTime', () => {
+  it('maps a date+time pair to a one-shot cron expression', () => {
+    expect(cronFromDateTime('2026-07-25', '14:30')).toBe('30 14 25 7 *');
+  });
+  it('returns null when date or time is empty', () => {
+    expect(cronFromDateTime('', '14:30')).toBeNull();
+    expect(cronFromDateTime('2026-07-25', '')).toBeNull();
+  });
+  it('returns null on malformed input', () => {
+    expect(cronFromDateTime('not-a-date', '14:30')).toBeNull();
+    expect(cronFromDateTime('2026-07-25', '25:99')).toBeNull();
+  });
+});
+
+describe('dateTimeFromCron', () => {
+  it('returns null for non-one-shot crons (wildcards, ranges)', () => {
+    expect(dateTimeFromCron('0 * * * *')).toBeNull();
+    expect(dateTimeFromCron('0 2 * * 0')).toBeNull();
+    expect(dateTimeFromCron('*/5 * * * *')).toBeNull();
+  });
+  it('round-trips with cronFromDateTime', () => {
+    const cron = cronFromDateTime('2026-12-01', '09:15');
+    const back = dateTimeFromCron(cron!);
+    expect(back).not.toBeNull();
+    expect(back!.time).toBe('09:15');
+    expect(back!.date.endsWith('-12-01')).toBe(true);
+  });
+});
+
+function renderBuilder(schedule: PresetType, customSchedule = '', props: Partial<React.ComponentProps<typeof CronBuilder>> = {}) {
+  const onChange = props.onChange ?? vi.fn();
+  const onPresetChange = props.onPresetChange ?? vi.fn();
+  return {
+    onChange,
+    onPresetChange,
+    ...render(
+      <CronBuilder
+        schedule={schedule}
+        customSchedule={customSchedule}
+        onChange={onChange}
+        onPresetChange={onPresetChange}
+        {...props}
+      />,
+    ),
+  };
+}
+
 describe('CronBuilder', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('should render all preset buttons', () => {
-    render(
-      <CronBuilder 
-        value="disabled"
-        onChange={vi.fn()}
-      />
-    );
-
-    expect(screen.getByTestId('preset-hourly')).toBeInTheDocument();
-    expect(screen.getByTestId('preset-every6h')).toBeInTheDocument();
-    expect(screen.getByTestId('preset-daily')).toBeInTheDocument();
-    expect(screen.getByTestId('preset-weekly')).toBeInTheDocument();
-    expect(screen.getByTestId('preset-custom')).toBeInTheDocument();
+  it('renders the preset select with all options', () => {
+    renderBuilder('disabled');
+    const sel = screen.getByTestId('preset-select') as HTMLSelectElement;
+    expect(sel).toBeInTheDocument();
+    expect(Array.from(sel.options).map((o) => o.value)).toEqual([
+      'disabled', 'hourly', 'every6h', 'daily', 'weekly', 'custom',
+    ]);
   });
 
-  it('should emit hourly cron when hourly preset clicked', () => {
-    const onChange = vi.fn();
-    render(
-      <CronBuilder value="disabled" onChange={onChange} />
-    );
+  it('marks the active preset in the select based on schedule, not customSchedule', () => {
+    // schedule='daily' with empty customSchedule: today the operator
+    // cannot tell which preset is active. With schedule-driven init,
+    // the select shows 'daily'.
+    renderBuilder('daily', '');
+    const sel = screen.getByTestId('preset-select') as HTMLSelectElement;
+    expect(sel.value).toBe('daily');
+  });
 
-    fireEvent.click(screen.getByTestId('preset-hourly'));
+  it('shows the cron expression of the active preset', () => {
+    renderBuilder('daily');
+    expect(screen.getByText('0 2 * * *')).toBeInTheDocument();
+  });
+
+  it('emits preset cron when a preset is selected', () => {
+    const { onChange, onPresetChange } = renderBuilder('disabled');
+    const sel = screen.getByTestId('preset-select');
+    fireEvent.change(sel, { target: { value: 'hourly' } });
+    expect(onPresetChange).toHaveBeenCalledWith('hourly');
     expect(onChange).toHaveBeenCalledWith('0 * * * *');
   });
 
-  it('should emit daily cron when daily preset clicked', () => {
-    const onChange = vi.fn();
-    render(
-      <CronBuilder value="disabled" onChange={onChange} />
-    );
-
-    fireEvent.click(screen.getByTestId('preset-daily'));
+  it('emits daily cron when daily is selected', () => {
+    const { onChange, onPresetChange } = renderBuilder('disabled');
+    fireEvent.change(screen.getByTestId('preset-select'), { target: { value: 'daily' } });
+    expect(onPresetChange).toHaveBeenCalledWith('daily');
     expect(onChange).toHaveBeenCalledWith('0 2 * * *');
   });
 
-  it('should emit every6h cron when every6h preset clicked', () => {
-    const onChange = vi.fn();
-    render(
-      <CronBuilder value="disabled" onChange={onChange} />
-    );
-
-    fireEvent.click(screen.getByTestId('preset-every6h'));
+  it('emits every6h cron when every6h is selected', () => {
+    const { onChange } = renderBuilder('disabled');
+    fireEvent.change(screen.getByTestId('preset-select'), { target: { value: 'every6h' } });
     expect(onChange).toHaveBeenCalledWith('0 */6 * * *');
   });
 
-  it('should emit weekly cron when weekly preset clicked', () => {
-    const onChange = vi.fn();
-    render(
-      <CronBuilder value="disabled" onChange={onChange} />
-    );
-
-    fireEvent.click(screen.getByTestId('preset-weekly'));
+  it('emits weekly cron when weekly is selected', () => {
+    const { onChange } = renderBuilder('disabled');
+    fireEvent.change(screen.getByTestId('preset-select'), { target: { value: 'weekly' } });
     expect(onChange).toHaveBeenCalledWith('0 2 * * 0');
   });
 
-  it('should show custom input when custom preset clicked', () => {
-    render(
-      <CronBuilder value="disabled" onChange={vi.fn()} />
-    );
-
-    fireEvent.click(screen.getByTestId('preset-custom'));
-    expect(screen.getByPlaceholderText(/format/i)).toBeInTheDocument();
-  });
-
-  it('should validate custom cron on blur', () => {
-    render(
-      <CronBuilder value="disabled" onChange={vi.fn()} />
-    );
-
-    fireEvent.click(screen.getByTestId('preset-custom'));
-    const input = screen.getByPlaceholderText(/format/i) as HTMLInputElement;
-
-    fireEvent.change(input, { target: { value: 'invalid' } });
-    fireEvent.blur(input);
-
-    expect(screen.getByText(/invalid/i)).toBeInTheDocument();
-  });
-
-  it('should emit valid custom cron on blur', () => {
-    const onChange = vi.fn();
-    render(
-      <CronBuilder value="disabled" onChange={onChange} />
-    );
-
-    fireEvent.click(screen.getByTestId('preset-custom'));
-    const input = screen.getByPlaceholderText(/format/i) as HTMLInputElement;
-
-    fireEvent.change(input, { target: { value: '*/5 * * * *' } });
-    fireEvent.blur(input);
-
-    expect(onChange).toHaveBeenCalledWith('*/5 * * * *');
-  });
-
-  it('should mark correct preset as checked based on value', () => {
-    render(
-      <CronBuilder value="0 2 * * *" onChange={vi.fn()} />
-    );
-
-    const dailyRadio = screen.getByTestId('preset-daily') as HTMLInputElement;
-    expect(dailyRadio.checked).toBe(true);
-  });
-
-  it('should show custom value when initialized with custom cron', () => {
-    render(
-      <CronBuilder value="*/15 * * * *" onChange={vi.fn()} />
-    );
-
-    const customRadio = screen.getByTestId('preset-custom') as HTMLInputElement;
-    expect(customRadio.checked).toBe(true);
-    expect((screen.getByPlaceholderText(/format/i) as HTMLInputElement).value).toBe('*/15 * * * *');
-  });
-
-  it('should show error for invalid initial value', () => {
-    render(
-      <CronBuilder value="invalid-cron" onChange={vi.fn()} />
-    );
-
-    expect(screen.getByText(/invalid/i)).toBeInTheDocument();
-  });
-
-  it('should not call onChange for invalid custom cron', () => {
-    const onChange = vi.fn();
-    render(
-      <CronBuilder value="disabled" onChange={onChange} />
-    );
-
-    fireEvent.click(screen.getByTestId('preset-custom'));
-    const input = screen.getByPlaceholderText(/format/i) as HTMLInputElement;
-
-    fireEvent.change(input, { target: { value: '99 99 99 99 99' } });
-    fireEvent.blur(input);
-
-    // onChange should NOT be called for invalid cron
+  it('does not call onChange when disabled is selected', () => {
+    const { onChange } = renderBuilder('hourly');
+    fireEvent.change(screen.getByTestId('preset-select'), { target: { value: 'disabled' } });
+    // disabled is a state transition, not a cron emission
     expect(onChange).not.toHaveBeenCalled();
-    expect(screen.getByText(/invalid/i)).toBeInTheDocument();
   });
 
-  it('should trim whitespace from custom input', () => {
-    const onChange = vi.fn();
-    render(
-      <CronBuilder value="disabled" onChange={onChange} />
-    );
-
-    fireEvent.click(screen.getByTestId('preset-custom'));
-    const input = screen.getByPlaceholderText(/format/i) as HTMLInputElement;
-
-    fireEvent.change(input, { target: { value: '  0 2 * * *  ' } });
-    fireEvent.blur(input);
-
-    expect(onChange).toHaveBeenCalledWith('0 2 * * *');
+  it('shows date and time pickers when custom is active', () => {
+    renderBuilder('custom', '30 14 25 7 *');
+    expect(screen.getByTestId('custom-date')).toBeInTheDocument();
+    expect(screen.getByTestId('custom-time')).toBeInTheDocument();
   });
 
-  // NEW TEST: Verify that CronBuilder has onSave callback for explicit save (not auto-save)
-  it('should accept onSave callback for explicit save when provided', () => {
-    const onSave = vi.fn();
-    const onChange = vi.fn();
-    render(
-      <CronBuilder 
-        value="disabled" 
-        onChange={onChange}
-        onSave={onSave}
-      />
-    );
-
-    // When onSave is provided, there should be a save button
-    expect(screen.queryByRole('button', { name: /save|confirm/i })).toBeTruthy();
+  it('initializes the custom pickers from a one-shot cron', () => {
+    renderBuilder('custom', '30 14 25 7 *');
+    const date = screen.getByTestId('custom-date') as HTMLInputElement;
+    const time = screen.getByTestId('custom-time') as HTMLInputElement;
+    expect(date.value.endsWith('-07-25')).toBe(true);
+    expect(time.value).toBe('14:30');
   });
 
-  // TRIANGULATION: Verify save button is NOT shown when onSave not provided
-  it('should not show save button when onSave not provided', () => {
-    render(
-      <CronBuilder 
-        value="disabled" 
-        onChange={vi.fn()}
-      />
-    );
+  it('emits a one-shot cron when the picker changes', () => {
+    const { onChange } = renderBuilder('custom', '');
+    const date = screen.getByTestId('custom-date');
+    const time = screen.getByTestId('custom-time');
+    fireEvent.change(date, { target: { value: '2026-08-15' } });
+    fireEvent.change(time, { target: { value: '09:00' } });
+    expect(onChange).toHaveBeenCalledWith('0 9 15 8 *');
+  });
 
+  it('hides the raw cron input behind the advanced toggle by default', () => {
+    renderBuilder('custom', '30 14 25 7 *');
+    expect(screen.queryByTestId('custom-cron-input')).toBeNull();
+    expect(screen.getByTestId('custom-advanced-toggle')).toBeInTheDocument();
+  });
+
+  it('shows the raw cron input after toggling advanced', () => {
+    renderBuilder('custom', '30 14 25 7 *');
+    fireEvent.click(screen.getByTestId('custom-advanced-toggle'));
+    const raw = screen.getByTestId('custom-cron-input') as HTMLInputElement;
+    expect(raw).toBeInTheDocument();
+    expect(raw.value).toBe('30 14 25 7 *');
+  });
+
+  it('validates the raw cron on blur and surfaces an error', () => {
+    renderBuilder('custom', '0 2 * * *');
+    fireEvent.click(screen.getByTestId('custom-advanced-toggle'));
+    const raw = screen.getByTestId('custom-cron-input');
+    fireEvent.change(raw, { target: { value: 'invalid' } });
+    fireEvent.blur(raw);
+    expect(screen.getByText(/invalid cron/i)).toBeInTheDocument();
+  });
+
+  it('accepts onSave and shows a save button when provided', () => {
+    renderBuilder('daily', '', { onSave: vi.fn() });
+    expect(screen.getByRole('button', { name: /save/i })).toBeInTheDocument();
+  });
+
+  it('hides the save button when onSave is not provided', () => {
+    renderBuilder('daily');
     expect(screen.queryByRole('button', { name: /save|confirm/i })).toBeNull();
   });
 
-  // TRIANGULATION: Verify save button calls onSave when clicked
-  it('should call onSave callback when save button clicked', () => {
+  it('calls onSave when the save button is clicked', () => {
     const onSave = vi.fn();
-    render(
-      <CronBuilder 
-        value="0 2 * * *" 
-        onChange={vi.fn()}
-        onSave={onSave}
-      />
-    );
-
-    const saveButton = screen.getByRole('button', { name: /save/i });
-    fireEvent.click(saveButton);
-
+    renderBuilder('daily', '', { onSave });
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
     expect(onSave).toHaveBeenCalled();
   });
 
-  // NEW: Verify helpful text about cron format is visible when custom is selected
-  it('should show cron format help text in custom mode', () => {
-    render(
-      <CronBuilder value="disabled" onChange={vi.fn()} />
-    );
-
-    fireEvent.click(screen.getByTestId('preset-custom'));
-    
-    // Should show the format explanation
-    expect(screen.getByText(/5-field format/i)).toBeInTheDocument();
-    expect(screen.getByText(/minute hour day-of-month month day-of-week/i)).toBeInTheDocument();
-  });
-
-  // NEW: Verify placeholder text provides example
-  it('should show example cron in input placeholder', () => {
-    render(
-      <CronBuilder value="disabled" onChange={vi.fn()} />
-    );
-
-    fireEvent.click(screen.getByTestId('preset-custom'));
-    const input = screen.getByPlaceholderText(/0 2 \* \* \*/i);
-    
-    expect(input).toBeInTheDocument();
+  it('shows the next-run summary for custom', () => {
+    renderBuilder('custom', '0 9 15 8 *');
+    // The summary line: "Runs once on ... at ..."
+    expect(screen.getByText(/runs once on/i)).toBeInTheDocument();
   });
 });
