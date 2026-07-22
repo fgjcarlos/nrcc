@@ -724,7 +724,13 @@ func (h *AuthHandler) setRefreshCookie(w http.ResponseWriter, r *http.Request, u
 	http.SetCookie(w, &http.Cookie{
 		Name:     refreshCookieName,
 		Value:    refreshToken,
-		Path:     "/api/auth",
+		// Path is "/" so the cookie rides every request, not just
+		// /api/auth/*. Required when the backend is behind a reverse
+		// proxy (e.g. Tailscale Serve, Portless) that may rewrite the
+		// Host header upstream — a narrower Path combined with a
+		// rewritten Host made the cookie's effective host mismatch
+		// the browser's origin and dropped the cookie on F5.
+		Path:     "/",
 		HttpOnly: true,
 		Secure:   isSecureRequest(r),
 		SameSite: http.SameSiteStrictMode,
@@ -737,7 +743,7 @@ func clearRefreshCookie(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     refreshCookieName,
 		Value:    "",
-		Path:     "/api/auth",
+		Path:     "/",
 		HttpOnly: true,
 		Secure:   isSecureRequest(r),
 		SameSite: http.SameSiteStrictMode,

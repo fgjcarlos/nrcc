@@ -111,8 +111,8 @@ func TestRefresh_ValidFlow(t *testing.T) {
 	if !newCookie.HttpOnly {
 		t.Fatal("refresh cookie must be HttpOnly")
 	}
-	if !strings.HasPrefix(newCookie.Path, "/api/auth") {
-		t.Fatalf("expected cookie path /api/auth, got %s", newCookie.Path)
+	if newCookie.Path != "/" {
+		t.Fatalf("expected cookie path /, got %s", newCookie.Path)
 	}
 }
 
