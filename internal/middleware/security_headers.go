@@ -11,8 +11,13 @@ func SecurityHeaders(next http.Handler) http.Handler {
 		h.Set("X-DNS-Prefetch-Control", "off")
 		h.Set("X-Permitted-Cross-Domain-Policies", "none")
 		h.Set("Content-Security-Policy",
-			"default-src 'self'; style-src 'self' 'unsafe-inline'; "+
-				"img-src 'self' data:; font-src 'self' data:; "+
+			"default-src 'self'; "+
+				"script-src 'self' 'unsafe-inline'; "+
+				"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "+
+				"style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; "+
+				"font-src 'self' data: https://fonts.gstatic.com; "+
+				"img-src 'self' data:; "+
+				"connect-src 'self'; "+
 				"frame-ancestors 'none'")
 
 		if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {

@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -94,5 +95,29 @@ func TestSecurityHeaders_CallsNext(t *testing.T) {
 
 	if !called {
 		t.Error("next handler should be called")
+	}
+}
+
+func TestSecurityHeaders_CSP_AllowsGoogleFonts(t *testing.T) {
+	handler := SecurityHeaders(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+
+	req := httptest.NewRequest("GET", "/", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	csp := w.Header().Get("Content-Security-Policy")
+	for _, want := range []string{
+		"default-src 'self'",
+		"script-src 'self' 'unsafe-inline'",
+		"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+		"style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com",
+		"font-src 'self' data: https://fonts.gstatic.com",
+		"img-src 'self' data:",
+		"connect-src 'self'",
+		"frame-ancestors 'none'",
+	} {
+		if !strings.Contains(csp, want) {
+			t.Errorf("CSP missing %q in: %s", want, csp)
+		}
 	}
 }
