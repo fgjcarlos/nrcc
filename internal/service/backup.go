@@ -611,6 +611,11 @@ func (s *BackupService) OpenForDownload(id string) (io.ReadCloser, int64, error)
 // client decrypts with the same passphrase. This lets an operator transfer a
 // backup containing credentials/secrets off-host without exposing them in the
 // raw archive.
+//
+// The encrypted path streams in 64 KiB chunks via EncryptStream so peak
+// memory is bounded well below the archive size; the handler must set
+// headers (including Transfer-Encoding: chunked when no Content-Length is
+// available) BEFORE calling Download.
 func (s *BackupService) Download(id string, w io.Writer, password string) error {
 	rc, _, err := s.OpenForDownload(id)
 	if err != nil {
@@ -626,15 +631,7 @@ func (s *BackupService) Download(id string, w io.Writer, password string) error 
 		return nil
 	}
 
-	data, err := io.ReadAll(rc)
-	if err != nil {
-		return fmt.Errorf("failed to read backup: %w", err)
-	}
-	encrypted, err := EncryptBytes(data, password)
-	if err != nil {
-		return fmt.Errorf("failed to encrypt backup: %w", err)
-	}
-	if _, err := io.WriteString(w, encrypted); err != nil {
+	if err := EncryptStream(rc, password, w); err != nil {
 		return fmt.Errorf("failed to stream encrypted backup: %w", err)
 	}
 	return nil

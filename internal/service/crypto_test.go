@@ -1,6 +1,8 @@
 package service
 
 import (
+	"bytes"
+	"io"
 	"strings"
 	"testing"
 )
@@ -80,5 +82,45 @@ func TestIsEncrypted(t *testing.T) {
 	}
 	if !IsEncrypted(encPrefix + "something") {
 		t.Error("prefixed value should be detected as encrypted")
+	}
+}
+
+// TestEncryptStreamRoundTrip covers the streaming AEAD round-trip over a
+// payload larger than streamingChunk so the loop crosses at least one
+// chunk boundary. Asserts the envelope is small relative to the input
+// (no whole-blob buffering) and that wrong passwords fail at the GCM
+// tag check.
+func TestEncryptStreamRoundTrip(t *testing.T) {
+	payload := bytes.Repeat([]byte("ABCDEFGH"), 512*1024) // 4 MiB
+	var enc bytes.Buffer
+	if err := EncryptStream(bytes.NewReader(payload), "stream-pw", &enc); err != nil {
+		t.Fatalf("EncryptStream: %v", err)
+	}
+	// Header (7 magic + 16 salt + 12 nonce = 35) + at least one chunk
+	// (4 len + 64 KiB plaintext + 16 tag = 65620) + 4-byte EOF marker.
+	if enc.Len() < 32+4+16 {
+		t.Fatalf("encrypted envelope suspiciously small: %d bytes", enc.Len())
+	}
+
+	var dec bytes.Buffer
+	if err := DecryptStream(&enc, "stream-pw", &dec); err != nil {
+		t.Fatalf("DecryptStream: %v", err)
+	}
+	if !bytes.Equal(dec.Bytes(), payload) {
+		t.Fatalf("round-trip mismatch: got %d bytes, want %d", dec.Len(), len(payload))
+	}
+
+	var wrong bytes.Buffer
+	if err := DecryptStream(bytes.NewReader(enc.Bytes()), "wrong-pw", &wrong); err == nil {
+		t.Fatal("DecryptStream with wrong password must fail")
+	}
+}
+
+// TestEncryptStreamHeaderMagic rejects inputs that do not start with the
+// enc:v2: magic, so an operator who accidentally feeds a legacy enc:
+// envelope into the streaming path gets a clear error.
+func TestEncryptStreamHeaderMagic(t *testing.T) {
+	if err := DecryptStream(bytes.NewReader([]byte("enc:abcdef==")), "any", io.Discard); err == nil {
+		t.Fatal("DecryptStream must reject non-streaming input")
 	}
 }

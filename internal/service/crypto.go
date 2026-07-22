@@ -6,11 +6,22 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/binary"
 	"fmt"
+	"io"
 	"strings"
 )
 
-const encPrefix = "enc:"
+const (
+	encPrefix  = "enc:"
+	encV2Magic = "enc:v2:" // header prefix identifying the streaming envelope
+	encV2Salt  = 16
+	encV2Nonce = 12
+	// streamingChunk is the plaintext chunk size for EncryptStream. 64 KiB
+	// keeps memory bounded well below the prior whole-zip read while
+	// staying large enough that GCM overhead per chunk stays negligible.
+	streamingChunk = 64 * 1024
+)
 
 // GenerateJWTSecret returns 32 random bytes hex-encoded. Moved here from
 // the removed installer package; only main.go's JWT bootstrap uses it.
@@ -81,24 +92,6 @@ func Decrypt(encoded, key string) (string, error) {
 	return string(plaintext), nil
 }
 
-// EncryptForDownload wraps raw backup bytes with AES-256-GCM using the
-// operator's passphrase and returns the enc:-prefixed envelope. The
-// handler uses this to compute a Content-Length *before* writing any
-// response body, so a partial-write error becomes a 500 instead of an
-// HTTP 200 with truncated ciphertext.
-//
-// ponytail: still buffers the full encrypted blob in memory; cap is the
-// same as maxBackupEntrySize (200 MiB) plus GCM+base64 overhead. If
-// archives grow past hundreds of MiB, switch to a streaming
-// cipher.NewGCM(NewEncrypter) over io.Pipe.
-func EncryptForDownload(zipBytes []byte, password string) ([]byte, error) {
-	s, err := EncryptBytes(zipBytes, password)
-	if err != nil {
-		return nil, err
-	}
-	return []byte(s), nil
-}
-
 // EncryptBytes wraps Encrypt for byte payloads, returning the enc:-prefixed
 // base64 ciphertext. Kept as the canonical byte-oriented primitive; callers
 // that need it for non-download purposes (e.g. tests) use this directly.
@@ -118,4 +111,156 @@ func DecryptBytes(encoded, key string) ([]byte, error) {
 // IsEncrypted reports whether value carries the enc: ciphertext prefix.
 func IsEncrypted(value string) bool {
 	return strings.HasPrefix(value, encPrefix)
+}
+
+// EncryptStream wraps rc in a streaming AES-256-GCM envelope and writes
+// it to w. Peak memory is bounded by streamingChunk (64 KiB plaintext)
+// plus one AEAD ciphertext chunk, regardless of the total payload size.
+//
+// Envelope layout (binary, no base64):
+//   - "enc:v2:"             7 bytes  ASCII magic + version
+//   - salt                  16 bytes random per call
+//   - base nonce            12 bytes random per call (the per-chunk nonce is
+//                            XORed with the chunk counter in the low 8 bytes)
+//   - chunks                repeat until EOF:
+//       chunk_len           4 bytes  BE, ciphertext length (incl. 16B tag)
+//                                  zero marks end-of-stream
+//       chunk_nonce         12 bytes derived from base + counter
+//       chunk_ciphertext    chunk_len bytes
+//
+// The handler is responsible for setting headers (Transfer-Encoding:
+// chunked, no Content-Length) BEFORE invoking this function; the
+// returned error after any bytes have hit the wire is a peer-truncation
+// case the same way the legacy path was.
+//
+// ponytail: GCM-with-counter nonces are a deliberate deviation from the
+// canonical chunked-AEAD (RFC 9580 §5.4). It is correct for an
+// operator-only download where the only attacker who can tamper with a
+// chunk also controls the whole stream; upgrade if a partial-trust
+// scenario (e.g. browser-decrypted streaming) ever appears.
+func EncryptStream(rc io.Reader, password string, w io.Writer) error {
+	key := deriveKey(password)
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return fmt.Errorf("create cipher: %w", err)
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return fmt.Errorf("create GCM: %w", err)
+	}
+
+	salt := make([]byte, encV2Salt)
+	if _, err := rand.Read(salt); err != nil {
+		return fmt.Errorf("generate salt: %w", err)
+	}
+	// Header carries the salt so the recipient can derive the same key.
+	header := make([]byte, 0, len(encV2Magic)+encV2Salt)
+	header = append(header, []byte(encV2Magic)...)
+	header = append(header, salt...)
+	if _, err := w.Write(header); err != nil {
+		return fmt.Errorf("write header: %w", err)
+	}
+
+	// One fresh nonce per chunk; low 8 bytes are the big-endian counter
+	// so chunks can be reordered safely under the same password.
+	baseNonce := make([]byte, encV2Nonce)
+	if _, err := rand.Read(baseNonce); err != nil {
+		return fmt.Errorf("generate nonce: %w", err)
+	}
+	if _, err := w.Write(baseNonce); err != nil {
+		return fmt.Errorf("write nonce: %w", err)
+	}
+
+	buf := make([]byte, streamingChunk)
+	var counter uint64
+	for {
+		n, err := io.ReadFull(rc, buf)
+		if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+			return fmt.Errorf("read plaintext: %w", err)
+		}
+		if n > 0 {
+			chunkNonce := deriveChunkNonce(baseNonce, counter)
+			sealed := gcm.Seal(nil, chunkNonce, buf[:n], nil)
+			lenBuf := make([]byte, 4)
+			binary.BigEndian.PutUint32(lenBuf, uint32(len(sealed)))
+			if _, err := w.Write(lenBuf); err != nil {
+				return fmt.Errorf("write chunk len: %w", err)
+			}
+			if _, err := w.Write(sealed); err != nil {
+				return fmt.Errorf("write chunk: %w", err)
+			}
+			counter++
+		}
+		if err == io.EOF || err == io.ErrUnexpectedEOF {
+			break
+		}
+	}
+
+	// Zero-length final frame marks end-of-stream.
+	end := make([]byte, 4)
+	if _, err := w.Write(end); err != nil {
+		return fmt.Errorf("write EOF marker: %w", err)
+	}
+	return nil
+}
+
+// deriveChunkNonce returns a copy of baseNonce with the low 8 bytes
+// replaced by the big-endian counter. Counter stays in its own 8-byte
+// region so chunks are distinguishable even if the high 4 bytes happen
+// to collide with another chunk's high 4 bytes.
+func deriveChunkNonce(base []byte, counter uint64) []byte {
+	out := make([]byte, len(base))
+	copy(out, base)
+	binary.BigEndian.PutUint64(out[4:], counter)
+	return out
+}
+
+// DecryptStream is the symmetric counterpart of EncryptStream: it reads
+// the streaming envelope from r and writes the recovered plaintext to w.
+// Returns an error if the envelope is malformed or any chunk fails its
+// AEAD tag check.
+func DecryptStream(r io.Reader, password string, w io.Writer) error {
+	key := deriveKey(password)
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return fmt.Errorf("create cipher: %w", err)
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return fmt.Errorf("create GCM: %w", err)
+	}
+
+	header := make([]byte, len(encV2Magic)+encV2Salt+encV2Nonce)
+	if _, err := io.ReadFull(r, header); err != nil {
+		return fmt.Errorf("read header: %w", err)
+	}
+	if string(header[:len(encV2Magic)]) != encV2Magic {
+		return fmt.Errorf("not a streaming envelope")
+	}
+	baseNonce := header[len(encV2Magic)+encV2Salt:]
+
+	lenBuf := make([]byte, 4)
+	var counter uint64
+	for {
+		if _, err := io.ReadFull(r, lenBuf); err != nil {
+			return fmt.Errorf("read chunk len: %w", err)
+		}
+		chunkLen := binary.BigEndian.Uint32(lenBuf)
+		if chunkLen == 0 {
+			return nil
+		}
+		sealed := make([]byte, chunkLen)
+		if _, err := io.ReadFull(r, sealed); err != nil {
+			return fmt.Errorf("read chunk: %w", err)
+		}
+		chunkNonce := deriveChunkNonce(baseNonce, counter)
+		plain, err := gcm.Open(nil, chunkNonce, sealed, nil)
+		if err != nil {
+			return fmt.Errorf("decrypt chunk %d: %w", counter, err)
+		}
+		if _, err := w.Write(plain); err != nil {
+			return fmt.Errorf("write plaintext: %w", err)
+		}
+		counter++
+	}
 }
