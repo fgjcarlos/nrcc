@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"io"
 	"strings"
+
+	"golang.org/x/crypto/argon2"
 )
 
 const (
@@ -21,6 +23,14 @@ const (
 	// keeps memory bounded well below the prior whole-zip read while
 	// staying large enough that GCM overhead per chunk stays negligible.
 	streamingChunk = 64 * 1024
+
+	// argon2id parameters for v2 envelope key derivation. Fixed across
+	// deployments — see #478 for the rationale. mem=64 MiB, t=3, p=2 gives
+	// ~250 ms per derivation on the reference host, which is acceptable
+	// for an operator-only download path.
+	argon2Memory = 64 * 1024
+	argon2Time   = 3
+	argon2Threads = 2
 )
 
 // GenerateJWTSecret returns 32 random bytes hex-encoded. Moved here from
@@ -36,6 +46,15 @@ func GenerateJWTSecret() (string, error) {
 func deriveKey(passphrase string) []byte {
 	hash := sha256.Sum256([]byte(passphrase))
 	return hash[:]
+}
+
+// deriveKeyArgon2id derives a 32-byte AES key with argon2id using the
+// given salt. Used by the v2 streaming envelope; the legacy enc: path
+// still uses single SHA-256 because its input is operator-readable
+// config (not a high-value secret) and migration would break existing
+// stored values.
+func deriveKeyArgon2id(passphrase string, salt []byte) []byte {
+	return argon2.IDKey([]byte(passphrase), salt, argon2Time, argon2Memory, argon2Threads, 32)
 }
 
 func Encrypt(plaintext, key string) (string, error) {
@@ -139,7 +158,11 @@ func IsEncrypted(value string) bool {
 // chunk also controls the whole stream; upgrade if a partial-trust
 // scenario (e.g. browser-decrypted streaming) ever appears.
 func EncryptStream(rc io.Reader, password string, w io.Writer) error {
-	key := deriveKey(password)
+	salt := make([]byte, encV2Salt)
+	if _, err := rand.Read(salt); err != nil {
+		return fmt.Errorf("generate salt: %w", err)
+	}
+	key := deriveKeyArgon2id(password, salt)
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return fmt.Errorf("create cipher: %w", err)
@@ -149,10 +172,6 @@ func EncryptStream(rc io.Reader, password string, w io.Writer) error {
 		return fmt.Errorf("create GCM: %w", err)
 	}
 
-	salt := make([]byte, encV2Salt)
-	if _, err := rand.Read(salt); err != nil {
-		return fmt.Errorf("generate salt: %w", err)
-	}
 	// Header carries the salt so the recipient can derive the same key.
 	header := make([]byte, 0, len(encV2Magic)+encV2Salt)
 	header = append(header, []byte(encV2Magic)...)
@@ -220,7 +239,17 @@ func deriveChunkNonce(base []byte, counter uint64) []byte {
 // Returns an error if the envelope is malformed or any chunk fails its
 // AEAD tag check.
 func DecryptStream(r io.Reader, password string, w io.Writer) error {
-	key := deriveKey(password)
+	header := make([]byte, len(encV2Magic)+encV2Salt+encV2Nonce)
+	if _, err := io.ReadFull(r, header); err != nil {
+		return fmt.Errorf("read header: %w", err)
+	}
+	if string(header[:len(encV2Magic)]) != encV2Magic {
+		return fmt.Errorf("not a streaming envelope")
+	}
+	salt := header[len(encV2Magic) : len(encV2Magic)+encV2Salt]
+	baseNonce := header[len(encV2Magic)+encV2Salt:]
+
+	key := deriveKeyArgon2id(password, salt)
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return fmt.Errorf("create cipher: %w", err)
@@ -229,15 +258,6 @@ func DecryptStream(r io.Reader, password string, w io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("create GCM: %w", err)
 	}
-
-	header := make([]byte, len(encV2Magic)+encV2Salt+encV2Nonce)
-	if _, err := io.ReadFull(r, header); err != nil {
-		return fmt.Errorf("read header: %w", err)
-	}
-	if string(header[:len(encV2Magic)]) != encV2Magic {
-		return fmt.Errorf("not a streaming envelope")
-	}
-	baseNonce := header[len(encV2Magic)+encV2Salt:]
 
 	lenBuf := make([]byte, 4)
 	var counter uint64
