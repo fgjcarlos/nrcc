@@ -31,9 +31,8 @@ git clone --depth 1 --branch "$VERSION" "https://github.com/$REPO.git" "$INSTALL
 
 cd "$INSTALL_DIR"
 
-echo "→ Pulling base image (nodered/node-red:5.0) and starting stack"
-docker compose pull
-docker compose up -d
+echo "→ Building and starting stack"
+docker compose up -d --build
 
 echo ""
 echo "✓ nrcc stack is up."
