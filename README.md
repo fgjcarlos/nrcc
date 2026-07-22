@@ -66,8 +66,8 @@ name, host ports, and volume names:
   nrcc-b:
     build: .
     ports:
-      - "3002:3001"   # nrcc UI / API
-      - "1881:1880"   # Node-RED editor
+      - "127.0.0.1:3002:3001"   # nrcc UI / API (Tailscale-reachable)
+      - "127.0.0.1:1881:1880"   # Node-RED editor (Tailscale-reachable)
     environment:
       PORT: "3001"
       DATA_DIR: /data
@@ -83,6 +83,25 @@ Two stacks on the same host MUST differ on `PORT`, `NODE_RED_PORT`,
 `DATA_DIR` (volume), `JWT_SECRET`, and `NRCC_ENCRYPTION_KEY`. The
 contract enforces this — see
 [docs/configuration/env-contract.md#per-stack-guarantees](docs/configuration/env-contract.md).
+
+## Host port binding
+
+The shipped `docker-compose.yml` binds to `127.0.0.1` so the same
+ports are reachable via Tailscale without exposing them to the LAN.
+Change the binding to `"0.0.0.0"` (or remove the prefix) if you
+need LAN access.
+
+### With Tailscale (recommended for VPS)
+
+```bash
+sudo tailscale serve --bg --https=3001 http://localhost:3001
+sudo tailscale serve --bg --https=1880 http://localhost:1880
+```
+
+URLs become `https://<tailnet-hostname>:3001/` and
+`https://<tailnet-hostname>:1880/` with HTTPS terminated by
+Tailscale. See `docs/operations/docker-stack.md` for full
+persistence and revert steps.
 
 ### What persists per instance
 

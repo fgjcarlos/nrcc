@@ -58,7 +58,8 @@ Procedure:
 
 1. Copy `docker-compose.yml` to a second file (e.g. `docker-compose.b.yml`).
 2. Rename the service (`nrcc` → `nrcc-b`).
-3. Remap host ports: `"3001:3001"` → `"3002:3001"`, `"1880:1880"` → `"1881:1880"`.
+3. Remap host ports: `"127.0.0.1:3001:3001"` → `"127.0.0.1:3002:3001"`,
+   `"127.0.0.1:1880:1880"` → `"127.0.0.1:1881:1880"`.
 4. Rename volumes: `nrcc_data` → `nrcc_data_b`, etc.
 5. Set fresh `JWT_SECRET` and `NRCC_ENCRYPTION_KEY` in the new file's
    `environment:` block.
@@ -69,6 +70,47 @@ A preflight check that detects two stacks sharing `DATA_DIR` or
 is responsible. See
 [the Per-stack guarantees section](../configuration/env-contract.md#per-stack-guarantees)
 for the full contract.
+
+## Host port binding
+
+The shipped `docker-compose.yml` binds to `127.0.0.1` so the same
+ports are reachable via Tailscale without exposing them to the LAN.
+If you do not use Tailscale and need LAN access, change the host
+binding to `"0.0.0.0"` or remove the prefix.
+
+### With Tailscale (recommended for VPS)
+
+Tailscale routes to the host's loopback via `tailscale serve`,
+which terminates HTTPS with a Tailscale-issued cert. No need to
+expose the host port publicly.
+
+```bash
+# One-time per host. Re-run after `tailscaled` restarts.
+sudo tailscale serve --bg --https=3001 http://localhost:3001
+sudo tailscale serve --bg --https=1880 http://localhost:1880
+```
+
+URLs become (replace the hostname with your tailnet one):
+
+- nrcc UI:     `https://ubuntu-1.tail03b606.ts.net:3001/`
+- Node-RED:    `https://ubuntu-1.tail03b606.ts.net:1880/`
+
+To persist across reboots, add a `tailscaled`-post-up script or
+systemd drop-in that runs the two commands above. See
+<https://tailscale.com/kb/1242/tailscale-serve>.
+
+To undo:
+
+```bash
+sudo tailscale serve --https=3001 off
+sudo tailscale serve --https=1880 off
+```
+
+### Without Tailscale
+
+If you do not use Tailscale and want LAN access, change the host
+binding to `"0.0.0.0"` (or remove the prefix) on both ports in
+`docker-compose.yml`. Put a reverse proxy in front for HTTPS.
 
 ## Backup
 
