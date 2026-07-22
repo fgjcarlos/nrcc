@@ -31,45 +31,58 @@ A single-binary management UI for one Node-RED instance. The canonical deploymen
 
 ## Quick Start — Docker (canonical)
 
-One stack = one NRCC + one Node-RED + one persistent volume. Distinct host ports per stack:
+One stack = one NRCC + one Node-RED + one persistent volume. Distinct
+host ports per stack.
+
+### 1. Bring up the stack (local build)
+
+The shipped image is built locally from this repo — the registry image
+publish flow is wired in `.github/workflows/release.yml` and will
+appear on GHCR/Docker Hub as the release workflow runs.
+
+```bash
+git clone https://github.com/fgjcarlos/nrcc.git
+cd nrcc
+cp .env.example .env
+# edit .env — set JWT_SECRET and NRCC_ENCRYPTION_KEY to real values
+docker compose up -d --build
+```
+
+Open <http://localhost:3001> for the NRCC UI and
+<http://localhost:1880> for the Node-RED editor.
+
+The full stack contract (every env var, every restart requirement)
+lives in [docs/configuration/env-contract.md](docs/configuration/env-contract.md).
+For day-to-day operations (multi-instance, backup, upgrade, uninstall)
+see [docs/operations/docker-stack.md](docs/operations/docker-stack.md).
+
+### 2. Multi-instance
+
+A second instance = a second Compose service with different host ports
+and its own volumes. Copy `docker-compose.yml` and change the service
+name, host ports, and volume names:
 
 ```yaml
-services:
-  nodered:
-    image: ghcr.io/fgjcarlos/nrcc:latest
+  nrcc-b:
+    build: .
     ports:
-      - "3001:3001"   # nrcc UI / API
-      - "1880:1880"   # Node-RED editor
+      - "3002:3001"   # nrcc UI / API
+      - "1881:1880"   # Node-RED editor
     environment:
       PORT: "3001"
       DATA_DIR: /data
-      NODE_RED_PORT: "1880"
-    volumes:
-      - nrcc_data:/data
-      - nrcc_backups:/data/backups
-      - nrcc_node_modules:/data/node_modules
-
-volumes:
-  nrcc_data:
-  nrcc_backups:
-  nrcc_node_modules:
-```
-
-A second instance = a second Compose service with different host ports and its own volume:
-
-```yaml
-  nodered-b:
-    image: ghcr.io/fgjcarlos/nrcc:latest
-    ports:
-      - "3002:3001"
-      - "1881:1880"
+      JWT_SECRET: "<a different random string>"
+      NRCC_ENCRYPTION_KEY: "<a different random string>"
     volumes:
       - nrcc_data_b:/data
       - nrcc_backups_b:/data/backups
       - nrcc_node_modules_b:/data/node_modules
 ```
 
-Open the first instance at **<http://localhost:3001>** → set up the admin user → log in.
+Two stacks on the same host MUST differ on `PORT`, `NODE_RED_PORT`,
+`DATA_DIR` (volume), `JWT_SECRET`, and `NRCC_ENCRYPTION_KEY`. The
+contract enforces this — see
+[docs/configuration/env-contract.md#per-stack-guarantees](docs/configuration/env-contract.md).
 
 ### What persists per instance
 
@@ -92,26 +105,43 @@ To change NRCC's own behavior you still rebuild and publish a new NRCC image.
 
 ## Configuration
 
-All configuration is via environment variables. Create `.env` from `.env.example`:
+All configuration is via environment variables. Create `.env` from
+[`.env.example`](.env.example):
 
 ```bash
 cp .env.example .env
+# Generate real secrets:
+echo "JWT_SECRET=$(openssl rand -base64 48)" >> .env
+echo "NRCC_ENCRYPTION_KEY=$(openssl rand -base64 48)" >> .env
 ```
 
-| Variable | Default | Description |
-| ---------- | --------- | ------------- |
-| `PORT` | 3001 | HTTP server port |
-| `DATA_DIR` | `./data` | Directory for config, users, backups |
-| `NODE_RED_CMD` | `node-red` | Path to node-red executable |
-| `NODE_RED_PORT` | 1880 | Target Node-RED HTTP port; runtime override is tracked in [#429](https://github.com/fgjcarlos/nrcc/issues/429) |
-| `JWT_SECRET` | (insecure) | ⚠️ **Must set in production** |
-| `NRCC_ENCRYPTION_KEY` | (insecure) | Encryption key for secret environment values |
+The shipped `.env.example` rejects three well-known placeholder
+values (`change-me-in-production` and friends) — the binary refuses
+to start until you replace them.
+
+The complete contract — every variable, its default, restart
+requirement, and precedence rule — lives in
+[docs/configuration/env-contract.md](docs/configuration/env-contract.md).
+Highlights:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `PORT` | `3001` | nrcc HTTP port |
+| `DATA_DIR` | `/data` | Where nrcc stores config, users, sessions, backups |
+| `JWT_SECRET` | (auto-generated, persisted) | JWT signing secret |
+| `NRCC_ENCRYPTION_KEY` | empty (encryption disabled) | Encrypts the persisted env store |
+| `NODE_RED_PORT` | `1880` | Node-RED editor port |
+| `NODE_RED_USER_DIR` | `<DATA_DIR>` | Where Node-RED keeps flows, `settings.js`, `node_modules` |
+| `NRCC_BACKUP_DIR` | `<DATA_DIR>/backups` | Local backup snapshot root |
+| `NRCC_RESTIC_REPO` + `_BINARY` + `_PASSWORD` + `_PASSWORD_FILE` + `_CACHE_DIR` | empty | Off-host backups (all five required to enable) |
 | `NRCC_CORS_ORIGINS` | `*` | CORS allowed origins |
-| `EDGE_MODE` | `false` | Opt-in edge mode for constrained deployments (resource-safe defaults). See [ADR 0002](docs/adr/0002-edge-mode-defaults-and-exposure-ux.md) |
+| `EDGE_MODE` | `false` | Resource-safe defaults (ADR 0002) |
 
-> **Runtime configuration note.** The canonical Compose example keeps Node-RED on `1880` today. Making `NODE_RED_PORT`, `NODE_RED_USER_DIR`, and `NODE_RED_SETTINGS` true runtime overrides is tracked in [#429](https://github.com/fgjcarlos/nrcc/issues/429).
-
-> **Operator self-check.** nrcc is in beta hardening — confirm these before you put it on the public internet: set strong `JWT_SECRET` and `NRCC_ENCRYPTION_KEY`, persist `DATA_DIR` on durable storage, place it behind a reverse proxy with HTTPS, and restrict `NRCC_CORS_ORIGINS`.
+> **Operator self-check.** nrcc is in beta hardening — confirm these
+> before you put it on the public internet: set strong `JWT_SECRET`
+> and `NRCC_ENCRYPTION_KEY`, persist `DATA_DIR` on durable storage,
+> place it behind a reverse proxy with HTTPS, and restrict
+> `NRCC_CORS_ORIGINS`.
 
 ## Data Directory Layout
 
@@ -146,40 +176,32 @@ These are **not** part of the current release. Treat the following as backlog, n
 - The model that current routes assume is defined by [ADR 0001 — Tenant-ready seams](docs/adr/0001-tenant-ready-seams.md).
 - Edge-friendly defaults and exposure UX are defined by [ADR 0002](docs/adr/0002-edge-mode-defaults-and-exposure-ux.md).
 
-## Production rollout
+## Operations
 
-Manual GitHub Pages, DNS, and release validation steps live in [docs/production-install-launch-guide.md](docs/production-install-launch-guide.md).
+- [docs/operations/docker-stack.md](docs/operations/docker-stack.md) — bring-up, multi-instance, backup, upgrade, uninstall
+- [docs/production-install-launch-guide.md](docs/production-install-launch-guide.md) — manual GitHub Pages, DNS, and release validation steps
 
 ## Development
 
-### Start dev servers
-
-```bash
-make dev
-# Go backend:   http://localhost:3001
-# Vite frontend: http://localhost:5173 (HMR enabled)
-```
-
-The dev server proxies API requests to the Go backend.
-
 ### Local development (Docker)
 
-End-to-end dev stack with hot reload:
+End-to-end dev stack with hot reload, driven by [Taskfile.yml](Taskfile.yml):
 
 ```bash
-make dev-up        # build the dev image + start stack in detached mode
-make dev-logs      # stream backend + frontend logs
-make dev-shell     # open a shell in the backend container
-make dev-down      # stop the stack (keeps volumes)
-make dev-reset     # stop the stack AND remove volumes (clean slate)
+task build     # build the nrcc image
+task up        # start the stack (--build on first run)
+task down      # stop the stack (volumes preserved)
+task logs      # stream container logs
 ```
+
+Install `task` from <https://taskfile.dev/installation/>.
 
 ### Run tests
 
 ```bash
-make test            # Go test suite
-make test-frontend   # Vitest frontend suite
-make e2e             # Playwright e2e suite (boots its own preview server)
+go test ./...                          # Go suite
+cd frontend && pnpm test --run         # Vitest frontend suite
+cd frontend && pnpm run test:e2e       # Playwright Chromium smoke
 ```
 
 Frontend gates:
@@ -189,7 +211,6 @@ cd frontend
 pnpm install --frozen-lockfile
 pnpm run typecheck          # tsc --noEmit
 pnpm test -- --run          # Vitest
-pnpm run test:e2e           # Playwright Chromium smoke
 pnpm run build              # Production Vite build
 ```
 
