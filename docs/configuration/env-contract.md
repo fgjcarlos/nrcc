@@ -8,6 +8,21 @@ runtime, and which are secret-managed.
 See [ADR 0003 — Docker-first: one Compose stack per Node-RED](../adr/0003-docker-first-one-stack-per-node-red.md)
 for why each stack has its own contract instead of sharing one.
 
+## Enforcement
+
+The contract is pinned by `internal/service/env_contract_test.go`:
+
+- `TestEnvContract_BinaryReadsAllCanonicalNames` — every variable in
+  the canonical list must be read by `os.Getenv` somewhere in the
+  binary. Catches "documented but unused" drift (the old
+  `NRCC_BOOTSTRAP_INTERACTIVE` was one such entry).
+- `TestEnvContract_NoUndocumentedBootstrapReads` — every `os.Getenv`
+  call in non-test code must be in the canonical list. Catches the
+  opposite drift: "code reads X but docs don't say so".
+
+Adding a new variable requires extending both the test list and
+`.env.example` in the same commit.
+
 ## Layers
 
 Two layers, two restart requirements:
@@ -38,8 +53,14 @@ OS env → EnvService → `.env`.
 | `NRCC_TRUSTED_PROXIES` | empty | Comma-separated CIDRs/IPs trusted for forwarded headers | yes |
 | `EDGE_MODE` | `false` | Resource-safe defaults for Pi/NAS (ADR 0002) | yes |
 | `NRCC_MANAGE_NODE_RED` | `true` | If `false`, NRCC never starts/stops Node-RED; it only attaches | yes |
-| `NRCC_BOOTSTRAP_INTERACTIVE` | auto-detect TTY | Force the setup wizard on/off | yes |
 | `NRCC_IMAGE` | release image | Image tag the install/update flow tracks | yes |
+| `NRCC_BACKUP_DIR` | `$DATA_DIR/backups` | Backup storage root | yes |
+| `NRCC_RESTIC_REPO` | empty | Restic repository URL for off-host backups (all 5 below required to enable) | yes |
+| `NRCC_RESTIC_BINARY` | `/usr/bin/restic` | Path to the restic binary | yes |
+| `NRCC_RESTIC_PASSWORD` | empty | Restic repository password | yes |
+| `NRCC_RESTIC_PASSWORD_FILE` | empty | Path to file containing the restic password (preferred over `_PASSWORD`) | yes |
+| `NRCC_RESTIC_CACHE_DIR` | `/tmp/restic-cache` | Local restic cache directory | yes |
+| `NPM_BIN` | empty | Override the npm binary path the palette manager invokes | yes |
 | `NRCC_AI_ENABLED` | `false` | Enable the in-UI AI assistant | yes |
 | `NRCC_AI_PROVIDER` | none | AI provider id (`openai`, `anthropic`, …) | yes |
 | `NRCC_AI_ENDPOINT` | provider default | Custom AI endpoint URL | yes |
@@ -58,16 +79,21 @@ keep today's behavior.
 | `NODE_RED_USER_DIR` | `<DATA_DIR>` | `--userDir` (flows, settings, lib, node_modules) |
 | `NODE_RED_SETTINGS` | `<userDir>/settings.js` | `--settings` path |
 
-## Compatibility aliases
+## Placeholder rejection
 
-These legacy names are still honored by the bootstrap read paths but
-emit a one-time deprecation warning at startup. Migrate before the
-next minor release.
+`main.go:resolveJWTSecret` (and the equivalent path for
+`NRCC_ENCRYPTION_KEY`) refuse to start when the secret is set to one
+of three well-known placeholder values:
 
-| Legacy | Canonical | Notes |
-|---|---|---|
-| `ENCRYPTION_KEY` | `NRCC_ENCRYPTION_KEY` | Bootstrap secret |
-| `CORS_ORIGINS` | `NRCC_CORS_ORIGINS` | Bootstrap CORS |
+```
+change-me-in-production
+cc-secret-change-in-production
+dev-secret-not-for-production
+```
+
+This catches the common "I copied `.env.example` and forgot to set a
+real secret" mistake. Generate a real secret with
+`openssl rand -base64 48` or `head -c 48 /dev/urandom | base64`.
 
 ## Precedence (Node-RED env injected into the child)
 
@@ -86,9 +112,10 @@ Bootstrap reads only layer 1 (OS env / Compose `environment:` /
 Production should source secrets from:
 
 - **Docker Secrets** — mount under `/run/secrets/<name>` and reference
-  via `${NRCC_JWT_SECRET_FILE}` indirection (compose `_FILE` convention).
-- **File-based inputs** — same `_FILE` pattern for `NRCC_ENCRYPTION_KEY_FILE`,
-  `NRCC_AI_API_KEY_FILE`, etc.
+  via `${VAR_FILE}` indirection (compose `_FILE` convention).
+- **File-based inputs** — same `_FILE` pattern for
+  `NRCC_ENCRYPTION_KEY_FILE`, `NRCC_AI_API_KEY_FILE`,
+  `NRCC_RESTIC_PASSWORD_FILE`.
 
 NRCC does not currently auto-apply `_FILE` expansion; declare it as a
 known TODO at the bootstrap layer. Until then, compose `secrets:` +
@@ -101,7 +128,7 @@ Two Compose stacks running on the same host MUST differ on at least:
 - `PORT` (NRCC UI/API)
 - `NODE_RED_PORT` (Node-RED editor)
 - `DATA_DIR` (mounted volume)
-- `NRCC_JWT_SECRET` (independent auth realm)
+- `JWT_SECRET` (independent auth realm)
 - `NRCC_ENCRYPTION_KEY` (independent secret store)
 
 A preflight check that detects two stacks sharing `DATA_DIR` or
@@ -110,10 +137,13 @@ is responsible.
 
 ## Validation
 
-`go test ./internal/service/ -run TestResolveNodeRedRuntime` covers
-the runtime contract end to end. Bootstrap values are read once at
-startup and not currently validated centrally; future work should
-add `internal/config/bootstrap.go` with a single typed reader.
+- `go test ./internal/service/ -run TestEnvContract` enforces the
+  contract against the binary.
+- `go test ./internal/service/ -run TestResolveNodeRedRuntime` covers
+  the runtime contract end to end.
+- Bootstrap values are read once at startup and not currently
+  validated centrally; future work should add
+  `internal/config/bootstrap.go` with a single typed reader.
 
 ## Related
 
