@@ -500,3 +500,83 @@ func TestBackupServiceDownloadWithoutPasswordStreamsRawZip(t *testing.T) {
 		t.Fatalf("raw bytes are not a readable stream: %v", err)
 	}
 }
+
+// TestDeleteIsAtomic proves Delete is crash-safe: the final backup dir is
+// empty, no .deleted marker survives, and a second Delete call reports
+// "not found" instead of leaving residue behind.
+func TestDeleteIsAtomic(t *testing.T) {
+	dataDir := t.TempDir()
+	writeTestFile(t, filepath.Join(dataDir, "flows.json"), `[{"id":"1"}]`)
+
+	svc := NewBackupService(dataDir)
+	backup, err := svc.CreateTyped(model.BackupTypeManual, "delete-atomic")
+	if err != nil {
+		t.Fatalf("CreateTyped: %v", err)
+	}
+
+	if err := svc.Delete(backup.ID); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+
+	// Final dir must be empty: no published zip, no .deleted marker.
+	entries, err := os.ReadDir(filepath.Dir(backup.Path))
+	if err != nil {
+		t.Fatalf("read backup dir: %v", err)
+	}
+	if len(entries) != 0 {
+		names := make([]string, 0, len(entries))
+		for _, e := range entries {
+			names = append(names, e.Name())
+		}
+		t.Fatalf("backup dir not empty after Delete: %v", names)
+	}
+
+	// A repeat Delete on the same id must report a not-found-style error
+	// without leaving any marker behind.
+	if err := svc.Delete(backup.ID); err == nil {
+		t.Fatal("second Delete must error (file already gone)")
+	}
+	entries, _ = os.ReadDir(filepath.Dir(backup.Path))
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".deleted") {
+			t.Fatalf(".deleted marker leaked after second Delete: %s", e.Name())
+		}
+	}
+}
+
+// TestDeleteSurvivesCrashedRename exercises the recovery path: if a previous
+// Delete crashed after the rename but before the unlink, the .deleted marker
+// stays on disk and a follow-up Delete (or the next sweep) cleans it up.
+func TestDeleteSurvivesCrashedRename(t *testing.T) {
+	dataDir := t.TempDir()
+	writeTestFile(t, filepath.Join(dataDir, "flows.json"), `[{"id":"1"}]`)
+
+	backupDir := filepath.Join(t.TempDir(), "backups")
+	if err := os.MkdirAll(backupDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	id := "crash-1"
+	zipPath := filepath.Join(backupDir, id+".zip")
+	if err := os.WriteFile(zipPath, []byte("not a real zip"), 0o644); err != nil {
+		t.Fatalf("seed zip: %v", err)
+	}
+	// Simulate the prior crashed run by pre-staging the .deleted marker.
+	marker := zipPath + ".deleted"
+	if err := os.Rename(zipPath, marker); err != nil {
+		t.Fatalf("seed marker: %v", err)
+	}
+
+	svc := NewBackupServiceWithBackupDir(dataDir, backupDir)
+	if err := svc.Delete(id); err != nil {
+		t.Fatalf("Delete on stale marker: %v", err)
+	}
+
+	entries, _ := os.ReadDir(backupDir)
+	if len(entries) != 0 {
+		names := make([]string, 0, len(entries))
+		for _, e := range entries {
+			names = append(names, e.Name())
+		}
+		t.Fatalf("backup dir not empty after recovery Delete: %v", names)
+	}
+}

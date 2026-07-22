@@ -152,6 +152,10 @@ func (h *BackupHandler) DeleteBackup(w http.ResponseWriter, r *http.Request) {
 
 	err := h.svc.Delete(id)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			model.RespondError(w, http.StatusNotFound, "BACKUP_NOT_FOUND", "Backup not found")
+			return
+		}
 		model.RespondError(w, http.StatusInternalServerError, "BACKUP_ERROR", err.Error())
 		return
 	}

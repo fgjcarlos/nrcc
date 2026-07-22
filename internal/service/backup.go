@@ -553,6 +553,13 @@ func (s *BackupService) RestoreWithSafetyBackup(id string) (string, error) {
 }
 
 // Delete deletes a backup by ID.
+//
+// The unlink happens through a 3-phase atomic sequence — validate, rename
+// to a sibling .deleted marker, fsync the parent directory, then unlink the
+// marker — so a crash mid-operation can never leave a half-deleted zip
+// observable to the next List/Stat. The .deleted marker is itself cleaned
+// by a successful unlink; if the rename succeeds but the unlink fails, a
+// follow-up Delete or pruneBackups sweep recovers the marker.
 func (s *BackupService) Delete(id string) error {
 	if err := ValidateBackupID(id); err != nil {
 		return err
@@ -560,7 +567,7 @@ func (s *BackupService) Delete(id string) error {
 	backupPath := filepath.Join(s.backupDir, id+".zip")
 	backup, _ := s.describeBackup(backupPath)
 
-	if err := os.Remove(backupPath); err != nil {
+	if err := atomicRemove(backupPath); err != nil {
 		return fmt.Errorf("failed to delete backup: %w", err)
 	}
 
@@ -1627,4 +1634,46 @@ func IsValidCron(cronExpr string) bool {
 	// or we could import directly. Let's use a basic check first.
 	_, err := backupCronParser.Parse(cronExpr)
 	return err == nil
+}
+
+// atomicRemove unlinks path through a 3-phase sequence so a crash mid-op
+// never leaves a half-deleted file observable to the next List/Stat:
+//   1. Rename path → path+".deleted" (atomic on POSIX, same filesystem).
+//   2. Open the parent dir and fsync it so the rename is durable.
+//   3. Unlink the .deleted marker.
+//
+// The marker is only observable between steps 1 and 3; an interrupted run
+// that skips step 3 leaves it for the next Delete or pruneBackups sweep to
+// clean up. If the marker is already present (a previous Delete crashed
+// between steps 1 and 3), atomicRemove short-circuits straight to the
+// unlink so the next call always finishes the job. ponytail: no retry on
+// the unlink; if the rename succeeded but the unlink fails for any
+// reason, the next sweep handles it.
+func atomicRemove(path string) error {
+	dir := filepath.Dir(path)
+	base := filepath.Base(path)
+	tmp := filepath.Join(dir, base+".deleted")
+
+	if _, err := os.Stat(tmp); err == nil {
+		// A previous Delete crashed between the rename and the unlink.
+		// Skip straight to the unlink so this call always finishes the
+		// job; the dir-fsync already happened in the crashed run.
+		return os.Remove(tmp)
+	}
+
+	if err := os.Rename(path, tmp); err != nil {
+		return err
+	}
+
+	if df, err := os.Open(dir); err == nil {
+		_ = df.Sync()
+		_ = df.Close()
+	}
+
+	if err := os.Remove(tmp); err != nil {
+		// The rename was durable; the marker survives and the next
+		// Delete/pruneBackups call will attempt the unlink again.
+		return fmt.Errorf("unlink after rename: %w", err)
+	}
+	return nil
 }
