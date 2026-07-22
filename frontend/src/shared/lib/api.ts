@@ -21,6 +21,60 @@ let tokenGetter: (() => string | null) | null = null;
 let tokenSetter: ((token: string) => void) | null = null;
 let refreshPromise: Promise<string | null> | null = null;
 
+// Auth-bootstrap gate. The first page load arms a single
+// page-scoped promise; every non-auth request awaits it before
+// going out, so a TanStack query fired during the first render
+// does not race the rehydrate call and produce a spurious 401
+// that would otherwise send the user back to /login — see
+// issue #517.
+//
+// The gate is single-shot: arm once, release once. Subsequent
+// useAuth mounts in the same page load (e.g. on a protected
+// route mounted after login) do NOT re-arm and do NOT touch the
+// gate — they just see whatever state the singleton is in. If
+// the gate is already resolved, requests pass through. If it is
+// still pending, requests wait for the original release.
+//
+// A safety timeout releases the gate after 2s even if the
+// owning useAuth never settles (e.g. a misconfigured mock in
+// tests, or a wedged request interceptor). Without this, a
+// single failure path could deadlock the page. 2s is well
+// above the legitimate rehydrate window (cookie round-trip to
+// /auth/refresh + /auth/me) and well below the E2E test
+// timeout, so it never trips in working paths.
+let bootstrapGate: Promise<void> = Promise.resolve();
+let bootstrapGateResolve: (() => void) | null = null;
+let bootstrapArmed = false;
+let bootstrapTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
+
+const GATE_TIMEOUT_MS = 2000;
+
+export function armAuthBootstrap(): void {
+  if (bootstrapArmed) return;
+  bootstrapArmed = true;
+  bootstrapGate = new Promise<void>((resolve) => {
+    bootstrapGateResolve = resolve;
+  });
+  // ponytail: 2s ceiling on a global gate. Add a per-test mock that
+  // resolves releaseAuthBootstrap() before this fires if the test
+  // path needs the gate held longer.
+  bootstrapTimeoutHandle = setTimeout(() => {
+    releaseAuthBootstrap();
+  }, GATE_TIMEOUT_MS);
+}
+
+export function releaseAuthBootstrap(): void {
+  if (!bootstrapArmed) return;
+  bootstrapArmed = false;
+  if (bootstrapTimeoutHandle !== null) {
+    clearTimeout(bootstrapTimeoutHandle);
+    bootstrapTimeoutHandle = null;
+  }
+  const r = bootstrapGateResolve;
+  bootstrapGateResolve = null;
+  r?.();
+}
+
 export function registerTokenAccessors(
   getter: () => string | null,
   setter: (token: string) => void,
@@ -45,7 +99,23 @@ async function refreshAccessToken(): Promise<string | null> {
 }
 
 api.interceptors.request.use(
-  (config) => {
+  async (config) => {
+    const url = config.url ?? '';
+    // Auth bootstrap requests (login/setup/refresh/me/status) and
+    // calls that happen before useAuth mounts must not be gated —
+    // they are the bootstrap itself. Every other call waits for
+    // the gate. Note /auth/me is on the whitelist because checkAuth
+    // calls it as the last step of the rehydrate — gating it would
+    // deadlock the gate the rehydrate is supposed to release.
+    if (
+      !url.includes('/auth/login') &&
+      !url.includes('/auth/setup') &&
+      !url.includes('/auth/refresh') &&
+      !url.includes('/auth/me') &&
+      !url.includes('/auth/status')
+    ) {
+      await bootstrapGate;
+    }
     const token = tokenGetter?.();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;

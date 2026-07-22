@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { authService, type User } from '../services/authService';
-import { api } from '@/shared/lib';
+import { api, armAuthBootstrap, releaseAuthBootstrap } from '@/shared/lib';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -63,7 +63,14 @@ export function useAuth() {
   }, []);
 
   useEffect(() => {
-    checkAuth();
+    // Each useAuth mount arms the gate (refcount) and releases it
+    // when its checkAuth settles. The gate itself is a singleton
+    // in the api module: a second mount in the same page load does
+    // not create a fresh pending gate — it just bumps the refcount
+    // and lets the existing one stay armed until both releases
+    // have run.
+    armAuthBootstrap();
+    checkAuth().finally(releaseAuthBootstrap);
   }, [checkAuth]);
 
   return {
