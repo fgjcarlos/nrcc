@@ -94,10 +94,20 @@ describe('CommandPalette', () => {
     const search = screen.getByRole('combobox', { name: /search commands/i });
     await waitFor(() => expect(search).toHaveFocus());
 
-    await user.type(search, 'logs');
+    await user.type(search, 'configuration');
 
-    expect(screen.getByRole('option', { name: /open logs/i })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /go to configuration/i })).toBeInTheDocument();
     expect(screen.queryByRole('option', { name: /go to dashboard/i })).not.toBeInTheDocument();
+  });
+
+  it('does not offer navigation to removed Logs or Docker pages', async () => {
+    renderPalette();
+    const user = userEvent.setup();
+
+    await user.keyboard('{Control>}k{/Control}');
+
+    expect(screen.queryByRole('option', { name: 'Open Logs' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Go to Docker' })).not.toBeInTheDocument();
   });
 
   it('executes route navigation from the keyboard', async () => {
