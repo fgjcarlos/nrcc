@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { type EnvVar } from '@/features/env-vars/services';
-import { Plus, FileStack } from 'lucide-react';
+import { Plus, FileStack, Download } from 'lucide-react';
 import { EnvVarRow } from '@/features/env-vars/components';
 import { EnvVarModal } from '@/features/env-vars/components';
 import { BulkImportModal } from '@/features/env-vars/components';
 import { DotenvEditor } from '@/features/env-vars/components';
 import { ConfirmationDialog } from '@/shared/components';
 import { useEnvVarsData, useEnvVarsActions } from '@/features/env-vars/hooks';
+import { envService } from '@/features/env-vars/services';
 
 export function EnvVarsView() {
   // Data queries
@@ -96,6 +97,18 @@ export function EnvVarsView() {
         </div>
         {activeTab === 'table' && (
           <div className="flex gap-2">
+            <button
+              onClick={async () => {
+                const result = await envService.importFromNodeRed(true);
+                if (result.lines.length > 0) refetchEnvVars();
+              }}
+              className="action-btn-secondary"
+              data-testid="import-from-node-red-button"
+              title="Pull new env vars from Node-RED 5 global-config"
+            >
+              <Download className="w-4 h-4" />
+              From Node-RED
+            </button>
             <button
               onClick={() => setIsBulkOpen(true)}
               className="action-btn-secondary"

@@ -225,6 +225,31 @@ func (h *EnvHandler) BulkEnv(w http.ResponseWriter, r *http.Request) {
 	model.RespondJSON(w, http.StatusOK, parsed)
 }
 
+// ImportFromNodeRedEnv mirrors Node-RED 5 global-config env entries back
+// into NRCC. commit=false runs a dry run; commit=true persists every new
+// key through the same stop/restart envelope as the bulk import path.
+// POST /api/env/import-from-node-red  body: { commit: false }
+func (h *EnvHandler) ImportFromNodeRedEnv(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Commit bool `json:"commit"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err.Error() != "EOF" {
+		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+		return
+	}
+
+	result, err := h.svc.ImportFromNodeRed(req.Commit, func(fn func() error) (bool, error) {
+		restarted, stopErr := h.withManagedNodeRedStopped(fn)
+		return restarted, stopErr
+	})
+	if err != nil {
+		model.RespondError(w, http.StatusInternalServerError, "IMPORT_FAILED", err.Error())
+		return
+	}
+	h.audit.Log(r, "", "ENV_IMPORT_FROM_NODE_RED", "", "ok", map[string]string{"lines": fmt.Sprintf("%d", len(result.Lines))})
+	model.RespondJSON(w, http.StatusOK, result)
+}
+
 // GetDotenv returns the content of data/.env
 // GET /api/env/dotenv
 func (h *EnvHandler) GetDotenv(w http.ResponseWriter, r *http.Request) {
