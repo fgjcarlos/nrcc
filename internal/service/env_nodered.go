@@ -1,16 +1,21 @@
 package service
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/fgjcarlos/nrcc/internal/model"
 	"github.com/google/uuid"
 )
 
+// EnvService handles environment variable operations
 type nodeRedGlobalEnv struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
@@ -26,6 +31,38 @@ func nodeRedGlobalEnvType(typ string) string {
 	default:
 		return "str"
 	}
+}
+
+// activeNodeRedUserDir resolves the directory that Node-RED uses for the
+// flow file. The contract mirrors ProcessManager.resolveNodeRedRuntime so
+// env sync follows overrides such as NODE_RED_USER_DIR and NODE_RED_SETTINGS.
+func (s *EnvService) activeNodeRedUserDir() (string, error) {
+	base := s.configSvc.dataDir
+	envMap := map[string]string{}
+	for _, pair := range os.Environ() {
+		parts := strings.SplitN(pair, "=", 2)
+		if len(parts) == 2 {
+			envMap[parts[0]] = parts[1]
+		}
+	}
+	if s != nil {
+		if stored, err := s.GetAll(); err == nil {
+			for k, v := range stored {
+				envMap[k] = v
+			}
+		}
+	}
+	dotenvPath := filepath.Join(base, ".env")
+	if dotenvVars, err := parseEnvFile(dotenvPath); err == nil {
+		for k, v := range dotenvVars {
+			envMap[k] = v
+		}
+	}
+	rt, err := resolveNodeRedRuntime(envMap, base)
+	if err != nil {
+		return "", fmt.Errorf("resolve Node-RED runtime: %w", err)
+	}
+	return rt.UserDir, nil
 }
 
 // syncNodeRedGlobalEnv updates the Node-RED 5 global-config node stored in
@@ -44,10 +81,11 @@ func (s *EnvService) syncNodeRedGlobalEnv(key string, envVar *model.EnvVar) erro
 	if flowFile == "" {
 		flowFile = "flows.json"
 	}
-	flowPath := flowFile
-	if !filepath.IsAbs(flowPath) {
-		flowPath = filepath.Join(s.configSvc.dataDir, flowPath)
+	flowDir, err := s.activeNodeRedUserDir()
+	if err != nil {
+		return err
 	}
+	flowPath := filepath.Join(flowDir, flowFile)
 	flowPath = filepath.Clean(flowPath)
 	dataRoot, err := filepath.Abs(s.configSvc.dataDir)
 	if err != nil {
@@ -79,12 +117,16 @@ func (s *EnvService) syncNodeRedGlobalEnv(key string, envVar *model.EnvVar) erro
 	}
 
 	globalIndex := -1
+	globalCount := 0
 	for i, flow := range flows {
 		var typ string
 		if raw, ok := flow["type"]; ok && json.Unmarshal(raw, &typ) == nil && typ == "global-config" {
 			globalIndex = i
-			break
+			globalCount++
 		}
+	}
+	if globalCount > 1 {
+		return fmt.Errorf("multiple Node-RED global-config nodes found")
 	}
 
 	if globalIndex == -1 {
@@ -159,7 +201,7 @@ func (s *EnvService) syncNodeRedGlobalEnv(key string, envVar *model.EnvVar) erro
 		return fmt.Errorf("create temporary Node-RED flow file: %w", err)
 	}
 	tmpPath := tmp.Name()
-	defer os.Remove(tmpPath)
+	defer func() { _ = os.Remove(tmpPath) }()
 	if err := tmp.Chmod(mode); err != nil {
 		_ = tmp.Close()
 		return fmt.Errorf("set temporary Node-RED flow permissions: %w", err)
@@ -180,3 +222,9 @@ func (s *EnvService) syncNodeRedGlobalEnv(key string, envVar *model.EnvVar) erro
 	}
 	return nil
 }
+
+// keep imports referenced when running tests on stripped builds
+var _ = time.Now
+var _ = strconv.Atoi
+var _ = bytes.Equal
+var _ bufio.Scanner

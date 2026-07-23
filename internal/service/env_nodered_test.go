@@ -179,3 +179,35 @@ func TestEnvServiceCreatesSingleGlobalConfig(t *testing.T) {
 		t.Fatalf("global-config count = %d, want 1", count)
 	}
 }
+
+func TestEnvServicePreservesManualGlobalOnSecretCreate(t *testing.T) {
+	dir := t.TempDir()
+	flow := `[{"id":"manual-global","type":"global-config","env":[{"name":"MANUAL","value":"keep","type":"str"}]}]`
+	if err := os.WriteFile(filepath.Join(dir, "flows.json"), []byte(flow), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	svc := NewEnvService(NewIsolatedConfigService(dir))
+	if err := svc.Set("MANUAL", "ignored", "secret", "", true); err != nil {
+		t.Fatal(err)
+	}
+	env := readGlobalEnv(t, dir)
+	if len(env) != 1 || env[0].Value != "keep" {
+		t.Fatalf("secret create erased manual global env: %#v", env)
+	}
+}
+
+func TestEnvServiceRejectsMultipleGlobalConfig(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "flows.json"), []byte(`[{"id":"a","type":"global-config","env":[]},{"id":"b","type":"global-config","env":[]}]`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	configSvc := NewIsolatedConfigService(dir)
+	svc := NewEnvService(configSvc)
+	err := svc.Set("VALUE", "x", "string", "", false)
+	if err == nil {
+		t.Fatal("Set() error = nil, want multiple-global-config error")
+	}
+	if !strings.Contains(err.Error(), "multiple Node-RED global-config") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}

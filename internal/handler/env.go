@@ -19,6 +19,7 @@ type EnvHandler struct {
 	audit   *audit.Service
 	dataDir string
 	mu      sync.Mutex
+	managed bool
 }
 
 // NewEnvHandler creates a new environment handler
@@ -26,8 +27,12 @@ func NewEnvHandler(svc *service.EnvService, dataDir string) *EnvHandler {
 	return &EnvHandler{
 		svc:     svc,
 		dataDir: dataDir,
+		managed: true,
 	}
 }
+
+// SetManagedRuntime declares whether NRCC owns the Node-RED process lifecycle.
+func (h *EnvHandler) SetManagedRuntime(enabled bool) { h.managed = enabled }
 
 // SetProcessManager wires a ProcessManager so node-red is restarted automatically
 // whenever an env var is saved or deleted.
@@ -134,6 +139,9 @@ func (h *EnvHandler) withManagedNodeRedStopped(change func() error) (bool, error
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
+	if !h.managed {
+		return false, fmt.Errorf("cannot synchronize environment variables when Node-RED management is disabled")
+	}
 	if h.pm == nil {
 		return false, change()
 	}
