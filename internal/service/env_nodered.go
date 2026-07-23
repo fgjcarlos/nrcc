@@ -224,6 +224,177 @@ func (s *EnvService) syncNodeRedGlobalEnv(key string, envVar *model.EnvVar) erro
 	return nil
 }
 
+// nodeRedGlobalEnvList reads every env entry in flows.json. The result is
+// used both to push and to pull, so keep the source of truth single.
+func (s *EnvService) nodeRedGlobalEnvList() ([]nodeRedGlobalEnv, error) {
+	if s == nil || s.configSvc == nil {
+		return nil, fmt.Errorf("env service not initialised")
+	}
+	cfg, err := s.configSvc.Get()
+	if err != nil {
+		return nil, fmt.Errorf("read Node-RED config: %w", err)
+	}
+	flowFile := cfg.FlowFile
+	if flowFile == "" {
+		flowFile = "flows.json"
+	}
+	flowDir, err := s.activeNodeRedUserDir()
+	if err != nil {
+		return nil, err
+	}
+	flowPath := filepath.Clean(filepath.Join(flowDir, flowFile))
+	dataRoot, err := filepath.Abs(s.configSvc.dataDir)
+	if err != nil {
+		return nil, fmt.Errorf("resolve data directory: %w", err)
+	}
+	flowPath, err = filepath.Abs(flowPath)
+	if err != nil {
+		return nil, fmt.Errorf("resolve flow file: %w", err)
+	}
+	rel, err := filepath.Rel(dataRoot, flowPath)
+	if err != nil || rel == ".." || filepath.IsAbs(rel) || (len(rel) > 3 && rel[:3] == ".."+string(filepath.Separator)) {
+		return nil, fmt.Errorf("flow file must stay inside Node-RED data directory")
+	}
+	data, err := os.ReadFile(flowPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("read Node-RED flows: %w", err)
+	}
+	var flows []map[string]json.RawMessage
+	if err := json.Unmarshal(data, &flows); err != nil {
+		return nil, fmt.Errorf("parse Node-RED flows: %w", err)
+	}
+	var entries []nodeRedGlobalEnv
+	for _, item := range flows {
+		if !hasNodeRedGlobalEnvType(item) {
+			continue
+		}
+		raw, ok := item["env"]
+		if !ok {
+			continue
+		}
+		var envList []nodeRedGlobalEnv
+		if err := json.Unmarshal(raw, &envList); err != nil {
+			return nil, fmt.Errorf("parse global-config env: %w", err)
+		}
+		entries = append(entries, envList...)
+	}
+	return entries, nil
+}
+
+func hasNodeRedGlobalEnvType(item map[string]json.RawMessage) bool {
+	raw, ok := item["type"]
+	if !ok {
+		return false
+	}
+	var typ string
+	if err := json.Unmarshal(raw, &typ); err != nil {
+		return false
+	}
+	return typ == "global-config"
+}
+
+// ImportFromNodeRed snapshots the Node-RED 5 global-config env entries and
+// merges every new key into NRCC. Keys already present are skipped to keep
+// the operation idempotent; secrets remain encrypted in NRCC and never
+// leave flows.json. commit=false performs a dry run.
+func (s *EnvService) ImportFromNodeRed(commit bool, stopAndRestart func(func() error) (bool, error)) (BulkEnvResult, error) {
+	entries, err := s.nodeRedGlobalEnvList()
+	if err != nil {
+		return BulkEnvResult{}, err
+	}
+	if len(entries) == 0 {
+		return BulkEnvResult{
+			Lines:   []BulkEnvLine{},
+			Issues:  []BulkEnvIssue{},
+			Valid:   true,
+			Summary: "no global-config entries in Node-RED",
+		}, nil
+	}
+	existing, err := s.List()
+	if err != nil {
+		return BulkEnvResult{}, err
+	}
+	managed := make(map[string]struct{}, len(existing))
+	for _, ev := range existing {
+		managed[ev.Key] = struct{}{}
+	}
+
+	var (
+		toImport []BulkEnvLine
+		issues   []BulkEnvIssue
+		seen     = map[string]int{}
+	)
+	for i, e := range entries {
+		line := i + 1
+		if e.Name == "" {
+			issues = append(issues, BulkEnvIssue{Line: line, Reason: "entry is missing a name"})
+			continue
+		}
+		if _, ok := managed[e.Name]; ok {
+			issues = append(issues, BulkEnvIssue{Line: line, Key: e.Name, Reason: "already managed by NRCC"})
+			continue
+		}
+		if _, ok := seen[e.Name]; ok {
+			continue
+		}
+		typ := nodeRedTypeToValueType(e.Type)
+		if err := ValidateEnvKey(e.Name); err != nil {
+			issues = append(issues, BulkEnvIssue{Line: line, Key: e.Name, Reason: err.Error()})
+			continue
+		}
+		if err := ValidateValue(e.Value, typ); err != nil {
+			issues = append(issues, BulkEnvIssue{Line: line, Key: e.Name, Reason: err.Error()})
+			continue
+		}
+		seen[e.Name] = line
+		toImport = append(toImport, BulkEnvLine{Line: line, Key: e.Name, Value: e.Value, Type: typ})
+	}
+
+	result := BulkEnvResult{
+		Lines:  toImport,
+		Issues: issues,
+		Valid:  len(toImport) > 0,
+	}
+	switch {
+	case len(toImport) == 0 && len(issues) == 0:
+		result.Summary = "no new entries to import"
+	case len(issues) > 0:
+		result.Summary = fmt.Sprintf("%d skipped, %d ready", len(issues), len(toImport))
+	default:
+		result.Summary = fmt.Sprintf("%d variable(s) ready", len(toImport))
+	}
+	if !commit || !result.Valid {
+		return result, nil
+	}
+	for _, line := range toImport {
+		set := func() error {
+			return s.Set(line.Key, line.Value, line.Type, "imported from Node-RED", false)
+		}
+		if stopAndRestart != nil {
+			if _, err := stopAndRestart(set); err != nil {
+				return result, fmt.Errorf("line %d (%s): %w", line.Line, line.Key, err)
+			}
+		} else if err := set(); err != nil {
+			return result, fmt.Errorf("line %d (%s): %w", line.Line, line.Key, err)
+		}
+	}
+	return result, nil
+}
+
+func nodeRedTypeToValueType(nodeRedType string) string {
+	switch nodeRedType {
+	case "num":
+		return "number"
+	case "bool":
+		return "boolean"
+	default:
+		return "string"
+	}
+}
+
 // keep imports referenced when running tests on stripped builds
 var _ = time.Now
 var _ = strconv.Atoi

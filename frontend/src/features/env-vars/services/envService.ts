@@ -35,8 +35,43 @@ export const envService = {
   },
 
   bulkImport: async (content: string, commit: boolean): Promise<BulkEnvResult> => {
-    const response = await api.post<unknown>('/env/bulk', { content, commit });
-    return response.data as BulkEnvResult;
+    try {
+      const response = await api.post<unknown>('/env/bulk', { content, commit });
+      const body = response.data;
+      const data = (body as { data?: BulkEnvResult })?.data ?? (body as BulkEnvResult);
+      return {
+        lines: data?.lines ?? [],
+        issues: data?.issues ?? [],
+        valid: data?.valid ?? false,
+        summary: data?.summary ?? '',
+      };
+    } catch (err) {
+      // ponytail: backend errors come back without a BulkEnvResult envelope;
+      // surface a synthetic report so the modal never crashes on undefined.
+      const reason =
+        (err as { response?: { data?: { error?: { code?: string; message?: string } } } })?.response?.data
+          ?.error?.message ?? 'Import failed';
+      return { lines: [], issues: [{ line: 0, reason }], valid: false, summary: reason };
+    }
+  },
+
+  importFromNodeRed: async (commit: boolean): Promise<BulkEnvResult> => {
+    try {
+      const response = await api.post<unknown>('/env/import-from-node-red', { commit });
+      const body = response.data;
+      const data = (body as { data?: BulkEnvResult })?.data ?? (body as BulkEnvResult);
+      return {
+        lines: data?.lines ?? [],
+        issues: data?.issues ?? [],
+        valid: data?.valid ?? false,
+        summary: data?.summary ?? '',
+      };
+    } catch (err) {
+      const reason =
+        (err as { response?: { data?: { error?: { code?: string; message?: string } } } })?.response?.data
+          ?.error?.message ?? 'Import failed';
+      return { lines: [], issues: [{ line: 0, reason }], valid: false, summary: reason };
+    }
   },
 };
 

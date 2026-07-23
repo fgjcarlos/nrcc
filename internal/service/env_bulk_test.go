@@ -2,6 +2,8 @@ package service
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -153,3 +155,72 @@ func TestApplyBulkEnvRejectsInvalid(t *testing.T) {
 
 // keep model symbol referenced
 var _ = model.EnvVar{}
+
+// TestImportFromNodeRed pulls only the keys NRCC does not already manage,
+// translating the Node-RED types back to the NRCC vocabulary.
+func TestImportFromNodeRed(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(
+		filepath.Join(dir, "flows.json"),
+		[]byte(`[{"id":"manual-global","type":"global-config","env":[{"name":"ALPHA","value":"1","type":"str"},{"name":"BETA","value":"true","type":"bool"}]}]`),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	svc := NewEnvService(NewIsolatedConfigService(dir), "test-key")
+	if err := svc.Set("ALPHA", "local", "string", "", false); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := svc.ImportFromNodeRed(false, nil)
+	if err != nil {
+		t.Fatalf("dry-run: %v", err)
+	}
+	if !result.Valid {
+		t.Fatalf("expected valid, got %+v", result)
+	}
+	if len(result.Lines) != 1 || result.Lines[0].Key != "BETA" || result.Lines[0].Type != "boolean" {
+		t.Fatalf("unexpected lines: %+v", result.Lines)
+	}
+	hasSkip := false
+	for _, iss := range result.Issues {
+		if iss.Key == "ALPHA" && iss.Reason == "already managed by NRCC" {
+			hasSkip = true
+		}
+	}
+	if !hasSkip {
+		t.Fatalf("expected ALPHA skip issue, got %+v", result.Issues)
+	}
+
+	if _, err := svc.ImportFromNodeRed(true, nil); err != nil {
+		t.Fatalf("commit: %v", err)
+	}
+	config, err := svc.configSvc.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var beta *model.EnvVar
+	for i := range config.EnvVars {
+		if config.EnvVars[i].Key == "BETA" {
+			beta = &config.EnvVars[i]
+		}
+	}
+	if beta == nil {
+		t.Fatal("BETA missing after commit")
+	}
+	if beta.Type != "boolean" || beta.Description != "imported from Node-RED" {
+		t.Fatalf("unexpected BETA: %+v", beta)
+	}
+}
+
+func TestImportFromNodeRedEmptyFlows(t *testing.T) {
+	dir := t.TempDir()
+	svc := NewEnvService(NewIsolatedConfigService(dir))
+	result, err := svc.ImportFromNodeRed(false, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Valid || result.Summary != "no global-config entries in Node-RED" {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+}
