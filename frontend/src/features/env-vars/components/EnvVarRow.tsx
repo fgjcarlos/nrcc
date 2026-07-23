@@ -32,6 +32,9 @@ export function EnvVarRow({ envVar, onDelete, onToggleSecret, onEdit, showSecret
           envVar.type === 'number' ? 'bg-success/15 text-success-content' :
           'bg-base-300/70 text-base-content'
         }`}>{envVar.type}</span>
+        {envVar.type === 'secret' && (
+          <span className="ml-2 text-xs text-base-content/50">runtime only</span>
+        )}
       </td>
       <td className="px-4 py-3 text-sm text-base-content/60">{envVar.description || '-'}</td>
       <td className="px-4 py-3 text-right">
