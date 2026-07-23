@@ -71,22 +71,6 @@ export function CommandPalette() {
         run: () => navigate('/configuration'),
       },
       {
-        id: 'nav-logs',
-        title: 'Open Logs',
-        description: 'Review Node-RED runtime logs.',
-        keywords: ['runtime', 'events', 'log'],
-        kind: 'navigation',
-        run: () => navigate('/logs'),
-      },
-      {
-        id: 'nav-docker',
-        title: 'Go to Docker',
-        description: 'Open container status and Docker controls.',
-        keywords: ['container', 'image', 'compose'],
-        kind: 'navigation',
-        run: () => navigate('/docker'),
-      },
-      {
         id: 'nav-updates',
         title: 'Go to Updates',
         description: 'Check and apply NRCC updates.',

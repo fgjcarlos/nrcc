@@ -154,6 +154,15 @@ describe('sidebar navigation (#365)', () => {
     expect(screen.queryByText('Dashboard page')).not.toBeInTheDocument();
   });
 
+  it('does not show links to removed Logs or Docker pages', async () => {
+    mockAuthenticated();
+    render(<App />);
+
+    expect(await screen.findByText('Dashboard page')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /^Logs$/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /^Docker$/ })).not.toBeInTheDocument();
+  });
+
   it('navigates Configuration -> Dashboard -> Configuration without showing a stale view', async () => {
     mockAuthenticated();
     window.history.pushState({}, '', '/configuration');
