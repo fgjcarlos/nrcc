@@ -37,6 +37,9 @@ func nodeRedGlobalEnvType(typ string) string {
 // flow file. The contract mirrors ProcessManager.resolveNodeRedRuntime so
 // env sync follows overrides such as NODE_RED_USER_DIR and NODE_RED_SETTINGS.
 func (s *EnvService) activeNodeRedUserDir() (string, error) {
+	if s == nil || s.configSvc == nil {
+		return "", fmt.Errorf("env service not initialised")
+	}
 	base := s.configSvc.dataDir
 	envMap := map[string]string{}
 	for _, pair := range os.Environ() {
@@ -45,11 +48,9 @@ func (s *EnvService) activeNodeRedUserDir() (string, error) {
 			envMap[parts[0]] = parts[1]
 		}
 	}
-	if s != nil {
-		if stored, err := s.GetAll(); err == nil {
-			for k, v := range stored {
-				envMap[k] = v
-			}
+	if stored, err := s.GetAll(); err == nil {
+		for k, v := range stored {
+			envMap[k] = v
 		}
 	}
 	dotenvPath := filepath.Join(base, ".env")
