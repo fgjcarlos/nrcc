@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/fgjcarlos/nrcc/internal/model"
 )
@@ -16,6 +17,7 @@ import (
 type EnvService struct {
 	configSvc     *ConfigService
 	encryptionKey string
+	mu            sync.Mutex
 }
 
 // NewEnvService creates a new environment variable service.
@@ -29,6 +31,16 @@ func NewEnvService(configSvc *ConfigService, encryptionKey ...string) *EnvServic
 		configSvc:     configSvc,
 		encryptionKey: key,
 	}
+}
+
+func ValidateEnvKey(key string) error {
+	if key == "" {
+		return fmt.Errorf("key is required")
+	}
+	if strings.ContainsAny(key, "\x00\r\n=") {
+		return fmt.Errorf("key cannot contain NUL, newline, or '='")
+	}
+	return nil
 }
 
 // ValidateValue validates that a value is appropriate for its type.
@@ -169,6 +181,12 @@ func (s *EnvService) List() ([]model.EnvVar, error) {
 // The typ parameter should be one of: "string", "number", "boolean", "secret"
 // Description is optional and used to document the purpose of the variable.
 func (s *EnvService) Set(key, value string, typ string, description string, encrypted bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if err := ValidateEnvKey(key); err != nil {
+		return err
+	}
 	config, err := s.configSvc.Get()
 	if err != nil {
 		return fmt.Errorf("failed to get config: %w", err)
@@ -211,21 +229,43 @@ func (s *EnvService) Set(key, value string, typ string, description string, encr
 		})
 	}
 
+	var nodeRedVar *model.EnvVar
+	if !encrypted && typ != "secret" {
+		nodeRedVar = &model.EnvVar{Key: key, Value: value, Type: typ}
+	}
+	if err := s.syncNodeRedGlobalEnv(key, nodeRedVar); err != nil {
+		return err
+	}
+
 	return s.configSvc.Save(config)
 }
 
 // Delete deletes an environment variable
 func (s *EnvService) Delete(key string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if err := ValidateEnvKey(key); err != nil {
+		return err
+	}
 	config, err := s.configSvc.Get()
 	if err != nil {
 		return fmt.Errorf("failed to get config: %w", err)
 	}
 
+	managedByNRCC := false
 	// Remove env var
 	var newEnvVars []model.EnvVar
 	for _, ev := range config.EnvVars {
 		if ev.Key != key {
 			newEnvVars = append(newEnvVars, ev)
+		} else {
+			managedByNRCC = true
+		}
+	}
+	if managedByNRCC {
+		if err := s.syncNodeRedGlobalEnv(key, nil); err != nil {
+			return err
 		}
 	}
 	config.EnvVars = newEnvVars

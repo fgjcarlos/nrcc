@@ -229,6 +229,16 @@ func TestPostEnvValidationFlow(t *testing.T) {
 			expectedStatus: http.StatusBadRequest,
 			expectedError:  "INVALID_REQUEST",
 		},
+		{
+			name: "Key containing equals is rejected",
+			payload: map[string]interface{}{
+				"key":   "BAD=KEY",
+				"value": "something",
+				"type":  "string",
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "INVALID_REQUEST",
+		},
 	}
 
 	for _, tt := range tests {

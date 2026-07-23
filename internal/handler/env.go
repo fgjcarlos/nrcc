@@ -2,7 +2,9 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"sync"
 
 	"github.com/fgjcarlos/nrcc/internal/audit"
 	"github.com/fgjcarlos/nrcc/internal/model"
@@ -16,6 +18,7 @@ type EnvHandler struct {
 	pm      *service.ProcessManager
 	audit   *audit.Service
 	dataDir string
+	mu      sync.Mutex
 }
 
 // NewEnvHandler creates a new environment handler
@@ -61,8 +64,8 @@ func (h *EnvHandler) PostEnv(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Key == "" {
-		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Key is required")
+	if err := service.ValidateEnvKey(req.Key); err != nil {
+		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", err.Error())
 		return
 	}
 
@@ -87,12 +90,14 @@ func (h *EnvHandler) PostEnv(w http.ResponseWriter, r *http.Request) {
 	// Derive Encrypted flag from type (secret → encrypted=true)
 	encrypted := (req.Type == "secret")
 
-	if err := h.svc.Set(req.Key, normalizedValue, req.Type, req.Description, encrypted); err != nil {
+	restarted, err := h.withManagedNodeRedStopped(func() error {
+		return h.svc.Set(req.Key, normalizedValue, req.Type, req.Description, encrypted)
+	})
+	if err != nil {
 		model.RespondError(w, http.StatusInternalServerError, "ENV_ERROR", err.Error())
 		return
 	}
 
-	restarted := h.restartIfRunning()
 	h.audit.Log(r, "", "ENV_SET", req.Key, "ok", map[string]string{"type": req.Type})
 	model.RespondJSON(w, http.StatusOK, map[string]interface{}{
 		"message":   "Environment variable set",
@@ -105,12 +110,12 @@ func (h *EnvHandler) PostEnv(w http.ResponseWriter, r *http.Request) {
 func (h *EnvHandler) DeleteEnv(w http.ResponseWriter, r *http.Request) {
 	key := chi.URLParam(r, "key")
 
-	if err := h.svc.Delete(key); err != nil {
+	restarted, err := h.withManagedNodeRedStopped(func() error { return h.svc.Delete(key) })
+	if err != nil {
 		model.RespondError(w, http.StatusInternalServerError, "ENV_ERROR", err.Error())
 		return
 	}
 
-	restarted := h.restartIfRunning()
 	h.audit.Log(r, "", "ENV_DELETE", key, "ok", nil)
 	if restarted {
 		model.RespondJSON(w, http.StatusOK, map[string]interface{}{
@@ -120,6 +125,44 @@ func (h *EnvHandler) DeleteEnv(w http.ResponseWriter, r *http.Request) {
 	} else {
 		w.WriteHeader(http.StatusNoContent)
 	}
+}
+
+// withManagedNodeRedStopped prevents NRCC from racing Node-RED's own writes to
+// flows.json. Environment mutations are synchronous so success means both the
+// persisted NRCC store and the Node-RED 5 global-config are ready.
+func (h *EnvHandler) withManagedNodeRedStopped(change func() error) (bool, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if h.pm == nil {
+		return false, change()
+	}
+	if h.pm.IsExternalMode() {
+		return false, fmt.Errorf("cannot synchronize environment variables for externally managed Node-RED")
+	}
+
+	wasRunning := h.pm.Status().Status == "running"
+	if wasRunning {
+		if err := h.pm.Stop(); err != nil {
+			return false, fmt.Errorf("stop Node-RED before environment update: %w", err)
+		}
+	}
+
+	if err := change(); err != nil {
+		if wasRunning {
+			if restartErr := h.pm.Start(); restartErr != nil {
+				return true, fmt.Errorf("%w; restart Node-RED after failed update: %v", err, restartErr)
+			}
+		}
+		return wasRunning, err
+	}
+
+	if wasRunning {
+		if err := h.pm.Start(); err != nil {
+			return true, fmt.Errorf("restart Node-RED after environment update: %w", err)
+		}
+	}
+	return wasRunning, nil
 }
 
 // restartIfRunning restarts the node-red process if it is currently running.
