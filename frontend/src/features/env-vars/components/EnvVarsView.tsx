@@ -1,21 +1,23 @@
 import { useState } from 'react';
 import { type EnvVar } from '@/features/env-vars/services';
-import { Plus } from 'lucide-react';
+import { Plus, FileStack } from 'lucide-react';
 import { EnvVarRow } from '@/features/env-vars/components';
 import { EnvVarModal } from '@/features/env-vars/components';
+import { BulkImportModal } from '@/features/env-vars/components';
 import { DotenvEditor } from '@/features/env-vars/components';
 import { ConfirmationDialog } from '@/shared/components';
 import { useEnvVarsData, useEnvVarsActions } from '@/features/env-vars/hooks';
 
 export function EnvVarsView() {
   // Data queries
-  const { envVars, isLoading } = useEnvVarsData();
+  const { envVars, isLoading, refetchEnvVars } = useEnvVarsData();
 
   // Mutations
   const { createMutation, deleteMutation } = useEnvVarsActions();
 
   // UI state
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isBulkOpen, setIsBulkOpen] = useState(false);
   const [editingVar, setEditingVar] = useState<EnvVar | null>(null);
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = useState<'table' | 'dotenv'>('table');
@@ -93,13 +95,20 @@ export function EnvVarsView() {
           <h1 className="text-2xl font-bold text-base-content">Environment Variables</h1>
         </div>
         {activeTab === 'table' && (
-          <button
-            onClick={() => openModal()}
-            className="action-btn-primary"
-          >
-            <Plus className="w-4 h-4" />
-            Add
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setIsBulkOpen(true)}
+              className="action-btn-secondary"
+              data-testid="bulk-import-button"
+            >
+              <FileStack className="w-4 h-4" />
+              Bulk import
+            </button>
+            <button onClick={() => openModal()} className="action-btn-primary">
+              <Plus className="w-4 h-4" />
+              Add
+            </button>
+          </div>
         )}
       </div>
 
@@ -166,16 +175,21 @@ export function EnvVarsView() {
       {activeTab === 'dotenv' && <DotenvEditor />}
 
        {/* Modal */}
-       {isModalOpen && (
-         <EnvVarModal
-           editing={!!editingVar}
-           formData={formData}
-           setFormData={setFormData}
-           onCancel={closeModal}
-           onSubmit={handleSubmit}
-           isPending={createMutation.isPending}
-         />
-       )}
+      {isModalOpen && (
+        <EnvVarModal
+          editing={!!editingVar}
+          formData={formData}
+          setFormData={setFormData}
+          onCancel={closeModal}
+          onSubmit={handleSubmit}
+          isPending={createMutation.isPending}
+        />
+      )}
+      <BulkImportModal
+        open={isBulkOpen}
+        onClose={() => setIsBulkOpen(false)}
+        onImported={() => refetchEnvVars()}
+      />
 
       {confirmConfig && (
         <ConfirmationDialog

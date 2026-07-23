@@ -227,6 +227,7 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 		r.Route("/api/env", func(r chi.Router) {
 			r.Get("/", envHandler.GetEnv)
 			r.With(middleware.RequireAdmin).Post("/", envHandler.PostEnv)
+			r.With(middleware.RequireAdmin).Post("/bulk", envHandler.BulkEnv)
 			r.With(middleware.RequireAdmin).Delete("/{key}", envHandler.DeleteEnv)
 			r.Get("/dotenv", envHandler.GetDotenv)                               // TAREA 2c: Read .env file
 			r.With(middleware.RequireAdmin).Put("/dotenv", envHandler.PutDotenv) // TAREA 2c: Write .env file
@@ -382,6 +383,7 @@ func (s *Server) SetProcessManager(pm *service.ProcessManager) {
 		})
 	}
 }
+
 // ServeHTTP implements http.Handler
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.router.ServeHTTP(w, r)

@@ -188,6 +188,43 @@ func (h *EnvHandler) restartIfRunning() bool {
 	return true
 }
 
+// BulkEnv validates and imports a Dokploy-style payload.
+// POST /api/env/bulk  body: { content: "K=V\nK=V#type", commit: false }
+// commit=false returns a dry-run report (200). commit=true applies the
+// payload and returns the same report on success. Validation errors
+// always return 400 with the report so the UI can highlight each line.
+func (h *EnvHandler) BulkEnv(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Content string `json:"content"`
+		Commit  bool   `json:"commit"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+		return
+	}
+
+	parsed := service.ParseBulkEnv(req.Content)
+	if !parsed.Valid {
+		model.RespondJSON(w, http.StatusBadRequest, parsed)
+		return
+	}
+	if !req.Commit {
+		model.RespondJSON(w, http.StatusOK, parsed)
+		return
+	}
+
+	_, err := h.withManagedNodeRedStopped(func() error {
+		_, applyErr := h.svc.ApplyBulkEnv(parsed, nil)
+		return applyErr
+	})
+	if err != nil {
+		model.RespondError(w, http.StatusInternalServerError, "BULK_IMPORT_FAILED", err.Error())
+		return
+	}
+	h.audit.Log(r, "", "ENV_BULK_IMPORT", "", "ok", map[string]string{"lines": fmt.Sprintf("%d", len(parsed.Lines))})
+	model.RespondJSON(w, http.StatusOK, parsed)
+}
+
 // GetDotenv returns the content of data/.env
 // GET /api/env/dotenv
 func (h *EnvHandler) GetDotenv(w http.ResponseWriter, r *http.Request) {
