@@ -33,4 +33,29 @@ export const envService = {
     const response = await api.put<Schemas['SuccessEnvelope_EnvSetResult']>('/env/dotenv', { content });
     return unwrap(response.data);
   },
+
+  bulkImport: async (content: string, commit: boolean): Promise<BulkEnvResult> => {
+    const response = await api.post<unknown>('/env/bulk', { content, commit });
+    return response.data as BulkEnvResult;
+  },
 };
+
+export interface BulkEnvIssue {
+  line: number;
+  key?: string;
+  reason: string;
+}
+
+export interface BulkEnvLine {
+  line: number;
+  key: string;
+  value: string;
+  type: string;
+}
+
+export interface BulkEnvResult {
+  lines: BulkEnvLine[];
+  issues: BulkEnvIssue[];
+  valid: boolean;
+  summary: string;
+}

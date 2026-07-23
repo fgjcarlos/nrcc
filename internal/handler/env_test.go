@@ -682,6 +682,88 @@ func TestPostEnvUpdateExistingVariable(t *testing.T) {
 }
 
 // TestPostEnvSecretHandling tests special handling of secret type variables
+func TestBulkEnvHandler(t *testing.T) {
+	tests := []struct {
+		name           string
+		payload        map[string]interface{}
+		expectedStatus int
+		expectValid    bool
+		expectKey      string
+	}{
+		{
+			name:           "valid payload dry-run",
+			payload:        map[string]interface{}{"content": "FOO=bar\nCOUNT=42#number\n", "commit": false},
+			expectedStatus: http.StatusOK,
+			expectValid:    true,
+			expectKey:      "FOO",
+		},
+		{
+			name:           "missing equals is rejected",
+			payload:        map[string]interface{}{"content": "BADLINE", "commit": false},
+			expectedStatus: http.StatusBadRequest,
+			expectValid:    false,
+		},
+		{
+			name:           "commit true with valid payload applies",
+			payload:        map[string]interface{}{"content": "HELLO=world\n", "commit": true},
+			expectedStatus: http.StatusOK,
+			expectValid:    true,
+			expectKey:      "HELLO",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			handler := NewEnvHandler(service.NewEnvService(service.NewIsolatedConfigService(dir)), dir)
+
+			body, _ := json.Marshal(tt.payload)
+			req := httptest.NewRequest("POST", "/api/env/bulk", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+			handler.BulkEnv(w, req)
+
+			if w.Code != tt.expectedStatus {
+				t.Fatalf("status=%d, want %d, body=%s", w.Code, tt.expectedStatus, w.Body.String())
+			}
+			var resp struct {
+				Success bool `json:"success"`
+				Data    *struct {
+					Valid bool `json:"valid"`
+					Lines []struct {
+						Key string `json:"key"`
+					} `json:"lines"`
+				} `json:"data"`
+			}
+			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.Fatalf("decode: %v", err)
+			}
+			if resp.Data == nil {
+				t.Fatalf("missing data envelope")
+			}
+			if resp.Data.Valid != tt.expectValid {
+				t.Fatalf("valid=%v, want %v", resp.Data.Valid, tt.expectValid)
+			}
+			if tt.expectKey != "" && tt.payload["commit"].(bool) {
+				config, err := service.NewIsolatedConfigService(dir).Get()
+				if err != nil {
+					t.Fatal(err)
+				}
+				found := false
+				for _, ev := range config.EnvVars {
+					if ev.Key == tt.expectKey {
+						found = true
+					}
+				}
+				if !found {
+					t.Fatalf("expected persisted key %q, none found", tt.expectKey)
+				}
+			}
+		})
+	}
+}
+
+// TestPostEnvSecretHandling tests special handling of secret type variables
 func TestPostEnvSecretHandling(t *testing.T) {
 	configSvc := service.NewIsolatedConfigService(t.TempDir())
 	envSvc := service.NewEnvService(configSvc)
