@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { type EnvVar } from '@/features/env-vars/services';
 import { Plus, FileStack, Download } from 'lucide-react';
 import { EnvVarRow } from '@/features/env-vars/components';
@@ -7,9 +8,12 @@ import { BulkImportModal } from '@/features/env-vars/components';
 import { DotenvEditor } from '@/features/env-vars/components';
 import { ConfirmationDialog } from '@/shared/components';
 import { useEnvVarsData, useEnvVarsActions } from '@/features/env-vars/hooks';
+import { useAuth } from '@/features/auth/hooks';
 import { envService } from '@/features/env-vars/services';
 
 export function EnvVarsView() {
+  const { user } = useAuth();
+
   // Data queries
   const { envVars, isLoading, refetchEnvVars } = useEnvVarsData();
 
@@ -22,6 +26,8 @@ export function EnvVarsView() {
   const [editingVar, setEditingVar] = useState<EnvVar | null>(null);
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = useState<'table' | 'dotenv'>('table');
+  const didAutoImport = useRef(false);
+  const isMounted = useRef(false);
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
     title: string;
@@ -36,6 +42,26 @@ export function EnvVarsView() {
     type: 'string' as EnvVar['type'],
     description: '',
   });
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (user?.role !== 'admin' || didAutoImport.current) return;
+    didAutoImport.current = true;
+
+    void envService.importFromNodeRed(true).then((result) => {
+      if (!isMounted.current) return;
+      if (result.lines.length > 0) refetchEnvVars();
+      if (result.issues.some((issue) => issue.line === 0) && result.summary) {
+        toast.error(result.summary);
+      }
+    });
+  }, [refetchEnvVars, user?.role]);
 
   const openModal = (envVar?: EnvVar) => {
     if (envVar) {
