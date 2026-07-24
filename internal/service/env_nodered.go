@@ -369,17 +369,20 @@ func (s *EnvService) ImportFromNodeRed(commit bool, stopAndRestart func(func() e
 	if !commit || !result.Valid {
 		return result, nil
 	}
-	for _, line := range toImport {
-		set := func() error {
-			return s.Set(line.Key, line.Value, line.Type, "imported from Node-RED", false)
-		}
-		if stopAndRestart != nil {
-			if _, err := stopAndRestart(set); err != nil {
-				return result, fmt.Errorf("line %d (%s): %w", line.Line, line.Key, err)
+	apply := func() error {
+		for _, line := range toImport {
+			if err := s.Set(line.Key, line.Value, line.Type, "imported from Node-RED", false); err != nil {
+				return fmt.Errorf("line %d (%s): %w", line.Line, line.Key, err)
 			}
-		} else if err := set(); err != nil {
-			return result, fmt.Errorf("line %d (%s): %w", line.Line, line.Key, err)
 		}
+		return nil
+	}
+	if stopAndRestart != nil {
+		if _, err := stopAndRestart(apply); err != nil {
+			return result, err
+		}
+	} else if err := apply(); err != nil {
+		return result, err
 	}
 	return result, nil
 }

@@ -162,7 +162,7 @@ func TestImportFromNodeRed(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(
 		filepath.Join(dir, "flows.json"),
-		[]byte(`[{"id":"manual-global","type":"global-config","env":[{"name":"ALPHA","value":"1","type":"str"},{"name":"BETA","value":"true","type":"bool"}]}]`),
+		[]byte(`[{"id":"manual-global","type":"global-config","env":[{"name":"ALPHA","value":"1","type":"str"},{"name":"BETA","value":"true","type":"bool"},{"name":"GAMMA","value":"3","type":"num"}]}]`),
 		0o644,
 	); err != nil {
 		t.Fatal(err)
@@ -179,7 +179,7 @@ func TestImportFromNodeRed(t *testing.T) {
 	if !result.Valid {
 		t.Fatalf("expected valid, got %+v", result)
 	}
-	if len(result.Lines) != 1 || result.Lines[0].Key != "BETA" || result.Lines[0].Type != "boolean" {
+	if len(result.Lines) != 2 || result.Lines[0].Key != "BETA" || result.Lines[0].Type != "boolean" || result.Lines[1].Key != "GAMMA" || result.Lines[1].Type != "number" {
 		t.Fatalf("unexpected lines: %+v", result.Lines)
 	}
 	hasSkip := false
@@ -192,24 +192,37 @@ func TestImportFromNodeRed(t *testing.T) {
 		t.Fatalf("expected ALPHA skip issue, got %+v", result.Issues)
 	}
 
-	if _, err := svc.ImportFromNodeRed(true, nil); err != nil {
+	callbackCalls := 0
+	if _, err := svc.ImportFromNodeRed(true, func(change func() error) (bool, error) {
+		callbackCalls++
+		return true, change()
+	}); err != nil {
 		t.Fatalf("commit: %v", err)
+	}
+	if callbackCalls != 1 {
+		t.Fatalf("expected one lifecycle callback, got %d", callbackCalls)
 	}
 	config, err := svc.configSvc.Get()
 	if err != nil {
 		t.Fatal(err)
 	}
-	var beta *model.EnvVar
+	var beta, gamma *model.EnvVar
 	for i := range config.EnvVars {
-		if config.EnvVars[i].Key == "BETA" {
+		switch config.EnvVars[i].Key {
+		case "BETA":
 			beta = &config.EnvVars[i]
+		case "GAMMA":
+			gamma = &config.EnvVars[i]
 		}
 	}
-	if beta == nil {
-		t.Fatal("BETA missing after commit")
+	if beta == nil || gamma == nil {
+		t.Fatalf("imported variables missing after commit: BETA=%+v GAMMA=%+v", beta, gamma)
 	}
 	if beta.Type != "boolean" || beta.Description != "imported from Node-RED" {
 		t.Fatalf("unexpected BETA: %+v", beta)
+	}
+	if gamma.Type != "number" || gamma.Description != "imported from Node-RED" {
+		t.Fatalf("unexpected GAMMA: %+v", gamma)
 	}
 }
 
