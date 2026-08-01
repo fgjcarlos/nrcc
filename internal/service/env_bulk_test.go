@@ -318,10 +318,8 @@ func TestApplyBulkEnvRestartCallback(t *testing.T) {
 				if tc.wantErrContains != "" && !strings.Contains(err.Error(), tc.wantErrContains) {
 					t.Fatalf("error %q does not contain %q", err.Error(), tc.wantErrContains)
 				}
-			} else {
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
+			} else if err != nil {
+				t.Fatalf("unexpected error: %v", err)
 			}
 
 			// Verify callback was called the expected number of times.
