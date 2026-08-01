@@ -237,3 +237,99 @@ func TestImportFromNodeRedEmptyFlows(t *testing.T) {
 		t.Fatalf("unexpected result: %+v", result)
 	}
 }
+
+// restartCall records a single callback invocation for #540 regression.
+type restartCall struct {
+	set func() error
+}
+
+// restartRecorder captures every ApplyBulkEnv callback invocation by #540 regression test.
+type restartRecorder struct {
+	calls []restartCall
+	err   error
+}
+
+// callback implements the restart parameter contract for ApplyBulkEnv.
+func (r *restartRecorder) callback(set func() error) (bool, error) {
+	r.calls = append(r.calls, restartCall{set: set})
+	if r.err != nil {
+		return false, r.err
+	}
+	return true, nil
+}
+
+// TestApplyBulkEnvRestartCallback is the #540 regression: it locks in the
+// dual-path contract of ApplyBulkEnv. If a future change removes the
+// `else if err := set()` branch, the nil-path assertion below will fail.
+func TestApplyBulkEnvRestartCallback(t *testing.T) {
+	tests := []struct {
+		name            string
+		useNilRestart   bool
+		recorderErr     error
+		wantCallCount   int
+		wantErr         bool
+		wantErrContains string
+	}{
+		{
+			name:          "nil_restart_calls_set_directly",
+			useNilRestart: true,
+			wantCallCount: 0, // nil path does NOT call restart callback
+		},
+		{
+			name:          "non_nil_restart_wraps_each_line",
+			useNilRestart: false,
+			wantCallCount: 2, // non-nil path calls restart callback for each line
+		},
+		{
+			name:            "non_nil_restart_propagates_error",
+			useNilRestart:   false,
+			recorderErr:     errors.New("boom"),
+			wantCallCount:   1, // stops after first error
+			wantErr:         true,
+			wantErrContains: "boom",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			svc := NewEnvService(NewIsolatedConfigService(dir), "test-key")
+			parsed := BulkEnvResult{
+				Valid: true,
+				Lines: []BulkEnvLine{
+					{Key: "FOO", Value: "1", Type: "string", Line: 1},
+					{Key: "BAR", Value: "2", Type: "string", Line: 2},
+				},
+			}
+
+			rec := &restartRecorder{err: tc.recorderErr}
+			var restart func(func() error) (bool, error)
+			if !tc.useNilRestart {
+				restart = rec.callback
+			}
+
+			_, err := svc.ApplyBulkEnv(parsed, restart)
+
+			// Verify error expectation
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
+				if tc.wantErrContains != "" && !strings.Contains(err.Error(), tc.wantErrContains) {
+					t.Fatalf("error %q does not contain %q", err.Error(), tc.wantErrContains)
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+			}
+
+			// Verify callback was called the expected number of times.
+			// This is the core #540 contract: restart==nil means callback not called;
+			// restart!=nil means callback called for each line (unless early error).
+			if len(rec.calls) != tc.wantCallCount {
+				t.Fatalf("callback calls = %d, want %d", len(rec.calls), tc.wantCallCount)
+			}
+		})
+	}
+}

@@ -213,6 +213,9 @@ func (h *EnvHandler) BulkEnv(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// withManagedNodeRedStopped IS the stop/restart envelope for this handler.
+	// Pass nil so ApplyBulkEnv invokes set() directly inside this closure
+	// without firing an additional restart per line. See ApplyBulkEnv doc.
 	_, err := h.withManagedNodeRedStopped(func() error {
 		_, applyErr := h.svc.ApplyBulkEnv(parsed, nil)
 		return applyErr

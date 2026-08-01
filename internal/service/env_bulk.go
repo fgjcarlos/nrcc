@@ -114,6 +114,14 @@ func validBulkType(typ string) bool {
 // active Node-RED runtime. Caller guarantees BulkEnvResult.Valid == true.
 // Secrets persist encrypted and never reach flows.json; the rest route
 // through EnvService.Set which already drives syncNodeRedGlobalEnv.
+//
+// The restart parameter controls how each line's set() is invoked:
+//   - restart == nil: the caller is responsible for the stop/restart envelope.
+//     set() is invoked directly. This is the path used by BulkEnv, which is
+//     already wrapped in withManagedNodeRedStopped at the handler level.
+//   - restart != nil: each line's set() is wrapped inside the callback, so
+//     the service drives the envelope per line. The callback's boolean return
+//     is intentionally discarded — only the error is meaningful.
 func (s *EnvService) ApplyBulkEnv(parsed BulkEnvResult, restart func(func() error) (bool, error)) (BulkEnvResult, error) {
 	if !parsed.Valid {
 		return parsed, fmt.Errorf("bulk payload failed validation")
