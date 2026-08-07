@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/fgjcarlos/nrcc/internal/model"
@@ -41,24 +40,9 @@ func (s *EnvService) activeNodeRedUserDir() (string, error) {
 		return "", fmt.Errorf("env service not initialised")
 	}
 	base := s.configSvc.dataDir
-	envMap := map[string]string{}
-	for _, pair := range os.Environ() {
-		parts := strings.SplitN(pair, "=", 2)
-		if len(parts) == 2 {
-			envMap[parts[0]] = parts[1]
-		}
-	}
-	if stored, err := s.GetAll(); err == nil {
-		for k, v := range stored {
-			envMap[k] = v
-		}
-	}
-	dotenvPath := filepath.Join(base, ".env")
-	if dotenvVars, err := parseEnvFile(dotenvPath); err == nil {
-		for k, v := range dotenvVars {
-			envMap[k] = v
-		}
-	}
+	stored, _ := s.GetAll()
+	dotenvVars, _ := parseEnvFile(filepath.Join(base, ".env"))
+	envMap := mergeEnvLayers(os.Environ(), stored, dotenvVars)
 	rt, err := resolveNodeRedRuntime(envMap, base)
 	if err != nil {
 		return "", fmt.Errorf("resolve Node-RED runtime: %w", err)
