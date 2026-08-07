@@ -17,6 +17,13 @@ import (
 	"github.com/fgjcarlos/nrcc/internal/ui"
 )
 
+// Env precedence for the Node-RED child process (and any helper that
+// resolves the same env layers, e.g. EnvService.activeNodeRedUserDir):
+//   1. OS environ (base)
+//   2. EnvService.GetAll() — variables managed by NRCC
+//   3. dataDir/.env file (highest priority)
+// Single source of truth: mergeEnvLayers below.
+
 // ProcessManager manages the Node-RED child process lifecycle.
 //
 // Design invariants:
@@ -68,11 +75,11 @@ func NewProcessManager(cmd, dataDir string) *ProcessManager {
 	}
 	store := newRestartCountStore(dataDir)
 	return &ProcessManager{
-		nodeRedCmd:         cmd,
-		dataDir:            dataDir,
-		maxRestarts:        10,
-		restartDelay:       2 * time.Second,
-		doneCh:             closedChan(), // sentinel so Stop() doesn't block when nothing is running
+		nodeRedCmd:   cmd,
+		dataDir:      dataDir,
+		maxRestarts:  10,
+		restartDelay: 2 * time.Second,
+		doneCh:       closedChan(), // sentinel so Stop() doesn't block when nothing is running
 		// Two sources of truth about restarts, on purpose (see restart_tracker.go):
 		//   - tracker: in-memory ring buffer of recent events for the
 		//     runtime history endpoint; bounded, ephemeral.
@@ -182,29 +189,31 @@ func (pm *ProcessManager) SetEnvService(svc *EnvService) {
 
 // envForChild builds the environment map that will be passed to the
 // Node-RED child process, with the precedence:
-//   1. OS environ (base)
-//   2. config.json vars (EnvService)
-//   3. .env file in dataDir (highest)
+//  1. OS environ (base)
+//  2. config.json vars (EnvService)
+//  3. .env file in dataDir (highest)
 func (pm *ProcessManager) envForChild() map[string]string {
-	envMap := make(map[string]string)
-	for _, pair := range os.Environ() {
+	var stored map[string]string
+	if pm.envSvc != nil {
+		stored, _ = pm.envSvc.GetAll()
+	}
+	dotenvVars, _ := parseEnvFile(filepath.Join(pm.dataDir, ".env"))
+	return mergeEnvLayers(os.Environ(), stored, dotenvVars)
+}
+
+func mergeEnvLayers(osEnviron []string, stored map[string]string, dotenvVars map[string]string) map[string]string {
+	envMap := make(map[string]string, len(osEnviron)+len(stored)+len(dotenvVars))
+	for _, pair := range osEnviron {
 		parts := strings.SplitN(pair, "=", 2)
 		if len(parts) == 2 {
 			envMap[parts[0]] = parts[1]
 		}
 	}
-	if pm.envSvc != nil {
-		if stored, err := pm.envSvc.GetAll(); err == nil {
-			for k, v := range stored {
-				envMap[k] = v
-			}
-		}
+	for k, v := range stored {
+		envMap[k] = v
 	}
-	dotenvPath := filepath.Join(pm.dataDir, ".env")
-	if dotenvVars, err := parseEnvFile(dotenvPath); err == nil {
-		for k, v := range dotenvVars {
-			envMap[k] = v
-		}
+	for k, v := range dotenvVars {
+		envMap[k] = v
 	}
 	return envMap
 }

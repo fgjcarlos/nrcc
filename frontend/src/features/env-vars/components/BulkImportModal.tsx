@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { X, CheckCircle2, AlertTriangle, ClipboardPaste } from 'lucide-react';
 import { envService, type BulkEnvResult } from '../services/envService';
 
@@ -20,6 +20,7 @@ export function BulkImportModal({ open, onClose, onImported }: BulkImportModalPr
   const [report, setReport] = useState<BulkEnvResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const inFlightRef = useRef(false);
 
   const issueByLine = useMemo(() => {
     const map = new Map<number, string>();
@@ -33,6 +34,8 @@ export function BulkImportModal({ open, onClose, onImported }: BulkImportModalPr
   const linesForRender = content.split('\n');
 
   async function handleValidate() {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     setError(null);
     setLoading(true);
     try {
@@ -43,12 +46,15 @@ export function BulkImportModal({ open, onClose, onImported }: BulkImportModalPr
       setError(message);
       setReport(null);
     } finally {
+      inFlightRef.current = false;
       setLoading(false);
     }
   }
 
   async function handleCommit() {
     if (!report?.valid) return;
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     setError(null);
     setLoading(true);
     try {
@@ -63,6 +69,7 @@ export function BulkImportModal({ open, onClose, onImported }: BulkImportModalPr
       const message = err instanceof Error ? err.message : 'Import failed';
       setError(message);
     } finally {
+      inFlightRef.current = false;
       setLoading(false);
     }
   }
@@ -94,10 +101,7 @@ export function BulkImportModal({ open, onClose, onImported }: BulkImportModalPr
             className="textarea textarea-bordered h-48 w-full font-mono text-xs"
             placeholder={PLACEHOLDER}
             value={content}
-            onChange={(e) => {
-              setContent(e.target.value);
-              setReport(null);
-            }}
+            onChange={(e) => setContent(e.target.value)}
           />
 
           <div className="flex flex-wrap items-center gap-2">
