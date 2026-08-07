@@ -6,6 +6,59 @@ import (
 	"testing"
 )
 
+func TestMergeEnvLayers(t *testing.T) {
+	tests := []struct {
+		name       string
+		osEnviron  []string
+		stored     map[string]string
+		dotenvVars map[string]string
+		want       map[string]string
+	}{
+		{
+			name:       "precedence",
+			osEnviron:  []string{"SHARED=os", "OS_ONLY=1"},
+			stored:     map[string]string{"SHARED": "stored", "STORED_ONLY": "2"},
+			dotenvVars: map[string]string{"SHARED": "dotenv", "DOTENV_ONLY": "3"},
+			want:       map[string]string{"SHARED": "dotenv", "OS_ONLY": "1", "STORED_ONLY": "2", "DOTENV_ONLY": "3"},
+		},
+		{
+			name: "empty layers",
+			want: map[string]string{},
+		},
+		{
+			name:      "os-only override",
+			osEnviron: []string{"KEY=first", "KEY=last"},
+			want:      map[string]string{"KEY": "last"},
+		},
+		{
+			name:      "os entries without values are ignored",
+			osEnviron: []string{"NO_VALUE", "EMPTY=", "WITH_VALUE=value"},
+			want:      map[string]string{"EMPTY": "", "WITH_VALUE": "value"},
+		},
+		{
+			name:       "higher layers win independent of map iteration",
+			osEnviron:  []string{"KEY=os", "OTHER=os"},
+			stored:     map[string]string{"KEY": "stored"},
+			dotenvVars: map[string]string{"KEY": "dotenv"},
+			want:       map[string]string{"KEY": "dotenv", "OTHER": "os"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := mergeEnvLayers(tt.osEnviron, tt.stored, tt.dotenvVars)
+			if len(got) != len(tt.want) {
+				t.Fatalf("mergeEnvLayers() = %#v, want %#v", got, tt.want)
+			}
+			for key, want := range tt.want {
+				if got[key] != want {
+					t.Errorf("mergeEnvLayers()[%q] = %q, want %q", key, got[key], want)
+				}
+			}
+		})
+	}
+}
+
 // TestResolveNodeRedRuntime_Defaults covers the contract when no env
 // overrides are set: port 1880, userDir = dataDir, settings under userDir.
 func TestResolveNodeRedRuntime_Defaults(t *testing.T) {
@@ -36,9 +89,9 @@ func TestResolveNodeRedRuntime_EnvOverrides(t *testing.T) {
 	settingsDir := t.TempDir()
 
 	rt, err := resolveNodeRedRuntime(map[string]string{
-		"NODE_RED_PORT":      "2880",
-		"NODE_RED_USER_DIR":  overrideDir,
-		"NODE_RED_SETTINGS":  filepath.Join(settingsDir, "alt-settings.js"),
+		"NODE_RED_PORT":     "2880",
+		"NODE_RED_USER_DIR": overrideDir,
+		"NODE_RED_SETTINGS": filepath.Join(settingsDir, "alt-settings.js"),
 	}, dataDir)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

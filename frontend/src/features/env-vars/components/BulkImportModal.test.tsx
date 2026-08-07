@@ -35,6 +35,16 @@ describe('BulkImportModal', () => {
     expect(screen.getByRole('button', { name: /Import/ })).toBeDisabled();
   });
 
+  it('ignores a rapid double-click on Validate', async () => {
+    bulkImport.mockImplementationOnce(() => new Promise(() => {}));
+    render(<BulkImportModal open onClose={vi.fn()} onImported={vi.fn()} />);
+
+    await userEvent.type(screen.getByPlaceholderText(/# KEY=VALUE/), 'API_URL=https://x.test');
+    const validate = screen.getByRole('button', { name: 'Validate' });
+    await Promise.all([userEvent.click(validate), userEvent.click(validate)]);
+
+    expect(bulkImport).toHaveBeenCalledTimes(1);
+  });
   it('calls bulkImport with commit=true on a valid payload', async () => {
     bulkImport
       .mockResolvedValueOnce({
