@@ -32,7 +32,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o nrcc .
 
-FROM nodered/node-red:5.0.1-minimal
+FROM nodered/node-red:5.0.4-24-minimal
 LABEL org.opencontainers.image.title="nrcc" \
       org.opencontainers.image.description="Node-RED Control Center — all-in-one" \
       org.opencontainers.image.source="https://github.com/fgjcarlos/nrcc"
