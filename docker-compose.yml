@@ -38,6 +38,25 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+    # Hardening — single-user container, no new privileges, capped resources.
+    # See auditoria/devops-security.md §4. read_only is intentionally omitted:
+    # the entrypoint chmods /data and the persisted jwt_secret file needs a
+    # writable rootfs.
+    init: true
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop:
+      - ALL
+    pids_limit: 512
+    mem_limit: 512m
+    cpus: "1.0"
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+      nproc: 1024
 
 volumes:
   nrcc_data:
