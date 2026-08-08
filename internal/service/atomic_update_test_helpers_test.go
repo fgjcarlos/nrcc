@@ -5,6 +5,7 @@ import (
 	"testing"
 )
 
+//nolint:unused // Shared by subsequent atomic-update service test slices.
 func runConcurrent(t *testing.T, n int, fn func(i int) error) []error {
 	t.Helper()
 
@@ -24,6 +25,7 @@ func runConcurrent(t *testing.T, n int, fn func(i int) error) []error {
 	return errs
 }
 
+//nolint:unused // Shared by subsequent atomic-update service test slices.
 func assertNoError(t *testing.T, errs []error) {
 	t.Helper()
 
