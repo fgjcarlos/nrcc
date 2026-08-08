@@ -19,16 +19,16 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # pin to commit (v7.0.0)
 
       - name: Set up QEMU (for cross-arch emulation)
-        uses: docker/setup-qemu-action@v4
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a  # pin to commit (v4.0.0)
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd  # pin to commit (v4.0.0)
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v4
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2  # pin to commit (v4.0.0)
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -36,7 +36,7 @@ jobs:
 
       - name: Log in to Docker Hub (if secrets present)
         if: ${{ env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != '' }}
-        uses: docker/login-action@v4
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2  # pin to commit (v4.0.0)
         with:
           registry: docker.io
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -44,7 +44,7 @@ jobs:
 
       - name: Extract metadata (tags, labels)
         id: meta
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf  # pin to commit (v6.0.0)
         with:
           images: |
             ${{ env.IMAGE }}
@@ -56,7 +56,7 @@ jobs:
             type=raw,value=latest
 
       - name: Build and push
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294  # pin to commit (v7.0.0)
         with:
           context: .
           file: ./Dockerfile
@@ -76,10 +76,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # pin to commit (v7.0.0)
 
       - name: Set up Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # pin to commit (v7.0.0)
         with:
           go-version: "1.25"
           cache-dependency-path: go.sum
@@ -91,7 +91,7 @@ jobs:
           pnpm --version
 
       - name: Set up Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # pin to commit (v7.0.0)
         with:
           node-version: "22"
           cache: pnpm
@@ -140,7 +140,7 @@ jobs:
           ls -lh SHA256SUMS *.sha256
 
       - name: Upload binaries to GitHub Release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda  # pin to commit (v3.0.0)
         with:
           files: dist/*
           generate_release_notes: true
