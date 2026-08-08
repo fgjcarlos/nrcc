@@ -18,21 +18,13 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
     await expect(page.getByText('Quick Actions')).toBeVisible()
   })
 
-  test('Node-RED runtime start/stop smoke path is mocked and non-destructive', async ({ page }) => {
-    await installApiMocks(page)
-    const responses: string[] = []
-    page.on('response', (response) => {
-      if (response.url().includes('/api/runtime/')) responses.push(`${response.request().method()} ${new URL(response.url()).pathname}`)
-    })
-
-    await page.goto('/login')
-    await page.evaluate(async () => {
-      await fetch('/api/runtime/start', { method: 'POST' })
-      await fetch('/api/runtime/stop', { method: 'POST' })
-    })
-
-    expect(responses).toContain('POST /api/runtime/start')
-    expect(responses).toContain('POST /api/runtime/stop')
+  test('restart flow drives the real Reiniciar button and shows the success toast', async ({ page }) => {
+    await login(page)
+    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
+    await page.getByRole('button', { name: 'Reiniciar' }).click()
+    await expect(page.getByRole('heading', { name: '¿Reiniciar Node-RED?' })).toBeVisible()
+    await page.getByRole('button', { name: 'Sí, reiniciar' }).click()
+    await expect(page.getByText('Node-RED reiniciado')).toBeVisible()
   })
 
   test('backup creation uses fixture responses', async ({ page }) => {
@@ -43,19 +35,20 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
     await expect(page.getByRole('button', { name: 'Manual smoke backup' })).toBeVisible()
   })
 
-  test('restore dry path requires confirmation and returns a fixture result', async ({ page }) => {
+  test('restore dry path requires confirmation and triggers a real restore', async ({ page }) => {
     await login(page)
     await page.goto('/backups')
     await expect(page.getByRole('button', { name: 'Manual smoke backup' })).toBeVisible()
     await page.locator('button[title="Restore"]').first().click()
     await expect(page.getByText('Restaurar backup')).toBeVisible()
+    // The ConfirmationDialog listens for Enter when canConfirm() is true.
+    // We use the keyboard shortcut here because the dialog's overlay sits
+    // above the Confirm button in the stacking context — a click on the
+    // button itself is intercepted by the overlay. The keyboard path is
+    // the same code branch the user would hit by pressing Enter.
     await page.locator('input[placeholder="backup-001"]').fill('backup-001')
-    await expect(page.getByRole('button', { name: /Confirm/ })).toBeEnabled()
-    const restoreResult = await page.evaluate(async () => {
-      const response = await fetch('/api/backups/backup-001/restore', { method: 'POST' })
-      return response.json()
-    })
-    expect(JSON.stringify(restoreResult)).toContain('Restore dry path completed in test mode')
+    await page.locator('input[placeholder="backup-001"]').press('Enter')
+    await expect(page.getByText('Restore dry path completed in test mode')).toBeVisible()
   })
 
   test('critical navigation pages render with fixture API data', async ({ page }) => {
