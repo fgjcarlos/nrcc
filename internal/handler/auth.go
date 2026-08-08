@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -122,16 +123,6 @@ func (h *AuthHandler) Setup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if users already exist (setup only works once)
-	users, _ := h.authSvc.GetAllUsers()
-	if len(users) > 0 {
-		if h.limiter != nil {
-			h.limiter.Record("setup-ip:" + mw.ExtractIP(r))
-		}
-		model.RespondError(w, http.StatusConflict, "ALREADY_CONFIGURED", "System already configured with users")
-		return
-	}
-
 	// Create first user as admin
 	hash, err := h.authSvc.HashPassword(req.Password)
 	if err != nil {
@@ -149,8 +140,14 @@ func (h *AuthHandler) Setup(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt:    now,
 	}
 
-	// Save user
-	if err := h.authSvc.CreateUser(user); err != nil {
+	if err := h.authSvc.BootstrapFirstAdmin(user); err != nil {
+		if errors.Is(err, service.ErrAlreadyConfigured) {
+			if h.limiter != nil {
+				h.limiter.Record("setup-ip:" + mw.ExtractIP(r))
+			}
+			model.RespondError(w, http.StatusConflict, "ALREADY_CONFIGURED", "System already configured with users")
+			return
+		}
 		model.RespondError(w, http.StatusInternalServerError, "CREATE_ERROR", "Failed to create user")
 		return
 	}
@@ -251,8 +248,15 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	// Rehash if stored with lower bcrypt cost
 	if service.NeedsRehash(user.PasswordHash) {
 		if newHash, err := h.authSvc.HashPassword(req.Password); err == nil {
-			user.PasswordHash = newHash
-			_ = h.authSvc.UpdateUser(user)
+			now := model.NowISO8601()
+			if err := h.authSvc.UpdateUser(user.ID, func(current *model.CCUser) error {
+				current.PasswordHash = newHash
+				current.UpdatedAt = now
+				return nil
+			}); err == nil {
+				user.PasswordHash = newHash
+				user.UpdatedAt = now
+			}
 		}
 	}
 
@@ -426,13 +430,6 @@ func (h *AuthHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if username already exists
-	existing := h.authSvc.GetUserByUsername(req.Username)
-	if existing != nil {
-		model.RespondError(w, http.StatusConflict, "USERNAME_EXISTS", "Username already exists")
-		return
-	}
-
 	// Hash password
 	hash, err := h.authSvc.HashPassword(req.Password)
 	if err != nil {
@@ -451,6 +448,10 @@ func (h *AuthHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.authSvc.CreateUser(newUser); err != nil {
+		if errors.Is(err, service.ErrUsernameExists) {
+			model.RespondError(w, http.StatusConflict, "USERNAME_EXISTS", "Username already exists")
+			return
+		}
 		model.RespondError(w, http.StatusInternalServerError, "CREATE_ERROR", "Failed to create user")
 		return
 	}
@@ -487,30 +488,16 @@ func (h *AuthHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if user exists
-	user := h.authSvc.GetUserByID(userID)
-	if user == nil {
-		model.RespondError(w, http.StatusNotFound, "NOT_FOUND", "User not found")
-		return
-	}
-
-	// Cannot delete last admin
-	if user.Role == model.RoleAdmin {
-		users, _ := h.authSvc.GetAllUsers()
-		adminCount := 0
-		for _, u := range users {
-			if u.Role == model.RoleAdmin {
-				adminCount++
-			}
-		}
-		if adminCount <= 1 {
+	user, err := h.authSvc.DeleteUserWithPolicy(userID)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrUserNotFound):
+			model.RespondError(w, http.StatusNotFound, "NOT_FOUND", "User not found")
+		case errors.Is(err, service.ErrCannotDeleteLastAdmin):
 			model.RespondError(w, http.StatusForbidden, "CANNOT_DELETE_LAST_ADMIN", "Cannot delete the last admin user")
-			return
+		default:
+			model.RespondError(w, http.StatusInternalServerError, "DELETE_ERROR", "Failed to delete user")
 		}
-	}
-
-	if err := h.authSvc.DeleteUser(userID); err != nil {
-		model.RespondError(w, http.StatusInternalServerError, "DELETE_ERROR", "Failed to delete user")
 		return
 	}
 
@@ -554,13 +541,6 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get user
-	user := h.authSvc.GetUserByID(userID)
-	if user == nil {
-		model.RespondError(w, http.StatusNotFound, "NOT_FOUND", "User not found")
-		return
-	}
-
 	// Hash new password
 	hash, err := h.authSvc.HashPassword(req.Password)
 	if err != nil {
@@ -568,16 +548,23 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update user
-	user.PasswordHash = hash
-	user.UpdatedAt = model.NowISO8601()
-
-	if err := h.authSvc.UpdateUser(user); err != nil {
+	updatedAt := model.NowISO8601()
+	username := ""
+	if err := h.authSvc.UpdateUser(userID, func(user *model.CCUser) error {
+		user.PasswordHash = hash
+		user.UpdatedAt = updatedAt
+		username = user.Username
+		return nil
+	}); err != nil {
+		if errors.Is(err, service.ErrUserNotFound) {
+			model.RespondError(w, http.StatusNotFound, "NOT_FOUND", "User not found")
+			return
+		}
 		model.RespondError(w, http.StatusInternalServerError, "UPDATE_ERROR", "Failed to update user")
 		return
 	}
 
-	h.audit.Log(r, claims.Username, "PASSWORD_CHANGE", user.Username, "ok", nil)
+	h.audit.Log(r, claims.Username, "PASSWORD_CHANGE", username, "ok", nil)
 	model.RespondJSON(w, http.StatusOK, map[string]bool{"success": true})
 }
 
@@ -613,34 +600,16 @@ func (h *AuthHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get user
-	user := h.authSvc.GetUserByID(userID)
-	if user == nil {
-		model.RespondError(w, http.StatusNotFound, "NOT_FOUND", "User not found")
-		return
-	}
-
-	// Last-admin guard: cannot demote the sole admin
-	if *req.Role == model.RoleViewer && user.Role == model.RoleAdmin {
-		users, _ := h.authSvc.GetAllUsers()
-		adminCount := 0
-		for _, u := range users {
-			if u.Role == model.RoleAdmin {
-				adminCount++
-			}
-		}
-		if adminCount <= 1 {
+	user, err := h.authSvc.UpdateUserRole(userID, *req.Role, model.NowISO8601())
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrUserNotFound):
+			model.RespondError(w, http.StatusNotFound, "NOT_FOUND", "User not found")
+		case errors.Is(err, service.ErrCannotDemoteLastAdmin):
 			model.RespondError(w, http.StatusForbidden, "CANNOT_DEMOTE_LAST_ADMIN", "Cannot demote the last admin user")
-			return
+		default:
+			model.RespondError(w, http.StatusInternalServerError, "UPDATE_ERROR", "Failed to update user")
 		}
-	}
-
-	// Update user role
-	user.Role = *req.Role
-	user.UpdatedAt = model.NowISO8601()
-
-	if err := h.authSvc.UpdateUser(user); err != nil {
-		model.RespondError(w, http.StatusInternalServerError, "UPDATE_ERROR", "Failed to update user")
 		return
 	}
 
@@ -722,8 +691,8 @@ func (h *AuthHandler) setRefreshCookie(w http.ResponseWriter, r *http.Request, u
 		return err
 	}
 	http.SetCookie(w, &http.Cookie{
-		Name:     refreshCookieName,
-		Value:    refreshToken,
+		Name:  refreshCookieName,
+		Value: refreshToken,
 		// Path is "/" so the cookie rides every request, not just
 		// /api/auth/*. Required when the backend is behind a reverse
 		// proxy (e.g. Tailscale Serve, Portless) that may rewrite the
