@@ -168,23 +168,12 @@ func runServer() {
 	ui.Info("Shutdown complete")
 }
 
-var placeholderSecrets = []string{
-	"cc-secret-change-in-production",
-	"change-me-in-production",
-	"dev-secret-not-for-production",
-}
-
 func resolveJWTSecret(dataDir string) (string, error) {
 	secret := os.Getenv("JWT_SECRET")
 
 	if secret != "" {
-		for _, placeholder := range placeholderSecrets {
-			if strings.EqualFold(secret, placeholder) {
-				return "", fmt.Errorf(
-					"JWT_SECRET is set to a known placeholder (%q) — provide a real secret",
-					secret,
-				)
-			}
+		if err := service.ValidateSecret("JWT_SECRET", secret); err != nil {
+			return "", err
 		}
 		return secret, nil
 	}

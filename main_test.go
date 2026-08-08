@@ -33,6 +33,17 @@ func TestResolveJWTSecret_RejectsPlaceholders(t *testing.T) {
 			}
 		})
 	}
+
+	// Case-insensitive match: ALL-CAPS copies of the placeholder must
+	// also be rejected so an operator who paste-upper-cases the env
+	// file does not silently bypass the check (#584).
+	t.Run("CHANGE-ME-IN-PRODUCTION", func(t *testing.T) {
+		t.Setenv("JWT_SECRET", "CHANGE-ME-IN-PRODUCTION")
+		_, err := resolveJWTSecret(t.TempDir())
+		if err == nil {
+			t.Fatal("expected error for upper-cased placeholder")
+		}
+	})
 }
 
 func TestResolveJWTSecret_GeneratesAndPersists(t *testing.T) {

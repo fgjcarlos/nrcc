@@ -7,6 +7,53 @@ import (
 	"testing"
 )
 
+func TestValidateSecret(t *testing.T) {
+	placeholders := []string{
+		"cc-secret-change-in-production",
+		"change-me-in-production",
+		"dev-secret-not-for-production",
+	}
+
+	// Empty value is "not provided" — not a rejection case. Callers
+	// that require a value must enforce that separately.
+	if err := ValidateSecret("JWT_SECRET", ""); err != nil {
+		t.Fatalf("empty value must not be rejected: %v", err)
+	}
+
+	// Each placeholder must be rejected regardless of casing, and
+	// the error must mention the env var name so the operator knows
+	// where to fix it.
+	for _, p := range placeholders {
+		t.Run(p, func(t *testing.T) {
+			err := ValidateSecret("NRCC_ENCRYPTION_KEY", p)
+			if err == nil {
+				t.Fatalf("expected rejection of %q", p)
+			}
+			if !strings.Contains(err.Error(), "NRCC_ENCRYPTION_KEY") {
+				t.Errorf("error must mention the env var name, got: %v", err)
+			}
+		})
+
+		t.Run(strings.ToUpper(p), func(t *testing.T) {
+			err := ValidateSecret("NRCC_ENCRYPTION_KEY", strings.ToUpper(p))
+			if err == nil {
+				t.Fatalf("expected rejection of upper-cased %q", p)
+			}
+		})
+	}
+
+	// Real-looking values must pass through unchanged.
+	for _, v := range []string{
+		"my-real-production-secret",
+		"open sesame: a long passphrase with spaces",
+		strings.Repeat("a", 64),
+	} {
+		if err := ValidateSecret("JWT_SECRET", v); err != nil {
+			t.Errorf("real secret %q must not be rejected: %v", v, err)
+		}
+	}
+}
+
 func TestEncryptDecrypt_Roundtrip(t *testing.T) {
 	key := "my-secret-encryption-key"
 	values := []string{
