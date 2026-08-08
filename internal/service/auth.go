@@ -3,6 +3,7 @@ package service
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"time"
 
@@ -15,6 +16,15 @@ import (
 const (
 	AccessTokenLifetime  = 15 * time.Minute
 	RefreshTokenLifetime = 7 * 24 * time.Hour
+)
+
+var (
+	ErrAlreadyConfigured     = errors.New("system already configured")
+	ErrUsernameExists        = errors.New("username already exists")
+	ErrUserNotFound          = errors.New("user not found")
+	ErrCannotDeleteLastAdmin = errors.New("cannot delete the last admin user")
+	ErrCannotDemoteLastAdmin = errors.New("cannot demote the last admin user")
+	ErrInvalidUser           = errors.New("invalid user")
 )
 
 // AuthService handles authentication and user management
@@ -165,61 +175,139 @@ func (s *AuthService) GetAllUsers() ([]model.CCUser, error) {
 
 // CreateUser creates a new user
 func (s *AuthService) CreateUser(user *model.CCUser) error {
-	users, err := s.store.Read()
-	if err != nil {
-		// If file doesn't exist, create new users object
-		users = model.CCUsers{Users: []model.CCUser{}}
+	if user == nil {
+		return ErrInvalidUser
 	}
 
-	// Check if username already exists
-	for _, u := range users.Users {
-		if u.Username == user.Username {
-			return fmt.Errorf("username already exists")
+	return s.store.Update(func(users *model.CCUsers) error {
+		for _, current := range users.Users {
+			if current.Username == user.Username {
+				return ErrUsernameExists
+			}
 		}
-	}
 
-	users.Users = append(users.Users, *user)
-	return s.store.Write(users)
+		users.Users = append(users.Users, *user)
+		return nil
+	})
 }
 
-// UpdateUser updates an existing user
-func (s *AuthService) UpdateUser(user *model.CCUser) error {
-	users, err := s.store.Read()
-	if err != nil {
-		return err
-	}
-
-	for i, u := range users.Users {
-		if u.ID == user.ID {
-			users.Users[i] = *user
-			return s.store.Write(users)
+// BootstrapFirstAdmin atomically creates the initial administrative user.
+func (s *AuthService) BootstrapFirstAdmin(user *model.CCUser) error {
+	return s.store.Update(func(users *model.CCUsers) error {
+		if len(users.Users) != 0 {
+			return ErrAlreadyConfigured
 		}
+		if user == nil || user.ID == "" || user.Username == "" || user.PasswordHash == "" {
+			return ErrInvalidUser
+		}
+
+		firstAdmin := *user
+		firstAdmin.Role = model.RoleAdmin
+		users.Users = append(users.Users, firstAdmin)
+		return nil
+	})
+}
+
+// UpdateUser atomically locates a user and applies a field-level mutation.
+func (s *AuthService) UpdateUser(id string, mutate func(*model.CCUser) error) error {
+	if mutate == nil {
+		return errors.New("nil user mutation")
 	}
 
-	return fmt.Errorf("user not found")
+	return s.store.Update(func(users *model.CCUsers) error {
+		for i := range users.Users {
+			if users.Users[i].ID == id {
+				return mutate(&users.Users[i])
+			}
+		}
+
+		return ErrUserNotFound
+	})
 }
 
 // DeleteUser deletes a user by ID
 func (s *AuthService) DeleteUser(id string) error {
-	users, err := s.store.Read()
-	if err != nil {
-		return err
-	}
+	_, err := s.deleteUser(id, false)
+	return err
+}
 
-	index := -1
-	for i, u := range users.Users {
-		if u.ID == id {
-			index = i
-			break
+// DeleteUserWithPolicy atomically validates the last-admin invariant and removes a user.
+func (s *AuthService) DeleteUserWithPolicy(id string) (*model.CCUser, error) {
+	return s.deleteUser(id, true)
+}
+
+func (s *AuthService) deleteUser(id string, preserveLastAdmin bool) (*model.CCUser, error) {
+	var deleted model.CCUser
+	err := s.store.Update(func(users *model.CCUsers) error {
+		index := -1
+		for i := range users.Users {
+			if users.Users[i].ID == id {
+				index = i
+				break
+			}
 		}
-	}
+		if index == -1 {
+			return ErrUserNotFound
+		}
 
-	if index == -1 {
-		return fmt.Errorf("user not found")
-	}
+		if preserveLastAdmin && users.Users[index].Role == model.RoleAdmin {
+			adminCount := 0
+			for _, user := range users.Users {
+				if user.Role == model.RoleAdmin {
+					adminCount++
+				}
+			}
+			if adminCount <= 1 {
+				return ErrCannotDeleteLastAdmin
+			}
+		}
 
-	users.Users = append(users.Users[:index], users.Users[index+1:]...)
-	return s.store.Write(users)
+		deleted = users.Users[index]
+		users.Users = append(users.Users[:index], users.Users[index+1:]...)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &deleted, nil
+}
+
+// UpdateUserRole atomically changes a role while preserving at least one admin.
+func (s *AuthService) UpdateUserRole(id string, role model.UserRole, updatedAt string) (*model.CCUser, error) {
+	var updated model.CCUser
+	err := s.store.Update(func(users *model.CCUsers) error {
+		index := -1
+		for i := range users.Users {
+			if users.Users[i].ID == id {
+				index = i
+				break
+			}
+		}
+		if index == -1 {
+			return ErrUserNotFound
+		}
+
+		if role == model.RoleViewer && users.Users[index].Role == model.RoleAdmin {
+			adminCount := 0
+			for _, user := range users.Users {
+				if user.Role == model.RoleAdmin {
+					adminCount++
+				}
+			}
+			if adminCount <= 1 {
+				return ErrCannotDemoteLastAdmin
+			}
+		}
+
+		users.Users[index].Role = role
+		users.Users[index].UpdatedAt = updatedAt
+		updated = users.Users[index]
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &updated, nil
 }
 
 // CreateRefreshSession creates a new refresh session and returns its opaque token.
@@ -238,9 +326,10 @@ func (s *AuthService) CreateRefreshSession(userID string) (string, error) {
 		CreatedAt: now.Unix(),
 	}
 
-	sessions, _ := s.sessionStore.Read()
-	sessions.Sessions = append(sessions.Sessions, session)
-	if err := s.sessionStore.Write(sessions); err != nil {
+	if err := s.sessionStore.Update(func(sessions *model.RefreshSessions) error {
+		sessions.Sessions = append(sessions.Sessions, session)
+		return nil
+	}); err != nil {
 		return "", fmt.Errorf("persist refresh session: %w", err)
 	}
 
@@ -271,63 +360,46 @@ func (s *AuthService) ValidateRefreshSession(token string) (*model.RefreshSessio
 
 // RevokeRefreshSession marks a refresh session as revoked.
 func (s *AuthService) RevokeRefreshSession(token string) error {
-	sessions, err := s.sessionStore.Read()
-	if err != nil {
-		return fmt.Errorf("read sessions: %w", err)
-	}
-
-	for i, sess := range sessions.Sessions {
-		if sess.ID == token {
-			sessions.Sessions[i].Revoked = true
-			return s.sessionStore.Write(sessions)
+	return s.sessionStore.Update(func(sessions *model.RefreshSessions) error {
+		for i := range sessions.Sessions {
+			if sessions.Sessions[i].ID == token {
+				sessions.Sessions[i].Revoked = true
+				return nil
+			}
 		}
-	}
 
-	return fmt.Errorf("refresh token not found")
+		return fmt.Errorf("refresh token not found")
+	})
 }
 
 // RevokeUserSessions revokes all refresh sessions for a user.
 func (s *AuthService) RevokeUserSessions(userID string) error {
-	sessions, err := s.sessionStore.Read()
-	if err != nil {
-		return nil
-	}
-
-	changed := false
-	for i, sess := range sessions.Sessions {
-		if sess.UserID == userID && !sess.Revoked {
-			sessions.Sessions[i].Revoked = true
-			changed = true
+	return s.sessionStore.Update(func(sessions *model.RefreshSessions) error {
+		for i := range sessions.Sessions {
+			if sessions.Sessions[i].UserID == userID {
+				sessions.Sessions[i].Revoked = true
+			}
 		}
-	}
-
-	if changed {
-		return s.sessionStore.Write(sessions)
-	}
-	return nil
+		return nil
+	})
 }
 
 // PruneSessions removes expired and revoked sessions older than 24h.
-func (s *AuthService) PruneSessions() {
-	sessions, err := s.sessionStore.Read()
-	if err != nil {
-		return
-	}
-
+func (s *AuthService) PruneSessions() error {
+	now := time.Now()
 	cutoff := time.Now().Add(-24 * time.Hour).Unix()
-	kept := make([]model.RefreshSession, 0, len(sessions.Sessions))
-	for _, sess := range sessions.Sessions {
-		if sess.Revoked && sess.ExpiresAt < cutoff {
-			continue
+	return s.sessionStore.Update(func(sessions *model.RefreshSessions) error {
+		kept := make([]model.RefreshSession, 0, len(sessions.Sessions))
+		for _, session := range sessions.Sessions {
+			if session.Revoked && session.ExpiresAt < cutoff {
+				continue
+			}
+			if !session.Revoked && now.Unix() > session.ExpiresAt && session.ExpiresAt < cutoff {
+				continue
+			}
+			kept = append(kept, session)
 		}
-		if !sess.Revoked && time.Now().Unix() > sess.ExpiresAt && sess.ExpiresAt < cutoff {
-			continue
-		}
-		kept = append(kept, sess)
-	}
-
-	if len(kept) < len(sessions.Sessions) {
 		sessions.Sessions = kept
-		_ = s.sessionStore.Write(sessions)
-	}
+		return nil
+	})
 }
