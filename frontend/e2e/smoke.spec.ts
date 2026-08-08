@@ -53,15 +53,29 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
 
   test('critical navigation pages render with fixture API data', async ({ page }) => {
     await login(page)
-    const pages = [
-      { link: /Flows/, heading: 'Flows' },
-      { link: /Libraries/, heading: 'npm Libraries' },
-      { link: /Backups/, heading: 'Backups' },
+    // Reach each route directly. Doing page.goto / url avoids race conditions
+    // where the previous view is still tearing down when the next link click
+    // fires (Backups in particular was catching the next nav mid-render).
+    const pages: Array<{ url: string; heading: string }> = [
+      { url: '/flows', heading: 'Flows' },
+      { url: '/libraries', heading: 'npm Libraries' },
+      { url: '/backups', heading: 'Backups' },
+      { url: '/configuration', heading: 'Node-RED Configuration' },
+      { url: '/environment', heading: 'Environment Variables' },
+      { url: '/files', heading: 'Files' },
+      { url: '/updates', heading: 'Node-RED Updates' },
+      { url: '/bootstrap', heading: 'Bootstrap & Environment' },
     ]
 
-    for (const { link, heading } of pages) {
-      await page.getByRole('link', { name: link }).click()
+    for (const { url, heading } of pages) {
+      await page.goto(url)
       await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible()
     }
+
+    // /profile is reached from the UserMenu, not the sidebar.
+    await page.goto('/dashboard')
+    await page.getByRole('button', { name: /open user menu/ }).click()
+    await page.getByRole('menuitem', { name: 'Profile' }).click()
+    await expect(page.getByRole('heading', { name: 'Profile' })).toBeVisible()
   })
 })
