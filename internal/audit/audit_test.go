@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -140,23 +142,113 @@ func TestLog_AuditDirPermissions(t *testing.T) {
 	}
 }
 
-func TestLog_XForwardedFor(t *testing.T) {
-	svc, _ := NewService(t.TempDir())
-	defer func() { _ = svc.Close() }()
+func TestAudit_Log_IPExtraction_NoTrustedProxy(t *testing.T) {
+	runAuditIPExtractionCase(t, "", []auditIPCase{
+		{
+			name:       "spoofed XFF is ignored",
+			remoteAddr: "192.168.1.1:1234",
+			xff:        "1.2.3.4",
+			want:       "192.168.1.1",
+		},
+		{
+			name: "empty peer remains valid",
+			xff:  "1.2.3.4",
+			want: "",
+		},
+	})
+}
 
-	req := httptest.NewRequest("POST", "/test", nil)
-	req.Header.Set("X-Forwarded-For", "10.0.0.1, 172.16.0.1")
+func TestAudit_Log_IPExtraction_TrustedProxy(t *testing.T) {
+	runAuditIPExtractionCase(t, "127.0.0.1/32", []auditIPCase{
+		{
+			name:       "first forwarded IP is recorded",
+			remoteAddr: "127.0.0.1:1234",
+			xff:        " 1.2.3.4, 172.16.0.1",
+			want:       "1.2.3.4",
+		},
+	})
+}
 
-	svc.Log(req, "user", "TEST", "", "ok", nil)
-	_ = svc.Close()
+func TestAudit_Log_IPExtraction_UntrustedProxy(t *testing.T) {
+	runAuditIPExtractionCase(t, "10.0.0.0/8", []auditIPCase{
+		{
+			name:       "spoofed XFF is ignored",
+			remoteAddr: "192.168.1.1:1234",
+			xff:        "1.2.3.4",
+			want:       "192.168.1.1",
+		},
+	})
+}
 
-	data, _ := os.ReadFile(filepath.Join(svc.dir, fileName))
-	var event Event
-	_ = json.Unmarshal(data, &event)
+type auditIPCase struct {
+	name       string
+	remoteAddr string
+	xff        string
+	want       string
+}
 
-	if event.IP != "10.0.0.1" {
-		t.Errorf("IP = %q, want %q (first in X-Forwarded-For)", event.IP, "10.0.0.1")
+const auditIPChildEnv = "NRCC_AUDIT_IP_TEST_CHILD"
+
+func runAuditIPExtractionCase(t *testing.T, trustedProxies string, cases []auditIPCase) {
+	t.Helper()
+
+	if os.Getenv(auditIPChildEnv) != t.Name() {
+		cmd := exec.Command(os.Args[0], "-test.run=^"+regexp.QuoteMeta(t.Name())+"$")
+		cmd.Env = append(
+			environmentWithout("NRCC_TRUSTED_PROXIES", auditIPChildEnv),
+			"NRCC_TRUSTED_PROXIES="+trustedProxies,
+			auditIPChildEnv+"="+t.Name(),
+		)
+		if output, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("child test failed: %v\n%s", err, output)
+		}
+		return
 	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			svc, err := NewService(t.TempDir())
+			if err != nil {
+				t.Fatalf("NewService: %v", err)
+			}
+
+			req := httptest.NewRequest("POST", "/test", nil)
+			req.RemoteAddr = tc.remoteAddr
+			req.Header.Set("X-Forwarded-For", tc.xff)
+			svc.Log(req, "user", "TEST", "", "ok", nil)
+			if err := svc.Close(); err != nil {
+				t.Fatalf("close service: %v", err)
+			}
+
+			data, err := os.ReadFile(filepath.Join(svc.dir, fileName))
+			if err != nil {
+				t.Fatalf("read log: %v", err)
+			}
+			var event Event
+			if err := json.Unmarshal(data, &event); err != nil {
+				t.Fatalf("unmarshal event: %v", err)
+			}
+			if event.IP != tc.want {
+				t.Errorf("IP = %q, want %q", event.IP, tc.want)
+			}
+		})
+	}
+}
+
+func environmentWithout(keys ...string) []string {
+	excluded := make(map[string]struct{}, len(keys))
+	for _, key := range keys {
+		excluded[key] = struct{}{}
+	}
+
+	env := make([]string, 0, len(os.Environ()))
+	for _, entry := range os.Environ() {
+		key, _, _ := strings.Cut(entry, "=")
+		if _, ok := excluded[key]; !ok {
+			env = append(env, entry)
+		}
+	}
+	return env
 }
 
 func TestLog_SecretsNeverLogged(t *testing.T) {
