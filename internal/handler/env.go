@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync"
@@ -64,8 +63,7 @@ func (h *EnvHandler) PostEnv(w http.ResponseWriter, r *http.Request) {
 		Encrypted   bool   `json:"encrypted,omitempty"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+	if !DecodeJSON(w, r, &req) {
 		return
 	}
 
@@ -198,8 +196,7 @@ func (h *EnvHandler) BulkEnv(w http.ResponseWriter, r *http.Request) {
 		Content string `json:"content"`
 		Commit  bool   `json:"commit"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+	if !DecodeJSON(w, r, &req) {
 		return
 	}
 
@@ -236,8 +233,7 @@ func (h *EnvHandler) ImportFromNodeRedEnv(w http.ResponseWriter, r *http.Request
 	var req struct {
 		Commit bool `json:"commit"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err.Error() != "EOF" {
-		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+	if !DecodeJSONOptional(w, r, &req) {
 		return
 	}
 
@@ -274,8 +270,7 @@ func (h *EnvHandler) PutDotenv(w http.ResponseWriter, r *http.Request) {
 		Content string `json:"content"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+	if !DecodeJSON(w, r, &req) {
 		return
 	}
 

@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -78,8 +77,7 @@ func (h *MfaHandler) EnrollConfirm(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Code string `json:"code"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+	if !DecodeJSON(w, r, &req) {
 		return
 	}
 	if strings.TrimSpace(req.Code) == "" {
@@ -121,8 +119,7 @@ func (h *MfaHandler) Disable(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req model.MfaDisableRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+	if !DecodeJSON(w, r, &req) {
 		return
 	}
 	if req.Password == "" {
@@ -197,8 +194,7 @@ func (h *MfaHandler) Verify(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req model.MfaVerifyRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+	if !DecodeJSON(w, r, &req) {
 		return
 	}
 	if req.MfaToken == "" || req.Code == "" {

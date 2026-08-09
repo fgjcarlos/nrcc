@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/fgjcarlos/nrcc/internal/audit"
@@ -50,8 +49,7 @@ func (h *ConfigHandler) SaveConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var cfg model.NodeRedConfig
-	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
-		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+	if !DecodeJSON(w, r, &cfg) {
 		return
 	}
 
@@ -85,8 +83,7 @@ func (h *ConfigHandler) ValidateConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var cfg model.NodeRedConfig
-	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
-		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+	if !DecodeJSON(w, r, &cfg) {
 		return
 	}
 
