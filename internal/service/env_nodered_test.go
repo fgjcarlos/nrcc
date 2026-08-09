@@ -128,7 +128,7 @@ func TestEnvServiceUpdatesDeletesAndExcludesSecrets(t *testing.T) {
 	}
 }
 
-func TestEnvServiceLeavesMalformedFlowsAndStoreUntouched(t *testing.T) {
+func TestEnvServiceReportsPostCommitFailureForMalformedFlows(t *testing.T) {
 	dir := t.TempDir()
 	flowPath := filepath.Join(dir, "flows.json")
 	const malformed = `[{"id":]`
@@ -140,6 +140,8 @@ func TestEnvServiceLeavesMalformedFlowsAndStoreUntouched(t *testing.T) {
 	svc := NewEnvService(configSvc)
 	if err := svc.Set("VALUE", "x", "string", "", false); err == nil {
 		t.Fatal("Set() error = nil, want malformed-flow error")
+	} else if !strings.Contains(err.Error(), "environment JSON committed") {
+		t.Fatalf("Set() error = %q, want committed-state context", err)
 	}
 	data, err := os.ReadFile(flowPath)
 	if err != nil {
@@ -152,8 +154,8 @@ func TestEnvServiceLeavesMalformedFlowsAndStoreUntouched(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(cfg.EnvVars) != 0 {
-		t.Fatalf("env store changed despite sync failure: %#v", cfg.EnvVars)
+	if len(cfg.EnvVars) != 1 || cfg.EnvVars[0].Key != "VALUE" || cfg.EnvVars[0].Value != "x" {
+		t.Fatalf("env store was not committed before sync failure: %#v", cfg.EnvVars)
 	}
 }
 
