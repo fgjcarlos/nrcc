@@ -42,6 +42,11 @@ tasks:
     cmds:
       - go test ./...
 
+  test:race:
+    desc: Run all Go tests with the race detector (no test cache)
+    cmds:
+      - go test -race -count=1 ./...
+
   clean:
     desc: Remove the image and stopped containers
     cmds:
