@@ -3,6 +3,7 @@ package service
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -131,46 +132,92 @@ func MigrateEnvTypes(ev model.EnvVar) model.EnvVar {
 }
 
 func (s *EnvService) List() ([]model.EnvVar, error) {
-	config, err := s.configSvc.Get()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get config: %w", err)
-	}
-
-	if config.EnvVars == nil {
-		return []model.EnvVar{}, nil
-	}
-
-	// Check if any migration is needed (type migration or plaintext→encrypted)
-	migrationNeeded := false
-	for _, ev := range config.EnvVars {
-		if ev.Type == "" || ev.Type == "plain" {
-			migrationNeeded = true
-			break
+	for {
+		config, err := s.configSvc.Get()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get config: %w", err)
 		}
-		if ev.Encrypted && s.encryptionKey != "" && !IsEncrypted(ev.Value) {
-			migrationNeeded = true
-			break
+		if !envMigrationNeeded(config.EnvVars, s.encryptionKey) {
+			return maskEnvVars(config.EnvVars), nil
 		}
-	}
 
-	if migrationNeeded {
-		for i, ev := range config.EnvVars {
-			config.EnvVars[i] = MigrateEnvTypes(ev)
-			if config.EnvVars[i].Encrypted && s.encryptionKey != "" && !IsEncrypted(config.EnvVars[i].Value) {
-				encrypted, err := Encrypt(config.EnvVars[i].Value, s.encryptionKey)
-				if err == nil {
-					config.EnvVars[i].Value = encrypted
-				}
+		staged, err := stageEnvMigration(config.EnvVars, s.encryptionKey)
+		if err != nil {
+			return nil, err
+		}
+		committed, err := s.configSvc.Update(func(current *model.NodeRedConfig) error {
+			if !envMigrationNeeded(current.EnvVars, s.encryptionKey) {
+				return errEnvMigrationAlreadyDone
 			}
+			for i, envVar := range current.EnvVars {
+				migrated := MigrateEnvTypes(envVar)
+				if migrated.Encrypted && s.encryptionKey != "" && !IsEncrypted(migrated.Value) {
+					encrypted, ok := staged[envMigrationKey{key: migrated.Key, value: migrated.Value}]
+					if !ok {
+						return errEnvMigrationStale
+					}
+					migrated.Value = encrypted
+				}
+				current.EnvVars[i] = migrated
+			}
+			return nil
+		})
+		if errors.Is(err, errEnvMigrationStale) {
+			continue
 		}
-		if err := s.configSvc.Save(config); err != nil {
-			fmt.Printf("Warning: failed to save migrated config: %v\n", err)
+		if errors.Is(err, errEnvMigrationAlreadyDone) {
+			current, getErr := s.configSvc.Get()
+			if getErr != nil {
+				return nil, fmt.Errorf("read migrated environment config: %w", getErr)
+			}
+			return maskEnvVars(current.EnvVars), nil
+		}
+		if err != nil {
+			return nil, fmt.Errorf("migrate environment config: %w", err)
+		}
+		return maskEnvVars(committed.EnvVars), nil
+	}
+}
+
+var errEnvMigrationStale = errors.New("environment changed while staging migration")
+var errEnvMigrationAlreadyDone = errors.New("environment migration already committed")
+
+type envMigrationKey struct {
+	key   string
+	value string
+}
+
+func envMigrationNeeded(envVars []model.EnvVar, encryptionKey string) bool {
+	for _, envVar := range envVars {
+		if envVar.Type == "" || envVar.Type == "plain" || envVar.Encrypted && envVar.Type != "secret" ||
+			envVar.Encrypted && encryptionKey != "" && !IsEncrypted(envVar.Value) {
+			return true
 		}
 	}
+	return false
+}
 
-	// Return env vars without values (for masked display)
+func stageEnvMigration(envVars []model.EnvVar, encryptionKey string) (map[envMigrationKey]string, error) {
+	staged := make(map[envMigrationKey]string)
+	for _, envVar := range envVars {
+		if !envVar.Encrypted || encryptionKey == "" || IsEncrypted(envVar.Value) {
+			continue
+		}
+		encrypted, err := Encrypt(envVar.Value, encryptionKey)
+		if err != nil {
+			return nil, fmt.Errorf("encrypt migrated environment variable %s: %w", envVar.Key, err)
+		}
+		staged[envMigrationKey{key: envVar.Key, value: envVar.Value}] = encrypted
+	}
+	return staged, nil
+}
+
+func maskEnvVars(envVars []model.EnvVar) []model.EnvVar {
+	if len(envVars) == 0 {
+		return []model.EnvVar{}
+	}
 	var result []model.EnvVar
-	for _, ev := range config.EnvVars {
+	for _, ev := range envVars {
 		masked := model.EnvVar{
 			Key:         ev.Key,
 			Type:        ev.Type,
@@ -183,107 +230,121 @@ func (s *EnvService) List() ([]model.EnvVar, error) {
 		result = append(result, masked)
 	}
 
-	return result, nil
+	return result
 }
 
 // Set sets an environment variable with the specified type and description.
 // The typ parameter should be one of: "string", "number", "boolean", "secret"
 // Description is optional and used to document the purpose of the variable.
 func (s *EnvService) Set(key, value string, typ string, description string, encrypted bool) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	if err := ValidateEnvKey(key); err != nil {
 		return err
 	}
-	config, err := s.configSvc.Get()
-	if err != nil {
-		return fmt.Errorf("failed to get config: %w", err)
+	stagedValue := value
+	var err error
+	if encrypted && value != "" && s.encryptionKey != "" {
+		stagedValue, err = Encrypt(value, s.encryptionKey)
+		if err != nil {
+			return fmt.Errorf("encrypt value: %w", err)
+		}
 	}
-
 	previousNodeRedGlobal := false
-	// Check if env var already exists
-	found := false
-	for i, ev := range config.EnvVars {
-		if ev.Key == key {
-			previousNodeRedGlobal = !ev.Encrypted && ev.Type != "secret"
-			if value == "" && ev.Encrypted {
-				value = ev.Value
-			} else if encrypted && s.encryptionKey != "" {
-				value, err = Encrypt(value, s.encryptionKey)
-				if err != nil {
-					return fmt.Errorf("encrypt value: %w", err)
-				}
+	_, err = s.configSvc.Update(func(current *model.NodeRedConfig) error {
+		found := false
+		for i, envVar := range current.EnvVars {
+			if envVar.Key != key {
+				continue
 			}
-			config.EnvVars[i].Value = value
-			config.EnvVars[i].Type = typ
-			config.EnvVars[i].Description = description
-			config.EnvVars[i].Encrypted = encrypted
+			previousNodeRedGlobal = !envVar.Encrypted && envVar.Type != "secret"
+			committedValue := stagedValue
+			if value == "" && envVar.Encrypted {
+				committedValue = envVar.Value
+			}
+			current.EnvVars[i] = model.EnvVar{
+				Key:         key,
+				Value:       committedValue,
+				Type:        typ,
+				Description: description,
+				Encrypted:   encrypted,
+			}
 			found = true
 			break
 		}
-	}
-
-	if !found {
-		if encrypted && s.encryptionKey != "" {
-			value, err = Encrypt(value, s.encryptionKey)
-			if err != nil {
-				return fmt.Errorf("encrypt value: %w", err)
-			}
+		if !found {
+			current.EnvVars = append(current.EnvVars, model.EnvVar{
+				Key:         key,
+				Value:       stagedValue,
+				Type:        typ,
+				Description: description,
+				Encrypted:   encrypted,
+			})
 		}
-		config.EnvVars = append(config.EnvVars, model.EnvVar{
-			Key:         key,
-			Value:       value,
-			Type:        typ,
-			Description: description,
-			Encrypted:   encrypted,
-		})
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("update environment config: %w", err)
 	}
-
-	var nodeRedVar *model.EnvVar
-	if !encrypted && typ != "secret" {
-		nodeRedVar = &model.EnvVar{Key: key, Value: value, Type: typ}
-	}
-	if previousNodeRedGlobal || nodeRedVar != nil {
+	if previousNodeRedGlobal || !encrypted && typ != "secret" {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		nodeRedVar, err := s.currentNodeRedGlobal(key)
+		if err != nil {
+			return fmt.Errorf("environment JSON committed but current value reload failed: %w", err)
+		}
 		if err := s.syncNodeRedGlobalEnv(key, nodeRedVar); err != nil {
-			return err
+			return fmt.Errorf("environment JSON committed but Node-RED global sync failed: %w", err)
 		}
 	}
-
-	return s.configSvc.Save(config)
+	return nil
 }
 
 // Delete deletes an environment variable
 func (s *EnvService) Delete(key string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	if err := ValidateEnvKey(key); err != nil {
 		return err
 	}
-	config, err := s.configSvc.Get()
-	if err != nil {
-		return fmt.Errorf("failed to get config: %w", err)
-	}
-
 	managed := false
-	// Remove env var
-	var newEnvVars []model.EnvVar
-	for _, ev := range config.EnvVars {
-		if ev.Key != key {
-			newEnvVars = append(newEnvVars, ev)
-		} else {
-			managed = !ev.Encrypted && ev.Type != "secret"
+	_, err := s.configSvc.Update(func(current *model.NodeRedConfig) error {
+		newEnvVars := make([]model.EnvVar, 0, len(current.EnvVars))
+		for _, envVar := range current.EnvVars {
+			if envVar.Key != key {
+				newEnvVars = append(newEnvVars, envVar)
+			} else {
+				managed = !envVar.Encrypted && envVar.Type != "secret"
+			}
 		}
+		current.EnvVars = newEnvVars
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("update environment config: %w", err)
 	}
 	if managed {
-		if err := s.syncNodeRedGlobalEnv(key, nil); err != nil {
-			return err
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		nodeRedVar, err := s.currentNodeRedGlobal(key)
+		if err != nil {
+			return fmt.Errorf("environment JSON committed but current value reload failed: %w", err)
+		}
+		if err := s.syncNodeRedGlobalEnv(key, nodeRedVar); err != nil {
+			return fmt.Errorf("environment JSON committed but Node-RED global sync failed: %w", err)
 		}
 	}
-	config.EnvVars = newEnvVars
+	return nil
+}
 
-	return s.configSvc.Save(config)
+func (s *EnvService) currentNodeRedGlobal(key string) (*model.EnvVar, error) {
+	config, err := s.configSvc.Get()
+	if err != nil {
+		return nil, err
+	}
+	for _, envVar := range config.EnvVars {
+		if envVar.Key == key && !envVar.Encrypted && envVar.Type != "secret" {
+			current := envVar
+			return &current, nil
+		}
+	}
+	return nil, nil
 }
 
 // GetAll returns all environment variables as a decrypted map
