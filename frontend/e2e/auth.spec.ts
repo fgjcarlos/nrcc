@@ -2,6 +2,22 @@ import { expect, test } from '@playwright/test'
 import { installApiMocks, login } from './helpers'
 
 test.describe('NRCC auth boundaries', () => {
+  test('authenticated session survives a page reload without another login', async ({ page }) => {
+    let loginRequests = 0
+    page.on('request', (request) => {
+      if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/auth/login') {
+        loginRequests += 1
+      }
+    })
+
+    await login(page)
+    await page.reload()
+
+    await expect(page).toHaveURL(/\/dashboard$/)
+    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
+    expect(loginRequests).toBe(1)
+  })
+
   test('unauthenticated browser landing on /dashboard is redirected to /login', async ({ page }) => {
     await installApiMocks(page)
     await page.route('**/api/auth/refresh', async (route) => {
