@@ -11,7 +11,17 @@ import (
 	"github.com/fgjcarlos/nrcc/internal/middleware"
 	"github.com/fgjcarlos/nrcc/internal/model"
 	"github.com/fgjcarlos/nrcc/internal/service"
+	"golang.org/x/crypto/bcrypt"
 )
+
+func mustConfigPasswordHash(t *testing.T) string {
+	t.Helper()
+	hash, err := bcrypt.GenerateFromPassword([]byte("admin-password"), bcrypt.MinCost)
+	if err != nil {
+		t.Fatalf("generate bcrypt hash: %v", err)
+	}
+	return string(hash)
+}
 
 func TestSaveConfigWithFrontendPayload(t *testing.T) {
 	// Create a temporary config service
@@ -77,6 +87,7 @@ func TestSaveConfigWithFrontendPayload(t *testing.T) {
 func TestSaveConfigWithAdminAuth(t *testing.T) {
 	configSvc := service.NewIsolatedConfigService(t.TempDir())
 	handler := NewConfigHandler(configSvc)
+	hash := mustConfigPasswordHash(t)
 
 	// Frontend payload with admin auth enabled
 	frontendPayload := map[string]interface{}{
@@ -90,7 +101,7 @@ func TestSaveConfigWithAdminAuth(t *testing.T) {
 			"users": []map[string]interface{}{
 				{
 					"username":    "admin",
-					"password":    "password123",
+					"password":    hash,
 					"permissions": "*",
 				},
 			},
@@ -135,6 +146,7 @@ func TestSaveConfigWithAdminAuth(t *testing.T) {
 func TestSaveConfigAdminAuthRequiresUsername(t *testing.T) {
 	configSvc := service.NewIsolatedConfigService(t.TempDir())
 	handler := NewConfigHandler(configSvc)
+	hash := mustConfigPasswordHash(t)
 
 	frontendPayload := map[string]interface{}{
 		"uiPort":        1880,
@@ -145,7 +157,7 @@ func TestSaveConfigAdminAuthRequiresUsername(t *testing.T) {
 			"users": []map[string]interface{}{
 				{
 					"username":    "", // EMPTY username
-					"password":    "password123",
+					"password":    hash,
 					"permissions": "*",
 				},
 			},
@@ -215,6 +227,7 @@ func TestSaveConfigAdminAuthRequiresPassword(t *testing.T) {
 func TestSaveConfigAdminAuthPreservePassword(t *testing.T) {
 	tempDir := t.TempDir()
 	configSvc := service.NewIsolatedConfigService(tempDir)
+	hash := mustConfigPasswordHash(t)
 
 	// First, save an initial config with a password
 	initialCfg := model.NodeRedConfig{
@@ -227,7 +240,7 @@ func TestSaveConfigAdminAuthPreservePassword(t *testing.T) {
 			Users: []model.AdminAuthUser{
 				{
 					Username:    "admin",
-					Password:    "hashedpassword123",
+					Password:    hash,
 					Permissions: "*",
 				},
 			},
@@ -280,7 +293,7 @@ func TestSaveConfigAdminAuthPreservePassword(t *testing.T) {
 		t.Fatalf("AdminAuth was not saved")
 	}
 
-	if savedCfg.AdminAuth.Users[0].Password != "hashedpassword123" {
-		t.Errorf("Expected password 'hashedpassword123', got '%s'", savedCfg.AdminAuth.Users[0].Password)
+	if savedCfg.AdminAuth.Users[0].Password != hash {
+		t.Errorf("Expected password %q, got '%s'", hash, savedCfg.AdminAuth.Users[0].Password)
 	}
 }

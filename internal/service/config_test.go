@@ -1,13 +1,24 @@
 package service
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/fgjcarlos/nrcc/internal/model"
+	"golang.org/x/crypto/bcrypt"
 )
+
+func mustBcryptHash(t *testing.T, password string) string {
+	t.Helper()
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
+	if err != nil {
+		t.Fatalf("generate bcrypt hash: %v", err)
+	}
+	return string(hash)
+}
 
 func TestConfigService_Get_DefaultsWhenNoConfig(t *testing.T) {
 	tempDir := t.TempDir()
@@ -195,6 +206,198 @@ func TestConfigService_SaveRawSettings_WritesContent(t *testing.T) {
 
 	if string(savedContent) != content {
 		t.Errorf("Content mismatch. Got %q, want %q", string(savedContent), content)
+	}
+}
+
+func TestConfigService_Save_RejectsPlaintextPassword(t *testing.T) {
+	tests := []struct {
+		name     string
+		password string
+	}{
+		{name: "plaintext", password: "password123"},
+		{name: "unsupported bcrypt prefix", password: "$2$10$unsupported"},
+		{name: "bare 2a prefix", password: "$2a$"},
+		{name: "bare 2b prefix", password: "$2b$"},
+		{name: "bare 2y prefix", password: "$2y$"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tempDir := t.TempDir()
+			svc := NewIsolatedConfigService(tempDir)
+			baseline := svc.GetDefault()
+			baseline.AdminAuth = &model.AdminAuth{
+				Type: "credentials",
+				Users: []model.AdminAuthUser{{
+					Username:    "admin",
+					Password:    mustBcryptHash(t, "baseline-password"),
+					Permissions: "*",
+				}},
+			}
+			if err := svc.Save(baseline); err != nil {
+				t.Fatalf("save baseline: %v", err)
+			}
+
+			configPath := filepath.Join(tempDir, "config.json")
+			settingsPath := filepath.Join(tempDir, "settings.js")
+			configBefore, err := os.ReadFile(configPath)
+			if err != nil {
+				t.Fatalf("read baseline config: %v", err)
+			}
+			settingsBefore, err := os.ReadFile(settingsPath)
+			if err != nil {
+				t.Fatalf("read baseline settings: %v", err)
+			}
+
+			candidate := baseline
+			candidate.AdminAuth.Users[0].Password = tt.password
+			err = svc.Save(candidate)
+			if !errors.Is(err, ErrAdminAuthPlaintextPassword) {
+				t.Fatalf("Save() error = %v, want ErrAdminAuthPlaintextPassword", err)
+			}
+
+			configAfter, err := os.ReadFile(configPath)
+			if err != nil {
+				t.Fatalf("read config after rejection: %v", err)
+			}
+			settingsAfter, err := os.ReadFile(settingsPath)
+			if err != nil {
+				t.Fatalf("read settings after rejection: %v", err)
+			}
+			if string(configAfter) != string(configBefore) {
+				t.Fatal("rejected Save changed config.json")
+			}
+			if string(settingsAfter) != string(settingsBefore) {
+				t.Fatal("rejected Save changed settings.js")
+			}
+		})
+	}
+}
+
+func TestConfigService_SaveRawSettings_RejectsPlaintextPassword(t *testing.T) {
+	tempDir := t.TempDir()
+	svc := NewIsolatedConfigService(tempDir)
+	hash := mustBcryptHash(t, "baseline-password")
+	baseline := `module.exports = {
+  uiPort: 1880,
+  httpAdminRoot: "/",
+  httpNodeRoot: "/",
+  adminAuth: {
+    type: "credentials",
+    users: [{ username: "admin", password: "` + hash + `", permissions: "*" }]
+  }
+}`
+	if _, err := svc.SaveRawSettings(baseline); err != nil {
+		t.Fatalf("save raw baseline: %v", err)
+	}
+
+	configPath := filepath.Join(tempDir, "config.json")
+	settingsPath := filepath.Join(tempDir, "settings.js")
+	configBefore, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("read baseline config: %v", err)
+	}
+	settingsBefore, err := os.ReadFile(settingsPath)
+	if err != nil {
+		t.Fatalf("read baseline settings: %v", err)
+	}
+
+	plaintext := strings.Replace(baseline, hash, "password123", 1)
+	_, err = svc.SaveRawSettings(plaintext)
+	if !errors.Is(err, ErrAdminAuthPlaintextPassword) {
+		t.Fatalf("SaveRawSettings() error = %v, want ErrAdminAuthPlaintextPassword", err)
+	}
+
+	configAfter, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("read config after rejection: %v", err)
+	}
+	settingsAfter, err := os.ReadFile(settingsPath)
+	if err != nil {
+		t.Fatalf("read settings after rejection: %v", err)
+	}
+	if string(configAfter) != string(configBefore) {
+		t.Fatal("rejected SaveRawSettings changed config.json")
+	}
+	if string(settingsAfter) != string(settingsBefore) {
+		t.Fatal("rejected SaveRawSettings changed settings.js")
+	}
+	backupDir := filepath.Join(tempDir, "backups", "settings")
+	if _, err := os.Stat(backupDir); !os.IsNotExist(err) {
+		t.Fatalf("rejected SaveRawSettings created a backup, stat error = %v", err)
+	}
+}
+
+func TestConfigService_Save_AcceptsBcryptHash(t *testing.T) {
+	generated := mustBcryptHash(t, "accepted-password")
+	for _, prefix := range []string{"$2a$", "$2b$", "$2y$"} {
+		t.Run(prefix, func(t *testing.T) {
+			tempDir := t.TempDir()
+			svc := NewIsolatedConfigService(tempDir)
+			hash := prefix + generated[4:]
+			cfg := svc.GetDefault()
+			cfg.AdminAuth = &model.AdminAuth{
+				Type: "credentials",
+				Users: []model.AdminAuthUser{{
+					Username:    "admin",
+					Password:    hash,
+					Permissions: "*",
+				}},
+			}
+
+			if err := svc.Save(cfg); err != nil {
+				t.Fatalf("Save() error = %v", err)
+			}
+			saved, err := svc.Get()
+			if err != nil {
+				t.Fatalf("Get() error = %v", err)
+			}
+			if got := saved.AdminAuth.Users[0].Password; got != hash {
+				t.Fatalf("saved password = %q, want %q", got, hash)
+			}
+			settings, err := os.ReadFile(filepath.Join(tempDir, "settings.js"))
+			if err != nil {
+				t.Fatalf("read settings.js: %v", err)
+			}
+			if !strings.Contains(string(settings), hash) {
+				t.Fatalf("settings.js does not contain accepted hash %q", hash)
+			}
+		})
+	}
+}
+
+func TestConfigService_SettingsJS_FilePermissions(t *testing.T) {
+	tempDir := t.TempDir()
+	svc := NewIsolatedConfigService(tempDir)
+	initial := "module.exports = { uiPort: 1880, httpAdminRoot: '/', httpNodeRoot: '/' }\n"
+	doc, err := svc.SaveRawSettings(initial)
+	if err != nil {
+		t.Fatalf("create settings.js: %v", err)
+	}
+	assertFileMode(t, doc.Path, 0o600)
+
+	if err := os.Chmod(doc.Path, 0o644); err != nil {
+		t.Fatalf("prepare permissive existing settings.js: %v", err)
+	}
+	doc, err = svc.SaveRawSettings(strings.Replace(initial, "1880", "1881", 1))
+	if err != nil {
+		t.Fatalf("rewrite settings.js: %v", err)
+	}
+	assertFileMode(t, doc.Path, 0o600)
+	if doc.BackupPath == "" {
+		t.Fatal("rewritten settings.js did not create a backup")
+	}
+	assertFileMode(t, doc.BackupPath, 0o600)
+}
+
+func assertFileMode(t *testing.T, path string, want os.FileMode) {
+	t.Helper()
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat %s: %v", path, err)
+	}
+	if got := info.Mode().Perm(); got != want {
+		t.Fatalf("mode for %s = %04o, want %04o", path, got, want)
 	}
 }
 
@@ -531,6 +734,7 @@ func TestConfigService_GetDefault_HasRequiredFields(t *testing.T) {
 func TestConfigService_PreserveAdminAuthPasswords(t *testing.T) {
 	tempDir := t.TempDir()
 	svc := NewIsolatedConfigService(tempDir)
+	hash := mustBcryptHash(t, "preserved-password")
 
 	// Save initial config with password
 	initial := model.NodeRedConfig{
@@ -543,7 +747,7 @@ func TestConfigService_PreserveAdminAuthPasswords(t *testing.T) {
 			Users: []model.AdminAuthUser{
 				{
 					Username:    "admin",
-					Password:    "hashedpwd123",
+					Password:    hash,
 					Permissions: "*",
 				},
 			},
@@ -574,7 +778,7 @@ func TestConfigService_PreserveAdminAuthPasswords(t *testing.T) {
 		t.Errorf("preserveAdminAuthPasswords failed: %v", err)
 	}
 
-	if updated.AdminAuth.Users[0].Password != "hashedpwd123" {
+	if updated.AdminAuth.Users[0].Password != hash {
 		t.Errorf("Password should be preserved, got %s", updated.AdminAuth.Users[0].Password)
 	}
 }
@@ -898,6 +1102,7 @@ func TestConfigService_SaveRawSettings_SyncsAdminAuth(t *testing.T) {
 	svc := NewConfigServiceWithHost(tempDir, hostSvc)
 
 	// Raw settings with adminAuth
+	hash := mustBcryptHash(t, "raw-settings-password")
 	rawSettings := `module.exports = {
   uiPort: 1880,
   httpAdminRoot: "/",
@@ -906,7 +1111,7 @@ func TestConfigService_SaveRawSettings_SyncsAdminAuth(t *testing.T) {
     type: "credentials",
     users: [{
       username: "admin",
-      password: "hashedpwd456",
+      password: "` + hash + `",
       permissions: "*"
     }]
   }
@@ -937,8 +1142,8 @@ func TestConfigService_SaveRawSettings_SyncsAdminAuth(t *testing.T) {
 			if user.Username != "admin" {
 				t.Errorf("Username should be 'admin', got %s", user.Username)
 			}
-			if user.Password != "hashedpwd456" {
-				t.Errorf("Password should be 'hashedpwd456', got %s", user.Password)
+			if user.Password != hash {
+				t.Errorf("Password should be %q, got %s", hash, user.Password)
 			}
 		}
 	}
