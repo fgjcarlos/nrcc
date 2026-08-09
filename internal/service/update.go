@@ -345,25 +345,17 @@ func (s *UpdateService) AppendBackup(entry model.BackupEntry) error {
 	if err := os.MkdirAll(s.dataDir, 0755); err != nil {
 		return fmt.Errorf("failed to create data directory: %w", err)
 	}
-	
-	// Read current backups
-	backups := []model.BackupEntry{}
-	if s.backupStore.Exists() {
-		if read, err := s.backupStore.Read(); err == nil {
-			backups = read
+
+	return s.backupStore.Update(func(backups *[]model.BackupEntry) error {
+		if *backups == nil {
+			*backups = []model.BackupEntry{}
 		}
-	}
-	
-	// Keep max 5; remove oldest if at limit
-	if len(backups) >= 5 {
-		backups = backups[1:] // Remove first (oldest by append order)
-	}
-	
-	// Append new entry
-	backups = append(backups, entry)
-	
-	// Write back to store
-	return s.backupStore.Write(backups)
+		if len(*backups) >= 5 {
+			*backups = (*backups)[len(*backups)-4:]
+		}
+		*backups = append(*backups, entry)
+		return nil
+	})
 }
 
 // ApplyUpdateWithBackup orchestrates the full update flow: BackingUp → Applying → Completed/Failed.
