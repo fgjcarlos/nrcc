@@ -78,7 +78,9 @@ func TestNeedsRehash_LowerCost(t *testing.T) {
 }
 
 func TestNeedsRehash_CurrentCost(t *testing.T) {
-	hash, _ := bcrypt.GenerateFromPassword([]byte("test"), BcryptCost)
+	// Use ProductionBcryptCost (always 12) because NeedsRehash compares against
+	// it — even though BcryptCost is lowered in tests via SetBcryptCostForTest.
+	hash, _ := bcrypt.GenerateFromPassword([]byte("test"), ProductionBcryptCost)
 	if NeedsRehash(string(hash)) {
 		t.Error("cost 12 hash should not need rehash")
 	}
