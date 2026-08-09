@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/fgjcarlos/nrcc/internal/audit"
@@ -14,7 +16,10 @@ import (
 	"github.com/google/uuid"
 )
 
-const refreshCookieName = "nrcc_refresh"
+const (
+	refreshCookieName  = "nrcc_refresh"
+	refreshLockStripes = 64
+)
 
 // loginMetricsRecorder is the narrow interface for recording login metrics.
 // Using an interface instead of *metrics.MetricsCollector keeps AuthHandler
@@ -25,16 +30,21 @@ type loginMetricsRecorder interface {
 
 // AuthHandler handles authentication endpoints
 type AuthHandler struct {
-	authSvc      *service.AuthService
-	mfaSvc       *service.MfaService
-	audit        *audit.Service
-	limiter      *mw.RateLimiter
-	loginMetrics loginMetricsRecorder
+	authSvc              *service.AuthService
+	mfaSvc               *service.MfaService
+	audit                *audit.Service
+	limiter              *mw.RateLimiter
+	loginMetrics         loginMetricsRecorder
+	createRefreshSession func(string) (string, error)
+	refreshLocks         [refreshLockStripes]sync.Mutex
 }
 
 // NewAuthHandler creates a new auth handler
 func NewAuthHandler(authSvc *service.AuthService) *AuthHandler {
-	return &AuthHandler{authSvc: authSvc}
+	return &AuthHandler{
+		authSvc:              authSvc,
+		createRefreshSession: authSvc.CreateRefreshSession,
+	}
 }
 
 // SetMfaService injects the MFA service so the login handler can
@@ -630,22 +640,52 @@ func (h *AuthHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 // Refresh handles POST /api/auth/refresh — public endpoint.
 // Reads the httpOnly refresh cookie, validates the session, rotates
 // the refresh token, and returns a new short-lived access token.
+// Rate limiting mitigates brute-force attempts and amplification; it does not
+// prevent replay of a stolen bearer token. Proactive compromise response uses
+// /api/auth/logout-everywhere or AuthService.RevokeUserSessions. Refresh-token
+// comparison is not constant-time; that is accepted here for random 256-bit tokens.
 func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
+	ip := mw.ExtractIP(r)
+	refreshLock := &h.refreshLocks[refreshLockIndex(ip)]
+	refreshLock.Lock()
+	defer refreshLock.Unlock()
+
+	// Keep Check and a possible Record/Reset in one transaction. RateLimiter's
+	// individual methods are thread-safe, but a split Check/Record sequence is
+	// otherwise vulnerable to concurrent requests overshooting the threshold.
+	key := "refresh-ip:" + ip
+	if h.limiter != nil {
+		if blocked, retryAfter := h.limiter.Check(key); blocked {
+			w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())))
+			http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
+			return
+		}
+	}
+
 	cookie, err := r.Cookie(refreshCookieName)
 	if err != nil || cookie.Value == "" {
+		if h.limiter != nil {
+			h.limiter.Record(key)
+		}
 		model.RespondError(w, http.StatusUnauthorized, "NO_REFRESH_TOKEN", "Refresh token missing")
 		return
 	}
 
 	sess, err := h.authSvc.ValidateRefreshSession(cookie.Value)
 	if err != nil {
+		if h.limiter != nil {
+			h.limiter.Record(key)
+		}
 		clearRefreshCookie(w, r)
 		model.RespondError(w, http.StatusUnauthorized, "INVALID_REFRESH", "Refresh token invalid or expired")
 		return
 	}
 
 	// Rotate: revoke old, issue new.
-	_ = h.authSvc.RevokeRefreshSession(cookie.Value)
+	if err := h.authSvc.RevokeRefreshSession(cookie.Value); err != nil {
+		model.RespondError(w, http.StatusInternalServerError, "REFRESH_REVOKE_ERROR", "Failed to revoke refresh session")
+		return
+	}
 
 	user := h.authSvc.GetUserByID(sess.UserID)
 	if user == nil {
@@ -665,7 +705,7 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	model.RespondJSON(w, http.StatusOK, AuthResponse{
+	response := AuthResponse{
 		Token: token,
 		User: model.CCUserPublic{
 			ID:        user.ID,
@@ -674,7 +714,25 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 			CreatedAt: user.CreatedAt,
 			UpdatedAt: user.UpdatedAt,
 		},
-	})
+	}
+	if h.limiter != nil {
+		h.limiter.Reset(key)
+	}
+	model.RespondJSON(w, http.StatusOK, response)
+}
+
+func refreshLockIndex(ip string) uint32 {
+	const (
+		fnvOffset32 = uint32(2166136261)
+		fnvPrime32  = uint32(16777619)
+	)
+
+	hash := fnvOffset32
+	for i := 0; i < len(ip); i++ {
+		hash ^= uint32(ip[i])
+		hash *= fnvPrime32
+	}
+	return hash % refreshLockStripes
 }
 
 // isSecureRequest reports whether the cookie Secure flag should be set.
@@ -686,7 +744,7 @@ func isSecureRequest(r *http.Request) bool {
 }
 
 func (h *AuthHandler) setRefreshCookie(w http.ResponseWriter, r *http.Request, userID string) error {
-	refreshToken, err := h.authSvc.CreateRefreshSession(userID)
+	refreshToken, err := h.createRefreshSession(userID)
 	if err != nil {
 		return err
 	}

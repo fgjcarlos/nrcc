@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/fgjcarlos/nrcc/internal/middleware"
 	"github.com/fgjcarlos/nrcc/internal/model"
 	"github.com/fgjcarlos/nrcc/internal/service"
 	"github.com/fgjcarlos/nrcc/internal/store"
@@ -31,7 +32,9 @@ func setupAuthTest(t *testing.T) (*AuthHandler, *service.AuthService) {
 	}
 	_ = authSvc.CreateUser(user)
 
-	return NewAuthHandler(authSvc), authSvc
+	handler := NewAuthHandler(authSvc)
+	handler.SetRateLimiter(middleware.NewRateLimiter(dir))
+	return handler, authSvc
 }
 
 func TestRefresh_NoCookie(t *testing.T) {
