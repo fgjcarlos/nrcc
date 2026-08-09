@@ -66,6 +66,8 @@ var (
 	ErrMfaInvalidPassword   = errors.New("mfa: invalid password")
 	ErrMfaPendingMissing    = errors.New("mfa: no enrollment in progress")
 	ErrMfaRecoveryExhausted = errors.New("mfa: no unused recovery codes")
+	ErrMfaRecoveryCodeUsed  = errors.New("mfa: recovery code already used")
+	errMfaRecoveryNotFound  = errors.New("mfa: recovery code not found")
 )
 
 // MfaService owns the on-disk MFA state plus the in-memory mfaToken
@@ -109,15 +111,6 @@ func (s *MfaService) BeginEnrollment(userID string) (secret, otpauthURL string, 
 		return "", "", ErrMfaUserNotFound
 	}
 
-	now := model.NowISO8601()
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	data, _ := s.store.Read()
-	if hasActiveEnrollment(data, userID) {
-		return "", "", ErrMfaAlreadyEnrolled
-	}
-
 	key, err := totp.Generate(totp.GenerateOpts{
 		Issuer:      MfaIssuer,
 		AccountName: accountNameFor(userID),
@@ -129,29 +122,30 @@ func (s *MfaService) BeginEnrollment(userID string) (secret, otpauthURL string, 
 		return "", "", fmt.Errorf("generate totp key: %w", err)
 	}
 
-	// Upsert a pending row.
-	replaced := false
-	for i := range data.Enrollments {
-		if data.Enrollments[i].UserID == userID {
-			data.Enrollments[i] = model.MfaEnrollment{
-				UserID:    userID,
-				Secret:    key.Secret(),
-				Pending:   true,
-				UpdatedAt: now,
-			}
-			replaced = true
-			break
+	candidate := model.MfaEnrollment{
+		UserID:    userID,
+		Secret:    key.Secret(),
+		Pending:   true,
+		UpdatedAt: model.NowISO8601(),
+	}
+	err = s.store.Update(func(data *model.MfaStore) error {
+		if hasActiveEnrollment(*data, userID) {
+			return ErrMfaAlreadyEnrolled
 		}
+
+		for i := range data.Enrollments {
+			if data.Enrollments[i].UserID == userID {
+				data.Enrollments[i] = candidate
+				return nil
+			}
+		}
+		data.Enrollments = append(data.Enrollments, candidate)
+		return nil
+	})
+	if errors.Is(err, ErrMfaAlreadyEnrolled) {
+		return "", "", ErrMfaAlreadyEnrolled
 	}
-	if !replaced {
-		data.Enrollments = append(data.Enrollments, model.MfaEnrollment{
-			UserID:    userID,
-			Secret:    key.Secret(),
-			Pending:   true,
-			UpdatedAt: now,
-		})
-	}
-	if err := s.store.Write(data); err != nil {
+	if err != nil {
 		return "", "", fmt.Errorf("persist pending enrollment: %w", err)
 	}
 
@@ -162,23 +156,7 @@ func (s *MfaService) BeginEnrollment(userID string) (secret, otpauthURL string, 
 // secret and, on success, commits the enrollment, generates recovery
 // codes, and returns them (single display).
 func (s *MfaService) ConfirmEnrollment(userID, code string) ([]string, error) {
-	data, err := s.store.Read()
-	if err != nil {
-		// No MFA file at all means no enrollment in progress.
-		return nil, ErrMfaPendingMissing
-	}
-
-	row := findEnrollment(data, userID)
-	if row == nil || row.Secret == "" {
-		return nil, ErrMfaPendingMissing
-	}
-	if !row.Pending {
-		return nil, ErrMfaAlreadyEnrolled
-	}
 	if !validCodeFormat(code) {
-		return nil, ErrMfaInvalidCode
-	}
-	if !totp.Validate(code, row.Secret) {
 		return nil, ErrMfaInvalidCode
 	}
 
@@ -188,16 +166,28 @@ func (s *MfaService) ConfirmEnrollment(userID, code string) ([]string, error) {
 	}
 
 	now := model.NowISO8601()
-	for i := range data.Enrollments {
-		if data.Enrollments[i].UserID == userID {
-			data.Enrollments[i].Pending = false
-			data.Enrollments[i].EnrolledAt = now
-			data.Enrollments[i].UpdatedAt = now
-			data.Enrollments[i].RecoveryCodes = hashes
-			break
+	err = s.store.Update(func(data *model.MfaStore) error {
+		row := findEnrollment(*data, userID)
+		if row == nil || row.Secret == "" {
+			return ErrMfaPendingMissing
 		}
+		if !row.Pending {
+			return ErrMfaAlreadyEnrolled
+		}
+		if !totp.Validate(code, row.Secret) {
+			return ErrMfaInvalidCode
+		}
+
+		row.Pending = false
+		row.EnrolledAt = now
+		row.UpdatedAt = now
+		row.RecoveryCodes = hashes
+		return nil
+	})
+	if errors.Is(err, ErrMfaPendingMissing) || errors.Is(err, ErrMfaAlreadyEnrolled) || errors.Is(err, ErrMfaInvalidCode) {
+		return nil, err
 	}
-	if err := s.store.Write(data); err != nil {
+	if err != nil {
 		return nil, fmt.Errorf("commit enrollment: %w", err)
 	}
 
@@ -223,25 +213,28 @@ func (s *MfaService) Disable(actingID, targetUserID, password string, actingIsAd
 		return fmt.Errorf("forbidden: only admin can disable another user's MFA")
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	err := s.store.Update(func(data *model.MfaStore) error {
+		index := -1
+		for i := range data.Enrollments {
+			if data.Enrollments[i].UserID == targetUserID {
+				index = i
+				break
+			}
+		}
+		if index == -1 {
+			return ErrMfaNotEnrolled
+		}
 
-	data, err := s.store.Read()
-	if err != nil {
-		return fmt.Errorf("read mfa store: %w", err)
-	}
-	if findEnrollment(data, targetUserID) == nil {
+		data.Enrollments = append(data.Enrollments[:index], data.Enrollments[index+1:]...)
+		return nil
+	})
+	if errors.Is(err, ErrMfaNotEnrolled) {
 		return ErrMfaNotEnrolled
 	}
-
-	kept := data.Enrollments[:0]
-	for _, e := range data.Enrollments {
-		if e.UserID != targetUserID {
-			kept = append(kept, e)
-		}
+	if err != nil {
+		return fmt.Errorf("persist disabled enrollment: %w", err)
 	}
-	data.Enrollments = kept
-	return s.store.Write(data)
+	return nil
 }
 
 // Status reports enrollment state for a user. enabled is true only
@@ -386,40 +379,39 @@ func (s *MfaService) VerifyTotp(userID, code string) bool {
 // a previously-unused matching code was found and consumed.
 func (s *MfaService) ConsumeRecoveryCode(userID, code string) (bool, error) {
 	normalized := normalizeRecoveryCode(code)
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	data, err := s.store.Read()
-	if err != nil {
-		return false, fmt.Errorf("read mfa store: %w", err)
-	}
-	idx := -1
-	for i := range data.Enrollments {
-		if data.Enrollments[i].UserID == userID {
-			idx = i
-			break
-		}
-	}
-	if idx == -1 {
-		return false, ErrMfaNotEnrolled
-	}
-
-	row := &data.Enrollments[idx]
 	now := model.NowISO8601()
-	for i, c := range row.RecoveryCodes {
-		if c.UsedAt != "" {
-			continue
+	consumed := false
+	err := s.store.Update(func(data *model.MfaStore) error {
+		row := findEnrollment(*data, userID)
+		if row == nil {
+			return ErrMfaNotEnrolled
 		}
-		if bcrypt.CompareHashAndPassword([]byte(c.Hash), []byte(normalized)) == nil {
-			row.RecoveryCodes[i].UsedAt = now
-			if err := s.store.Write(data); err != nil {
-				return false, fmt.Errorf("persist recovery code use: %w", err)
+
+		for i := range row.RecoveryCodes {
+			recoveryCode := &row.RecoveryCodes[i]
+			if bcrypt.CompareHashAndPassword([]byte(recoveryCode.Hash), []byte(normalized)) != nil {
+				continue
 			}
-			return true, nil
+			if recoveryCode.UsedAt != "" {
+				return ErrMfaRecoveryCodeUsed
+			}
+
+			recoveryCode.UsedAt = now
+			consumed = true
+			return nil
 		}
+		return errMfaRecoveryNotFound
+	})
+	if errors.Is(err, errMfaRecoveryNotFound) {
+		return false, nil
 	}
-	return false, nil
+	if errors.Is(err, ErrMfaNotEnrolled) || errors.Is(err, ErrMfaRecoveryCodeUsed) {
+		return false, err
+	}
+	if err != nil {
+		return false, fmt.Errorf("persist recovery code use: %w", err)
+	}
+	return consumed, nil
 }
 
 // LookupUsernameByMfaToken returns the username associated with a
