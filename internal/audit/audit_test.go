@@ -269,3 +269,24 @@ func TestLog_SecretsNeverLogged(t *testing.T) {
 		t.Error("audit log should never contain secret values")
 	}
 }
+
+// TestLog_DocumentsTrustedProxyBoundary verifies REQ-6: the source file
+// explicitly documents that audit IP extraction honors NRCC_TRUSTED_PROXIES.
+// This is a meta-test against the audit.go source content; it guards against
+// silent removal of the trusted-proxy note during future refactors.
+func TestLog_DocumentsTrustedProxyBoundary(t *testing.T) {
+	data, err := os.ReadFile("audit.go")
+	if err != nil {
+		t.Fatalf("read audit.go: %v", err)
+	}
+	src := string(data)
+	if !strings.Contains(src, "NRCC_TRUSTED_PROXIES") {
+		t.Error("audit.go should document that IP extraction honors NRCC_TRUSTED_PROXIES")
+	}
+	if !strings.Contains(src, "middleware.ExtractIP") {
+		t.Error("audit.go should call middleware.ExtractIP (not a local extractIP)")
+	}
+	if strings.Contains(src, "func extractIP(") {
+		t.Error("audit.go should not contain a local extractIP function (regression of #576)")
+	}
+}
