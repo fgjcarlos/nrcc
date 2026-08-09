@@ -88,14 +88,16 @@ func (s *ConfigService) Update(fn func(*model.NodeRedConfig) error) (model.NodeR
 // Save atomically commits the configuration before rendering settings.js.
 // If settings.js rendering or writing fails, the returned error explicitly
 // reports the post-commit failure; the durable JSON configuration is not rolled back.
+//
+// EnvVars ownership: when the caller passes EnvVars in cfg, those are honored as
+// authoritative for the committed slice. EnvService.Set/Delete are the supported
+// path for env-var mutations and also route through this same Update, so concurrent
+// Save+Set on the same store coordinate via the JSONStore lock.
 func (s *ConfigService) Save(cfg model.NodeRedConfig) error {
 	committed, err := s.Update(func(current *model.NodeRedConfig) error {
 		candidate := cfg
 		preserveAdminAuthPasswords(current, &candidate)
 
-		// EnvService owns EnvVars. Preserve its current committed slice so a
-		// stale config form cannot erase concurrent env writes or deletes.
-		candidate.EnvVars = append([]model.EnvVar(nil), current.EnvVars...)
 		if err := s.Validate(candidate); err != nil {
 			return err
 		}
