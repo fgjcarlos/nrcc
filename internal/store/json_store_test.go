@@ -1,14 +1,193 @@
 package store
 
 import (
+	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 )
 
 type TestData struct {
 	Name  string `json:"name"`
 	Value int    `json:"value"`
+}
+
+type counterData struct {
+	Counter int `json:"counter"`
+}
+
+func runConcurrent(t *testing.T, n int, fn func(i int) error) []error {
+	t.Helper()
+
+	var wg sync.WaitGroup
+	errs := make([]error, n)
+	start := make(chan struct{})
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			<-start
+			errs[i] = fn(i)
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+	return errs
+}
+
+func assertNoError(t *testing.T, errs []error) {
+	t.Helper()
+
+	for i, err := range errs {
+		if err != nil {
+			t.Errorf("goroutine %d: %v", i, err)
+		}
+	}
+}
+
+func TestJSONStore_ConcurrentUpdate(t *testing.T) {
+	const updates = 100
+
+	storePath := filepath.Join(t.TempDir(), "counter.json")
+	store := NewJSONStore[counterData](storePath)
+	if err := store.Write(counterData{}); err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+
+	errs := runConcurrent(t, updates, func(_ int) error {
+		return store.Update(func(current *counterData) error {
+			current.Counter++
+			return nil
+		})
+	})
+	assertNoError(t, errs)
+
+	current, err := store.Read()
+	if err != nil {
+		t.Fatalf("Read failed: %v", err)
+	}
+	if current.Counter != updates {
+		t.Errorf("Counter = %d; want %d", current.Counter, updates)
+	}
+}
+
+func TestJSONStore_Update_Rollback(t *testing.T) {
+	storePath := filepath.Join(t.TempDir(), "rollback.json")
+	store := NewJSONStore[counterData](storePath)
+	initial := counterData{Counter: 41}
+	if err := store.Write(initial); err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+	before, err := os.ReadFile(storePath)
+	if err != nil {
+		t.Fatalf("ReadFile failed: %v", err)
+	}
+
+	sentinel := errors.New("reject update")
+	err = store.Update(func(current *counterData) error {
+		current.Counter++
+		return sentinel
+	})
+	if !errors.Is(err, sentinel) {
+		t.Fatalf("Update error = %v; want %v", err, sentinel)
+	}
+
+	after, err := os.ReadFile(storePath)
+	if err != nil {
+		t.Fatalf("ReadFile failed: %v", err)
+	}
+	if !bytes.Equal(after, before) {
+		t.Errorf("persisted bytes changed after callback error\nbefore: %q\nafter:  %q", before, after)
+	}
+	current, err := store.Read()
+	if err != nil {
+		t.Fatalf("Read failed: %v", err)
+	}
+	if current != initial {
+		t.Errorf("persisted value = %+v; want %+v", current, initial)
+	}
+}
+
+func TestJSONStore_Update_MissingFile(t *testing.T) {
+	storePath := filepath.Join(t.TempDir(), "missing.json")
+	store := NewJSONStore[counterData](storePath)
+
+	if err := store.Update(func(current *counterData) error {
+		current.Counter = 7
+		return nil
+	}); err != nil {
+		t.Fatalf("Update failed: %v", err)
+	}
+
+	current, err := store.Read()
+	if err != nil {
+		t.Fatalf("Read failed: %v", err)
+	}
+	if current.Counter != 7 {
+		t.Errorf("Counter = %d; want 7", current.Counter)
+	}
+}
+
+func TestJSONStore_Update_InvalidJSON(t *testing.T) {
+	storePath := filepath.Join(t.TempDir(), "invalid-update.json")
+	invalid := []byte("{invalid json}")
+	if err := os.WriteFile(storePath, invalid, 0600); err != nil {
+		t.Fatalf("WriteFile failed: %v", err)
+	}
+	store := NewJSONStore[counterData](storePath)
+	called := false
+
+	err := store.Update(func(_ *counterData) error {
+		called = true
+		return nil
+	})
+	if err == nil {
+		t.Fatal("Update should fail for malformed JSON")
+	}
+	if called {
+		t.Error("callback was invoked for malformed JSON")
+	}
+}
+
+func TestJSONStore_Update_NilCallback(t *testing.T) {
+	storePath := filepath.Join(t.TempDir(), "nil-callback.json")
+	store := NewJSONStore[counterData](storePath)
+	if err := store.Write(counterData{Counter: 9}); err != nil {
+		t.Fatalf("Write failed: %v", err)
+	}
+	before, err := os.ReadFile(storePath)
+	if err != nil {
+		t.Fatalf("ReadFile failed: %v", err)
+	}
+
+	if err := store.Update(nil); err == nil {
+		t.Fatal("Update(nil) should return an error")
+	}
+	after, err := os.ReadFile(storePath)
+	if err != nil {
+		t.Fatalf("ReadFile failed: %v", err)
+	}
+	if !bytes.Equal(after, before) {
+		t.Errorf("persisted bytes changed after nil callback\nbefore: %q\nafter:  %q", before, after)
+	}
+}
+
+func TestJSONStore_Update_WriteFailure(t *testing.T) {
+	storePath := filepath.Join(t.TempDir(), "missing-parent", "store.json")
+	store := NewJSONStore[counterData](storePath)
+
+	err := store.Update(func(current *counterData) error {
+		current.Counter = 1
+		return nil
+	})
+	if err == nil {
+		t.Fatal("Update should fail when the parent directory does not exist")
+	}
+	if _, statErr := os.Stat(storePath); !errors.Is(statErr, os.ErrNotExist) {
+		t.Errorf("target file state error = %v; want os.ErrNotExist", statErr)
+	}
 }
 
 func TestJSONStore_Write_CreatesFile(t *testing.T) {
@@ -264,9 +443,9 @@ func TestJSONStore_ReadPreservesFormatting(t *testing.T) {
 	}
 
 	// Verify it's formatted with indentation (MarshalIndent). The exact
-// whitespace is implementation-defined; we just confirm it parses as
-// JSON and contains the expected key, so the assertion below is a
-// sanity check, not a strict format check.
+	// whitespace is implementation-defined; we just confirm it parses as
+	// JSON and contains the expected key, so the assertion below is a
+	// sanity check, not a strict format check.
 	contentStr := string(content)
 	_ = contentStr
 }

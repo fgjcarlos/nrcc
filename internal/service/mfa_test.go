@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"encoding/base32"
 	"encoding/binary"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -235,8 +236,8 @@ func TestMfaService_ConsumeRecoveryCodeRoundTrip(t *testing.T) {
 		t.Fatal("first consume should succeed")
 	}
 	ok, err = svc.ConsumeRecoveryCode(uid, target)
-	if err != nil {
-		t.Fatalf("ConsumeRecoveryCode (second): %v", err)
+	if !errors.Is(err, ErrMfaRecoveryCodeUsed) {
+		t.Fatalf("ConsumeRecoveryCode (second): want ErrMfaRecoveryCodeUsed, got %v", err)
 	}
 	if ok {
 		t.Fatal("second consume of the same code should fail")

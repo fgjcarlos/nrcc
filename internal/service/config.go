@@ -65,26 +65,72 @@ func (s *ConfigService) Get() (model.NodeRedConfig, error) {
 	return cfg, nil
 }
 
-// Save saves the configuration
-func (s *ConfigService) Save(cfg model.NodeRedConfig) error {
-	// If adminAuth is provided, handle password preservation
-	if cfg.AdminAuth != nil {
-		if err := s.preserveAdminAuthPasswords(&cfg); err != nil {
+// Update atomically mutates the persisted Node-RED configuration and returns
+// the snapshot whose JSON commit completed successfully.
+func (s *ConfigService) Update(fn func(*model.NodeRedConfig) error) (model.NodeRedConfig, error) {
+	if fn == nil {
+		return model.NodeRedConfig{}, fmt.Errorf("config update callback is nil")
+	}
+	var committed model.NodeRedConfig
+	err := s.store.Update(func(current *model.NodeRedConfig) error {
+		if err := fn(current); err != nil {
 			return err
 		}
+		committed = *current
+		return nil
+	})
+	if err != nil {
+		return model.NodeRedConfig{}, err
 	}
+	return committed, nil
+}
 
-	// Validate before saving
-	if err := s.Validate(cfg); err != nil {
+// Save atomically commits the configuration before rendering settings.js.
+// If settings.js rendering or writing fails, the returned error explicitly
+// reports the post-commit failure; the durable JSON configuration is not rolled back.
+//
+// EnvVars ownership: when the caller passes EnvVars in cfg, those are honored as
+// authoritative for the committed slice. EnvService.Set/Delete are the supported
+// path for env-var mutations and also route through this same Update, so concurrent
+// Save+Set on the same store coordinate via the JSONStore lock.
+func (s *ConfigService) Save(cfg model.NodeRedConfig) error {
+	committed, err := s.Update(func(current *model.NodeRedConfig) error {
+		candidate := cfg
+		preserveAdminAuthPasswords(current, &candidate)
+
+		if err := s.Validate(candidate); err != nil {
+			return err
+		}
+		s.decorateConfig(&candidate)
+		*current = candidate
+		return nil
+	})
+	if err != nil {
 		return err
 	}
 
-	s.decorateConfig(&cfg)
-	if err := s.store.Write(cfg); err != nil {
-		return err
+	if _, err := s.writeSettingsFile(renderSettingsJS(committed), false); err != nil {
+		return fmt.Errorf("config JSON committed but settings.js update failed: %w", err)
 	}
-	_, err := s.writeSettingsFile(renderSettingsJS(cfg), false)
-	return err
+	return nil
+}
+
+func preserveAdminAuthPasswords(existing, candidate *model.NodeRedConfig) {
+	if candidate.AdminAuth == nil || len(candidate.AdminAuth.Users) == 0 ||
+		existing.AdminAuth == nil || len(existing.AdminAuth.Users) == 0 {
+		return
+	}
+	for i, newUser := range candidate.AdminAuth.Users {
+		if newUser.Password != "" {
+			continue
+		}
+		for _, existingUser := range existing.AdminAuth.Users {
+			if existingUser.Username == newUser.Username {
+				candidate.AdminAuth.Users[i].Password = existingUser.Password
+				break
+			}
+		}
+	}
 }
 
 // preserveAdminAuthPasswords preserves existing password hashes when empty password is provided
