@@ -7,11 +7,27 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-const (
-	BcryptCost     = 12
+// ProductionBcryptCost is the bcrypt cost used in production. It never changes
+// at runtime — NeedsRehash always compares against this value so a hash at
+// cost 10 is correctly flagged as needing rehash regardless of how tests
+// lowered the hashing cost.
+const ProductionBcryptCost = 12
+
+var (
+	// BcryptCost is the cost used when GENERATING hashes. Lowerable via
+	// SetBcryptCostForTest to keep the test suite inside the 10-min CI
+	// timeout (see audit HIGH-005). In production this stays at
+	// ProductionBcryptCost.
+	BcryptCost     = ProductionBcryptCost
 	MinPasswordLen = 8
 	MaxPasswordLen = 72 // bcrypt limit
 )
+
+// SetBcryptCostForTest lowers the bcrypt cost used by service code paths
+// when running under `go test`. Production binaries keep BcryptCost at
+// ProductionBcryptCost unless this helper is explicitly invoked. Tests should
+// pair it with `bcrypt.MinCost` (4).
+func SetBcryptCostForTest(c int) { BcryptCost = c }
 
 var commonPasswords = map[string]bool{
 	"password": true, "12345678": true, "123456789": true, "1234567890": true,
@@ -42,5 +58,5 @@ func NeedsRehash(hash string) bool {
 	if err != nil {
 		return false
 	}
-	return cost < BcryptCost
+	return cost < ProductionBcryptCost
 }
