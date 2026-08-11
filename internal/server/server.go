@@ -180,6 +180,11 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 	// Protected routes (auth middleware applied)
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.Auth(authSvc))
+		// Baseline per-IP throttle for every authenticated route. A valid JWT
+		// was previously enough to hammer any endpoint unthrottled (#585
+		// HIGH-002). Generous enough for normal dashboard polling; expensive
+		// endpoints below get their own tighter caps.
+		r.Use(middleware.RateLimitIP(300, time.Minute))
 
 		// Config routes
 		r.Route("/api/config", func(r chi.Router) {
@@ -207,7 +212,7 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 		// state-mutating operations require the admin role.
 		r.Route("/api/backups", func(r chi.Router) {
 			r.Get("/", backupHandler.GetBackups)
-			r.With(middleware.RequireAdmin).Post("/", backupHandler.PostBackup)
+			r.With(middleware.RateLimitIP(10, time.Hour), middleware.RequireAdmin).Post("/", backupHandler.PostBackup)
 			r.Get("/status", backupHandler.GetBackupStatus)
 			r.Get("/observability", backupHandler.GetBackupObservability)
 			r.Get("/storage", backupHandler.GetBackupStorage)
@@ -215,11 +220,11 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 			r.With(middleware.RequireAdmin).Post("/config", backupHandler.PostBackupConfig)
 			r.Get("/provider", backupHandler.GetBackupProvider)
 			r.Get("/provider/snapshots", backupHandler.ListProviderSnapshots)
-			r.With(middleware.RequireAdmin).Post("/provider/restore", backupHandler.RestoreProviderSnapshot)
+			r.With(middleware.RateLimitIP(10, time.Hour), middleware.RequireAdmin).Post("/provider/restore", backupHandler.RestoreProviderSnapshot)
 			r.Get("/{id}", backupHandler.GetBackupDetail)
 			r.With(middleware.RequireAdmin).Delete("/{id}", backupHandler.DeleteBackup)
 			r.Get("/{id}/download", backupHandler.DownloadBackup)
-			r.With(middleware.RequireAdmin).Post("/{id}/restore", backupHandler.RestoreBackup)
+			r.With(middleware.RateLimitIP(10, time.Hour), middleware.RequireAdmin).Post("/{id}/restore", backupHandler.RestoreBackup)
 		})
 
 		// Scheduler routes
@@ -258,10 +263,12 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 		// Library routes
 		r.Route("/api/libraries", func(r chi.Router) {
 			r.Get("/", libraryHandler.GetLibraries)
-			r.With(middleware.RequireAdmin).Post("/install", libraryHandler.PostInstall)
-			r.Post("/search", libraryHandler.PostSearch)
+			// npm install shells out and is slow — tightest cap on the router.
+			r.With(middleware.RateLimitIP(5, time.Hour), middleware.RequireAdmin).Post("/install", libraryHandler.PostInstall)
+			r.With(middleware.RateLimitIP(60, time.Hour)).Post("/search", libraryHandler.PostSearch)
 			r.With(middleware.RequireAdmin).Delete("/{name}", libraryHandler.DeleteLibrary)
-			r.Get("/{name}/check", libraryHandler.GetLibraryCheck)
+			// Proxies the npm registry; unthrottled it is a registry enumeration oracle.
+			r.With(middleware.RateLimitIP(60, time.Hour)).Get("/{name}/check", libraryHandler.GetLibraryCheck)
 		})
 
 		// Update routes
@@ -269,14 +276,14 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 			r.Get("/status", updateHandler.GetStatus)
 			r.Get("/check", updateHandler.GetCheck)
 			r.Get("/state", updateHandler.GetState)
-			r.With(middleware.RequireAdmin).Post("/apply", updateHandler.PostApply)
+			r.With(middleware.RateLimitIP(5, time.Hour), middleware.RequireAdmin).Post("/apply", updateHandler.PostApply)
 			r.Get("/history", updateHandler.GetHistory)
 		})
 
 		// Files routes
 		r.Route("/api/files", func(r chi.Router) {
 			r.Get("/", filesHandler.GetList)
-			r.With(middleware.RequireAdmin).Post("/upload", filesHandler.PostUpload)
+			r.With(middleware.RateLimitIP(30, time.Hour), middleware.RequireAdmin).Post("/upload", filesHandler.PostUpload)
 			r.Get("/{name}/download", filesHandler.DownloadFile)
 			r.With(middleware.RequireAdmin).Delete("/{name}", filesHandler.DeleteFile)
 		})
@@ -291,7 +298,7 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 
 		// AI routes
 		r.Route("/api/ai", func(r chi.Router) {
-			r.Post("/analyze/flow", aiHandler.PostAnalyzeFlow)
+			r.With(middleware.RateLimitIP(20, time.Hour)).Post("/analyze/flow", aiHandler.PostAnalyzeFlow)
 		})
 	})
 

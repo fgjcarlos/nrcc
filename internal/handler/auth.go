@@ -193,7 +193,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	ip := mw.ExtractIP(r)
 
 	if h.limiter != nil {
-		if blocked, retry := h.limiter.Check("ip:" + ip); blocked {
+		if blocked, retry := h.limiter.Check(mw.AuthIPKey(ip)); blocked {
 			mw.RespondTooManyRequests(w, retry)
 			return
 		}
@@ -211,7 +211,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if h.limiter != nil {
-		if blocked, retry := h.limiter.Check("user:" + req.Username); blocked {
+		if blocked, retry := h.limiter.Check(mw.AuthUserKey(req.Username)); blocked {
 			mw.RespondTooManyRequests(w, retry)
 			return
 		}
@@ -221,8 +221,8 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	user := h.authSvc.GetUserByUsername(req.Username)
 	if user == nil {
 		if h.limiter != nil {
-			h.limiter.Record("ip:" + ip)
-			h.limiter.Record("user:" + req.Username)
+			h.limiter.Record(mw.AuthIPKey(ip))
+			h.limiter.Record(mw.AuthUserKey(req.Username))
 		}
 		if h.loginMetrics != nil {
 			h.loginMetrics.RecordLoginAttempt(false)
@@ -235,8 +235,8 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	// Verify password
 	if !h.authSvc.VerifyPassword(user.PasswordHash, req.Password) {
 		if h.limiter != nil {
-			h.limiter.Record("ip:" + ip)
-			h.limiter.Record("user:" + req.Username)
+			h.limiter.Record(mw.AuthIPKey(ip))
+			h.limiter.Record(mw.AuthUserKey(req.Username))
 		}
 		if h.loginMetrics != nil {
 			h.loginMetrics.RecordLoginAttempt(false)
@@ -248,8 +248,8 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	// Successful login — reset rate limit counters
 	if h.limiter != nil {
-		h.limiter.Reset("ip:" + ip)
-		h.limiter.Reset("user:" + req.Username)
+		h.limiter.Reset(mw.AuthIPKey(ip))
+		h.limiter.Reset(mw.AuthUserKey(req.Username))
 	}
 
 	// Rehash if stored with lower bcrypt cost

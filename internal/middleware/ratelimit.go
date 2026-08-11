@@ -39,6 +39,19 @@ func NewRateLimiter(dataDir string) *RateLimiter {
 	return rl
 }
 
+// AuthIPKey and AuthUserKey build the credential-surface bucket keys. Login and
+// MFA verify are two steps of the same brute-force attempt, so they must share
+// one bucket per IP and per user — separate prefixes doubled the budget to 12
+// tries per 15-minute window from a single IP (#585 HIGH-001).
+func AuthIPKey(ip string) string { return "auth-ip:" + ip }
+
+// AuthUserKey normalizes the username so case variants (Admin, ADMIN, aDmin)
+// collapse into one bucket. Lookup is exact-match, so without this an attacker
+// got a fresh 6-try budget per spelling (#585 HIGH-010).
+func AuthUserKey(username string) string {
+	return "auth-user:" + strings.ToLower(strings.TrimSpace(username))
+}
+
 func (rl *RateLimiter) Check(key string) (blocked bool, retryAfter time.Duration) {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
