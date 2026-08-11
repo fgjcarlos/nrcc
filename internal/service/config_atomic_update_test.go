@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/fgjcarlos/nrcc/internal/model"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func TestConfigService_Save_Concurrent(t *testing.T) {
@@ -24,13 +25,18 @@ func TestConfigService_Save_Concurrent(t *testing.T) {
 	// test (TestEnvService_Set_Concurrent).
 	dir := t.TempDir()
 	configSvc := NewIsolatedConfigService(dir)
+	hashBytes, err := bcrypt.GenerateFromPassword([]byte("preserved-password"), bcrypt.MinCost)
+	if err != nil {
+		t.Fatalf("generate bcrypt hash: %v", err)
+	}
+	hash := string(hashBytes)
 
 	seed := configSvc.GetDefault()
 	seed.AdminAuth = &model.AdminAuth{
 		Type: "credentials",
 		Users: []model.AdminAuthUser{{
 			Username:    "admin",
-			Password:    "$2a$10$preserved-password-hash",
+			Password:    hash,
 			Permissions: "*",
 		}},
 	}
@@ -65,7 +71,7 @@ func TestConfigService_Save_Concurrent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read config: %v", err)
 	}
-	if got.AdminAuth == nil || got.AdminAuth.Users[0].Password != "$2a$10$preserved-password-hash" {
+	if got.AdminAuth == nil || got.AdminAuth.Users[0].Password != hash {
 		t.Fatalf("admin password hash was not preserved: %#v", got.AdminAuth)
 	}
 	// Lang must be exactly one of the proposed values — not a torn merge.

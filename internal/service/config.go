@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,6 +13,8 @@ import (
 	"github.com/fgjcarlos/nrcc/internal/model"
 	"github.com/fgjcarlos/nrcc/internal/store"
 )
+
+var ErrAdminAuthPlaintextPassword = errors.New("adminAuth password must be a bcrypt hash")
 
 // ConfigService handles Node-RED configuration
 type ConfigService struct {
@@ -98,6 +101,9 @@ func (s *ConfigService) Save(cfg model.NodeRedConfig) error {
 		candidate := cfg
 		preserveAdminAuthPasswords(current, &candidate)
 
+		if err := validateAdminAuthPasswords(candidate); err != nil {
+			return err
+		}
 		if err := s.Validate(candidate); err != nil {
 			return err
 		}
@@ -131,6 +137,27 @@ func preserveAdminAuthPasswords(existing, candidate *model.NodeRedConfig) {
 			}
 		}
 	}
+}
+
+func validateAdminAuthPasswords(cfg model.NodeRedConfig) error {
+	if cfg.AdminAuth == nil {
+		return nil
+	}
+	for i, user := range cfg.AdminAuth.Users {
+		if user.Password != "" && !isBcryptHash(user.Password) {
+			return fmt.Errorf("adminAuth user %d (%q): %w", i, user.Username, ErrAdminAuthPlaintextPassword)
+		}
+	}
+	return nil
+}
+
+func isBcryptHash(s string) bool {
+	if len(s) <= 4 {
+		return false
+	}
+	return strings.HasPrefix(s, "$2a$") ||
+		strings.HasPrefix(s, "$2b$") ||
+		strings.HasPrefix(s, "$2y$")
 }
 
 // preserveAdminAuthPasswords preserves existing password hashes when empty password is provided
@@ -195,6 +222,10 @@ func (s *ConfigService) GetRawSettings() (model.SettingsDocument, error) {
 
 // SaveRawSettings writes the active settings.js document after backing up the previous version.
 func (s *ConfigService) SaveRawSettings(content string) (model.SettingsDocument, error) {
+	parsed := s.parseConfigFromContent(content)
+	if err := validateAdminAuthPasswords(parsed); err != nil {
+		return model.SettingsDocument{}, err
+	}
 	return s.writeSettingsFile(content, true)
 }
 
@@ -211,7 +242,10 @@ func (s *ConfigService) writeSettingsFile(content string, syncStore bool) (model
 	if err != nil {
 		return doc, err
 	}
-	if err := os.WriteFile(doc.Path, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(doc.Path, []byte(content), 0600); err != nil {
+		return doc, err
+	}
+	if err := os.Chmod(doc.Path, 0600); err != nil {
 		return doc, err
 	}
 	if syncStore {
@@ -321,7 +355,7 @@ func (s *ConfigService) backupSettingsFile(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return backupPath, os.WriteFile(backupPath, data, 0644)
+	return backupPath, os.WriteFile(backupPath, data, 0600)
 }
 
 // renderSettingsJS either patches existing settings.js or generates a new one
