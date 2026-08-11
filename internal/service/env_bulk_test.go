@@ -210,6 +210,74 @@ func TestApplyBulkEnvRejectsInvalid(t *testing.T) {
 	}
 }
 
+func TestApplyBulkEnv_SyncCountOne(t *testing.T) {
+	svc := NewEnvService(NewIsolatedConfigService(t.TempDir()))
+	syncCalls := 0
+	svc.syncNodeRedGlobals = func(keys []string) error {
+		syncCalls++
+		if len(keys) != 3 {
+			t.Fatalf("sync received %d keys, want 3", len(keys))
+		}
+		return nil
+	}
+	parsed := ParseBulkEnv("A=1\nB=2\nC=3")
+	if _, err := svc.ApplyBulkEnv(parsed, nil); err != nil {
+		t.Fatalf("ApplyBulkEnv: %v", err)
+	}
+	if syncCalls != 1 {
+		t.Fatalf("sync calls=%d, want 1", syncCalls)
+	}
+}
+
+func TestApplyBulkEnv_PreservesManualGlobals(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "flows.json"), []byte(`[{"id":"global","type":"global-config","env":[{"name":"MANUAL","value":"keep","type":"str"}]}]`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	svc := NewEnvService(NewIsolatedConfigService(dir), "test-key")
+	parsed := ParseBulkEnv("A=1\nTOKEN=hidden#secret")
+	if _, err := svc.ApplyBulkEnv(parsed, nil); err != nil {
+		t.Fatalf("ApplyBulkEnv: %v", err)
+	}
+	flows, err := os.ReadFile(filepath.Join(dir, "flows.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(flows)
+	if !strings.Contains(text, `"name": "MANUAL"`) || !strings.Contains(text, `"name": "A"`) {
+		t.Fatalf("manual or managed global missing: %s", text)
+	}
+	if strings.Contains(text, `"name": "TOKEN"`) || strings.Contains(text, "hidden") {
+		t.Fatalf("secret leaked into globals: %s", text)
+	}
+}
+
+func TestApplyBulkEnv_PartialFailureRollback(t *testing.T) {
+	svc := NewEnvService(NewIsolatedConfigService(t.TempDir()))
+	syncCalls := 0
+	svc.syncNodeRedGlobals = func([]string) error {
+		syncCalls++
+		return nil
+	}
+	parsed := BulkEnvResult{Valid: true, Lines: []BulkEnvLine{
+		{Line: 1, Key: "A", Value: "1", Type: "string"},
+		{Line: 2, Key: "BAD\nKEY", Value: "2", Type: "string"},
+	}}
+	if _, err := svc.ApplyBulkEnv(parsed, nil); err == nil || !strings.Contains(err.Error(), "line 2") {
+		t.Fatalf("expected contextual second-line failure, got %v", err)
+	}
+	if syncCalls != 0 {
+		t.Fatalf("partial apply synchronized %d times, want 0", syncCalls)
+	}
+	config, err := svc.configSvc.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(config.EnvVars) != 1 || config.EnvVars[0].Key != "A" {
+		t.Fatalf("existing per-entry commit semantics changed: %+v", config.EnvVars)
+	}
+}
+
 // keep model symbol referenced
 var _ = model.EnvVar{}
 

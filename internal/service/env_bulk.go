@@ -150,10 +150,20 @@ func (s *EnvService) ApplyBulkEnv(parsed BulkEnvResult, restart func(func() erro
 	if !parsed.Valid {
 		return parsed, fmt.Errorf("bulk payload failed validation")
 	}
+	changedKeys := make([]string, 0, len(parsed.Lines))
 	for _, line := range parsed.Lines {
+		changedKeys = append(changedKeys, line.Key)
+	}
+	for i, line := range parsed.Lines {
 		encrypted := line.Type == "secret"
 		set := func() error {
-			return s.Set(line.Key, line.Value, line.Type, "bulk import", encrypted)
+			if err := s.set(line.Key, line.Value, line.Type, "bulk import", encrypted, false); err != nil {
+				return err
+			}
+			if restart != nil && i == len(parsed.Lines)-1 {
+				return s.syncNodeRedGlobals(changedKeys)
+			}
+			return nil
 		}
 		if restart != nil {
 			if _, err := restart(set); err != nil {
@@ -161,6 +171,11 @@ func (s *EnvService) ApplyBulkEnv(parsed BulkEnvResult, restart func(func() erro
 			}
 		} else if err := set(); err != nil {
 			return parsed, fmt.Errorf("line %d (%s): %w", line.Line, line.Key, err)
+		}
+	}
+	if restart == nil {
+		if err := s.syncNodeRedGlobals(changedKeys); err != nil {
+			return parsed, fmt.Errorf("environment JSON committed but final Node-RED global sync failed: %w", err)
 		}
 	}
 	return parsed, nil
