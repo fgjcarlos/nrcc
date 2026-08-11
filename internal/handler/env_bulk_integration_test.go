@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/fgjcarlos/nrcc/internal/model"
 	"github.com/fgjcarlos/nrcc/internal/service"
 )
 
@@ -47,6 +50,56 @@ func TestBulkEndpoint_FinalSyncFailure500(t *testing.T) {
 	}
 	if len(config.EnvVars) != 1 || config.EnvVars[0].Key != "COMMITTED" || config.EnvVars[0].Value != "value" {
 		t.Fatalf("committed state was not preserved: %+v", config.EnvVars)
+	}
+}
+
+func TestBulkEndpoint_CapRejectionDryRun(t *testing.T) {
+	testBulkEndpointCapRejection(t, false)
+}
+
+func TestBulkEndpoint_CapRejectionCommit(t *testing.T) {
+	testBulkEndpointCapRejection(t, true)
+}
+
+func testBulkEndpointCapRejection(t *testing.T, commit bool) {
+	t.Helper()
+	t.Setenv("NRCC_BULK_MAX_ENTRIES", "2")
+	dir := t.TempDir()
+	svc := service.NewEnvService(service.NewIsolatedConfigService(dir))
+	if err := svc.Set("EXISTING", "keep", "string", "", false); err != nil {
+		t.Fatalf("seed state: %v", err)
+	}
+	beforeConfig, err := os.ReadFile(filepath.Join(dir, "config.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	beforeFlows, err := os.ReadFile(filepath.Join(dir, "flows.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w := postBulkEnv(t, NewEnvHandler(svc, dir), bulkEnvContent(3), commit)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%s, want 400", w.Code, w.Body.String())
+	}
+	var response model.ApiResponse[service.BulkEnvResult]
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	result := response.Data
+	if result.Valid || len(result.Issues) != 1 || !strings.Contains(result.Issues[0].Reason, "maximum 2") {
+		t.Fatalf("unexpected cap payload: %+v", result)
+	}
+	afterConfig, err := os.ReadFile(filepath.Join(dir, "config.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	afterFlows, err := os.ReadFile(filepath.Join(dir, "flows.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(beforeConfig, afterConfig) || !bytes.Equal(beforeFlows, afterFlows) {
+		t.Fatalf("cap rejection mutated state (commit=%v)", commit)
 	}
 }
 
