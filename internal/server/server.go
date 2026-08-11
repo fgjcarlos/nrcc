@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/fgjcarlos/nrcc/internal/audit"
@@ -13,6 +14,7 @@ import (
 	"github.com/fgjcarlos/nrcc/internal/metrics"
 	"github.com/fgjcarlos/nrcc/internal/middleware"
 	"github.com/fgjcarlos/nrcc/internal/service"
+	setupstate "github.com/fgjcarlos/nrcc/internal/setup"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -58,6 +60,13 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 
 	// Initialize handlers
 	authHandler := handler.NewAuthHandler(authSvc)
+	setupTokenPath := filepath.Join(dataDir, setupstate.SetupTokenFileName)
+	users, _ := authSvc.GetAllUsers()
+	err := setupstate.EnsureTokenFile(setupTokenPath, len(users) > 0)
+	if err != nil {
+		log.Printf("auth setup token unavailable: %v", err)
+	}
+	authHandler.SetSetupTokenPath(setupTokenPath)
 	hostSvc := service.NewHostService(dataDir)
 	configSvc := service.NewConfigServiceWithHost(dataDir, hostSvc)
 	configHandler := handler.NewConfigHandler(configSvc)
