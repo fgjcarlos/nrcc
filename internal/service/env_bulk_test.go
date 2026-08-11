@@ -110,6 +110,63 @@ func TestParseBulkEnv(t *testing.T) {
 	}
 }
 
+func TestParseBulkEnv_RejectsTooManyEntries(t *testing.T) {
+	result := mustParseBulkWithLimits(t, "A=1\nB=2\nC=3\n", BulkLimits{MaxEntries: 2, MaxEntryBytes: 8192})
+	assertBulkCap(t, result, 2, "maximum 2 entries")
+}
+
+func TestParseBulkEnv_RejectsEntryTooLarge(t *testing.T) {
+	result := mustParseBulkWithLimits(t, "K="+strings.Repeat("v", 8192), BulkLimits{MaxEntries: 1000, MaxEntryBytes: 8192})
+	assertBulkCap(t, result, 0, "maximum 8192 bytes")
+}
+
+func TestParseBulkEnv_AcceptsAtLimits(t *testing.T) {
+	value := strings.Repeat("é", 4095) + "v"
+	result := mustParseBulkWithLimits(t, "# ignored\n\nK="+value+"#string\nB=2", BulkLimits{MaxEntries: 2, MaxEntryBytes: 8192})
+	if !result.Valid || len(result.Lines) != 2 {
+		t.Fatalf("expected limits to be inclusive, got %+v", result)
+	}
+}
+
+func TestParseBulkEnv_LimitsFromConfig(t *testing.T) {
+	tests := []struct {
+		name, entries, bytes string
+		want                 BulkLimits
+		wantErr              bool
+	}{
+		{"defaults", "", "", DefaultBulkLimits(), false},
+		{"zero uses defaults", "0", "0", DefaultBulkLimits(), false},
+		{"custom", "2", "16", BulkLimits{MaxEntries: 2, MaxEntryBytes: 16}, false},
+		{"negative", "-1", "16", BulkLimits{}, true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv("NRCC_BULK_MAX_ENTRIES", test.entries)
+			t.Setenv("NRCC_BULK_MAX_ENTRY_BYTES", test.bytes)
+			got, err := BulkLimitsFromEnv()
+			if (err != nil) != test.wantErr || got != test.want {
+				t.Fatalf("limits=%+v, err=%v, want %+v/error=%v", got, err, test.want, test.wantErr)
+			}
+		})
+	}
+}
+
+func mustParseBulkWithLimits(t *testing.T, content string, limits BulkLimits) BulkEnvResult {
+	t.Helper()
+	result, err := ParseBulkEnvWithLimits(content, limits)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return result
+}
+
+func assertBulkCap(t *testing.T, result BulkEnvResult, lines int, issue string) {
+	t.Helper()
+	if result.Valid || len(result.Lines) != lines || len(result.Issues) != 1 || !strings.Contains(result.Issues[0].Reason, issue) {
+		t.Fatalf("expected %d lines and issue %q, got %+v", lines, issue, result)
+	}
+}
+
 func TestApplyBulkEnvPersistsSecretsAndNonSecrets(t *testing.T) {
 	dir := t.TempDir()
 	svc := NewEnvService(NewIsolatedConfigService(dir), "test-key")

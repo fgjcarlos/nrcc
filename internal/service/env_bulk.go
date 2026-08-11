@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bufio"
 	"fmt"
 	"strings"
 
@@ -35,6 +36,15 @@ type BulkEnvResult struct {
 // "string" when missing. Validation reuses ValidateEnvKey and ValidateValue
 // so the rules stay identical to single-entry POST /api/env.
 func ParseBulkEnv(content string) BulkEnvResult {
+	result, _ := ParseBulkEnvWithLimits(content, DefaultBulkLimits())
+	return result
+}
+
+func ParseBulkEnvWithLimits(content string, limits BulkLimits) (BulkEnvResult, error) {
+	limits, err := limits.resolved()
+	if err != nil {
+		return BulkEnvResult{}, err
+	}
 	var (
 		lines  []BulkEnvLine
 		issues []BulkEnvIssue
@@ -45,11 +55,21 @@ func ParseBulkEnv(content string) BulkEnvResult {
 	}
 
 	seen := map[string]int{}
-	for rawLineNum, raw := range strings.Split(content, "\n") {
-		lineNum := rawLineNum + 1
+	records := 0
+	scanner := bufio.NewScanner(strings.NewReader(content))
+	scanner.Buffer(nil, len(content)+1)
+	lineNum := 0
+	for scanner.Scan() {
+		lineNum++
+		raw := scanner.Text()
 		trimmed := strings.TrimSpace(raw)
 		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
 			continue
+		}
+		records++
+		if records > limits.MaxEntries {
+			addIssue(lineNum, "", fmt.Sprintf("maximum %d entries exceeded", limits.MaxEntries))
+			break
 		}
 
 		eq := strings.IndexByte(trimmed, '=')
@@ -73,6 +93,10 @@ func ParseBulkEnv(content string) BulkEnvResult {
 			}
 		}
 		value := rest // honour spaces inside value
+		if size := len(key) + len(value); size > limits.MaxEntryBytes {
+			addIssue(lineNum, key, fmt.Sprintf("maximum %d bytes per entry exceeded (received %d)", limits.MaxEntryBytes, size))
+			break
+		}
 
 		if err := ValidateEnvKey(key); err != nil {
 			addIssue(lineNum, key, err.Error())
@@ -99,7 +123,7 @@ func ParseBulkEnv(content string) BulkEnvResult {
 	default:
 		result.Summary = fmt.Sprintf("%d variable(s) ready", len(lines))
 	}
-	return result
+	return result, nil
 }
 
 func validBulkType(typ string) bool {
