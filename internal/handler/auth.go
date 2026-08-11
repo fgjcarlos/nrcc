@@ -142,6 +142,12 @@ func (h *AuthHandler) Setup(w http.ResponseWriter, r *http.Request) {
 		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Username and password are required")
 		return
 	}
+	if h.limiter != nil {
+		if blocked, retry := h.limiter.Check(mw.SetupUserKey(req.Username)); blocked {
+			mw.RespondTooManyRequests(w, retry)
+			return
+		}
+	}
 	if err := service.ValidatePassword(req.Password); err != nil {
 		model.RespondError(w, http.StatusBadRequest, "WEAK_PASSWORD", err.Error())
 		return
@@ -159,12 +165,12 @@ func (h *AuthHandler) Setup(w http.ResponseWriter, r *http.Request) {
 	var recoveryToken *setupstate.SetupToken
 	if configured {
 		if h.setupTokenPath == "" {
-			h.respondAlreadyConfigured(w, r)
+			h.respondAlreadyConfigured(w, r, req.Username)
 			return
 		}
 		token, err := setupstate.ReadTokenFile(h.setupTokenPath)
 		if err != nil || subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Setup-Reset-Token")), []byte(token.Raw)) != 1 {
-			h.respondAlreadyConfigured(w, r)
+			h.respondAlreadyConfigured(w, r, req.Username)
 			return
 		}
 		recoveryToken = &token
@@ -193,7 +199,7 @@ func (h *AuthHandler) Setup(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := createUser(user); err != nil {
 		if errors.Is(err, service.ErrAlreadyConfigured) {
-			h.respondAlreadyConfigured(w, r)
+			h.respondAlreadyConfigured(w, r, req.Username)
 			return
 		}
 		model.RespondError(w, http.StatusInternalServerError, "CREATE_ERROR", "Failed to create user")
@@ -217,6 +223,10 @@ func (h *AuthHandler) Setup(w http.ResponseWriter, r *http.Request) {
 			log.Printf("auth setup: failed to consume recovery token after successful setup: %v", err)
 		}
 	}
+	if h.limiter != nil {
+		h.limiter.Reset("setup-ip:" + mw.ExtractIP(r))
+		h.limiter.Reset(mw.SetupUserKey(req.Username))
+	}
 
 	resp := AuthResponse{
 		Token: token,
@@ -233,9 +243,10 @@ func (h *AuthHandler) Setup(w http.ResponseWriter, r *http.Request) {
 	model.RespondJSON(w, http.StatusCreated, resp)
 }
 
-func (h *AuthHandler) respondAlreadyConfigured(w http.ResponseWriter, r *http.Request) {
+func (h *AuthHandler) respondAlreadyConfigured(w http.ResponseWriter, r *http.Request, username string) {
 	if h.limiter != nil {
 		h.limiter.Record("setup-ip:" + mw.ExtractIP(r))
+		h.limiter.Record(mw.SetupUserKey(username))
 	}
 	model.RespondError(w, http.StatusConflict, "ALREADY_CONFIGURED", "System already configured with users")
 }
@@ -338,7 +349,6 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-
 	// Generate access token
 	token, err := h.authSvc.GenerateToken(user)
 	if err != nil {

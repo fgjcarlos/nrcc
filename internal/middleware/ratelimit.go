@@ -52,6 +52,14 @@ func AuthUserKey(username string) string {
 	return "auth-user:" + strings.ToLower(strings.TrimSpace(username))
 }
 
+func NormalizeUsername(username string) string {
+	return strings.ToLower(strings.TrimSpace(username))
+}
+
+func SetupUserKey(username string) string {
+	return "setup-user:" + NormalizeUsername(username)
+}
+
 func (rl *RateLimiter) Check(key string) (blocked bool, retryAfter time.Duration) {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
