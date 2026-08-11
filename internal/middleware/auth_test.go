@@ -27,7 +27,7 @@ func TestAuth_MissingAuthorizationHeader(t *testing.T) {
 	})
 
 	wrapped := authMiddleware(nextHandler)
-	req := httptest.NewRequest("GET", "/api/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/test", nil)
 	// No Authorization header
 	w := httptest.NewRecorder()
 
@@ -55,7 +55,7 @@ func TestAuth_MissingBearerPrefix(t *testing.T) {
 	})
 
 	wrapped := authMiddleware(nextHandler)
-	req := httptest.NewRequest("GET", "/api/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/test", nil)
 	req.Header.Set("Authorization", "InvalidTokenWithoutBearer")
 	w := httptest.NewRecorder()
 
@@ -83,7 +83,7 @@ func TestAuth_InvalidToken(t *testing.T) {
 	})
 
 	wrapped := authMiddleware(nextHandler)
-	req := httptest.NewRequest("GET", "/api/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/test", nil)
 	req.Header.Set("Authorization", "Bearer invalid.token.here")
 	w := httptest.NewRecorder()
 
@@ -129,7 +129,7 @@ func TestAuth_ValidToken(t *testing.T) {
 	})
 
 	wrapped := authMiddleware(nextHandler)
-	req := httptest.NewRequest("GET", "/api/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/test", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 
@@ -159,7 +159,7 @@ func TestClaimsFromContext_WithValidClaims(t *testing.T) {
 	}
 
 	ctx := context.WithValue(context.Background(), CtxKeyUser, claims)
-	req := httptest.NewRequest("GET", "/api/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/test", nil)
 	req = req.WithContext(ctx)
 
 	retrieved := ClaimsFromContext(req)
@@ -176,7 +176,7 @@ func TestClaimsFromContext_WithValidClaims(t *testing.T) {
 
 func TestClaimsFromContext_WithNoClaims(t *testing.T) {
 	ctx := context.Background()
-	req := httptest.NewRequest("GET", "/api/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/test", nil)
 	req = req.WithContext(ctx)
 
 	retrieved := ClaimsFromContext(req)
@@ -189,7 +189,7 @@ func TestClaimsFromContext_WithNoClaims(t *testing.T) {
 func TestClaimsFromContext_WithWrongType(t *testing.T) {
 	// Put wrong type in context
 	ctx := context.WithValue(context.Background(), CtxKeyUser, "not a claims struct")
-	req := httptest.NewRequest("GET", "/api/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/test", nil)
 	req = req.WithContext(ctx)
 
 	retrieved := ClaimsFromContext(req)
@@ -231,7 +231,7 @@ func TestAuth_InjectsClaimsIntoContext(t *testing.T) {
 	})
 
 	wrapped := authMiddleware(nextHandler)
-	req := httptest.NewRequest("GET", "/api/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/test", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 
@@ -282,13 +282,13 @@ func TestAuth_MultipleRequests_IndependentContexts(t *testing.T) {
 
 	// First request
 	wrapped := authMiddleware(nextHandler)
-	req1 := httptest.NewRequest("GET", "/api/test", nil)
+	req1 := httptest.NewRequest(http.MethodGet, "/api/test", nil)
 	req1.Header.Set("Authorization", "Bearer "+token1)
 	w1 := httptest.NewRecorder()
 	wrapped.ServeHTTP(w1, req1)
 
 	// Second request
-	req2 := httptest.NewRequest("GET", "/api/test", nil)
+	req2 := httptest.NewRequest(http.MethodGet, "/api/test", nil)
 	req2.Header.Set("Authorization", "Bearer "+token2)
 	w2 := httptest.NewRecorder()
 	wrapped.ServeHTTP(w2, req2)

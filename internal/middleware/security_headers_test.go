@@ -13,7 +13,7 @@ func TestSecurityHeaders_SetsAllExpectedHeaders(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	req := httptest.NewRequest("GET", "/api/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/test", nil)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
@@ -42,7 +42,7 @@ func TestSecurityHeaders_NoHSTS_WhenHTTP(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	req := httptest.NewRequest("GET", "/api/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/test", nil)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
@@ -56,7 +56,7 @@ func TestSecurityHeaders_HSTS_WhenTLS(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	req := httptest.NewRequest("GET", "/api/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/test", nil)
 	req.TLS = &tls.ConnectionState{}
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
@@ -72,7 +72,7 @@ func TestSecurityHeaders_HSTS_WhenForwardedProto(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	req := httptest.NewRequest("GET", "/api/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/test", nil)
 	req.Header.Set("X-Forwarded-Proto", "https")
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
@@ -89,7 +89,7 @@ func TestSecurityHeaders_CallsNext(t *testing.T) {
 		called = true
 	}))
 
-	req := httptest.NewRequest("GET", "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
@@ -101,7 +101,7 @@ func TestSecurityHeaders_CallsNext(t *testing.T) {
 func TestSecurityHeaders_CSP_AllowsGoogleFonts(t *testing.T) {
 	handler := SecurityHeaders(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 
-	req := httptest.NewRequest("GET", "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 

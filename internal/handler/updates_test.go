@@ -20,7 +20,7 @@ func TestUpdateHandler_GetStatus_ReturnsOK(t *testing.T) {
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
-	req := httptest.NewRequest("GET", "/api/updates/status", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/updates/status", nil)
 	w := httptest.NewRecorder()
 
 	handler.GetStatus(w, req)
@@ -37,7 +37,7 @@ func TestUpdateHandler_GetStatus_ContentType(t *testing.T) {
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
-	req := httptest.NewRequest("GET", "/api/updates/status", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/updates/status", nil)
 	w := httptest.NewRecorder()
 
 	handler.GetStatus(w, req)
@@ -55,7 +55,7 @@ func TestUpdateHandler_GetStatus_EmptyCache(t *testing.T) {
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
-	req := httptest.NewRequest("GET", "/api/updates/status", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/updates/status", nil)
 	w := httptest.NewRecorder()
 
 	handler.GetStatus(w, req)
@@ -86,7 +86,7 @@ func TestUpdateHandler_GetStatus_ValidJSON(t *testing.T) {
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
-	req := httptest.NewRequest("GET", "/api/updates/status", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/updates/status", nil)
 	w := httptest.NewRecorder()
 
 	handler.GetStatus(w, req)
@@ -105,7 +105,7 @@ func TestUpdateHandler_GetCheck_ReturnsOK(t *testing.T) {
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
-	req := httptest.NewRequest("GET", "/api/updates/check", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/updates/check", nil)
 	w := httptest.NewRecorder()
 
 	handler.GetCheck(w, req)
@@ -123,7 +123,7 @@ func TestUpdateHandler_GetCheck_ContentType(t *testing.T) {
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
-	req := httptest.NewRequest("GET", "/api/updates/check", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/updates/check", nil)
 	w := httptest.NewRecorder()
 
 	handler.GetCheck(w, req)
@@ -141,7 +141,7 @@ func TestUpdateHandler_GetCheck_ResponseStructure(t *testing.T) {
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
-	req := httptest.NewRequest("GET", "/api/updates/check", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/updates/check", nil)
 	w := httptest.NewRecorder()
 
 	handler.GetCheck(w, req)
@@ -171,7 +171,7 @@ func TestUpdateHandler_GetCheck_ValidJSON(t *testing.T) {
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
-	req := httptest.NewRequest("GET", "/api/updates/check", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/updates/check", nil)
 	w := httptest.NewRecorder()
 
 	handler.GetCheck(w, req)
@@ -199,7 +199,7 @@ func TestUpdateHandler_PostApply_ReturnsOK(t *testing.T) {
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
-	req := httptest.NewRequest("POST", "/api/updates/apply", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/updates/apply", nil)
 	w := httptest.NewRecorder()
 
 	handler.PostApply(w, req)
@@ -224,7 +224,7 @@ func TestUpdateHandler_PostApply_ResponseStructure(t *testing.T) {
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
-	req := httptest.NewRequest("POST", "/api/updates/apply", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/updates/apply", nil)
 	w := httptest.NewRecorder()
 
 	handler.PostApply(w, req)
@@ -271,7 +271,7 @@ func TestUpdateHandler_PostApply_ContentType(t *testing.T) {
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
-	req := httptest.NewRequest("POST", "/api/updates/apply", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/updates/apply", nil)
 	w := httptest.NewRecorder()
 
 	handler.PostApply(w, req)
@@ -292,7 +292,7 @@ func TestUpdateHandler_GetState_ReturnsOK(t *testing.T) {
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
-	req := httptest.NewRequest("GET", "/api/updates/state", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/updates/state", nil)
 	w := httptest.NewRecorder()
 
 	handler.GetState(w, req)
@@ -309,7 +309,7 @@ func TestUpdateHandler_GetState_ValidJSON(t *testing.T) {
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
-	req := httptest.NewRequest("GET", "/api/updates/state", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/updates/state", nil)
 	w := httptest.NewRecorder()
 
 	handler.GetState(w, req)
@@ -331,7 +331,7 @@ func TestUpdateHandler_GetState_InitialStateIdle(t *testing.T) {
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
-	req := httptest.NewRequest("GET", "/api/updates/state", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/updates/state", nil)
 	w := httptest.NewRecorder()
 
 	handler.GetState(w, req)
@@ -375,7 +375,7 @@ func TestUpdateHandler_GetState_ContentType(t *testing.T) {
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
-	req := httptest.NewRequest("GET", "/api/updates/state", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/updates/state", nil)
 	w := httptest.NewRecorder()
 
 	handler.GetState(w, req)
@@ -399,7 +399,7 @@ func TestUpdateHandler_PostApply_StartsBackgroundFlow(t *testing.T) {
 		t.Fatalf("Expected initial state Idle, got %s", initialState.State)
 	}
 
-	req := httptest.NewRequest("POST", "/api/updates/apply", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/updates/apply", nil)
 	w := httptest.NewRecorder()
 
 	handler.PostApply(w, req)
@@ -437,7 +437,7 @@ func TestUpdateHandler_PostApply_IncludesBackupId(t *testing.T) {
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
-	req := httptest.NewRequest("POST", "/api/updates/apply", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/updates/apply", nil)
 	w := httptest.NewRecorder()
 
 	handler.PostApply(w, req)
@@ -482,7 +482,7 @@ func TestUpdateHandler_PostApply_ConcurrencyLogic_DocumentedBehavior(t *testing.
 	}
 
 	// First POST should succeed
-	req := httptest.NewRequest("POST", "/api/updates/apply", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/updates/apply", nil)
 	w := httptest.NewRecorder()
 	handler.PostApply(w, req)
 	waitForUpdateFlowToSettle(t, svc)

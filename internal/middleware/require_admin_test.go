@@ -10,7 +10,7 @@ import (
 )
 
 func requestWithClaims(claims *model.Claims) *http.Request {
-	req := httptest.NewRequest("POST", "/api/test", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/test", nil)
 	if claims != nil {
 		ctx := context.WithValue(req.Context(), CtxKeyUser, claims)
 		req = req.WithContext(ctx)

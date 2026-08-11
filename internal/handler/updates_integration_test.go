@@ -34,7 +34,7 @@ func TestIntegration_BackupCreateFlow_6_1(t *testing.T) {
 	}
 
 	// Make POST /api/updates/apply request
-	req := httptest.NewRequest("POST", "/api/updates/apply", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/updates/apply", nil)
 	w := httptest.NewRecorder()
 	handler.PostApply(w, req)
 
@@ -82,7 +82,7 @@ func TestIntegration_BackupFailureBlocks_6_2(t *testing.T) {
 	defer func() { _ = os.Chmod(readOnlyBackupPath, 0644) }() // Restore permissions for cleanup
 
 	// POST /api/updates/apply should still return 200 (async operation)
-	req := httptest.NewRequest("POST", "/api/updates/apply", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/updates/apply", nil)
 	w := httptest.NewRecorder()
 	handler.PostApply(w, req)
 
@@ -113,7 +113,7 @@ func TestIntegration_ConcurrencyGuard_6_3(t *testing.T) {
 	})
 
 	// First attempt should return 409 because state != Idle
-	req := httptest.NewRequest("POST", "/api/updates/apply", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/updates/apply", nil)
 	w := httptest.NewRecorder()
 	handler.PostApply(w, req)
 
@@ -233,7 +233,7 @@ func TestIntegration_StateTransitions_6_5(t *testing.T) {
 	}
 
 	// POST /api/updates/apply
-	req := httptest.NewRequest("POST", "/api/updates/apply", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/updates/apply", nil)
 	w := httptest.NewRecorder()
 	handler.PostApply(w, req)
 
@@ -270,7 +270,7 @@ func TestIntegration_StateEndpointPolling_6_6(t *testing.T) {
 	handler := NewUpdateHandler(svc)
 
 	// Test 1: Idle state
-	req := httptest.NewRequest("GET", "/api/updates/state", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/updates/state", nil)
 	w := httptest.NewRecorder()
 	handler.GetState(w, req)
 
@@ -304,7 +304,7 @@ func TestIntegration_StateEndpointPolling_6_6(t *testing.T) {
 		BackupID: "backup-abc123",
 	})
 
-	req2 := httptest.NewRequest("GET", "/api/updates/state", nil)
+	req2 := httptest.NewRequest(http.MethodGet, "/api/updates/state", nil)
 	w2 := httptest.NewRecorder()
 	handler.GetState(w2, req2)
 
@@ -343,7 +343,7 @@ func TestIntegration_ConcurrentApplyRejection_6_7(t *testing.T) {
 	})
 
 	// Attempt POST /api/updates/apply while Applying
-	req := httptest.NewRequest("POST", "/api/updates/apply", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/updates/apply", nil)
 	w := httptest.NewRecorder()
 	handler.PostApply(w, req)
 
@@ -379,7 +379,7 @@ func TestIntegration_FullFlowScenario_6_8(t *testing.T) {
 	t.Log("✓ Step 1: Initial state is Idle")
 
 	// Step 2: POST /api/updates/apply
-	applyReq := httptest.NewRequest("POST", "/api/updates/apply", nil)
+	applyReq := httptest.NewRequest(http.MethodPost, "/api/updates/apply", nil)
 	applyW := httptest.NewRecorder()
 	handler.PostApply(applyW, applyReq)
 
@@ -407,7 +407,7 @@ func TestIntegration_FullFlowScenario_6_8(t *testing.T) {
 	t.Logf("✓ Step 4: State progressed to %s (phase: %s)", state.State, state.Phase)
 
 	// Step 5: GET /api/updates/state should return current state
-	stateReq := httptest.NewRequest("GET", "/api/updates/state", nil)
+	stateReq := httptest.NewRequest(http.MethodGet, "/api/updates/state", nil)
 	stateW := httptest.NewRecorder()
 	handler.GetState(stateW, stateReq)
 
@@ -419,7 +419,7 @@ func TestIntegration_FullFlowScenario_6_8(t *testing.T) {
 
 	// Concurrent request during active update should fail with 409
 	if state.State != model.StateIdle {
-		concurrentReq := httptest.NewRequest("POST", "/api/updates/apply", nil)
+		concurrentReq := httptest.NewRequest(http.MethodPost, "/api/updates/apply", nil)
 		concurrentW := httptest.NewRecorder()
 		handler.PostApply(concurrentW, concurrentReq)
 
@@ -450,7 +450,7 @@ func TestIntegration_BrowserRefreshRecovery(t *testing.T) {
 	})
 
 	// First client request
-	req1 := httptest.NewRequest("GET", "/api/updates/state", nil)
+	req1 := httptest.NewRequest(http.MethodGet, "/api/updates/state", nil)
 	w1 := httptest.NewRecorder()
 	handler.GetState(w1, req1)
 
@@ -463,7 +463,7 @@ func TestIntegration_BrowserRefreshRecovery(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	// Second client request (after "refresh")
-	req2 := httptest.NewRequest("GET", "/api/updates/state", nil)
+	req2 := httptest.NewRequest(http.MethodGet, "/api/updates/state", nil)
 	w2 := httptest.NewRecorder()
 	handler.GetState(w2, req2)
 
@@ -544,7 +544,7 @@ func TestIntegration_PollingBehavior(t *testing.T) {
 
 	// Simulate 5 polling requests
 	for i := 0; i < 5; i++ {
-		req := httptest.NewRequest("GET", "/api/updates/state", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/updates/state", nil)
 		w := httptest.NewRecorder()
 		handler.GetState(w, req)
 
@@ -583,7 +583,7 @@ func TestIntegration_ErrorRecovery(t *testing.T) {
 	})
 
 	// Query state
-	req := httptest.NewRequest("GET", "/api/updates/state", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/updates/state", nil)
 	w := httptest.NewRecorder()
 	handler.GetState(w, req)
 
@@ -606,7 +606,7 @@ func TestIntegration_ErrorRecovery(t *testing.T) {
 	})
 
 	// Verify can POST /apply again
-	applyReq := httptest.NewRequest("POST", "/api/updates/apply", nil)
+	applyReq := httptest.NewRequest(http.MethodPost, "/api/updates/apply", nil)
 	applyW := httptest.NewRecorder()
 	handler.PostApply(applyW, applyReq)
 

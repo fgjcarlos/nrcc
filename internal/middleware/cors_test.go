@@ -11,7 +11,7 @@ func TestCORS_DenyByDefault(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	req := httptest.NewRequest("GET", "/api/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/test", nil)
 	req.Header.Set("Origin", "https://evil.com")
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
@@ -27,7 +27,7 @@ func TestCORS_AllowConfiguredOrigin(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	req := httptest.NewRequest("GET", "/api/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/test", nil)
 	req.Header.Set("Origin", "https://app.example.com")
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
@@ -46,7 +46,7 @@ func TestCORS_RejectUnconfiguredOrigin(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	req := httptest.NewRequest("GET", "/api/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/test", nil)
 	req.Header.Set("Origin", "https://other.example.com")
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
@@ -62,7 +62,7 @@ func TestCORS_UnsafeWildcard(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	req := httptest.NewRequest("GET", "/api/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/test", nil)
 	req.Header.Set("Origin", "https://anything.com")
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
@@ -79,7 +79,7 @@ func TestCORS_PreflightResponse(t *testing.T) {
 		nextCalled = true
 	}))
 
-	req := httptest.NewRequest("OPTIONS", "/api/test", nil)
+	req := httptest.NewRequest(http.MethodOptions, "/api/test", nil)
 	req.Header.Set("Origin", "https://app.example.com")
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
@@ -107,7 +107,7 @@ func TestCORS_PreflightDenied_WhenOriginNotAllowed(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	req := httptest.NewRequest("OPTIONS", "/api/test", nil)
+	req := httptest.NewRequest(http.MethodOptions, "/api/test", nil)
 	req.Header.Set("Origin", "https://evil.com")
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
@@ -125,7 +125,7 @@ func TestCORS_NoOriginHeader_PassesThrough(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	req := httptest.NewRequest("GET", "/api/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/test", nil)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
@@ -147,7 +147,7 @@ func TestCORS_MultipleOrigins(t *testing.T) {
 	}))
 
 	for _, origin := range cfg.AllowedOrigins {
-		req := httptest.NewRequest("GET", "/api/test", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/test", nil)
 		req.Header.Set("Origin", origin)
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)

@@ -17,7 +17,7 @@ func TestBootstrapHandler_GetStatus_Returns200(t *testing.T) {
 	hostSvc := service.NewHostService(t.TempDir())
 	handler := NewBootstrapHandler(hostSvc)
 
-	req := httptest.NewRequest("GET", "/api/bootstrap/status", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/bootstrap/status", nil)
 	w := httptest.NewRecorder()
 
 	handler.GetStatus(w, req)
@@ -31,7 +31,7 @@ func TestBootstrapHandler_GetStatus_ReturnsValidJSON(t *testing.T) {
 	hostSvc := service.NewHostService(t.TempDir())
 	handler := NewBootstrapHandler(hostSvc)
 
-	req := httptest.NewRequest("GET", "/api/bootstrap/status", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/bootstrap/status", nil)
 	w := httptest.NewRecorder()
 
 	handler.GetStatus(w, req)
@@ -48,7 +48,7 @@ func TestBootstrapHandler_GetStatus_HasRequiredFields(t *testing.T) {
 	hostSvc := service.NewHostService(t.TempDir())
 	handler := NewBootstrapHandler(hostSvc)
 
-	req := httptest.NewRequest("GET", "/api/bootstrap/status", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/bootstrap/status", nil)
 	w := httptest.NewRecorder()
 
 	handler.GetStatus(w, req)
@@ -66,7 +66,7 @@ func TestBootstrapHandler_GetStatus_Dependencies(t *testing.T) {
 	hostSvc := service.NewHostService(t.TempDir())
 	handler := NewBootstrapHandler(hostSvc)
 
-	req := httptest.NewRequest("GET", "/api/bootstrap/status", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/bootstrap/status", nil)
 	w := httptest.NewRecorder()
 
 	handler.GetStatus(w, req)
@@ -84,7 +84,7 @@ func TestBootstrapHandler_GetStatus_NodeRedEnvironment(t *testing.T) {
 	hostSvc := service.NewHostService(t.TempDir())
 	handler := NewBootstrapHandler(hostSvc)
 
-	req := httptest.NewRequest("GET", "/api/bootstrap/status", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/bootstrap/status", nil)
 	w := httptest.NewRecorder()
 
 	handler.GetStatus(w, req)
@@ -101,7 +101,7 @@ func TestSettingsHandler_GetRaw_RequiresAuth(t *testing.T) {
 	configSvc := service.NewIsolatedConfigService(t.TempDir())
 	handler := NewSettingsHandler(configSvc)
 
-	req := httptest.NewRequest("GET", "/api/settings/raw", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/settings/raw", nil)
 	// No auth token
 	w := httptest.NewRecorder()
 
@@ -117,7 +117,7 @@ func TestSettingsHandler_GetRaw_WithAuth_Returns200(t *testing.T) {
 	configSvc := service.NewIsolatedConfigService(tempDir)
 	handler := NewSettingsHandler(configSvc)
 
-	req := httptest.NewRequest("GET", "/api/settings/raw", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/settings/raw", nil)
 
 	// Inject auth claims
 	ctx := req.Context()
@@ -141,7 +141,7 @@ func TestSettingsHandler_GetRaw_ReturnsValidJSON(t *testing.T) {
 	configSvc := service.NewIsolatedConfigService(tempDir)
 	handler := NewSettingsHandler(configSvc)
 
-	req := httptest.NewRequest("GET", "/api/settings/raw", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/settings/raw", nil)
 
 	// Inject auth
 	ctx := req.Context()
@@ -173,7 +173,7 @@ func TestSettingsHandler_SaveRaw_RequiresAuth(t *testing.T) {
 	payload := RawSettingsRequest{Content: "module.exports = {}"}
 	body, _ := json.Marshal(payload)
 
-	req := httptest.NewRequest("POST", "/api/settings/raw", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/settings/raw", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	// No auth
 	w := httptest.NewRecorder()
@@ -192,7 +192,7 @@ func TestSettingsHandler_SaveRaw_RequiresAdminRole(t *testing.T) {
 	payload := RawSettingsRequest{Content: "module.exports = {}"}
 	body, _ := json.Marshal(payload)
 
-	req := httptest.NewRequest("POST", "/api/settings/raw", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/settings/raw", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	// Inject non-admin auth
@@ -220,7 +220,7 @@ func TestSettingsHandler_SaveRaw_WithAdmin_Returns200(t *testing.T) {
 	payload := RawSettingsRequest{Content: "module.exports = { uiPort: 1880 }"}
 	body, _ := json.Marshal(payload)
 
-	req := httptest.NewRequest("POST", "/api/settings/raw", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/settings/raw", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	// Inject admin auth
@@ -247,7 +247,7 @@ func TestSettingsHandler_SaveRaw_RejectsEmptyContent(t *testing.T) {
 	payload := RawSettingsRequest{Content: ""} // Empty
 	body, _ := json.Marshal(payload)
 
-	req := httptest.NewRequest("POST", "/api/settings/raw", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/settings/raw", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	// Inject admin auth
@@ -275,7 +275,7 @@ func TestSettingsHandler_SaveRaw_ReturnsValidJSON(t *testing.T) {
 	payload := RawSettingsRequest{Content: "module.exports = { uiPort: 1880 }"}
 	body, _ := json.Marshal(payload)
 
-	req := httptest.NewRequest("POST", "/api/settings/raw", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/settings/raw", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	ctx := req.Context()
@@ -306,7 +306,7 @@ func TestSettingsHandler_SaveRaw_InvalidJSON_Body(t *testing.T) {
 	configSvc := service.NewIsolatedConfigService(t.TempDir())
 	handler := NewSettingsHandler(configSvc)
 
-	req := httptest.NewRequest("POST", "/api/settings/raw", bytes.NewReader([]byte("invalid json")))
+	req := httptest.NewRequest(http.MethodPost, "/api/settings/raw", bytes.NewReader([]byte("invalid json")))
 	req.Header.Set("Content-Type", "application/json")
 
 	ctx := req.Context()
@@ -330,7 +330,7 @@ func TestSettingsHandler_GetRaw_WithEditor_Role(t *testing.T) {
 	configSvc := service.NewIsolatedConfigService(tempDir)
 	handler := NewSettingsHandler(configSvc)
 
-	req := httptest.NewRequest("GET", "/api/settings/raw", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/settings/raw", nil)
 
 	// Inject viewer (read-only) auth
 	ctx := req.Context()
@@ -357,7 +357,7 @@ func TestSettingsHandler_SaveRaw_WithViewer_Role_Forbidden(t *testing.T) {
 	payload := RawSettingsRequest{Content: "module.exports = {}"}
 	body, _ := json.Marshal(payload)
 
-	req := httptest.NewRequest("POST", "/api/settings/raw", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/settings/raw", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	// Inject viewer auth (not admin)
@@ -392,7 +392,7 @@ func TestSettingsHandler_SaveRaw_CreatesBackup(t *testing.T) {
 
 	save := func(content string) model.ApiResponse[model.SettingsDocument] {
 		body, _ := json.Marshal(RawSettingsRequest{Content: content})
-		req := httptest.NewRequest("POST", "/api/settings/raw", bytes.NewReader(body))
+		req := httptest.NewRequest(http.MethodPost, "/api/settings/raw", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		req = makeAdminCtx(req)
 		w := httptest.NewRecorder()

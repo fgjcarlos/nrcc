@@ -527,10 +527,10 @@ func parseCriticalCount(output []byte) int {
 	return report.Metadata.Vulnerabilities.Critical
 }
 
-func truncateOutput(b []byte, max int) string {
+func truncateOutput(b []byte, limit int) string {
 	s := strings.TrimSpace(string(b))
-	if len(s) > max {
-		return s[:max] + "..."
+	if len(s) > limit {
+		return s[:limit] + "..."
 	}
 	return s
 }

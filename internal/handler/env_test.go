@@ -250,7 +250,7 @@ func TestPostEnvValidationFlow(t *testing.T) {
 
 			// Create request
 			body, _ := json.Marshal(tt.payload)
-			req := httptest.NewRequest("POST", "/api/env", bytes.NewReader(body))
+			req := httptest.NewRequest(http.MethodPost, "/api/env", bytes.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
 
 			w := httptest.NewRecorder()
@@ -334,7 +334,7 @@ func TestPostEnvHandlerRoundTrip(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(payload)
-	req := httptest.NewRequest("POST", "/api/env", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/env", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	w := httptest.NewRecorder()
@@ -345,7 +345,7 @@ func TestPostEnvHandlerRoundTrip(t *testing.T) {
 	}
 
 	// GET the environment variables
-	req = httptest.NewRequest("GET", "/api/env", nil)
+	req = httptest.NewRequest(http.MethodGet, "/api/env", nil)
 	w = httptest.NewRecorder()
 	handler.GetEnv(w, req)
 
@@ -511,7 +511,7 @@ func TestGetEnvLazyMigration(t *testing.T) {
 			handler := NewEnvHandler(envSvc, t.TempDir())
 
 			// Call GetEnv which should trigger lazy migration
-			req := httptest.NewRequest("GET", "/api/env", nil)
+			req := httptest.NewRequest(http.MethodGet, "/api/env", nil)
 			w := httptest.NewRecorder()
 			handler.GetEnv(w, req)
 
@@ -568,7 +568,7 @@ func TestGetEnvMigrationIdempotence(t *testing.T) {
 	handler := NewEnvHandler(envSvc, t.TempDir())
 
 	// First GET (triggers migration)
-	req1 := httptest.NewRequest("GET", "/api/env", nil)
+	req1 := httptest.NewRequest(http.MethodGet, "/api/env", nil)
 	w1 := httptest.NewRecorder()
 	handler.GetEnv(w1, req1)
 
@@ -583,7 +583,7 @@ func TestGetEnvMigrationIdempotence(t *testing.T) {
 	vars1 := resp1.Data
 
 	// Second GET (should return same result, migration should be idempotent)
-	req2 := httptest.NewRequest("GET", "/api/env", nil)
+	req2 := httptest.NewRequest(http.MethodGet, "/api/env", nil)
 	w2 := httptest.NewRecorder()
 	handler.GetEnv(w2, req2)
 
@@ -631,7 +631,7 @@ func TestPostEnvUpdateExistingVariable(t *testing.T) {
 		"type":  "string",
 	}
 	body, _ := json.Marshal(payload1)
-	req := httptest.NewRequest("POST", "/api/env", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/env", bytes.NewReader(body))
 	w := httptest.NewRecorder()
 	handler.PostEnv(w, req)
 
@@ -647,7 +647,7 @@ func TestPostEnvUpdateExistingVariable(t *testing.T) {
 		"description": "Updated to number type",
 	}
 	body, _ = json.Marshal(payload2)
-	req = httptest.NewRequest("POST", "/api/env", bytes.NewReader(body))
+	req = httptest.NewRequest(http.MethodPost, "/api/env", bytes.NewReader(body))
 	w = httptest.NewRecorder()
 	handler.PostEnv(w, req)
 
@@ -718,7 +718,7 @@ func TestBulkEnvHandler(t *testing.T) {
 			handler := NewEnvHandler(service.NewEnvService(service.NewIsolatedConfigService(dir)), dir)
 
 			body, _ := json.Marshal(tt.payload)
-			req := httptest.NewRequest("POST", "/api/env/bulk", bytes.NewReader(body))
+			req := httptest.NewRequest(http.MethodPost, "/api/env/bulk", bytes.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 			handler.BulkEnv(w, req)
@@ -777,7 +777,7 @@ func TestPostEnvSecretHandling(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(payload)
-	req := httptest.NewRequest("POST", "/api/env", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/env", bytes.NewReader(body))
 	w := httptest.NewRecorder()
 	handler.PostEnv(w, req)
 
