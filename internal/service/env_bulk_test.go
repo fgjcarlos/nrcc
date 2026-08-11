@@ -421,7 +421,7 @@ func (r *restartRecorder) callback(set func() error) (bool, error) {
 	if r.err != nil {
 		return false, r.err
 	}
-	return true, nil
+	return true, set()
 }
 
 // TestApplyBulkEnvRestartCallback is the #540 regression: it locks in the
@@ -495,5 +495,39 @@ func TestApplyBulkEnvRestartCallback(t *testing.T) {
 				t.Fatalf("callback calls = %d, want %d", len(rec.calls), tc.wantCallCount)
 			}
 		})
+	}
+}
+
+func TestParseBulkEnv_CallbacksExecutedOnSuccess(t *testing.T) {
+	svc := NewEnvService(NewIsolatedConfigService(t.TempDir()))
+	setCalled, stopCalled, syncCalled := 0, 0, 0
+	svc.syncNodeRedGlobals = func(keys []string) error {
+		syncCalled++
+		if len(keys) != 1 || keys[0] != "KEY" {
+			t.Fatalf("sync keys=%v, want [KEY]", keys)
+		}
+		return nil
+	}
+	parsed := ParseBulkEnv("KEY=value")
+	_, err := svc.ApplyBulkEnv(parsed, func(set func() error) (bool, error) {
+		stopCalled++
+		if err := set(); err != nil {
+			return true, err
+		}
+		setCalled++
+		return false, nil
+	})
+	if err != nil {
+		t.Fatalf("ApplyBulkEnv: %v", err)
+	}
+	if setCalled != 1 || stopCalled != 1 || syncCalled != 1 {
+		t.Fatalf("set=%d stop=%d sync=%d, want 1/1/1", setCalled, stopCalled, syncCalled)
+	}
+	config, err := svc.configSvc.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(config.EnvVars) != 1 || config.EnvVars[0].Key != "KEY" {
+		t.Fatalf("callback did not execute mutation: %+v", config.EnvVars)
 	}
 }
