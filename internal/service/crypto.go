@@ -28,10 +28,43 @@ const (
 	// deployments — see #478 for the rationale. mem=64 MiB, t=3, p=2 gives
 	// ~250 ms per derivation on the reference host, which is acceptable
 	// for an operator-only download path.
-	argon2Memory = 64 * 1024
-	argon2Time   = 3
+	argon2Memory  = 64 * 1024
+	argon2Time    = 3
 	argon2Threads = 2
 )
+
+// placeholderSecrets lists values that look like real secrets but are
+// in fact well-known defaults shipped in .env.example. Any caller
+// accepting an operator-supplied secret (JWT_SECRET,
+// NRCC_ENCRYPTION_KEY, …) must run it through ValidateSecret before
+// trusting it. The list is intentionally short — extend it when a new
+// "change-me" default appears in the example env file. See #584.
+var placeholderSecrets = []string{
+	"cc-secret-change-in-production",
+	"change-me-in-production",
+	"dev-secret-not-for-production",
+}
+
+// ValidateSecret returns an error when value matches a known
+// placeholder default (case-insensitive). The name argument is only
+// used to make the error message actionable — pass the env var name
+// the operator needs to override. An empty value is considered
+// "not provided" and is not rejected here; callers that require the
+// secret to be set should enforce that separately.
+func ValidateSecret(name, value string) error {
+	if value == "" {
+		return nil
+	}
+	for _, placeholder := range placeholderSecrets {
+		if strings.EqualFold(value, placeholder) {
+			return fmt.Errorf(
+				"%s is set to a known placeholder (%q) — provide a real secret",
+				name, value,
+			)
+		}
+	}
+	return nil
+}
 
 // GenerateJWTSecret returns 32 random bytes hex-encoded. Moved here from
 // the removed installer package; only main.go's JWT bootstrap uses it.

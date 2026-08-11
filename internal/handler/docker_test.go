@@ -54,7 +54,7 @@ func TestDockerHandler_GetStatus_NativeNotAvailable(t *testing.T) {
 	c := &capturedCmd{psOutput: ""}
 	h.SetDockerService(newDockerServiceWith(t, c))
 
-	req := httptest.NewRequest("GET", "/api/docker/status", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/docker/status", nil)
 	w := httptest.NewRecorder()
 	h.GetStatus(w, req)
 
@@ -83,7 +83,7 @@ func TestDockerHandler_GetStatus_NativeWithContainer(t *testing.T) {
 	}
 	h.SetDockerService(newDockerServiceWith(t, c))
 
-	req := httptest.NewRequest("GET", "/api/docker/status", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/docker/status", nil)
 	w := httptest.NewRecorder()
 	h.GetStatus(w, req)
 

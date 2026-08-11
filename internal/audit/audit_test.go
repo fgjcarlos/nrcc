@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"os/exec"
@@ -20,7 +21,7 @@ func TestLog_WritesJSONLEvent(t *testing.T) {
 	}
 	defer func() { _ = svc.Close() }()
 
-	req := httptest.NewRequest("POST", "/api/auth/login", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", nil)
 	req.RemoteAddr = "192.168.1.10:12345"
 	req.Header.Set("User-Agent", "TestAgent/1.0")
 
@@ -53,7 +54,7 @@ func TestLog_WritesJSONLEvent(t *testing.T) {
 
 func TestLog_NilServiceIsNoop(t *testing.T) {
 	var svc *Service
-	req := httptest.NewRequest("GET", "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	svc.Log(req, "x", "X", "", "ok", nil)
 }
 
@@ -61,7 +62,7 @@ func TestLog_MultipleEvents(t *testing.T) {
 	svc, _ := NewService(t.TempDir())
 	defer func() { _ = svc.Close() }()
 
-	req := httptest.NewRequest("POST", "/test", nil)
+	req := httptest.NewRequest(http.MethodPost, "/test", nil)
 
 	for i := 0; i < 5; i++ {
 		svc.Log(req, "user", fmt.Sprintf("ACTION_%d", i), "", "ok", nil)
@@ -87,7 +88,7 @@ func TestLog_Rotation(t *testing.T) {
 	svc, _ := NewService(dir)
 	defer func() { _ = svc.Close() }()
 
-	req := httptest.NewRequest("POST", "/test", nil)
+	req := httptest.NewRequest(http.MethodPost, "/test", nil)
 	bigMeta := map[string]string{"data": strings.Repeat("x", 1024)}
 
 	for i := 0; i < 12000; i++ {
@@ -114,7 +115,7 @@ func TestLog_FilePermissions(t *testing.T) {
 	svc, _ := NewService(dir)
 	defer func() { _ = svc.Close() }()
 
-	req := httptest.NewRequest("POST", "/test", nil)
+	req := httptest.NewRequest(http.MethodPost, "/test", nil)
 	svc.Log(req, "user", "TEST", "", "ok", nil)
 
 	info, err := os.Stat(filepath.Join(dir, "audit", fileName))
@@ -212,7 +213,7 @@ func runAuditIPExtractionCase(t *testing.T, trustedProxies string, cases []audit
 				t.Fatalf("NewService: %v", err)
 			}
 
-			req := httptest.NewRequest("POST", "/test", nil)
+			req := httptest.NewRequest(http.MethodPost, "/test", nil)
 			req.RemoteAddr = tc.remoteAddr
 			req.Header.Set("X-Forwarded-For", tc.xff)
 			svc.Log(req, "user", "TEST", "", "ok", nil)
@@ -255,7 +256,7 @@ func TestLog_SecretsNeverLogged(t *testing.T) {
 	svc, _ := NewService(t.TempDir())
 	defer func() { _ = svc.Close() }()
 
-	req := httptest.NewRequest("POST", "/test", nil)
+	req := httptest.NewRequest(http.MethodPost, "/test", nil)
 	svc.Log(req, "admin", "ENV_SET", "DB_PASS", "ok", map[string]string{
 		"key":  "DB_PASS",
 		"type": "secret",

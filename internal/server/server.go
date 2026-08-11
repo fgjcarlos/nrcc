@@ -86,7 +86,11 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 		backupSvc.SetBackupProvider(provider)
 		log.Printf("backup: restic provider configured (%s)", provider.Repo)
 	}
-	envSvc := service.NewEnvService(configSvc, os.Getenv("NRCC_ENCRYPTION_KEY"))
+	encKey := os.Getenv("NRCC_ENCRYPTION_KEY")
+	if err := service.ValidateSecret("NRCC_ENCRYPTION_KEY", encKey); err != nil {
+		log.Fatalf("Encryption key error: %v", err)
+	}
+	envSvc := service.NewEnvService(configSvc, encKey)
 	envHandler := handler.NewEnvHandler(envSvc, dataDir) // TAREA 2c: Pass dataDir
 	flowSvc := service.NewFlowService(dataDir)
 	flowVersionSvc := service.NewFlowVersionService(dataDir)

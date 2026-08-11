@@ -14,7 +14,7 @@ func TestBootstrapHandler_GetStatus_StatusCode(t *testing.T) {
 	hostSvc := service.NewHostService(t.TempDir())
 	handler := NewBootstrapHandler(hostSvc)
 
-	req := httptest.NewRequest("GET", "/api/bootstrap/status", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/bootstrap/status", nil)
 	w := httptest.NewRecorder()
 
 	handler.GetStatus(w, req)
@@ -28,7 +28,7 @@ func TestBootstrapHandler_GetStatus_ValidHostStatusStructure(t *testing.T) {
 	hostSvc := service.NewHostService(t.TempDir())
 	handler := NewBootstrapHandler(hostSvc)
 
-	req := httptest.NewRequest("GET", "/api/bootstrap/status", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/bootstrap/status", nil)
 	w := httptest.NewRecorder()
 
 	handler.GetStatus(w, req)
@@ -49,7 +49,7 @@ func TestBootstrapHandler_GetStatus_ContentType(t *testing.T) {
 	hostSvc := service.NewHostService(t.TempDir())
 	handler := NewBootstrapHandler(hostSvc)
 
-	req := httptest.NewRequest("GET", "/api/bootstrap/status", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/bootstrap/status", nil)
 	w := httptest.NewRecorder()
 
 	handler.GetStatus(w, req)
@@ -64,7 +64,7 @@ func TestBootstrapHandler_GetStatus_JSONMarshalable(t *testing.T) {
 	hostSvc := service.NewHostService(t.TempDir())
 	handler := NewBootstrapHandler(hostSvc)
 
-	req := httptest.NewRequest("GET", "/api/bootstrap/status", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/bootstrap/status", nil)
 	w := httptest.NewRecorder()
 
 	handler.GetStatus(w, req)
@@ -80,7 +80,7 @@ func TestBootstrapHandler_GetStatus_AllFieldsAccessible(t *testing.T) {
 	hostSvc := service.NewHostService(t.TempDir())
 	handler := NewBootstrapHandler(hostSvc)
 
-	req := httptest.NewRequest("GET", "/api/bootstrap/status", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/bootstrap/status", nil)
 	w := httptest.NewRecorder()
 
 	handler.GetStatus(w, req)
@@ -120,7 +120,7 @@ func TestBootstrapHandler_GetStatus_MultipleRequests_Consistent(t *testing.T) {
 	handler := NewBootstrapHandler(hostSvc)
 
 	// First request
-	req1 := httptest.NewRequest("GET", "/api/bootstrap/status", nil)
+	req1 := httptest.NewRequest(http.MethodGet, "/api/bootstrap/status", nil)
 	w1 := httptest.NewRecorder()
 	handler.GetStatus(w1, req1)
 
@@ -128,7 +128,7 @@ func TestBootstrapHandler_GetStatus_MultipleRequests_Consistent(t *testing.T) {
 	_ = json.Unmarshal(w1.Body.Bytes(), &status1)
 
 	// Second request
-	req2 := httptest.NewRequest("GET", "/api/bootstrap/status", nil)
+	req2 := httptest.NewRequest(http.MethodGet, "/api/bootstrap/status", nil)
 	w2 := httptest.NewRecorder()
 	handler.GetStatus(w2, req2)
 

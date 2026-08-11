@@ -2,10 +2,28 @@
 #
 # The CI job (.github/workflows/pr.yml) runs `golangci-lint run ./...` (no
 # only-new-issues) so the gate is repo-wide. Closes #396.
+# Extends the security-focused linter set per #596.
 version: "2"
 
 linters:
   # Default v2 linters (errcheck, govet, ineffassign, staticcheck, unused) plus
   # gocritic for the opinionated diagnostics requested in #286.
+  # Correctness additions per #596, limited to the ones the repo already
+  # passes clean: bodyclose (HTTP body leaks), predeclared (shadowed
+  # builtins), sqlclosecheck (open DB handles), tparallel (parallel test
+  # correctness), unconvert (redundant conversions), wastedassign (dead
+  # writes), usestdlibvars (use http.MethodGet etc.).
+  #
+  # NOT enabled yet — each has pre-existing findings that would fail the
+  # repo-wide gate on day one (counts as of 2026-08-11):
+  #   gosec 27, revive 50, paralleltest 50, errorlint 9, nilerr 5
+  # Enable one per cleanup PR. Tracking in audit meta-issue #597.
   enable:
     - gocritic
+    - bodyclose
+    - predeclared
+    - sqlclosecheck
+    - tparallel
+    - unconvert
+    - wastedassign
+    - usestdlibvars

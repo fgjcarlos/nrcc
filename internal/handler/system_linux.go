@@ -18,7 +18,7 @@ func getSystemStats() (uptime uint64, memTotal, memFree uint64) {
 	if err := syscall.Sysinfo(&sysinfo); err != nil {
 		return 0, 0, 0
 	}
-	return uint64(sysinfo.Uptime), uint64(sysinfo.Totalram), uint64(sysinfo.Freeram)
+	return uint64(sysinfo.Uptime), sysinfo.Totalram, sysinfo.Freeram
 }
 
 // readCPUStat reads total and idle CPU jiffies from /proc/stat

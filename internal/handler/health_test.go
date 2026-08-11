@@ -18,7 +18,7 @@ func TestHealthz_Returns200(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	req := httptest.NewRequest("GET", "/healthz", nil)
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -37,7 +37,7 @@ func TestAuthStatus_NoAuthRequired_Field(t *testing.T) {
 	authSvc := service.NewAuthService("test-secret", userStore, sessionStore)
 	handler := NewAuthHandler(authSvc)
 
-	req := httptest.NewRequest("GET", "/api/auth/status", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/status", nil)
 	w := httptest.NewRecorder()
 	handler.GetStatus(w, req)
 
@@ -80,7 +80,7 @@ func TestAuthStatus_InitializedWhenUsersExist(t *testing.T) {
 	_ = authSvc.CreateUser(user)
 
 	handler := NewAuthHandler(authSvc)
-	req := httptest.NewRequest("GET", "/api/auth/status", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/status", nil)
 	w := httptest.NewRecorder()
 	handler.GetStatus(w, req)
 

@@ -22,10 +22,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # pin to commit (v7.0.0)
 
       - name: Set up Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # pin to commit (v7.0.0)
         with:
           go-version: "1.25.12"
           cache-dependency-path: go.sum
@@ -50,7 +50,7 @@ jobs:
         working-directory: frontend
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # pin to commit (v7.0.0)
 
       - name: Setup pnpm via corepack
         run: |
@@ -59,7 +59,7 @@ jobs:
           pnpm --version
 
       - name: Set up Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # pin to commit (v7.0.0)
         with:
           node-version: "22"
           cache: pnpm
@@ -77,7 +77,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # pin to commit (v7.0.0)
 
       - name: Build image for scanning
         # Single Dockerfile now — same target as compose's local build.
@@ -86,7 +86,7 @@ jobs:
       # Non-blocking: base image (nodered/node-red) carries upstream CVEs
       # outside our control. Results are uploaded to GitHub Security tab.
       - name: Run Trivy
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # pin to commit (v0.36.0 — latest stable; 0.28.0 tag no longer published)
         with:
           image-ref: nrcc:scan
           format: sarif

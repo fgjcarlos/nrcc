@@ -48,7 +48,7 @@ OS env → EnvService → `.env`.
 | `DATA_DIR` | `./data` | NRCC config + Node-RED userDir root | yes |
 | `JWT_SECRET` | generated/persisted | JWT signing secret. Required in prod. | yes |
 | `NRCC_ENCRYPTION_KEY` | none (encryption disabled) | Encrypts the persisted env/secret store | yes |
-| `NRCC_CORS_ORIGINS` | `*` | Comma-separated allowed origins | yes |
+| `NRCC_CORS_ORIGINS` | empty (deny all cross-origin requests) | Comma-separated allowed origins | yes |
 | `NRCC_CORS_UNSAFE_WILDCARD` | `false` | Allow `*` even when origins are set (dev only) | yes |
 | `NRCC_TRUSTED_PROXIES` | empty | Comma-separated CIDRs/IPs trusted for forwarded headers | yes |
 | `EDGE_MODE` | `false` | Resource-safe defaults for Pi/NAS (ADR 0002) | yes |

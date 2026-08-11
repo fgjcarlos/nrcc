@@ -54,7 +54,7 @@ func TestSaveConfigWithFrontendPayload(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(frontendPayload)
-	req := httptest.NewRequest("POST", "/api/config", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/config", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	// Inject admin claims into context
@@ -109,7 +109,7 @@ func TestSaveConfigWithAdminAuth(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(frontendPayload)
-	req := httptest.NewRequest("POST", "/api/config", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/config", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	ctx := req.Context()
@@ -165,7 +165,7 @@ func TestSaveConfigAdminAuthRequiresUsername(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(frontendPayload)
-	req := httptest.NewRequest("POST", "/api/config", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/config", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	ctx := req.Context()
@@ -205,7 +205,7 @@ func TestSaveConfigAdminAuthRequiresPassword(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(frontendPayload)
-	req := httptest.NewRequest("POST", "/api/config", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/config", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	ctx := req.Context()
@@ -267,7 +267,7 @@ func TestSaveConfigAdminAuthPreservePassword(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(updatePayload)
-	req := httptest.NewRequest("POST", "/api/config", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/config", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 
 	ctx := req.Context()
