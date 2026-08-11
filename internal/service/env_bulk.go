@@ -154,6 +154,17 @@ func (s *EnvService) ApplyBulkEnv(parsed BulkEnvResult, restart func(func() erro
 	for _, line := range parsed.Lines {
 		changedKeys = append(changedKeys, line.Key)
 	}
+	if restart == nil {
+		if committed, err := s.applyBulkEnvDirect(parsed.Lines); committed {
+			if err != nil {
+				return parsed, err
+			}
+			if err := s.syncNodeRedGlobals(changedKeys); err != nil {
+				return parsed, fmt.Errorf("environment JSON committed but final Node-RED global sync failed: %w", err)
+			}
+			return parsed, nil
+		}
+	}
 	for i, line := range parsed.Lines {
 		encrypted := line.Type == "secret"
 		set := func() error {
@@ -179,6 +190,57 @@ func (s *EnvService) ApplyBulkEnv(parsed BulkEnvResult, restart func(func() erro
 		}
 	}
 	return parsed, nil
+}
+
+// applyBulkEnvDirect commits a fully validated direct batch in one atomic
+// config write. It declines malformed synthetic BulkEnvResults so the legacy
+// per-entry path can preserve its partial-commit error contract.
+func (s *EnvService) applyBulkEnvDirect(lines []BulkEnvLine) (bool, error) {
+	staged := make([]model.EnvVar, len(lines))
+	for i, line := range lines {
+		if err := ValidateEnvKey(line.Key); err != nil {
+			return false, nil
+		}
+		if err := ValidateValue(line.Value, line.Type); err != nil {
+			return false, nil
+		}
+		value := line.Value
+		encrypted := line.Type == "secret"
+		if encrypted && value != "" && s.encryptionKey != "" {
+			var err error
+			value, err = Encrypt(value, s.encryptionKey)
+			if err != nil {
+				return false, nil
+			}
+		}
+		staged[i] = model.EnvVar{
+			Key: line.Key, Value: value, Type: line.Type,
+			Description: "bulk import", Encrypted: encrypted,
+		}
+	}
+
+	_, err := s.configSvc.Update(func(current *model.NodeRedConfig) error {
+		indexes := make(map[string]int, len(current.EnvVars))
+		for i := range current.EnvVars {
+			indexes[current.EnvVars[i].Key] = i
+		}
+		for i, envVar := range staged {
+			if index, ok := indexes[envVar.Key]; ok {
+				if lines[i].Value == "" && current.EnvVars[index].Encrypted {
+					envVar.Value = current.EnvVars[index].Value
+				}
+				current.EnvVars[index] = envVar
+				continue
+			}
+			indexes[envVar.Key] = len(current.EnvVars)
+			current.EnvVars = append(current.EnvVars, envVar)
+		}
+		return nil
+	})
+	if err != nil {
+		return true, fmt.Errorf("update environment config: %w", err)
+	}
+	return true, nil
 }
 
 // unused but keep package symbol referenced on stripped builds

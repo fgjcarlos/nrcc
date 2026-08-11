@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/fgjcarlos/nrcc/internal/model"
 	"github.com/fgjcarlos/nrcc/internal/service"
@@ -103,13 +104,40 @@ func testBulkEndpointCapRejection(t *testing.T, commit bool) {
 	}
 }
 
-func BenchmarkBulkImport_1000(b *testing.B) {
+func BenchmarkParseBulkEnv_1000(b *testing.B) {
 	content := bulkEnvContent(1000)
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		result, err := service.ParseBulkEnvWithLimits(content, service.DefaultBulkLimits())
 		if err != nil || !result.Valid || len(result.Lines) != 1000 {
 			b.Fatalf("valid=%v lines=%d err=%v", result.Valid, len(result.Lines), err)
+		}
+	}
+}
+
+func BenchmarkBulkImportCommit_1000(b *testing.B) {
+	dir := b.TempDir()
+	configSvc := service.NewIsolatedConfigService(dir)
+	handler := NewEnvHandler(service.NewEnvService(configSvc), dir)
+	content := bulkEnvContent(1000)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		started := time.Now()
+		w := postBulkEnv(b, handler, content, true)
+		elapsed := time.Since(started)
+		if w.Code != http.StatusOK {
+			b.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+		}
+		config, err := configSvc.Get()
+		if err != nil {
+			b.Fatal(err)
+		}
+		if len(config.EnvVars) != 1000 {
+			b.Fatalf("persisted=%d, want 1000", len(config.EnvVars))
+		}
+		if elapsed >= time.Second {
+			b.Fatalf("committed import took %s, want <1s", elapsed)
 		}
 	}
 }
