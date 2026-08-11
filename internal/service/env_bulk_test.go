@@ -205,8 +205,8 @@ func TestApplyBulkEnvRejectsInvalid(t *testing.T) {
 	dir := t.TempDir()
 	svc := NewEnvService(NewIsolatedConfigService(dir))
 	parsed := ParseBulkEnv("BADLINE")
-	if _, err := svc.ApplyBulkEnv(parsed, nil); err == nil || !errors.Is(err, err) {
-		t.Fatalf("expected error for invalid payload, got nil (parsed=%v)", parsed)
+	if _, err := svc.ApplyBulkEnv(parsed, nil); err == nil || err.Error() != "bulk payload failed validation" {
+		t.Fatalf("expected invalid-payload error, got %v (parsed=%v)", err, parsed)
 	}
 }
 
@@ -530,4 +530,48 @@ func TestParseBulkEnv_CallbacksExecutedOnSuccess(t *testing.T) {
 	if len(config.EnvVars) != 1 || config.EnvVars[0].Key != "KEY" {
 		t.Fatalf("callback did not execute mutation: %+v", config.EnvVars)
 	}
+}
+
+func TestNodeRedGlobalEnv_ErrorPaths(t *testing.T) {
+	t.Run("uninitialized service", func(t *testing.T) {
+		var svc *EnvService
+		if _, err := svc.activeNodeRedUserDir(); err == nil {
+			t.Fatal("activeNodeRedUserDir error=nil")
+		}
+		if _, err := svc.nodeRedGlobalEnvList(); err == nil {
+			t.Fatal("nodeRedGlobalEnvList error=nil")
+		}
+	})
+	t.Run("invalid sync key", func(t *testing.T) {
+		svc := NewEnvService(NewIsolatedConfigService(t.TempDir()))
+		if err := svc.syncNodeRedGlobalEnv("BAD\nKEY", nil); err == nil {
+			t.Fatal("syncNodeRedGlobalEnv error=nil")
+		}
+		if err := svc.syncNodeRedGlobalEnvs([]string{"BAD\nKEY"}); err == nil {
+			t.Fatal("syncNodeRedGlobalEnvs error=nil")
+		}
+	})
+	t.Run("malformed global environment", func(t *testing.T) {
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, "flows.json"), []byte(`[{"type":"global-config","env":{}}]`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		svc := NewEnvService(NewIsolatedConfigService(dir))
+		if err := svc.syncNodeRedGlobalEnvs([]string{"A"}); err == nil || !strings.Contains(err.Error(), "parse Node-RED global environment") {
+			t.Fatalf("unexpected sync error: %v", err)
+		}
+		if _, err := svc.nodeRedGlobalEnvList(); err == nil {
+			t.Fatal("nodeRedGlobalEnvList error=nil")
+		}
+	})
+	t.Run("flow path is a directory", func(t *testing.T) {
+		dir := t.TempDir()
+		if err := os.Mkdir(filepath.Join(dir, "flows.json"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		svc := NewEnvService(NewIsolatedConfigService(dir))
+		if _, err := svc.nodeRedGlobalEnvList(); err == nil || !strings.Contains(err.Error(), "read Node-RED flows") {
+			t.Fatalf("unexpected list error: %v", err)
+		}
+	})
 }

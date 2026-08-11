@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/fgjcarlos/nrcc/internal/model"
 	"github.com/fgjcarlos/nrcc/internal/service"
+	"github.com/go-chi/chi/v5"
 )
 
 func TestBulkEndpoint_1000Entries(t *testing.T) {
@@ -101,6 +103,99 @@ func testBulkEndpointCapRejection(t *testing.T, commit bool) {
 	}
 	if !bytes.Equal(beforeConfig, afterConfig) || !bytes.Equal(beforeFlows, afterFlows) {
 		t.Fatalf("cap rejection mutated state (commit=%v)", commit)
+	}
+}
+
+func TestEnvHandler_RemainingEnvironmentEndpoints(t *testing.T) {
+	dir := t.TempDir()
+	svc := service.NewEnvService(service.NewIsolatedConfigService(dir))
+	handler := NewEnvHandler(svc, dir)
+	handler.SetManagedRuntime(true)
+	handler.SetProcessManager(nil)
+	handler.SetAuditService(nil)
+	if err := svc.Set("DELETE_ME", "value", "string", "", false); err != nil {
+		t.Fatal(err)
+	}
+
+	w := httptest.NewRecorder()
+	handler.GetEnv(w, httptest.NewRequest(http.MethodGet, "/api/env", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("GetEnv status=%d body=%s", w.Code, w.Body.String())
+	}
+	router := chi.NewRouter()
+	router.Delete("/api/env/{key}", handler.DeleteEnv)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, httptest.NewRequest(http.MethodDelete, "/api/env/DELETE_ME", nil))
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("DeleteEnv status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	w = httptest.NewRecorder()
+	handler.ImportFromNodeRedEnv(w, httptest.NewRequest(http.MethodPost, "/api/env/import-from-node-red", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("ImportFromNodeRedEnv status=%d body=%s", w.Code, w.Body.String())
+	}
+	w = httptest.NewRecorder()
+	handler.GetDotenv(w, httptest.NewRequest(http.MethodGet, "/api/env/dotenv", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("GetDotenv status=%d body=%s", w.Code, w.Body.String())
+	}
+	w = httptest.NewRecorder()
+	handler.PutDotenv(w, httptest.NewRequest(http.MethodPut, "/api/env/dotenv", strings.NewReader(`{"content":"A=1"}`)))
+	if w.Code != http.StatusOK || handler.restartIfRunning() {
+		t.Fatalf("PutDotenv status=%d restarted=true body=%s", w.Code, w.Body.String())
+	}
+	if _, err := handler.withManagedNodeRedStopped(func() error { return errors.New("change failed") }); err == nil {
+		t.Fatal("withManagedNodeRedStopped error=nil")
+	}
+
+	handler.SetManagedRuntime(false)
+	w = postBulkEnv(t, handler, "A=1", true)
+	if w.Code != http.StatusInternalServerError || !strings.Contains(w.Body.String(), "BULK_IMPORT_FAILED") {
+		t.Fatalf("unmanaged bulk status=%d body=%s", w.Code, w.Body.String())
+	}
+	handler.SetManagedRuntime(true)
+	t.Setenv("NRCC_BULK_MAX_ENTRIES", "-1")
+	w = postBulkEnv(t, handler, "A=1", false)
+	if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "cannot be negative") {
+		t.Fatalf("invalid-limit status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestEnvHandler_EnvironmentErrorResponses(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte("{"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	handler := NewEnvHandler(service.NewEnvService(service.NewIsolatedConfigService(dir)), dir)
+	w := httptest.NewRecorder()
+	handler.GetEnv(w, httptest.NewRequest(http.MethodGet, "/api/env", nil))
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("GetEnv status=%d", w.Code)
+	}
+
+	dir = t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "flows.json"), []byte(`[{"type":"global-config","env":{}}]`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	handler = NewEnvHandler(service.NewEnvService(service.NewIsolatedConfigService(dir)), dir)
+	w = httptest.NewRecorder()
+	handler.ImportFromNodeRedEnv(w, httptest.NewRequest(http.MethodPost, "/api/env/import-from-node-red", nil))
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("ImportFromNodeRedEnv status=%d", w.Code)
+	}
+
+	dataFile := filepath.Join(t.TempDir(), "data-file")
+	if err := os.WriteFile(dataFile, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	handler = NewEnvHandler(service.NewEnvService(service.NewIsolatedConfigService(t.TempDir())), dataFile)
+	for _, call := range []func(http.ResponseWriter, *http.Request){handler.GetDotenv, handler.PutDotenv} {
+		w = httptest.NewRecorder()
+		call(w, httptest.NewRequest(http.MethodPut, "/api/env/dotenv", strings.NewReader(`{"content":"A=1"}`)))
+		if w.Code != http.StatusInternalServerError {
+			t.Fatalf("dotenv error status=%d body=%s", w.Code, w.Body.String())
+		}
 	}
 }
 
