@@ -17,46 +17,27 @@ export interface AuthStatus {
   initialized: boolean;
 }
 
-// sessionStorage key for the access token. The access token lives
-// in sessionStorage (cleared on tab close, survives F5 in the same
-// tab) so a full-page reload rehydrates the session without having
-// to round-trip /auth/refresh. The refresh cookie path stays in
-// place as a fallback for the case where the in-tab token has
-// expired (token lifetime is short — see service.AccessTokenLifetime).
-const ACCESS_TOKEN_KEY = 'nrcc_access_token';
+let accessToken: string | null = null;
 
-function loadAccessToken(): string | null {
-  try {
-    return sessionStorage.getItem(ACCESS_TOKEN_KEY);
-  } catch {
-    // sessionStorage can throw in private-browsing / locked-down
-    // environments; fall back to module-only state.
-    return null;
-  }
+function setToken(token: string | null): void {
+  accessToken = token;
 }
 
-function saveAccessToken(token: string | null): void {
+async function logout(): Promise<void> {
+  const token = accessToken;
+  setToken(null);
   try {
-    if (token === null) {
-      sessionStorage.removeItem(ACCESS_TOKEN_KEY);
-    } else {
-      sessionStorage.setItem(ACCESS_TOKEN_KEY, token);
+    if (token) {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
+      });
     }
-  } catch {
-    // ignore — token is still in module memory for the current
-    // page session.
+  } finally {
+    setToken(null);
   }
 }
-
-let accessToken: string | null = loadAccessToken();
-
-registerTokenAccessors(
-  () => accessToken,
-  (token: string) => {
-    accessToken = token;
-    saveAccessToken(token);
-  },
-);
 
 export const authService = {
   getStatus: async (): Promise<AuthStatus> => {
@@ -71,8 +52,7 @@ export const authService = {
       confirmPassword: password,
     });
     const { token, user } = response.data.data;
-    accessToken = token;
-    saveAccessToken(token);
+    setToken(token);
     return { token, user };
   },
 
@@ -82,29 +62,17 @@ export const authService = {
       password,
     });
     const { token, user } = response.data.data;
-    accessToken = token;
-    saveAccessToken(token);
+    setToken(token);
     return { token, user };
   },
 
-  logout: async () => {
-    accessToken = null;
-    saveAccessToken(null);
-    try {
-      await api.post('/auth/logout');
-    } catch {
-      // best-effort server-side revocation
-    }
-  },
+  logout,
 
   getToken: (): string | null => {
     return accessToken;
   },
 
-  setToken: (token: string) => {
-    accessToken = token;
-    saveAccessToken(token);
-  },
+  setToken,
 
   getMe: async (): Promise<User> => {
     const response = await api.get<{ data: User }>('/auth/me');
@@ -138,3 +106,8 @@ export const authService = {
     return response.data.data;
   },
 };
+
+registerTokenAccessors(
+  () => accessToken,
+  (token: string) => authService.setToken(token),
+);
