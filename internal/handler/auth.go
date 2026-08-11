@@ -4,6 +4,7 @@ import (
 	"crypto/subtle"
 	"errors"
 	"io/fs"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -38,6 +39,7 @@ type AuthHandler struct {
 	limiter              *mw.RateLimiter
 	loginMetrics         loginMetricsRecorder
 	createRefreshSession func(string) (string, error)
+	consumeSetupToken    func(string) error
 	refreshLocks         [refreshLockStripes]sync.Mutex
 	setupMu              sync.Mutex
 	setupTokenPath       string
@@ -48,6 +50,7 @@ func NewAuthHandler(authSvc *service.AuthService) *AuthHandler {
 	return &AuthHandler{
 		authSvc:              authSvc,
 		createRefreshSession: authSvc.CreateRefreshSession,
+		consumeSetupToken:    setupstate.ConsumeTokenFile,
 	}
 }
 
@@ -149,21 +152,18 @@ func (h *AuthHandler) Setup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	configured := len(users) > 0
-	var recoveryToken setupstate.SetupToken
+	var recoveryToken *setupstate.SetupToken
 	if configured {
 		if h.setupTokenPath == "" {
 			h.respondAlreadyConfigured(w, r)
 			return
 		}
-		recoveryToken, err = setupstate.ReadTokenFile(h.setupTokenPath)
-		if err != nil || subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Setup-Reset-Token")), []byte(recoveryToken.Raw)) != 1 {
+		token, err := setupstate.ReadTokenFile(h.setupTokenPath)
+		if err != nil || subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Setup-Reset-Token")), []byte(token.Raw)) != 1 {
 			h.respondAlreadyConfigured(w, r)
 			return
 		}
-		if err := setupstate.ConsumeTokenFile(h.setupTokenPath); err != nil {
-			model.RespondError(w, http.StatusInternalServerError, "CREATE_ERROR", "Failed to claim setup recovery token")
-			return
-		}
+		recoveryToken = &token
 	}
 
 	// Create the requested administrator.
@@ -188,9 +188,6 @@ func (h *AuthHandler) Setup(w http.ResponseWriter, r *http.Request) {
 		createUser = h.authSvc.CreateUser
 	}
 	if err := createUser(user); err != nil {
-		if configured {
-			_ = setupstate.WriteTokenFile(h.setupTokenPath, recoveryToken)
-		}
 		if errors.Is(err, service.ErrAlreadyConfigured) {
 			h.respondAlreadyConfigured(w, r)
 			return
@@ -210,6 +207,12 @@ func (h *AuthHandler) Setup(w http.ResponseWriter, r *http.Request) {
 	if err := h.setRefreshCookie(w, r, user.ID); err != nil {
 		model.RespondError(w, http.StatusInternalServerError, "REFRESH_SESSION_ERROR", "Failed to create refresh session")
 		return
+	}
+
+	if recoveryToken != nil {
+		if err := h.consumeSetupToken(h.setupTokenPath); err != nil {
+			log.Printf("auth setup: failed to consume recovery token after successful setup: %v", err)
+		}
 	}
 
 	resp := AuthResponse{
