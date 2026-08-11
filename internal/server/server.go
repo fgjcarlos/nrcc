@@ -123,12 +123,17 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 	updateHandler.SetAuditService(auditSvc)
 	filesHandler.SetAuditService(auditSvc)
 	flowHandler.SetAuditService(auditSvc)
-	authHandler.SetRateLimiter(middleware.NewRateLimiter(dataDir))
+	// One RateLimiter for the whole auth surface. Two instances would keep
+	// independent in-memory bucket maps while persisting to the same
+	// ratelimit.json, so each could overwrite the other's buckets from a
+	// stale map and drop lockouts. Closes #615.
+	rateLimiter := middleware.NewRateLimiter(dataDir)
+	authHandler.SetRateLimiter(rateLimiter)
 	mfaHandler.SetAuditService(auditSvc)
 	// MFA verify shares the auth surface's rate limiter instance so
 	// the per-IP and per-user buckets used by /api/auth/login also
 	// cover /api/auth/mfa/verify. Constructed once and shared.
-	mfaHandler.SetRateLimiter(middleware.NewRateLimiter(dataDir))
+	mfaHandler.SetRateLimiter(rateLimiter)
 
 	// Initialize metrics collector and wire into handlers
 	metricsCollector := metrics.NewCollector()
