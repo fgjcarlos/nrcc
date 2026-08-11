@@ -3,7 +3,6 @@ package audit
 import (
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/fgjcarlos/nrcc/internal/middleware"
 )
 
 const (
@@ -55,12 +56,16 @@ func (s *Service) Log(r *http.Request, actor, action, target, result string, met
 		return
 	}
 
+	// IP is resolved through middleware.ExtractIP, which honors
+	// NRCC_TRUSTED_PROXIES. Untrusted peers cannot spoof XFF.
+	ip := middleware.ExtractIP(r)
+
 	event := Event{
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
 		Actor:     actor,
 		Action:    action,
 		Target:    target,
-		IP:        extractIP(r),
+		IP:        ip,
 		UserAgent: r.Header.Get("User-Agent"),
 		Result:    result,
 		Meta:      meta,
@@ -159,15 +164,4 @@ func (s *Service) pruneOld() {
 	for _, name := range rotated[:len(rotated)-maxBackups] {
 		_ = os.Remove(filepath.Join(s.dir, name))
 	}
-}
-
-func extractIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		return strings.TrimSpace(strings.SplitN(xff, ",", 2)[0])
-	}
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return host
 }
