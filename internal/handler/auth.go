@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
@@ -117,8 +116,7 @@ func (h *AuthHandler) Setup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req SetupRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+	if !DecodeJSON(w, r, &req) {
 		return
 	}
 
@@ -202,8 +200,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req LoginRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+	if !DecodeJSON(w, r, &req) {
 		return
 	}
 
@@ -419,8 +416,7 @@ func (h *AuthHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req CreateUserRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+	if !DecodeJSON(w, r, &req) {
 		return
 	}
 
@@ -536,8 +532,7 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req PasswordChangeRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+	if !DecodeJSON(w, r, &req) {
 		return
 	}
 
@@ -593,8 +588,7 @@ func (h *AuthHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req UpdateUserRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+	if !DecodeJSON(w, r, &req) {
 		return
 	}
 

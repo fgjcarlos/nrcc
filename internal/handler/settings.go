@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/fgjcarlos/nrcc/internal/audit"
@@ -54,8 +53,7 @@ func (h *SettingsHandler) SaveRaw(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req RawSettingsRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+	if !DecodeJSON(w, r, &req) {
 		return
 	}
 	if req.Content == "" {

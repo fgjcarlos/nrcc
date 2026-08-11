@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -54,8 +53,7 @@ func (h *LibraryHandler) PostInstall(w http.ResponseWriter, r *http.Request) {
 		Name string `json:"name"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+	if !DecodeJSON(w, r, &req) {
 		return
 	}
 
@@ -117,8 +115,7 @@ func (h *LibraryHandler) PostSearch(w http.ResponseWriter, r *http.Request) {
 		Query string `json:"query"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+	if !DecodeJSON(w, r, &req) {
 		return
 	}
 

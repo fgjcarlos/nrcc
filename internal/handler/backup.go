@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -115,7 +114,9 @@ func (h *BackupHandler) PostBackup(w http.ResponseWriter, r *http.Request) {
 
 	// Try to parse JSON body if present
 	if r.ContentLength > 0 {
-		_ = json.NewDecoder(r.Body).Decode(&req) // best-effort; empty name on parse error
+		if !DecodeJSONBestEffort(w, r, &req) {
+			return
+		}
 	}
 
 	backup, err := h.svc.CreateTyped(model.BackupType(req.Type), req.Name)
@@ -274,8 +275,7 @@ func (h *BackupHandler) GetBackupConfig(w http.ResponseWriter, r *http.Request) 
 // POST /api/backups/config
 func (h *BackupHandler) PostBackupConfig(w http.ResponseWriter, r *http.Request) {
 	var req model.BackupConfig
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+	if !DecodeJSON(w, r, &req) {
 		return
 	}
 
@@ -296,8 +296,7 @@ func (h *BackupHandler) PostBackupConfig(w http.ResponseWriter, r *http.Request)
 // POST /api/scheduler/config
 func (h *BackupHandler) PostSchedulerConfig(w http.ResponseWriter, r *http.Request) {
 	var req model.SchedulerConfigRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+	if !DecodeJSON(w, r, &req) {
 		return
 	}
 
@@ -366,8 +365,7 @@ func (h *BackupHandler) GetSchedulerHistory(w http.ResponseWriter, r *http.Reque
 // PATCH /api/storage/retention
 func (h *BackupHandler) PatchStorageRetention(w http.ResponseWriter, r *http.Request) {
 	var req model.RetentionConfigRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+	if !DecodeJSON(w, r, &req) {
 		return
 	}
 
@@ -441,8 +439,7 @@ func (h *BackupHandler) RestoreProviderSnapshot(w http.ResponseWriter, r *http.R
 		ID          string `json:"id"`
 		Destination string `json:"destination"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+	if !DecodeJSON(w, r, &req) {
 		return
 	}
 	if req.ID == "" {

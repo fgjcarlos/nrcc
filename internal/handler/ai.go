@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -26,8 +25,7 @@ func NewAIHandler(svc ...*service.AIService) *AIHandler {
 // POST /api/ai/analyze/flow
 func (h *AIHandler) PostAnalyzeFlow(w http.ResponseWriter, r *http.Request) {
 	var req service.AIFlowRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid AI flow request")
+	if !DecodeJSON(w, r, &req) {
 		return
 	}
 	if req.Action == "" {
