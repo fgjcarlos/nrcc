@@ -61,6 +61,33 @@ func (s *EnvService) syncNodeRedGlobalEnv(key string, envVar *model.EnvVar) erro
 	if err != nil {
 		return fmt.Errorf("read Node-RED config: %w", err)
 	}
+	return s.syncNodeRedGlobalEnvValues(cfg, []string{key}, map[string]*model.EnvVar{key: envVar})
+}
+
+func (s *EnvService) syncNodeRedGlobalEnvs(keys []string) error {
+	cfg, err := s.configSvc.Get()
+	if err != nil {
+		return fmt.Errorf("read Node-RED config: %w", err)
+	}
+	wanted := make(map[string]struct{}, len(keys))
+	changes := make(map[string]*model.EnvVar, len(keys))
+	for _, key := range keys {
+		if err := ValidateEnvKey(key); err != nil {
+			return err
+		}
+		wanted[key] = struct{}{}
+		changes[key] = nil
+	}
+	for i := range cfg.EnvVars {
+		envVar := &cfg.EnvVars[i]
+		if _, ok := wanted[envVar.Key]; ok && !envVar.Encrypted && envVar.Type != "secret" {
+			changes[envVar.Key] = envVar
+		}
+	}
+	return s.syncNodeRedGlobalEnvValues(cfg, keys, changes)
+}
+
+func (s *EnvService) syncNodeRedGlobalEnvValues(cfg model.NodeRedConfig, keys []string, changes map[string]*model.EnvVar) error {
 
 	flowFile := cfg.FlowFile
 	if flowFile == "" {
@@ -115,7 +142,14 @@ func (s *EnvService) syncNodeRedGlobalEnv(key string, envVar *model.EnvVar) erro
 	}
 
 	if globalIndex == -1 {
-		if envVar == nil {
+		hasGlobal := false
+		for _, envVar := range changes {
+			if envVar != nil {
+				hasGlobal = true
+				break
+			}
+		}
+		if !hasGlobal {
 			return nil
 		}
 		id, _ := json.Marshal(uuid.NewString())
@@ -137,17 +171,25 @@ func (s *EnvService) syncNodeRedGlobalEnv(key string, envVar *model.EnvVar) erro
 		}
 	}
 
-	updated := make([]map[string]json.RawMessage, 0, len(items)+1)
+	wanted := make(map[string]struct{}, len(keys))
+	for _, key := range keys {
+		wanted[key] = struct{}{}
+	}
+	updated := make([]map[string]json.RawMessage, 0, len(items)+len(keys))
 	for _, item := range items {
 		var name string
 		if raw, ok := item["name"]; ok {
 			_ = json.Unmarshal(raw, &name)
 		}
-		if name != key {
+		if _, replace := wanted[name]; !replace {
 			updated = append(updated, item)
 		}
 	}
-	if envVar != nil {
+	for _, key := range keys {
+		envVar := changes[key]
+		if envVar == nil {
+			continue
+		}
 		raw, err := json.Marshal(nodeRedGlobalEnv{
 			Name:  envVar.Key,
 			Value: envVar.Value,

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bufio"
 	"fmt"
 	"strings"
 
@@ -35,6 +36,15 @@ type BulkEnvResult struct {
 // "string" when missing. Validation reuses ValidateEnvKey and ValidateValue
 // so the rules stay identical to single-entry POST /api/env.
 func ParseBulkEnv(content string) BulkEnvResult {
+	result, _ := ParseBulkEnvWithLimits(content, DefaultBulkLimits())
+	return result
+}
+
+func ParseBulkEnvWithLimits(content string, limits BulkLimits) (BulkEnvResult, error) {
+	limits, err := limits.resolved()
+	if err != nil {
+		return BulkEnvResult{}, err
+	}
 	var (
 		lines  []BulkEnvLine
 		issues []BulkEnvIssue
@@ -45,11 +55,21 @@ func ParseBulkEnv(content string) BulkEnvResult {
 	}
 
 	seen := map[string]int{}
-	for rawLineNum, raw := range strings.Split(content, "\n") {
-		lineNum := rawLineNum + 1
+	records := 0
+	scanner := bufio.NewScanner(strings.NewReader(content))
+	scanner.Buffer(nil, len(content)+1)
+	lineNum := 0
+	for scanner.Scan() {
+		lineNum++
+		raw := scanner.Text()
 		trimmed := strings.TrimSpace(raw)
 		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
 			continue
+		}
+		records++
+		if records > limits.MaxEntries {
+			addIssue(lineNum, "", fmt.Sprintf("maximum %d entries exceeded", limits.MaxEntries))
+			break
 		}
 
 		eq := strings.IndexByte(trimmed, '=')
@@ -73,6 +93,10 @@ func ParseBulkEnv(content string) BulkEnvResult {
 			}
 		}
 		value := rest // honour spaces inside value
+		if size := len(key) + len(value); size > limits.MaxEntryBytes {
+			addIssue(lineNum, key, fmt.Sprintf("maximum %d bytes per entry exceeded (received %d)", limits.MaxEntryBytes, size))
+			break
+		}
 
 		if err := ValidateEnvKey(key); err != nil {
 			addIssue(lineNum, key, err.Error())
@@ -99,7 +123,7 @@ func ParseBulkEnv(content string) BulkEnvResult {
 	default:
 		result.Summary = fmt.Sprintf("%d variable(s) ready", len(lines))
 	}
-	return result
+	return result, nil
 }
 
 func validBulkType(typ string) bool {
@@ -126,10 +150,31 @@ func (s *EnvService) ApplyBulkEnv(parsed BulkEnvResult, restart func(func() erro
 	if !parsed.Valid {
 		return parsed, fmt.Errorf("bulk payload failed validation")
 	}
+	changedKeys := make([]string, 0, len(parsed.Lines))
 	for _, line := range parsed.Lines {
+		changedKeys = append(changedKeys, line.Key)
+	}
+	if restart == nil {
+		if committed, err := s.applyBulkEnvDirect(parsed.Lines); committed {
+			if err != nil {
+				return parsed, err
+			}
+			if err := s.syncNodeRedGlobals(changedKeys); err != nil {
+				return parsed, fmt.Errorf("environment JSON committed but final Node-RED global sync failed: %w", err)
+			}
+			return parsed, nil
+		}
+	}
+	for i, line := range parsed.Lines {
 		encrypted := line.Type == "secret"
 		set := func() error {
-			return s.Set(line.Key, line.Value, line.Type, "bulk import", encrypted)
+			if err := s.set(line.Key, line.Value, line.Type, "bulk import", encrypted, false); err != nil {
+				return err
+			}
+			if restart != nil && i == len(parsed.Lines)-1 {
+				return s.syncNodeRedGlobals(changedKeys)
+			}
+			return nil
 		}
 		if restart != nil {
 			if _, err := restart(set); err != nil {
@@ -139,7 +184,63 @@ func (s *EnvService) ApplyBulkEnv(parsed BulkEnvResult, restart func(func() erro
 			return parsed, fmt.Errorf("line %d (%s): %w", line.Line, line.Key, err)
 		}
 	}
+	if restart == nil {
+		if err := s.syncNodeRedGlobals(changedKeys); err != nil {
+			return parsed, fmt.Errorf("environment JSON committed but final Node-RED global sync failed: %w", err)
+		}
+	}
 	return parsed, nil
+}
+
+// applyBulkEnvDirect commits a fully validated direct batch in one atomic
+// config write. It declines malformed synthetic BulkEnvResults so the legacy
+// per-entry path can preserve its partial-commit error contract.
+func (s *EnvService) applyBulkEnvDirect(lines []BulkEnvLine) (bool, error) {
+	staged := make([]model.EnvVar, len(lines))
+	for i, line := range lines {
+		if err := ValidateEnvKey(line.Key); err != nil {
+			return false, nil
+		}
+		if err := ValidateValue(line.Value, line.Type); err != nil {
+			return false, nil
+		}
+		value := line.Value
+		encrypted := line.Type == "secret"
+		if encrypted && value != "" && s.encryptionKey != "" {
+			var err error
+			value, err = Encrypt(value, s.encryptionKey)
+			if err != nil {
+				return false, nil
+			}
+		}
+		staged[i] = model.EnvVar{
+			Key: line.Key, Value: value, Type: line.Type,
+			Description: "bulk import", Encrypted: encrypted,
+		}
+	}
+
+	_, err := s.configSvc.Update(func(current *model.NodeRedConfig) error {
+		indexes := make(map[string]int, len(current.EnvVars))
+		for i := range current.EnvVars {
+			indexes[current.EnvVars[i].Key] = i
+		}
+		for i, envVar := range staged {
+			if index, ok := indexes[envVar.Key]; ok {
+				if lines[i].Value == "" && current.EnvVars[index].Encrypted {
+					envVar.Value = current.EnvVars[index].Value
+				}
+				current.EnvVars[index] = envVar
+				continue
+			}
+			indexes[envVar.Key] = len(current.EnvVars)
+			current.EnvVars = append(current.EnvVars, envVar)
+		}
+		return nil
+	})
+	if err != nil {
+		return true, fmt.Errorf("update environment config: %w", err)
+	}
+	return true, nil
 }
 
 // unused but keep package symbol referenced on stripped builds

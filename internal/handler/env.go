@@ -200,7 +200,24 @@ func (h *EnvHandler) BulkEnv(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	parsed := service.ParseBulkEnv(req.Content)
+	limits, err := service.BulkLimitsFromEnv()
+	if err != nil {
+		model.RespondJSON(w, http.StatusBadRequest, service.BulkEnvResult{
+			Issues:  []service.BulkEnvIssue{{Reason: err.Error()}},
+			Valid:   false,
+			Summary: "invalid bulk import limits",
+		})
+		return
+	}
+	parsed, err := service.ParseBulkEnvWithLimits(req.Content, limits)
+	if err != nil {
+		model.RespondJSON(w, http.StatusBadRequest, service.BulkEnvResult{
+			Issues:  []service.BulkEnvIssue{{Reason: err.Error()}},
+			Valid:   false,
+			Summary: "invalid bulk import limits",
+		})
+		return
+	}
 	if !parsed.Valid {
 		model.RespondJSON(w, http.StatusBadRequest, parsed)
 		return
@@ -213,7 +230,7 @@ func (h *EnvHandler) BulkEnv(w http.ResponseWriter, r *http.Request) {
 	// withManagedNodeRedStopped IS the stop/restart envelope for this handler.
 	// Pass nil so ApplyBulkEnv invokes set() directly inside this closure
 	// without firing an additional restart per line. See ApplyBulkEnv doc.
-	_, err := h.withManagedNodeRedStopped(func() error {
+	_, err = h.withManagedNodeRedStopped(func() error {
 		_, applyErr := h.svc.ApplyBulkEnv(parsed, nil)
 		return applyErr
 	})

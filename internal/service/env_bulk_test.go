@@ -110,6 +110,63 @@ func TestParseBulkEnv(t *testing.T) {
 	}
 }
 
+func TestParseBulkEnv_RejectsTooManyEntries(t *testing.T) {
+	result := mustParseBulkWithLimits(t, "A=1\nB=2\nC=3\n", BulkLimits{MaxEntries: 2, MaxEntryBytes: 8192})
+	assertBulkCap(t, result, 2, "maximum 2 entries")
+}
+
+func TestParseBulkEnv_RejectsEntryTooLarge(t *testing.T) {
+	result := mustParseBulkWithLimits(t, "K="+strings.Repeat("v", 8192), BulkLimits{MaxEntries: 1000, MaxEntryBytes: 8192})
+	assertBulkCap(t, result, 0, "maximum 8192 bytes")
+}
+
+func TestParseBulkEnv_AcceptsAtLimits(t *testing.T) {
+	value := strings.Repeat("é", 4095) + "v"
+	result := mustParseBulkWithLimits(t, "# ignored\n\nK="+value+"#string\nB=2", BulkLimits{MaxEntries: 2, MaxEntryBytes: 8192})
+	if !result.Valid || len(result.Lines) != 2 {
+		t.Fatalf("expected limits to be inclusive, got %+v", result)
+	}
+}
+
+func TestParseBulkEnv_LimitsFromConfig(t *testing.T) {
+	tests := []struct {
+		name, entries, bytes string
+		want                 BulkLimits
+		wantErr              bool
+	}{
+		{"defaults", "", "", DefaultBulkLimits(), false},
+		{"zero uses defaults", "0", "0", DefaultBulkLimits(), false},
+		{"custom", "2", "16", BulkLimits{MaxEntries: 2, MaxEntryBytes: 16}, false},
+		{"negative", "-1", "16", BulkLimits{}, true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv("NRCC_BULK_MAX_ENTRIES", test.entries)
+			t.Setenv("NRCC_BULK_MAX_ENTRY_BYTES", test.bytes)
+			got, err := BulkLimitsFromEnv()
+			if (err != nil) != test.wantErr || got != test.want {
+				t.Fatalf("limits=%+v, err=%v, want %+v/error=%v", got, err, test.want, test.wantErr)
+			}
+		})
+	}
+}
+
+func mustParseBulkWithLimits(t *testing.T, content string, limits BulkLimits) BulkEnvResult {
+	t.Helper()
+	result, err := ParseBulkEnvWithLimits(content, limits)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return result
+}
+
+func assertBulkCap(t *testing.T, result BulkEnvResult, lines int, issue string) {
+	t.Helper()
+	if result.Valid || len(result.Lines) != lines || len(result.Issues) != 1 || !strings.Contains(result.Issues[0].Reason, issue) {
+		t.Fatalf("expected %d lines and issue %q, got %+v", lines, issue, result)
+	}
+}
+
 func TestApplyBulkEnvPersistsSecretsAndNonSecrets(t *testing.T) {
 	dir := t.TempDir()
 	svc := NewEnvService(NewIsolatedConfigService(dir), "test-key")
@@ -148,8 +205,117 @@ func TestApplyBulkEnvRejectsInvalid(t *testing.T) {
 	dir := t.TempDir()
 	svc := NewEnvService(NewIsolatedConfigService(dir))
 	parsed := ParseBulkEnv("BADLINE")
-	if _, err := svc.ApplyBulkEnv(parsed, nil); err == nil || !errors.Is(err, err) {
-		t.Fatalf("expected error for invalid payload, got nil (parsed=%v)", parsed)
+	if _, err := svc.ApplyBulkEnv(parsed, nil); err == nil || err.Error() != "bulk payload failed validation" {
+		t.Fatalf("expected invalid-payload error, got %v (parsed=%v)", err, parsed)
+	}
+}
+
+func TestApplyBulkEnv_SyncCountOne(t *testing.T) {
+	svc := NewEnvService(NewIsolatedConfigService(t.TempDir()))
+	syncCalls := 0
+	svc.syncNodeRedGlobals = func(keys []string) error {
+		syncCalls++
+		if len(keys) != 3 {
+			t.Fatalf("sync received %d keys, want 3", len(keys))
+		}
+		return nil
+	}
+	parsed := ParseBulkEnv("A=1\nB=2\nC=3")
+	if _, err := svc.ApplyBulkEnv(parsed, nil); err != nil {
+		t.Fatalf("ApplyBulkEnv: %v", err)
+	}
+	if syncCalls != 1 {
+		t.Fatalf("sync calls=%d, want 1", syncCalls)
+	}
+}
+
+func TestApplyBulkEnv_PreservesManualGlobals(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "flows.json"), []byte(`[{"id":"global","type":"global-config","env":[{"name":"MANUAL","value":"keep","type":"str"}]}]`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	svc := NewEnvService(NewIsolatedConfigService(dir), "test-key")
+	parsed := ParseBulkEnv("A=1\nTOKEN=hidden#secret")
+	if _, err := svc.ApplyBulkEnv(parsed, nil); err != nil {
+		t.Fatalf("ApplyBulkEnv: %v", err)
+	}
+	flows, err := os.ReadFile(filepath.Join(dir, "flows.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(flows)
+	if !strings.Contains(text, `"name": "MANUAL"`) || !strings.Contains(text, `"name": "A"`) {
+		t.Fatalf("manual or managed global missing: %s", text)
+	}
+	if strings.Contains(text, `"name": "TOKEN"`) || strings.Contains(text, "hidden") {
+		t.Fatalf("secret leaked into globals: %s", text)
+	}
+}
+
+func TestParseBulkEnv_SecretConversionRemovesGlobal(t *testing.T) {
+	dir := t.TempDir()
+	svc := NewEnvService(NewIsolatedConfigService(dir), "test-key")
+	if err := svc.Set("KEY", "public", "string", "", false); err != nil {
+		t.Fatalf("seed global: %v", err)
+	}
+
+	syncGlobals := svc.syncNodeRedGlobals
+	syncCalls := 0
+	svc.syncNodeRedGlobals = func(keys []string) error {
+		syncCalls++
+		return syncGlobals(keys)
+	}
+	parsed := ParseBulkEnv("KEY=private#secret")
+	if _, err := svc.ApplyBulkEnv(parsed, nil); err != nil {
+		t.Fatalf("ApplyBulkEnv: %v", err)
+	}
+
+	config, err := svc.configSvc.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(config.EnvVars) != 1 || config.EnvVars[0].Key != "KEY" || config.EnvVars[0].Type != "secret" || !config.EnvVars[0].Encrypted {
+		t.Fatalf("secret conversion not persisted: %+v", config.EnvVars)
+	}
+	plaintext, err := Decrypt(config.EnvVars[0].Value, "test-key")
+	if err != nil || plaintext != "private" {
+		t.Fatalf("stored secret decrypts to %q, err=%v", plaintext, err)
+	}
+	flows, err := os.ReadFile(filepath.Join(dir, "flows.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(flows), `"name": "KEY"`) || strings.Contains(string(flows), "private") {
+		t.Fatalf("converted secret remained in globals: %s", flows)
+	}
+	if syncCalls != 1 {
+		t.Fatalf("final sync calls=%d, want 1", syncCalls)
+	}
+}
+
+func TestApplyBulkEnv_PartialFailureRollback(t *testing.T) {
+	svc := NewEnvService(NewIsolatedConfigService(t.TempDir()))
+	syncCalls := 0
+	svc.syncNodeRedGlobals = func([]string) error {
+		syncCalls++
+		return nil
+	}
+	parsed := BulkEnvResult{Valid: true, Lines: []BulkEnvLine{
+		{Line: 1, Key: "A", Value: "1", Type: "string"},
+		{Line: 2, Key: "BAD\nKEY", Value: "2", Type: "string"},
+	}}
+	if _, err := svc.ApplyBulkEnv(parsed, nil); err == nil || !strings.Contains(err.Error(), "line 2") {
+		t.Fatalf("expected contextual second-line failure, got %v", err)
+	}
+	if syncCalls != 0 {
+		t.Fatalf("partial apply synchronized %d times, want 0", syncCalls)
+	}
+	config, err := svc.configSvc.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(config.EnvVars) != 1 || config.EnvVars[0].Key != "A" {
+		t.Fatalf("existing per-entry commit semantics changed: %+v", config.EnvVars)
 	}
 }
 
@@ -255,7 +421,7 @@ func (r *restartRecorder) callback(set func() error) (bool, error) {
 	if r.err != nil {
 		return false, r.err
 	}
-	return true, nil
+	return true, set()
 }
 
 // TestApplyBulkEnvRestartCallback is the #540 regression: it locks in the
@@ -330,4 +496,82 @@ func TestApplyBulkEnvRestartCallback(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestParseBulkEnv_CallbacksExecutedOnSuccess(t *testing.T) {
+	svc := NewEnvService(NewIsolatedConfigService(t.TempDir()))
+	setCalled, stopCalled, syncCalled := 0, 0, 0
+	svc.syncNodeRedGlobals = func(keys []string) error {
+		syncCalled++
+		if len(keys) != 1 || keys[0] != "KEY" {
+			t.Fatalf("sync keys=%v, want [KEY]", keys)
+		}
+		return nil
+	}
+	parsed := ParseBulkEnv("KEY=value")
+	_, err := svc.ApplyBulkEnv(parsed, func(set func() error) (bool, error) {
+		stopCalled++
+		if err := set(); err != nil {
+			return true, err
+		}
+		setCalled++
+		return false, nil
+	})
+	if err != nil {
+		t.Fatalf("ApplyBulkEnv: %v", err)
+	}
+	if setCalled != 1 || stopCalled != 1 || syncCalled != 1 {
+		t.Fatalf("set=%d stop=%d sync=%d, want 1/1/1", setCalled, stopCalled, syncCalled)
+	}
+	config, err := svc.configSvc.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(config.EnvVars) != 1 || config.EnvVars[0].Key != "KEY" {
+		t.Fatalf("callback did not execute mutation: %+v", config.EnvVars)
+	}
+}
+
+func TestNodeRedGlobalEnv_ErrorPaths(t *testing.T) {
+	t.Run("uninitialized service", func(t *testing.T) {
+		var svc *EnvService
+		if _, err := svc.activeNodeRedUserDir(); err == nil {
+			t.Fatal("activeNodeRedUserDir error=nil")
+		}
+		if _, err := svc.nodeRedGlobalEnvList(); err == nil {
+			t.Fatal("nodeRedGlobalEnvList error=nil")
+		}
+	})
+	t.Run("invalid sync key", func(t *testing.T) {
+		svc := NewEnvService(NewIsolatedConfigService(t.TempDir()))
+		if err := svc.syncNodeRedGlobalEnv("BAD\nKEY", nil); err == nil {
+			t.Fatal("syncNodeRedGlobalEnv error=nil")
+		}
+		if err := svc.syncNodeRedGlobalEnvs([]string{"BAD\nKEY"}); err == nil {
+			t.Fatal("syncNodeRedGlobalEnvs error=nil")
+		}
+	})
+	t.Run("malformed global environment", func(t *testing.T) {
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, "flows.json"), []byte(`[{"type":"global-config","env":{}}]`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		svc := NewEnvService(NewIsolatedConfigService(dir))
+		if err := svc.syncNodeRedGlobalEnvs([]string{"A"}); err == nil || !strings.Contains(err.Error(), "parse Node-RED global environment") {
+			t.Fatalf("unexpected sync error: %v", err)
+		}
+		if _, err := svc.nodeRedGlobalEnvList(); err == nil {
+			t.Fatal("nodeRedGlobalEnvList error=nil")
+		}
+	})
+	t.Run("flow path is a directory", func(t *testing.T) {
+		dir := t.TempDir()
+		if err := os.Mkdir(filepath.Join(dir, "flows.json"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		svc := NewEnvService(NewIsolatedConfigService(dir))
+		if _, err := svc.nodeRedGlobalEnvList(); err == nil || !strings.Contains(err.Error(), "read Node-RED flows") {
+			t.Fatalf("unexpected list error: %v", err)
+		}
+	})
 }

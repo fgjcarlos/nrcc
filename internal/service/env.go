@@ -16,10 +16,11 @@ import (
 
 // EnvService handles environment variable operations
 type EnvService struct {
-	configSvc     *ConfigService
-	encryptionKey string
-	mu            sync.Mutex
-	pm            *ProcessManager
+	configSvc          *ConfigService
+	encryptionKey      string
+	mu                 sync.Mutex
+	pm                 *ProcessManager
+	syncNodeRedGlobals func([]string) error
 }
 
 // NewEnvService creates a new environment variable service.
@@ -29,10 +30,12 @@ func NewEnvService(configSvc *ConfigService, encryptionKey ...string) *EnvServic
 	if len(encryptionKey) > 0 {
 		key = encryptionKey[0]
 	}
-	return &EnvService{
+	s := &EnvService{
 		configSvc:     configSvc,
 		encryptionKey: key,
 	}
+	s.syncNodeRedGlobals = s.syncNodeRedGlobalEnvs
+	return s
 }
 
 // SetProcessManager records the active ProcessManager so env sync can reuse
@@ -237,6 +240,10 @@ func maskEnvVars(envVars []model.EnvVar) []model.EnvVar {
 // The typ parameter should be one of: "string", "number", "boolean", "secret"
 // Description is optional and used to document the purpose of the variable.
 func (s *EnvService) Set(key, value string, typ string, description string, encrypted bool) error {
+	return s.set(key, value, typ, description, encrypted, true)
+}
+
+func (s *EnvService) set(key, value string, typ string, description string, encrypted, syncGlobal bool) error {
 	if err := ValidateEnvKey(key); err != nil {
 		return err
 	}
@@ -284,7 +291,7 @@ func (s *EnvService) Set(key, value string, typ string, description string, encr
 	if err != nil {
 		return fmt.Errorf("update environment config: %w", err)
 	}
-	if previousNodeRedGlobal || !encrypted && typ != "secret" {
+	if syncGlobal && (previousNodeRedGlobal || !encrypted && typ != "secret") {
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		nodeRedVar, err := s.currentNodeRedGlobal(key)
