@@ -8,10 +8,13 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 )
 
 const SetupTokenFileName = ".nrcc-setup-token"
+
+var ensureTokenMu sync.Mutex
 
 type SetupToken struct {
 	Raw       string    `json:"token"`
@@ -79,20 +82,26 @@ func ConsumeTokenFile(path string) error {
 	return nil
 }
 
-func EnsureTokenFile(path string, configured bool) error {
-	if _, err := ReadTokenFile(path); err == nil {
-		return nil
+func EnsureTokenFile(path string, configured bool) (SetupToken, error) {
+	ensureTokenMu.Lock()
+	defer ensureTokenMu.Unlock()
+
+	if token, err := ReadTokenFile(path); err == nil {
+		return token, nil
 	} else if !errors.Is(err, fs.ErrNotExist) {
-		return err
+		return SetupToken{}, err
 	}
 	if configured {
-		return nil
+		return SetupToken{}, nil
 	}
 	token, err := GenerateToken()
 	if err != nil {
-		return err
+		return SetupToken{}, err
 	}
-	return WriteTokenFile(path, token)
+	if err := WriteTokenFile(path, token); err != nil {
+		return SetupToken{}, err
+	}
+	return token, nil
 }
 
 func (t SetupToken) String() string { return t.Raw }

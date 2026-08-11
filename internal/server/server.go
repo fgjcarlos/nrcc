@@ -62,7 +62,7 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 	authHandler := handler.NewAuthHandler(authSvc)
 	setupTokenPath := filepath.Join(dataDir, setupstate.SetupTokenFileName)
 	users, _ := authSvc.GetAllUsers()
-	err := setupstate.EnsureTokenFile(setupTokenPath, len(users) > 0)
+	_, err := setupstate.EnsureTokenFile(setupTokenPath, len(users) > 0)
 	if err != nil {
 		log.Printf("auth setup token unavailable: %v", err)
 	}
