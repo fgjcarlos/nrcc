@@ -252,6 +252,47 @@ func TestApplyBulkEnv_PreservesManualGlobals(t *testing.T) {
 	}
 }
 
+func TestParseBulkEnv_SecretConversionRemovesGlobal(t *testing.T) {
+	dir := t.TempDir()
+	svc := NewEnvService(NewIsolatedConfigService(dir), "test-key")
+	if err := svc.Set("KEY", "public", "string", "", false); err != nil {
+		t.Fatalf("seed global: %v", err)
+	}
+
+	syncGlobals := svc.syncNodeRedGlobals
+	syncCalls := 0
+	svc.syncNodeRedGlobals = func(keys []string) error {
+		syncCalls++
+		return syncGlobals(keys)
+	}
+	parsed := ParseBulkEnv("KEY=private#secret")
+	if _, err := svc.ApplyBulkEnv(parsed, nil); err != nil {
+		t.Fatalf("ApplyBulkEnv: %v", err)
+	}
+
+	config, err := svc.configSvc.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(config.EnvVars) != 1 || config.EnvVars[0].Key != "KEY" || config.EnvVars[0].Type != "secret" || !config.EnvVars[0].Encrypted {
+		t.Fatalf("secret conversion not persisted: %+v", config.EnvVars)
+	}
+	plaintext, err := Decrypt(config.EnvVars[0].Value, "test-key")
+	if err != nil || plaintext != "private" {
+		t.Fatalf("stored secret decrypts to %q, err=%v", plaintext, err)
+	}
+	flows, err := os.ReadFile(filepath.Join(dir, "flows.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(flows), `"name": "KEY"`) || strings.Contains(string(flows), "private") {
+		t.Fatalf("converted secret remained in globals: %s", flows)
+	}
+	if syncCalls != 1 {
+		t.Fatalf("final sync calls=%d, want 1", syncCalls)
+	}
+}
+
 func TestApplyBulkEnv_PartialFailureRollback(t *testing.T) {
 	svc := NewEnvService(NewIsolatedConfigService(t.TempDir()))
 	syncCalls := 0
