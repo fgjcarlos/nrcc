@@ -115,7 +115,7 @@ func (s *ConfigService) Save(cfg model.NodeRedConfig) error {
 		return err
 	}
 
-	if _, err := s.writeSettingsFile(renderSettingsJS(committed), false); err != nil {
+	if _, err := s.writeSettingsFile(s.renderSettings(committed), false); err != nil {
 		return fmt.Errorf("config JSON committed but settings.js update failed: %w", err)
 	}
 	return nil
@@ -358,12 +358,26 @@ func (s *ConfigService) backupSettingsFile(path string) (string, error) {
 	return backupPath, os.WriteFile(backupPath, data, 0600)
 }
 
-// renderSettingsJS either patches existing settings.js or generates a new one
+// renderSettings patches the live settings.js when one already exists, so
+// operator-authored blocks (functionGlobalContext, externalModules, https,
+// httpMiddleware, ...) survive a Save. Falls back to generating from scratch
+// on first write or when the file is unreadable. Closes #577.
+func (s *ConfigService) renderSettings(cfg model.NodeRedConfig) string {
+	path := s.hostSvc.Detect().Settings.Path
+	if path == "" {
+		path = filepath.Join(s.dataDir, "settings.js")
+	}
+	existing, err := os.ReadFile(path)
+	if err != nil || len(strings.TrimSpace(string(existing))) == 0 {
+		return generateSettingsJS(cfg)
+	}
+	return patchSettingsJS(string(existing), cfg)
+}
+
+// renderSettingsJS builds settings.js from scratch. Used for the default
+// preview in GetRawSettings when no file exists; Save goes through
+// (*ConfigService).renderSettings so existing content is patched, not clobbered.
 func renderSettingsJS(cfg model.NodeRedConfig) string {
-	// Note: We don't attempt to read the file from disk here because:
-	// 1. renderSettingsJS is called during Save(), and we'd need a file path
-	// 2. The patch strategy would be best called from writeSettingsFile() where we have the path
-	// For now, we generate from scratch. A future enhancement could implement patching.
 	return generateSettingsJS(cfg)
 }
 
@@ -489,6 +503,14 @@ func replaceBlockKey(content, key, blockContent string) string {
 	if re.MatchString(content) {
 		// Replace existing block
 		return re.ReplaceAllString(content, blockContent)
+	}
+
+	// The key may currently hold a scalar (e.g. `adminAuth: null,`) rather than
+	// a block. Without this, every Save appends a duplicate entry and the file
+	// grows unbounded.
+	scalarRe := regexp.MustCompile(fmt.Sprintf(`(?m)^\s*%s\s*:\s*[^,{\n]*,?\s*$`, regexp.QuoteMeta(key)))
+	if scalarRe.MatchString(content) {
+		return scalarRe.ReplaceAllString(content, blockContent)
 	}
 
 	// Block not found, append before closing brace
