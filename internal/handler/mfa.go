@@ -187,7 +187,7 @@ func (h *MfaHandler) Verify(w http.ResponseWriter, r *http.Request) {
 	// Rate limit by IP even before decoding — we want a single
 	// shared bucket with the rest of the auth surface.
 	if h.limiter != nil {
-		if blocked, retry := h.limiter.Check("mfa-verify-ip:" + ip); blocked {
+		if blocked, retry := h.limiter.Check(mw.AuthIPKey(ip)); blocked {
 			mw.RespondTooManyRequests(w, retry)
 			return
 		}
@@ -205,7 +205,7 @@ func (h *MfaHandler) Verify(w http.ResponseWriter, r *http.Request) {
 	// Look up the username for rate-limiting per-user and audit.
 	username := h.mfaSvc.LookupUsernameByMfaToken(req.MfaToken)
 	if username != "" && h.limiter != nil {
-		if blocked, retry := h.limiter.Check("mfa-verify-user:" + username); blocked {
+		if blocked, retry := h.limiter.Check(mw.AuthUserKey(username)); blocked {
 			mw.RespondTooManyRequests(w, retry)
 			return
 		}
@@ -226,9 +226,9 @@ func (h *MfaHandler) Verify(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, service.ErrMfaInvalidCode):
 			if h.limiter != nil {
 				if username != "" {
-					h.limiter.Record("mfa-verify-user:" + username)
+					h.limiter.Record(mw.AuthUserKey(username))
 				}
-				h.limiter.Record("mfa-verify-ip:" + ip)
+				h.limiter.Record(mw.AuthIPKey(ip))
 			}
 			h.audit.Log(r, username, "MFA_VERIFY", username, "fail", map[string]string{"reason": "bad_code"})
 			model.RespondError(w, http.StatusUnauthorized, "INVALID_CODE", "The provided code is not valid")
@@ -242,9 +242,9 @@ func (h *MfaHandler) Verify(w http.ResponseWriter, r *http.Request) {
 
 	// Reset the rate limit on success.
 	if h.limiter != nil {
-		h.limiter.Reset("mfa-verify-ip:" + ip)
+		h.limiter.Reset(mw.AuthIPKey(ip))
 		if username != "" {
-			h.limiter.Reset("mfa-verify-user:" + username)
+			h.limiter.Reset(mw.AuthUserKey(username))
 		}
 	}
 
