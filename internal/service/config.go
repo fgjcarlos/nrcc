@@ -670,75 +670,25 @@ func parseProjectsEnabledFromJS(content string, fallback bool) bool {
 }
 
 // parseAdminAuthFromJS extracts the adminAuth block from raw settings.js content
-// It handles the multiline adminAuth: { type: "...", users: [{ username, password, permissions }] } structure
+// using a goja-based JavaScript sandbox (see settings_sandbox.go). The legacy
+// regex implementation was removed because it failed on escaped quotes, line
+// comments, block comments and silently picked the first adminAuth block when
+// several were present. The sandbox observes actual script execution order,
+// so the value returned is whatever the script actually exported.
+//
+// Returns nil when the script does not export an adminAuth block or the
+// content cannot be parsed safely; preserves the legacy contract that callers
+// (parseConfigFromContent, LoadSettings) can simply check for nil.
 func parseAdminAuthFromJS(content string) *model.AdminAuth {
-	// Match the entire adminAuth block using a pattern that captures the JSON-like structure
-	// Pattern: adminAuth: { type: "...", users: [{ username: "...", password: "...", permissions: "..." }] }
-	adminAuthRe := regexp.MustCompile(`(?ms)adminAuth\s*:\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}`)
-	adminAuthMatches := adminAuthRe.FindStringSubmatch(content)
-
-	if len(adminAuthMatches) == 0 {
+	auth, err := ParseAdminAuthViaSandbox(content)
+	if err != nil {
+		// Surface the parse failure as nil to preserve the legacy contract;
+		// the sandbox still blocks forbidden host APIs and reports syntax
+		// errors via ErrSandboxRuntime / ErrSandboxSyntax if the caller wants
+		// to surface them.
 		return nil
 	}
-
-	blockContent := adminAuthMatches[1]
-
-	// Check if it's the null case
-	nullRe := regexp.MustCompile(`(?i)adminAuth\s*:\s*null`)
-	if nullRe.MatchString(content) {
-		return nil
-	}
-
-	// Extract type
-	typeRe := regexp.MustCompile(`type\s*:\s*['"]([^'"]+)['"]`)
-	typeMatches := typeRe.FindStringSubmatch(blockContent)
-	if len(typeMatches) == 0 {
-		return nil
-	}
-	authType := typeMatches[1]
-
-	// Extract users array
-	usersRe := regexp.MustCompile(`users\s*:\s*\[\s*(\{[^}]+\}(?:\s*,\s*\{[^}]+\})*)\s*\]`)
-	usersMatches := usersRe.FindStringSubmatch(blockContent)
-	if len(usersMatches) == 0 {
-		return nil
-	}
-
-	usersContent := usersMatches[1]
-
-	// Extract individual user objects
-	userRe := regexp.MustCompile(`\{([^}]+)\}`)
-	userMatches := userRe.FindAllStringSubmatch(usersContent, -1)
-
-	var users []model.AdminAuthUser
-	for _, userMatch := range userMatches {
-		if len(userMatch) == 0 {
-			continue
-		}
-		userContent := userMatch[1]
-
-		// Extract username, password, permissions
-		username := extractQuotedValue(userContent, "username")
-		password := extractQuotedValue(userContent, "password")
-		permissions := extractQuotedValue(userContent, "permissions")
-
-		if username != "" && password != "" {
-			users = append(users, model.AdminAuthUser{
-				Username:    username,
-				Password:    password,
-				Permissions: permissions,
-			})
-		}
-	}
-
-	if len(users) == 0 {
-		return nil
-	}
-
-	return &model.AdminAuth{
-		Type:  authType,
-		Users: users,
-	}
+	return auth
 }
 
 // extractQuotedValue extracts a quoted value from a key:value pair in a string
