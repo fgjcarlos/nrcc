@@ -51,6 +51,7 @@ OS env → EnvService → `.env`.
 | `NRCC_CORS_ORIGINS` | empty (deny all cross-origin requests) | Comma-separated allowed origins | yes |
 | `NRCC_CORS_UNSAFE_WILDCARD` | `false` | Allow `*` even when origins are set (dev only) | yes |
 | `NRCC_TRUSTED_PROXIES` | empty | Comma-separated CIDRs/IPs trusted for forwarded headers | yes |
+| `NRCC_TLS` | `false` | Mark setup refresh cookies Secure when TLS terminates outside the request path | yes |
 | `EDGE_MODE` | `false` | Resource-safe defaults for Pi/NAS (ADR 0002) | yes |
 | `NRCC_MANAGE_NODE_RED` | `true` | If `false`, NRCC never starts/stops Node-RED; it only attaches | yes |
 | `NRCC_IMAGE` | release image | Image tag the install/update flow tracks | yes |

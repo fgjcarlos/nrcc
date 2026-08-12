@@ -1,7 +1,10 @@
 package handler
 
 import (
+	"crypto/subtle"
 	"errors"
+	"io/fs"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -12,6 +15,7 @@ import (
 	mw "github.com/fgjcarlos/nrcc/internal/middleware"
 	"github.com/fgjcarlos/nrcc/internal/model"
 	"github.com/fgjcarlos/nrcc/internal/service"
+	setupstate "github.com/fgjcarlos/nrcc/internal/setup"
 	"github.com/google/uuid"
 )
 
@@ -35,7 +39,10 @@ type AuthHandler struct {
 	limiter              *mw.RateLimiter
 	loginMetrics         loginMetricsRecorder
 	createRefreshSession func(string) (string, error)
+	consumeSetupToken    func(string) error
 	refreshLocks         [refreshLockStripes]sync.Mutex
+	setupMu              sync.Mutex
+	setupTokenPath       string
 }
 
 // NewAuthHandler creates a new auth handler
@@ -43,6 +50,7 @@ func NewAuthHandler(authSvc *service.AuthService) *AuthHandler {
 	return &AuthHandler{
 		authSvc:              authSvc,
 		createRefreshSession: authSvc.CreateRefreshSession,
+		consumeSetupToken:    setupstate.ConsumeTokenFile,
 	}
 }
 
@@ -58,6 +66,9 @@ func (h *AuthHandler) SetRateLimiter(rl *mw.RateLimiter) { h.limiter = rl }
 
 // SetLoginMetrics injects the metrics recorder for login attempts.
 func (h *AuthHandler) SetLoginMetrics(m loginMetricsRecorder) { h.loginMetrics = m }
+
+// SetSetupTokenPath configures the one-time token used for authorized recovery.
+func (h *AuthHandler) SetSetupTokenPath(path string) { h.setupTokenPath = path }
 
 // SetupRequest represents the setup endpoint request
 type SetupRequest struct {
@@ -119,6 +130,7 @@ func (h *AuthHandler) Setup(w http.ResponseWriter, r *http.Request) {
 	if !DecodeJSON(w, r, &req) {
 		return
 	}
+	req.Username = strings.ToLower(strings.TrimSpace(req.Username))
 
 	// Validate input
 	if req.Username == "" || req.Password == "" {
@@ -131,7 +143,30 @@ func (h *AuthHandler) Setup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create first user as admin
+	h.setupMu.Lock()
+	defer h.setupMu.Unlock()
+
+	users, err := h.authSvc.GetAllUsers()
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		model.RespondError(w, http.StatusInternalServerError, "CREATE_ERROR", "Failed to inspect user configuration")
+		return
+	}
+	configured := len(users) > 0
+	var recoveryToken *setupstate.SetupToken
+	if configured {
+		if h.setupTokenPath == "" {
+			h.respondAlreadyConfigured(w, r)
+			return
+		}
+		token, err := setupstate.ReadTokenFile(h.setupTokenPath)
+		if err != nil || subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Setup-Reset-Token")), []byte(token.Raw)) != 1 {
+			h.respondAlreadyConfigured(w, r)
+			return
+		}
+		recoveryToken = &token
+	}
+
+	// Create the requested administrator.
 	hash, err := h.authSvc.HashPassword(req.Password)
 	if err != nil {
 		model.RespondError(w, http.StatusInternalServerError, "HASH_ERROR", "Failed to hash password")
@@ -148,12 +183,13 @@ func (h *AuthHandler) Setup(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt:    now,
 	}
 
-	if err := h.authSvc.BootstrapFirstAdmin(user); err != nil {
+	createUser := h.authSvc.BootstrapFirstAdmin
+	if configured {
+		createUser = h.authSvc.CreateUser
+	}
+	if err := createUser(user); err != nil {
 		if errors.Is(err, service.ErrAlreadyConfigured) {
-			if h.limiter != nil {
-				h.limiter.Record("setup-ip:" + mw.ExtractIP(r))
-			}
-			model.RespondError(w, http.StatusConflict, "ALREADY_CONFIGURED", "System already configured with users")
+			h.respondAlreadyConfigured(w, r)
 			return
 		}
 		model.RespondError(w, http.StatusInternalServerError, "CREATE_ERROR", "Failed to create user")
@@ -173,6 +209,12 @@ func (h *AuthHandler) Setup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if recoveryToken != nil {
+		if err := h.consumeSetupToken(h.setupTokenPath); err != nil {
+			log.Printf("auth setup: failed to consume recovery token after successful setup: %v", err)
+		}
+	}
+
 	resp := AuthResponse{
 		Token: token,
 		User: model.CCUserPublic{
@@ -186,6 +228,13 @@ func (h *AuthHandler) Setup(w http.ResponseWriter, r *http.Request) {
 
 	h.audit.Log(r, req.Username, "SYSTEM_SETUP", "", "ok", nil)
 	model.RespondJSON(w, http.StatusCreated, resp)
+}
+
+func (h *AuthHandler) respondAlreadyConfigured(w http.ResponseWriter, r *http.Request) {
+	if h.limiter != nil {
+		h.limiter.Record("setup-ip:" + mw.ExtractIP(r))
+	}
+	model.RespondError(w, http.StatusConflict, "ALREADY_CONFIGURED", "System already configured with users")
 }
 
 // Login handles POST /api/auth/login
