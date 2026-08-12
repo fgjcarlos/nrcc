@@ -1,11 +1,22 @@
 import { Lock } from 'lucide-react';
 import { InputField, ToggleField } from './FormFields';
 import type { NodeRedConfigFormData } from '@/shared/types';
+import { passwordSchema } from '@/shared/validation/schemas';
 
 interface AuthSettingsProps {
   settings: NodeRedConfigFormData;
   onUpdate: (field: keyof NodeRedConfigFormData, value: string | number | boolean) => void;
   disabled?: boolean;
+}
+
+// Returns the password validation message derived from the shared
+// passwordSchema, or undefined if the value passes. Centralises the rule
+// so every password field in this component agrees with UserModal.
+function passwordHelp(value: string): string | undefined {
+  if (!value) return undefined;
+  const result = passwordSchema.safeParse(value);
+  if (result.success) return undefined;
+  return result.error.issues[0]?.message ?? 'Invalid password';
 }
 
 export function AuthSettings({ settings, onUpdate, disabled }: AuthSettingsProps) {
@@ -15,7 +26,7 @@ export function AuthSettings({ settings, onUpdate, disabled }: AuthSettingsProps
         <Lock className="w-5 h-5 text-base-content/60" />
         <h3 className="text-lg font-medium text-base-content">Authentication</h3>
       </div>
-      
+
       <div className="space-y-6">
         {/* Admin Auth */}
         <div>
@@ -47,7 +58,7 @@ export function AuthSettings({ settings, onUpdate, disabled }: AuthSettingsProps
                     onChange={(v) => onUpdate('authAdminPassword', v as string)}
                     type="password"
                     placeholder="Enter new password"
-                    help={settings.authAdminPassword && settings.authAdminPassword.length < 6 ? 'Min 6 characters' : undefined}
+                    help={passwordHelp(settings.authAdminPassword)}
                     disabled={disabled}
                   />
                 </div>
@@ -86,7 +97,7 @@ export function AuthSettings({ settings, onUpdate, disabled }: AuthSettingsProps
                     onChange={(v) => onUpdate('authNodeHttpPassword', v as string)}
                     type="password"
                     placeholder="Enter new password"
-                    help={settings.authNodeHttpPassword && settings.authNodeHttpPassword.length < 6 ? 'Min 6 characters' : undefined}
+                    help={passwordHelp(settings.authNodeHttpPassword)}
                     disabled={disabled}
                   />
                 </div>
@@ -125,7 +136,7 @@ export function AuthSettings({ settings, onUpdate, disabled }: AuthSettingsProps
                     onChange={(v) => onUpdate('authStaticPassword', v as string)}
                     type="password"
                     placeholder="Enter new password"
-                    help={settings.authStaticPassword && settings.authStaticPassword.length < 6 ? 'Min 6 characters' : undefined}
+                    help={passwordHelp(settings.authStaticPassword)}
                     disabled={disabled}
                   />
                 </div>

@@ -5,6 +5,8 @@ import { toast } from 'sonner';
 import { Save, RefreshCw } from 'lucide-react';
 
 import { queryKeys } from '@/shared/lib/queryKeys';
+import { dotenvSchema } from '@/shared/validation/schemas';
+
 // TAREA 3: Component for editing .env file
 export function DotenvEditor() {
   const queryClient = useQueryClient();
@@ -42,6 +44,12 @@ export function DotenvEditor() {
   });
 
   const handleSave = () => {
+    const result = dotenvSchema.safeParse(content);
+    if (!result.success) {
+      const first = result.error.issues[0];
+      toast.error(`Invalid .env: ${first?.message ?? 'malformed content'}`);
+      return;
+    }
     saveMutation.mutate();
   };
 
