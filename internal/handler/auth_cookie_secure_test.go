@@ -124,6 +124,7 @@ func TestSetRefreshCookie_SecureAttribute(t *testing.T) {
 			}
 			if refreshCookie == nil {
 				t.Fatal("setRefreshCookie did not set a cookie")
+				return
 			}
 			if refreshCookie.Secure != tt.wantSecure {
 				t.Errorf("cookie Secure = %v, want %v (Set-Cookie header: %q)",
@@ -180,6 +181,7 @@ func TestClearRefreshCookie_SecureAttribute(t *testing.T) {
 			}
 			if refreshCookie == nil {
 				t.Fatal("clearRefreshCookie did not set a cookie")
+				return
 			}
 			if refreshCookie.Secure != tt.wantSecure {
 				t.Errorf("cookie Secure = %v, want %v (Set-Cookie header: %q)",

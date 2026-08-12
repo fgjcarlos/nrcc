@@ -198,6 +198,7 @@ func TestLogout_ClearsCookieAndRevokesRefreshSession(t *testing.T) {
 	}
 	if cleared == nil {
 		t.Fatal("logout should clear the refresh cookie")
+		return
 	}
 	if cleared.MaxAge >= 0 || cleared.Value != "" {
 		t.Fatalf("expected expired empty refresh cookie, got value=%q maxAge=%d", cleared.Value, cleared.MaxAge)
