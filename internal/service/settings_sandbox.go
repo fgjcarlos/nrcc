@@ -48,7 +48,12 @@ func ParseAdminAuthViaSandbox(content string) (*model.AdminAuth, error) {
 		"require", "process", "Buffer", "globalThis", "global",
 		"setTimeout", "setInterval", "fetch",
 	} {
-		rt.Set(name, goja.Undefined())
+		// Per goja docs Set may return an error for some value kinds; we
+		// pass goja.Undefined() which is always representable, but we still
+		// capture and surface the error if it ever happens.
+		if err := rt.Set(name, goja.Undefined()); err != nil {
+			return nil, fmt.Errorf("sandbox setup: block %q: %w", name, err)
+		}
 	}
 
 	if _, err := rt.RunString(wrapped); err != nil {
