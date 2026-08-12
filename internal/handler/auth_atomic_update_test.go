@@ -130,6 +130,7 @@ func TestAuthHandler_LoginPasswordRehash_Concurrent(t *testing.T) {
 	user := authSvc.GetUserByID("u1")
 	if user == nil {
 		t.Fatal("user disappeared after login rehash")
+		return
 	}
 	cost, err := bcrypt.Cost([]byte(user.PasswordHash))
 	if err != nil || cost != service.BcryptCost {
