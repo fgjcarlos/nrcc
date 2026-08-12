@@ -89,6 +89,8 @@ export function useBackupsData({
     // Refetch functions
     refetchConfig: configQuery.refetch,
     refetchStatus: statusQuery.refetch,
+    refetchObservability: observabilityQuery.refetch,
     refetchBackups: backupListQuery.refetch,
+    refetchStorage: storageQuery.refetch,
   };
 }
