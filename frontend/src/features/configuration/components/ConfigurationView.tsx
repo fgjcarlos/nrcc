@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import { cn } from '@/shared/lib';
 import type { NodeRedConfigFormData } from '@/shared/types';
+import { settingsRawSchema } from '@/shared/validation/schemas';
 import {
   BasicSettings,
   AuthSettings,
@@ -186,6 +188,11 @@ export function ConfigurationView() {
   // textarea. After a successful save we re-lock the editor so the next
   // session starts in the safe default.
   const handleSaveRawSettingsLocked = (content: string) => {
+    const result = settingsRawSchema.safeParse(content);
+    if (!result.success) {
+      toast.error(`Invalid settings.js: ${result.error.issues[0]?.message ?? 'syntax error'}`);
+      return;
+    }
     actions.handleSaveRawSettings(content);
     // Snapshot the saved content so a re-lock restores the saved state,
     // not the pre-edit state.

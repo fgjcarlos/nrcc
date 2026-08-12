@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { type User } from '@/features/auth/services/authService';
 import { UI_COPY } from '@/shared/constants/uiCopy';
+import { passwordSchema } from '@/shared/validation/schemas';
 
 type ModalMode = 'create' | 'edit_full' | 'edit_password';
 
@@ -57,8 +58,9 @@ export function UserModal({
   ) && (mode !== 'edit_full' || !isLastAdmin);
 
   const validatePassword = (pw: string): boolean => {
-    if (pw.length < 8) {
-      setPasswordError('Password must be at least 8 characters');
+    const result = passwordSchema.safeParse(pw);
+    if (!result.success) {
+      setPasswordError(result.error.issues[0]?.message ?? 'Invalid password');
       return false;
     }
     setPasswordError('');
