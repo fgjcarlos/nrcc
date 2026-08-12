@@ -691,16 +691,6 @@ func parseAdminAuthFromJS(content string) *model.AdminAuth {
 	return auth
 }
 
-// extractQuotedValue extracts a quoted value from a key:value pair in a string
-func extractQuotedValue(content, key string) string {
-	re := regexp.MustCompile(key + `\s*:\s*['"]([^'"]+)['"]`)
-	matches := re.FindStringSubmatch(content)
-	if len(matches) == 2 {
-		return matches[1]
-	}
-	return ""
-}
-
 func parseIntFromJS(content, key string, fallback int) int {
 	re := regexp.MustCompile(key + `\s*:\s*(\d+)`)
 	matches := re.FindStringSubmatch(content)
