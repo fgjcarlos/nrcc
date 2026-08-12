@@ -36,6 +36,7 @@ func TestNewUpdateService(t *testing.T) {
 
 	if svc == nil {
 		t.Fatal("NewUpdateService should not return nil")
+		return
 	}
 
 	if svc.dataDir != tmpDir {

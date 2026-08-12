@@ -110,6 +110,7 @@ func TestRefresh_ValidFlow(t *testing.T) {
 	}
 	if newCookie == nil {
 		t.Fatal("expected new refresh cookie")
+		return
 	}
 	if !newCookie.HttpOnly {
 		t.Fatal("refresh cookie must be HttpOnly")
@@ -142,6 +143,7 @@ func TestLogin_SetsRefreshCookie(t *testing.T) {
 	}
 	if refreshCookie == nil {
 		t.Fatal("login should set refresh cookie")
+		return
 	}
 	if !refreshCookie.HttpOnly {
 		t.Fatal("refresh cookie must be HttpOnly")
@@ -196,6 +198,7 @@ func TestLogout_ClearsCookieAndRevokesRefreshSession(t *testing.T) {
 	}
 	if cleared == nil {
 		t.Fatal("logout should clear the refresh cookie")
+		return
 	}
 	if cleared.MaxAge >= 0 || cleared.Value != "" {
 		t.Fatalf("expected expired empty refresh cookie, got value=%q maxAge=%d", cleared.Value, cleared.MaxAge)
