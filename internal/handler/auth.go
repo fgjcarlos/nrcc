@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -23,6 +24,10 @@ const (
 	refreshCookieName  = "nrcc_refresh"
 	refreshLockStripes = 64
 )
+
+var warnInsecureSetupCookie = func() {
+	log.Print("refresh cookie emitted without TLS for setup; verify NRCC_TLS or reverse proxy")
+}
 
 // loginMetricsRecorder is the narrow interface for recording login metrics.
 // Using an interface instead of *metrics.MetricsCollector keeps AuthHandler
@@ -137,7 +142,12 @@ func (h *AuthHandler) Setup(w http.ResponseWriter, r *http.Request) {
 		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Username and password are required")
 		return
 	}
-
+	if h.limiter != nil {
+		if blocked, retry := h.limiter.Check(mw.SetupUserKey(req.Username)); blocked {
+			mw.RespondTooManyRequests(w, retry)
+			return
+		}
+	}
 	if err := service.ValidatePassword(req.Password); err != nil {
 		model.RespondError(w, http.StatusBadRequest, "WEAK_PASSWORD", err.Error())
 		return
@@ -155,12 +165,12 @@ func (h *AuthHandler) Setup(w http.ResponseWriter, r *http.Request) {
 	var recoveryToken *setupstate.SetupToken
 	if configured {
 		if h.setupTokenPath == "" {
-			h.respondAlreadyConfigured(w, r)
+			h.respondAlreadyConfigured(w, r, req.Username)
 			return
 		}
 		token, err := setupstate.ReadTokenFile(h.setupTokenPath)
 		if err != nil || subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Setup-Reset-Token")), []byte(token.Raw)) != 1 {
-			h.respondAlreadyConfigured(w, r)
+			h.respondAlreadyConfigured(w, r, req.Username)
 			return
 		}
 		recoveryToken = &token
@@ -189,13 +199,12 @@ func (h *AuthHandler) Setup(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := createUser(user); err != nil {
 		if errors.Is(err, service.ErrAlreadyConfigured) {
-			h.respondAlreadyConfigured(w, r)
+			h.respondAlreadyConfigured(w, r, req.Username)
 			return
 		}
 		model.RespondError(w, http.StatusInternalServerError, "CREATE_ERROR", "Failed to create user")
 		return
 	}
-
 	// Generate access token
 	token, err := h.authSvc.GenerateToken(user)
 	if err != nil {
@@ -204,7 +213,7 @@ func (h *AuthHandler) Setup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Issue refresh cookie
-	if err := h.setRefreshCookie(w, r, user.ID); err != nil {
+	if err := h.setSetupRefreshCookie(w, r, user.ID); err != nil {
 		model.RespondError(w, http.StatusInternalServerError, "REFRESH_SESSION_ERROR", "Failed to create refresh session")
 		return
 	}
@@ -213,6 +222,10 @@ func (h *AuthHandler) Setup(w http.ResponseWriter, r *http.Request) {
 		if err := h.consumeSetupToken(h.setupTokenPath); err != nil {
 			log.Printf("auth setup: failed to consume recovery token after successful setup: %v", err)
 		}
+	}
+	if h.limiter != nil {
+		h.limiter.Reset("setup-ip:" + mw.ExtractIP(r))
+		h.limiter.Reset(mw.SetupUserKey(req.Username))
 	}
 
 	resp := AuthResponse{
@@ -230,9 +243,10 @@ func (h *AuthHandler) Setup(w http.ResponseWriter, r *http.Request) {
 	model.RespondJSON(w, http.StatusCreated, resp)
 }
 
-func (h *AuthHandler) respondAlreadyConfigured(w http.ResponseWriter, r *http.Request) {
+func (h *AuthHandler) respondAlreadyConfigured(w http.ResponseWriter, r *http.Request, username string) {
 	if h.limiter != nil {
 		h.limiter.Record("setup-ip:" + mw.ExtractIP(r))
+		h.limiter.Record(mw.SetupUserKey(username))
 	}
 	model.RespondError(w, http.StatusConflict, "ALREADY_CONFIGURED", "System already configured with users")
 }
@@ -335,7 +349,6 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-
 	// Generate access token
 	token, err := h.authSvc.GenerateToken(user)
 	if err != nil {
@@ -786,7 +799,23 @@ func isSecureRequest(r *http.Request) bool {
 	return r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
 }
 
+func shouldEmitSecureCookie(r *http.Request) bool {
+	return isSecureRequest(r) || os.Getenv("NRCC_TLS") == "true"
+}
+
+func (h *AuthHandler) setSetupRefreshCookie(w http.ResponseWriter, r *http.Request, userID string) error {
+	secure := shouldEmitSecureCookie(r)
+	if !secure {
+		warnInsecureSetupCookie()
+	}
+	return h.setRefreshCookieWithSecure(w, userID, secure)
+}
+
 func (h *AuthHandler) setRefreshCookie(w http.ResponseWriter, r *http.Request, userID string) error {
+	return h.setRefreshCookieWithSecure(w, userID, isSecureRequest(r))
+}
+
+func (h *AuthHandler) setRefreshCookieWithSecure(w http.ResponseWriter, userID string, secure bool) error {
 	refreshToken, err := h.createRefreshSession(userID)
 	if err != nil {
 		return err
@@ -802,7 +831,7 @@ func (h *AuthHandler) setRefreshCookie(w http.ResponseWriter, r *http.Request, u
 		// the browser's origin and dropped the cookie on F5.
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   isSecureRequest(r),
+		Secure:   secure,
 		SameSite: http.SameSiteStrictMode,
 		MaxAge:   int(service.RefreshTokenLifetime / time.Second),
 	})

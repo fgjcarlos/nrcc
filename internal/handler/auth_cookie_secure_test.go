@@ -194,6 +194,46 @@ func TestClearRefreshCookie_SecureAttribute(t *testing.T) {
 	}
 }
 
+func TestSetup_CookieSecureWithHTTPS(t *testing.T)          { runSetupCookieCase(t, "tls") }
+func TestSetup_CookieSecureWithNRCC_TLS(t *testing.T)       { runSetupCookieCase(t, "env") }
+func TestSetup_CookieSecureWithForwardedProto(t *testing.T) { runSetupCookieCase(t, "forwarded") }
+func TestSetup_CookieNonTLS_LogsWarning(t *testing.T)       { runSetupCookieCase(t, "warning") }
+
+func runSetupCookieCase(t *testing.T, scenario string) {
+	t.Helper()
+	t.Setenv("NRCC_TLS", "false")
+	h, _ := setupAuthTest(t)
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/setup", nil)
+	if scenario == "tls" {
+		req.TLS = &tls.ConnectionState{}
+	}
+	if scenario == "env" {
+		t.Setenv("NRCC_TLS", "true")
+	}
+	if scenario == "forwarded" {
+		req.Header.Set("X-Forwarded-Proto", "https")
+	}
+	warnings := 0
+	previousWarning := warnInsecureSetupCookie
+	warnInsecureSetupCookie = func() { warnings++ }
+	t.Cleanup(func() { warnInsecureSetupCookie = previousWarning })
+	rec := httptest.NewRecorder()
+	if err := h.setSetupRefreshCookie(rec, req, "test-user-id"); err != nil {
+		t.Fatal(err)
+	}
+	cookies := rec.Result().Cookies()
+	if len(cookies) != 1 {
+		t.Fatalf("cookies=%d want=1", len(cookies))
+	}
+	wantSecure, wantWarnings := scenario != "warning", 0
+	if scenario == "warning" {
+		wantWarnings = 1
+	}
+	if cookies[0].Secure != wantSecure || warnings != wantWarnings {
+		t.Fatalf("Secure=%v warnings=%d, want Secure=%v warnings=%d", cookies[0].Secure, warnings, wantSecure, wantWarnings)
+	}
+}
+
 // TestLogin_SecureAttributeConditional verifies the full login flow sets the
 // Secure cookie attribute based on the request protocol, not a hardcoded value.
 func TestLogin_SecureAttributeConditional(t *testing.T) {

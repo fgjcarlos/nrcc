@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	mw "github.com/fgjcarlos/nrcc/internal/middleware"
 	"github.com/fgjcarlos/nrcc/internal/model"
 	"github.com/fgjcarlos/nrcc/internal/service"
 	setupstate "github.com/fgjcarlos/nrcc/internal/setup"
@@ -246,5 +248,43 @@ func runSetupCase(t *testing.T, scenario string) {
 	}
 	if (scenario == "invalid-token" || scenario == "no-header") && statErr != nil {
 		t.Fatalf("token consumed: %v", statErr)
+	}
+}
+
+func TestSetup_RateLimitBlocksSeventh(t *testing.T) {
+	runSetupRateLimit(t, func(int) string { return "admin" })
+}
+
+func TestSetup_RateLimitKeyNormalizesCase(t *testing.T) {
+	if mw.NormalizeUsername(" Admin ") != "admin" || mw.SetupUserKey("ADMIN") != mw.SetupUserKey(" admin ") {
+		t.Fatal("setup username keys are not trim-and-case normalized")
+	}
+	runSetupRateLimit(t, func(i int) string {
+		if i%2 == 0 {
+			return " Admin "
+		}
+		return "admin"
+	})
+}
+
+func runSetupRateLimit(t *testing.T, username func(int) string) {
+	t.Helper()
+	h, _ := setupAuthTest(t)
+	for i := 1; i <= 7; i++ {
+		body := fmt.Sprintf(`{"username":%q,"password":"correct-horse-battery-staple"}`, username(i))
+		req := httptest.NewRequest(http.MethodPost, "/api/auth/setup", strings.NewReader(body))
+		req.RemoteAddr = fmt.Sprintf("192.0.2.%d:1234", i)
+		rec := httptest.NewRecorder()
+		h.Setup(rec, req)
+		want := http.StatusConflict
+		if i == 7 {
+			want = http.StatusTooManyRequests
+		}
+		if rec.Code != want {
+			t.Fatalf("attempt %d status=%d want=%d body=%s", i, rec.Code, want, rec.Body.String())
+		}
+		if i == 7 && rec.Header().Get("Retry-After") == "" {
+			t.Fatal("seventh attempt omitted Retry-After")
+		}
 	}
 }
