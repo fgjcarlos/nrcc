@@ -142,7 +142,7 @@ func TestAuth_ValidToken(t *testing.T) {
 		t.Errorf("Expected status 200, got %d", w.Code)
 	}
 	if capturedClaims == nil {
-		t.Error("Claims should be injected into context")
+		t.Fatal("handler should have captured claims")
 	}
 	if capturedClaims != nil && capturedClaims.Username != "admin" {
 		t.Errorf("Expected username 'admin', got %s", capturedClaims.Username)
@@ -165,6 +165,7 @@ func TestClaimsFromContext_WithValidClaims(t *testing.T) {
 	retrieved := ClaimsFromContext(req)
 	if retrieved == nil {
 		t.Fatal("ClaimsFromContext should not return nil")
+		return
 	}
 	if retrieved.Username != "testuser" {
 		t.Errorf("Expected username 'testuser', got %s", retrieved.Username)

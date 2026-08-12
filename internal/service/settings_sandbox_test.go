@@ -81,6 +81,7 @@ func TestParseAdminAuthViaSandbox_Basic(t *testing.T) {
 	}
 	if auth == nil {
 		t.Fatal("expected non-nil adminAuth")
+		return
 	}
 	if auth.Type != "credentials" {
 		t.Errorf("expected type credentials, got %q", auth.Type)
@@ -146,6 +147,7 @@ func TestParseAdminAuthViaSandbox_MultipleAdminAuthBlocks(t *testing.T) {
 	}
 	if auth == nil {
 		t.Fatal("expected non-nil adminAuth")
+		return
 	}
 	if auth.Type != "second" {
 		t.Errorf("expected type second (final assignment), got %q", auth.Type)

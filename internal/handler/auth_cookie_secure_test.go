@@ -288,6 +288,7 @@ func TestLogin_SecureAttributeConditional(t *testing.T) {
 			}
 			if refreshCookie == nil {
 				t.Fatal("Login did not set a refresh cookie")
+				return
 			}
 			if refreshCookie.Secure != tt.wantSecure {
 				t.Errorf("cookie Secure = %v, want %v", refreshCookie.Secure, tt.wantSecure)
