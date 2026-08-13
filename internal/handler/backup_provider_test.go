@@ -93,12 +93,18 @@ func TestRestoreProviderSnapshotRejectsNonAbsoluteDestination(t *testing.T) {
 // TestRestoreProviderSnapshotReturns503WhenDisabled ensures the write
 // endpoint also gates on the provider being configured.
 func TestRestoreProviderSnapshotReturns503WhenDisabled(t *testing.T) {
-	svc := service.NewBackupService(t.TempDir())
+	dataDir := t.TempDir()
+	svc := service.NewBackupService(dataDir)
 	handler := NewBackupHandler(svc)
 	router := chi.NewRouter()
 	router.Post("/api/backups/provider/restore", handler.RestoreProviderSnapshot)
 
-	body := `{"id":"abc","destination":"/tmp/x"}`
+	// Destination must resolve inside the service's dataDir so the new
+	// validateRestoreDestination containment check (HIGH-007) does not
+	// short-circuit with 400 before we reach the provider-availability
+	// branch. The handler returns 503 because no remote provider is
+	// configured on a fresh BackupService.
+	body := `{"id":"abc","destination":"` + dataDir + `/restore-target"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/backups/provider/restore", bytes.NewReader([]byte(body)))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
@@ -106,5 +112,56 @@ func TestRestoreProviderSnapshotReturns503WhenDisabled(t *testing.T) {
 
 	if w.Code != http.StatusServiceUnavailable {
 		t.Fatalf("expected 503, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestRestoreProviderSnapshotRejectsEscapeDestination covers HIGH-007 at the
+// HTTP boundary: a destination that resolves outside the configured
+// backup root (NRCC_BACKUP_ROOT env, fallback = service dataDir) must be
+// rejected with HTTP 400 before the provider layer is touched.
+func TestRestoreProviderSnapshotRejectsEscapeDestination(t *testing.T) {
+	// Pin the root to a directory that is NOT a prefix of "/etc". The
+	// handler resolves NRCC_BACKUP_ROOT and rejects any destination
+	// that does not resolve inside it.
+	root := t.TempDir()
+	t.Setenv("NRCC_BACKUP_ROOT", root)
+
+	svc := service.NewBackupService(t.TempDir()) // different from root
+	handler := NewBackupHandler(svc)
+	router := chi.NewRouter()
+	router.Post("/api/backups/provider/restore", handler.RestoreProviderSnapshot)
+
+	body := `{"id":"abc123def","destination":"/etc"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/backups/provider/restore", bytes.NewReader([]byte(body)))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestRestoreProviderSnapshotRejectsEscapeViaDotDot covers the canonical
+// attack surface: a destination like "/<root>/../etc" that passes the
+// no-`..` segment check at isSafeAbsoluteDestination but escapes via
+// the .. after filepath.Clean.
+func TestRestoreProviderSnapshotRejectsEscapeViaDotDot(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("NRCC_BACKUP_ROOT", root)
+
+	svc := service.NewBackupService(t.TempDir())
+	handler := NewBackupHandler(svc)
+	router := chi.NewRouter()
+	router.Post("/api/backups/provider/restore", handler.RestoreProviderSnapshot)
+
+	body := `{"id":"abc123def","destination":"` + root + `/../escape"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/backups/provider/restore", bytes.NewReader([]byte(body)))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
 	}
 }

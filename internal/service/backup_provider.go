@@ -22,8 +22,12 @@ type BackupProvider interface {
 	List(ctx context.Context) ([]RemoteBackup, error)
 
 	// Restore downloads the snapshot identified by remoteID to dstPath. The
-	// destination is created if missing.
-	Restore(ctx context.Context, remoteID, dstPath string) error
+	// destination is created if missing. Implementations MUST reject
+	// destinations that do not resolve inside root — see
+	// validateRestoreDestination for the canonical check. root is provided
+	// by the caller (handler) so the same provider binary can be reused
+	// across deployments with different operator-defined volumes.
+	Restore(ctx context.Context, remoteID, dstPath, root string) error
 }
 
 // RemoteBackup is the minimal descriptor the UI/API needs to show and select
@@ -51,6 +55,6 @@ func (NoopProvider) List(ctx context.Context) ([]RemoteBackup, error) {
 	return nil, nil
 }
 
-func (NoopProvider) Restore(ctx context.Context, remoteID, dstPath string) error {
+func (NoopProvider) Restore(ctx context.Context, remoteID, dstPath, root string) error {
 	return fmt.Errorf("remote backup provider is not configured")
 }

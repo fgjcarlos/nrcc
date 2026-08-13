@@ -2,7 +2,6 @@ package service
 
 import (
 	"archive/zip"
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -316,6 +315,58 @@ func ValidateBackupID(id string) error {
 	return nil
 }
 
+// ValidateRestoreDestination returns nil when dst, after absolute-path
+// canonicalization, resolves inside root. It is the path-containment
+// primitive that the restic provider restore path uses to defend against
+// writing outside the operator's data volume (HIGH-007).
+//
+// Both arguments are resolved via filepath.Abs so symbolic-but-clean
+// paths and ".." segments collapse to their canonical form before the
+// prefix check. filepath.Rel returning ".." or starting with ".." means
+// the destination escapes the root regardless of operator intent — the
+// restore is rejected before any file is written.
+//
+// The root "/" is treated as a special case: it is the only root under
+// which every absolute path is contained. This keeps callers that have
+// not yet set up a dedicated backup volume from being locked out.
+func ValidateRestoreDestination(dst, root string) error {
+	if dst == "" {
+		return errors.New("destination is required")
+	}
+	if root == "" {
+		return errors.New("backup root is required")
+	}
+	absDst, err := filepath.Abs(dst)
+	if err != nil {
+		return fmt.Errorf("resolve destination: %w", err)
+	}
+	absRoot, err := filepath.Abs(root)
+	if err != nil {
+		return fmt.Errorf("resolve backup root: %w", err)
+	}
+	if absRoot == string(os.PathSeparator) {
+		// "/" is the universal parent — every absolute path is contained.
+		return nil
+	}
+	rel, err := filepath.Rel(absRoot, absDst)
+	if err != nil {
+		return fmt.Errorf("destination %q escapes backup root %q: %w", dst, root, err)
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return fmt.Errorf("destination %q escapes backup root %q", dst, root)
+	}
+	return nil
+}
+
+// DataDir returns the directory the service restores into (the dataDir
+// passed to NewBackupService). Handlers use it as the default root for
+// validateRestoreDestination when NRCC_BACKUP_ROOT is unset, so the
+// restore-destination validation has a concrete bound even if the operator
+// never set an explicit root.
+func (s *BackupService) DataDir() string {
+	return s.dataDir
+}
+
 // Detail returns authoritative metadata for a backup file.
 func (s *BackupService) Detail(id string) (model.BackupManifest, error) {
 	if err := ValidateBackupID(id); err != nil {
@@ -428,26 +479,30 @@ func (s *BackupService) SaveConfig(cfg model.BackupConfig) (model.BackupConfig, 
 // extracted to a staging directory and only swapped into dataDir after the
 // full archive is verified intact. On validation failure the staging tree
 // is removed and dataDir is untouched.
+//
+// The zip is read in streaming mode (os.Open + zip.NewReader on the file
+// handle), matching the inspectBackup pattern. Peak heap allocation is
+// bounded by maxBackupEntrySize + the zip central directory (a few KiB),
+// not by the full archive size — closing HIGH-006 (memory DoS) and
+// HIGH-008 (fail-fast on checksum mismatch) at the same time.
 func (s *BackupService) Restore(id string) error {
 	if err := ValidateBackupID(id); err != nil {
 		return err
 	}
 	backupPath := filepath.Join(s.backupDir, id+".zip")
 
-	if _, err := os.Stat(backupPath); err != nil {
+	info, err := os.Stat(backupPath)
+	if err != nil {
 		return fmt.Errorf("backup not found: %w", err)
 	}
 
-	// Read the archive into memory in one pass so we can both verify
-	// checksums and stream files into staging. Backups are bounded by the
-	// per-entry size cap (see extractFileFromZip); the full archive is small
-	// enough to keep the implementation linear and atomic at the swap step.
-	data, err := os.ReadFile(backupPath)
+	file, err := os.Open(backupPath)
 	if err != nil {
-		return fmt.Errorf("failed to read backup: %w", err)
+		return fmt.Errorf("failed to open backup: %w", err)
 	}
+	defer func() { _ = file.Close() }()
 
-	zipReader, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	zipReader, err := zip.NewReader(file, info.Size())
 	if err != nil {
 		return fmt.Errorf("failed to parse backup: %w", err)
 	}
@@ -1209,6 +1264,7 @@ func verifyArchiveManifest(zipReader *zip.Reader) (backupMetadata, error) {
 
 	expected := make(map[string]string, len(manifest.Files))
 	expectedSize := make(map[string]int64, len(manifest.Files))
+	seen := make(map[string]bool, len(manifest.Files))
 	for _, entry := range manifest.Files {
 		expected[entry.Path] = entry.Checksum
 		expectedSize[entry.Path] = entry.Size
@@ -1231,6 +1287,17 @@ func verifyArchiveManifest(zipReader *zip.Reader) (backupMetadata, error) {
 		}
 		if got != want {
 			return backupMetadata{}, fmt.Errorf("checksum mismatch for %s", f.Name)
+		}
+		seen[f.Name] = true
+	}
+
+	// Every manifest entry must be backed by a real file in the zip. This
+	// closes the case where the manifest is intact but a payload entry was
+	// stripped after the archive was published — HIGH-008 wants a fail-fast
+	// on any inconsistency, not a partial-restore attempt later in swap.
+	for _, entry := range manifest.Files {
+		if !seen[entry.Path] {
+			return backupMetadata{}, fmt.Errorf("manifest entry %s missing from archive", entry.Path)
 		}
 	}
 

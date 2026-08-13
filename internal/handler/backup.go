@@ -434,6 +434,11 @@ func (h *BackupHandler) ListProviderSnapshots(w http.ResponseWriter, r *http.Req
 // When omitted or empty the handler returns 400 — restic itself accepts a
 // relative target and the operator would otherwise end up writing inside
 // the NRCC working directory, which is rarely what they want.
+//
+// HIGH-007: destination is also validated to resolve inside the configured
+// backup root (NRCC_BACKUP_ROOT env, default = service dataDir). This
+// stops a malicious or mistyped destination like "/etc" or
+// "/data/../etc" from being handed to the provider.
 func (h *BackupHandler) RestoreProviderSnapshot(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		ID          string `json:"id"`
@@ -450,12 +455,20 @@ func (h *BackupHandler) RestoreProviderSnapshot(w http.ResponseWriter, r *http.R
 		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "destination must be an absolute path with no '..' segments")
 		return
 	}
+	root := os.Getenv("NRCC_BACKUP_ROOT")
+	if root == "" {
+		root = h.svc.DataDir()
+	}
+	if err := service.ValidateRestoreDestination(req.Destination, root); err != nil {
+		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", err.Error())
+		return
+	}
 	provider := h.svc.BackupProvider()
 	if _, ok := provider.(service.NoopProvider); ok {
 		model.RespondError(w, http.StatusServiceUnavailable, "PROVIDER_DISABLED", "No remote backup provider is configured")
 		return
 	}
-	if err := provider.Restore(r.Context(), req.ID, req.Destination); err != nil {
+	if err := provider.Restore(r.Context(), req.ID, req.Destination, root); err != nil {
 		model.RespondError(w, http.StatusBadGateway, "PROVIDER_ERROR", err.Error())
 		return
 	}

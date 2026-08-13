@@ -230,12 +230,17 @@ func (p *ResticProvider) List(ctx context.Context) ([]RemoteBackup, error) {
 	return out, nil
 }
 
-func (p *ResticProvider) Restore(ctx context.Context, remoteID, dstPath string) error {
+func (p *ResticProvider) Restore(ctx context.Context, remoteID, dstPath, root string) error {
 	if err := validateResticSnapshotID(remoteID); err != nil {
 		return err
 	}
-	if dstPath == "" {
-		return errors.New("destination is required")
+	// HIGH-007: refuse to hand restic a destination that escapes the
+	// operator's data volume. validateRestoreDestination canonicalizes via
+	// filepath.Abs + filepath.Rel so "../" segments and absolute siblings
+	// are both caught. No file is created and no subprocess is run if the
+	// check fails.
+	if err := ValidateRestoreDestination(dstPath, root); err != nil {
+		return err
 	}
 	if err := os.MkdirAll(dstPath, 0o755); err != nil {
 		return err
