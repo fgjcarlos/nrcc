@@ -228,14 +228,18 @@ export function BackupsView() {
               {dataSyncError === 'status' ? ' (estado del scheduler)' : ' (observabilidad)'}.
             </p>
             <p className="text-base-content/70 mt-1">
-              Los datos en pantalla pueden estar desactualizados. Reintentá manualmente o recargá la página.
+              Los datos en pantalla pueden estar desactualizados. Reintentá para sincronizar los datos.
             </p>
           </div>
           <button
             type="button"
             onClick={() => {
+              // Resync all four backup-related queries without a full page
+              // reload — see issue #590 and auditoria/frontend.md HIGH-5.
+              void backupsData.refetchConfig();
               void backupsData.refetchStatus();
-              window.location.reload();
+              void backupsData.refetchObservability();
+              void backupsData.refetchStorage();
             }}
             className="flex items-center gap-1.5 rounded-md border border-base-content/20 px-2.5 py-1.5 text-xs font-medium hover:bg-base-content/5"
           >
