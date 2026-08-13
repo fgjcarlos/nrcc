@@ -366,43 +366,6 @@ func TestDataDir_ExposesConfiguredDirectory(t *testing.T) {
 
 // --- helpers ---
 
-// writeSingleEntryZip creates a zip at path with a single file entry of
-// the requested size, filled with deterministic bytes.
-func writeSingleEntryZip(path string, entryName string, size int) error {
-	f, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = f.Close() }()
-	zw := zip.NewWriter(f)
-	hdr := &zip.FileHeader{
-		Name:   entryName,
-		Method: zip.Deflate,
-	}
-	hdr.SetMode(0o644)
-	w, err := zw.CreateHeader(hdr)
-	if err != nil {
-		return err
-	}
-	// Deterministic fill so a flaky run is reproducible.
-	buf := make([]byte, 1024*1024)
-	for i := range buf {
-		buf[i] = byte(i % 251)
-	}
-	remaining := size
-	for remaining > 0 {
-		n := remaining
-		if n > len(buf) {
-			n = len(buf)
-		}
-		if _, err := w.Write(buf[:n]); err != nil {
-			return err
-		}
-		remaining -= n
-	}
-	return zw.Close()
-}
-
 // corruptBackup rewrites the bytes of `target` inside the zip and updates
 // the manifest so verifyArchiveManifest rejects (manifest checksum no
 // longer matches the entry content). This requires re-zipping the archive.
