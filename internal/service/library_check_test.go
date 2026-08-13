@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"testing"
 )
@@ -20,7 +21,7 @@ func TestLibraryServiceCheckRejectsInvalidName(t *testing.T) {
 		"",
 	}
 	for _, pkg := range bad {
-		ok, err := svc.Check(pkg)
+		ok, err := svc.Check(context.Background(), pkg)
 		if err == nil {
 			t.Errorf("Check(%q): expected validation error", pkg)
 		}

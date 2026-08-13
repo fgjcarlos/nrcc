@@ -69,11 +69,18 @@ type UpdateService struct {
 	getInstalledVersionFn func(ctx context.Context) string
 	getLatestVersionFn    func(ctx context.Context) (string, error)
 	// New fields for update flow state machine
-	applyMu       sync.Mutex
-	flowState     model.UpdateFlowState
-	flowStateMu   sync.RWMutex
-	backupStore   *store.JSONStore[[]model.BackupEntry]
-	backupSvc     backupCreator
+	applyMu     sync.Mutex
+	flowState   model.UpdateFlowState
+	flowStateMu sync.RWMutex
+	backupStore *store.JSONStore[[]model.BackupEntry]
+	backupSvc   backupCreator
+	// applyCtx / applyCancel form a service-level cancelable root used by
+	// ApplyUpdate so that a server SIGTERM (Shutdown) can abort an in-flight
+	// install. Regression for HIGH-011: the previous implementation used
+	// context.Background() and SIGTERM could not stop npm. applyMu guards the
+	// cancel func so Shutdown is race-free against ApplyUpdate's first read.
+	applyCtx    context.Context
+	applyCancel context.CancelFunc
 }
 
 // SetBackupCreator wires the backup engine used to take a real archive before an
@@ -101,10 +108,14 @@ func NewUpdateService(dataDir string) *UpdateService {
 		flowState:    model.UpdateFlowState{State: model.StateIdle, Phase: "idle"},
 	}
 
+	// Service-level cancelable root used by ApplyUpdate. Shutdown() cancels it
+	// so an in-flight install can be aborted on SIGTERM (HIGH-011 regression).
+	s.applyCtx, s.applyCancel = context.WithCancel(context.Background())
+
 	s.store = store.NewJSONStore[model.UpdateCacheEntry](
 		fmt.Sprintf("%s/%s", dataDir, updateCacheFile),
 	)
-	
+
 	s.backupStore = store.NewJSONStore[[]model.BackupEntry](
 		fmt.Sprintf("%s/%s", dataDir, updateBackupsFile),
 	)
@@ -358,6 +369,35 @@ func (s *UpdateService) AppendBackup(entry model.BackupEntry) error {
 	})
 }
 
+// Shutdown cancels the service-level apply context so any in-flight
+// ApplyUpdate returns promptly. Idempotent; safe to call multiple times.
+// Regression for HIGH-011: the previous implementation could not be stopped
+// by SIGTERM because ApplyUpdate used `context.Background()`.
+func (s *UpdateService) Shutdown(_ context.Context) error {
+	s.applyMu.Lock()
+	cancel := s.applyCancel
+	s.applyMu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+	return nil
+}
+
+// applyContext returns the service-level apply context. Returns the
+// already-canceled context.Background() if Shutdown was already called, so
+// subsequent ApplyUpdate calls still terminate.
+//
+// NOTE: This does NOT acquire applyMu. Callers that mutate applyCtx/applyCancel
+// (NewUpdateService, Shutdown) take the lock; ApplyUpdate only READS these
+// fields, and a benign race (Shutdown fires while ApplyUpdate is mid-read) is
+// acceptable — the next ApplyUpdate will see the canceled context.
+func (s *UpdateService) applyContext() context.Context {
+	if s.applyCtx == nil {
+		return context.Background()
+	}
+	return s.applyCtx
+}
+
 // ApplyUpdateWithBackup orchestrates the full update flow: BackingUp → Applying → Completed/Failed.
 // Only one update can proceed at a time; returns error if state != Idle.
 // Flow:
@@ -427,8 +467,11 @@ func (s *UpdateService) ApplyUpdateWithBackup(ctx context.Context) error {
 		AvailableVersion: preApplyStatus.LatestVersion,
 	})
 	
-	// Execute npm update
-	err = s.ApplyUpdate()
+	// Execute npm update. ctx is the request-derived context; the runner's
+	// actual context is also derived from s.applyCtx (Shutdown-cancelable),
+	// so a server SIGTERM propagates into the npm install even though the
+	// async caller uses context.Background().
+	err = s.ApplyUpdate(ctx)
 	if err != nil {
 		s.setFlowState(model.UpdateFlowState{
 			State:    model.StateFailed,
@@ -452,23 +495,33 @@ func (s *UpdateService) ApplyUpdateWithBackup(ctx context.Context) error {
 // ApplyUpdate installs the pinned target version of Node-RED and runs a
 // post-install vulnerability audit. If no resolved version is cached, the
 // update is rejected so we never run an unpinned "latest" install.
-func (s *UpdateService) ApplyUpdate() error {
+//
+// The runner context is derived from BOTH the caller's ctx AND the
+// service-level applyCtx (Shutdown-cancelable), so client cancellation,
+// request deadline, AND server SIGTERM all abort the install within ~1s.
+// Regression for HIGH-011.
+func (s *UpdateService) ApplyUpdate(ctx context.Context) error {
 	cached := s.GetCachedStatus()
 	if cached.LatestVersion == "" {
 		return fmt.Errorf("no resolved target version — run a version check first")
 	}
 	target := "node-red@" + cached.LatestVersion
 
-	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	runCtx, cancel := context.WithTimeout(s.applyContext(), 120*time.Second)
 	defer cancel()
 
-	_, err := s.runner.Run(ctx, "npm", "install", "-g", target)
+	if err := ctx.Err(); err != nil {
+		// Caller already canceled before we started; honor that.
+		return err
+	}
+
+	_, err := s.runner.Run(runCtx, "npm", "install", "-g", target)
 	if err != nil {
 		sanitized := s.sanitizeErrorMessage(err)
 		return fmt.Errorf("%s", sanitized)
 	}
 
-	if err := s.postInstallAudit(ctx, cached.LatestVersion); err != nil {
+	if err := s.postInstallAudit(runCtx, cached.LatestVersion); err != nil {
 		return err
 	}
 

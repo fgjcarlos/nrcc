@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"testing"
 )
@@ -22,7 +23,7 @@ func TestResolveNpmBinPrefersNpmBinEnv(t *testing.T) {
 func TestNpmInstallRejectsInvalidPackage(t *testing.T) {
 	pm := NewNpmPackageManager(t.TempDir())
 
-	err := pm.Install("evil; rm -rf /")
+	err := pm.Install(context.Background(), "evil; rm -rf /")
 	if err == nil {
 		t.Fatal("Install: expected error for invalid package name, got nil")
 	}
@@ -42,7 +43,7 @@ func TestLibraryCheckPropagatesNpmError(t *testing.T) {
 
 	svc := NewLibraryServiceWithPackageManager(t.TempDir(), pm)
 
-	ok, err := svc.Check("express")
+	ok, err := svc.Check(context.Background(), "express")
 	if ok {
 		t.Error("Check: expected false when npm binary is missing, got true")
 	}
