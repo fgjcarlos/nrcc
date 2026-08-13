@@ -86,8 +86,9 @@ func TestResticProviderSnapshotListRestore(t *testing.T) {
 		t.Fatalf("List returned %+v, want one snapshot id=%s", snaps, id)
 	}
 
-	dst := filepath.Join(t.TempDir(), "restored")
-	if err := p.Restore(ctx, id, dst); err != nil {
+	restoreRoot := t.TempDir()
+	dst := filepath.Join(restoreRoot, "restored")
+	if err := p.Restore(ctx, id, dst, restoreRoot); err != nil {
 		t.Fatalf("Restore: %v", err)
 	}
 	// restic preserves the absolute source path inside the snapshot; the
