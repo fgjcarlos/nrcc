@@ -1,12 +1,25 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/fgjcarlos/nrcc/internal/model"
 	"github.com/fgjcarlos/nrcc/internal/service"
 	"github.com/go-chi/chi/v5"
+)
+
+// Per-handler hard timeouts. Each is bounded above the service-level constant
+// so the handler timeout is the FIRST cap; the service's installTimeout /
+// searchHTTPTimeout is the fallback. Regression for HIGH-004 + HIGH-013: a
+// client disconnect (request ctx cancel) must abort the subprocess promptly.
+const (
+	installHandlerTimeout   = 5 * time.Minute
+	uninstallHandlerTimeout = 5 * time.Minute
+	searchHandlerTimeout    = 35 * time.Second
+	checkHandlerTimeout     = 12 * time.Second
 )
 
 // libraryMetricsRecorder is the narrow interface for recording library operation metrics.
@@ -62,7 +75,10 @@ func (h *LibraryHandler) PostInstall(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.svc.Install(req.Name)
+	ctx, cancel := context.WithTimeout(r.Context(), installHandlerTimeout)
+	defer cancel()
+
+	err := h.svc.Install(ctx, req.Name)
 	if err != nil {
 		if h.libraryMetrics != nil {
 			h.libraryMetrics.RecordLibraryOperation("install", false)
@@ -89,7 +105,10 @@ func (h *LibraryHandler) PostInstall(w http.ResponseWriter, r *http.Request) {
 func (h *LibraryHandler) DeleteLibrary(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
 
-	err := h.svc.Uninstall(name)
+	ctx, cancel := context.WithTimeout(r.Context(), uninstallHandlerTimeout)
+	defer cancel()
+
+	err := h.svc.Uninstall(ctx, name)
 	if err != nil {
 		if h.libraryMetrics != nil {
 			h.libraryMetrics.RecordLibraryOperation("uninstall", false)
@@ -124,7 +143,10 @@ func (h *LibraryHandler) PostSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	results, err := h.svc.Search(req.Query)
+	ctx, cancel := context.WithTimeout(r.Context(), searchHandlerTimeout)
+	defer cancel()
+
+	results, err := h.svc.Search(ctx, req.Query)
 	if err != nil {
 		// Search is an external registry convenience feature. Do not turn registry
 		// failures into UI-breaking 500s; return an empty result set instead.
@@ -144,7 +166,10 @@ func (h *LibraryHandler) PostSearch(w http.ResponseWriter, r *http.Request) {
 func (h *LibraryHandler) GetLibraryCheck(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
 
-	available, err := h.svc.Check(name)
+	ctx, cancel := context.WithTimeout(r.Context(), checkHandlerTimeout)
+	defer cancel()
+
+	available, err := h.svc.Check(ctx, name)
 	if err != nil {
 		model.RespondError(w, http.StatusInternalServerError, "CHECK_ERROR", err.Error())
 		return
