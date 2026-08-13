@@ -56,6 +56,7 @@ OS env → EnvService → `.env`.
 | `NRCC_MANAGE_NODE_RED` | `true` | If `false`, NRCC never starts/stops Node-RED; it only attaches | yes |
 | `NRCC_IMAGE` | release image | Image tag the install/update flow tracks | yes |
 | `NRCC_BACKUP_DIR` | `$DATA_DIR/backups` | Backup storage root | yes |
+| `NRCC_BACKUP_ROOT` | `$DATA_DIR` | Restore destination containment root for the restic provider restore endpoint | yes |
 | `NRCC_BULK_MAX_ENTRIES` | `1000` | Maximum non-comment records accepted by a bulk environment import | yes |
 | `NRCC_BULK_MAX_ENTRY_BYTES` | `8192` | Maximum UTF-8 bytes in one parsed bulk key plus value | yes |
 | `NRCC_RESTIC_REPO` | empty | Restic repository URL for off-host backups (all 5 below required to enable) | yes |
