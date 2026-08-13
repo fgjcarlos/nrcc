@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"testing"
 )
@@ -13,12 +14,12 @@ type stubPM struct {
 	installErr     error
 }
 
-func (s *stubPM) Install(pkg string) error {
+func (s *stubPM) Install(ctx context.Context, pkg string) error {
 	s.installCalls++
 	return s.installErr
 }
 
-func (s *stubPM) Uninstall(pkg string) error {
+func (s *stubPM) Uninstall(ctx context.Context, pkg string) error {
 	s.uninstallCalls++
 	return nil
 }
@@ -44,7 +45,7 @@ func TestLibraryServiceInstallTriggersRestart(t *testing.T) {
 				restartCalls++
 				return nil
 			})
-			err := svc.Install("node-red-dashboard")
+			err := svc.Install(context.Background(), "node-red-dashboard")
 			if c.installErr == nil && err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -68,7 +69,7 @@ func TestLibraryServiceUninstallTriggersRestart(t *testing.T) {
 		restartCalls++
 		return nil
 	})
-	if err := svc.Uninstall("node-red-dashboard"); err != nil {
+	if err := svc.Uninstall(context.Background(), "node-red-dashboard"); err != nil {
 		t.Fatalf("uninstall: %v", err)
 	}
 	if restartCalls != 1 {
@@ -81,7 +82,7 @@ func TestLibraryServiceUninstallTriggersRestart(t *testing.T) {
 func TestLibraryServiceInstallWithoutHook(t *testing.T) {
 	pm := &stubPM{}
 	svc := NewLibraryServiceWithPackageManager(t.TempDir(), pm)
-	if err := svc.Install("node-red-dashboard"); err != nil {
+	if err := svc.Install(context.Background(), "node-red-dashboard"); err != nil {
 		t.Fatalf("install: %v", err)
 	}
 	if pm.installCalls != 1 {
@@ -95,7 +96,7 @@ func TestLibraryServiceInstallIgnoresRestartError(t *testing.T) {
 	pm := &stubPM{}
 	svc := NewLibraryServiceWithPackageManager(t.TempDir(), pm)
 	svc.SetNodeRedRestart(func() error { return errors.New("node-red already stopped") })
-	if err := svc.Install("node-red-dashboard"); err != nil {
+	if err := svc.Install(context.Background(), "node-red-dashboard"); err != nil {
 		t.Fatalf("install should ignore restart error, got %v", err)
 	}
 }

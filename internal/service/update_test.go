@@ -737,7 +737,7 @@ func TestApplyUpdate_PinsResolvedVersion(t *testing.T) {
 	}
 	svc.runner = runner
 
-	err := svc.ApplyUpdate()
+	err := svc.ApplyUpdate(context.Background())
 	if err != nil {
 		t.Fatalf("ApplyUpdate should succeed: %v", err)
 	}
@@ -772,7 +772,7 @@ func TestApplyUpdate_RejectsWithoutResolvedVersion(t *testing.T) {
 
 	svc.runner = &mockRunner{output: nil, err: nil}
 
-	err := svc.ApplyUpdate()
+	err := svc.ApplyUpdate(context.Background())
 	if err == nil {
 		t.Fatal("expected error when no resolved version is cached")
 	}
@@ -805,7 +805,7 @@ func TestApplyUpdate_BlocksOnAuditFailure(t *testing.T) {
 	}
 	svc.runner = runner
 
-	err := svc.ApplyUpdate()
+	err := svc.ApplyUpdate(context.Background())
 	if err == nil {
 		t.Fatal("expected error when post-install audit finds critical vulnerabilities")
 	}
@@ -828,7 +828,7 @@ func TestApplyUpdate_DoesNotUseGlobalAuditFlag(t *testing.T) {
 	runner := &sequenceRunner{}
 	svc.runner = runner
 
-	_ = svc.ApplyUpdate()
+	_ = svc.ApplyUpdate(context.Background())
 
 	for _, call := range runner.calls {
 		isAudit := false
@@ -876,7 +876,7 @@ func TestApplyUpdate_AllowsWhenAuditCannotRun(t *testing.T) {
 	}
 	svc.runner = runner
 
-	if err := svc.ApplyUpdate(); err != nil {
+	if err := svc.ApplyUpdate(context.Background()); err != nil {
 		t.Fatalf("update must not be blocked by an operational audit failure: %v", err)
 	}
 }
@@ -907,7 +907,7 @@ func TestApplyUpdate_AllowsWhenNoCriticals(t *testing.T) {
 	}
 	svc.runner = runner
 
-	if err := svc.ApplyUpdate(); err != nil {
+	if err := svc.ApplyUpdate(context.Background()); err != nil {
 		t.Fatalf("update must not be blocked when there are no critical vulnerabilities: %v", err)
 	}
 }

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -8,12 +9,27 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 )
 
-// PackageManager defines operations for package management
+// Bounded timeouts for npm subprocess invocations. The constants are exported
+// (within the package) so tests can override them in short mode if needed.
+// installTimeout / uninstallTimeout are deliberately generous because a fresh
+// npm install on a slow registry can legitimately take minutes; the value is
+// bounded so a stalled child cannot pin the handler goroutine forever
+// (regression for HIGH-004).
+const (
+	installTimeout   = 5 * time.Minute
+	uninstallTimeout = 5 * time.Minute
+	checkTimeout     = 10 * time.Second
+)
+
+// PackageManager defines operations for package management.
+// All methods accept a context so the caller can cancel the underlying
+// subprocess (client disconnect, server shutdown, or hard deadline).
 type PackageManager interface {
-	Install(pkg string) error
-	Uninstall(pkg string) error
+	Install(ctx context.Context, pkg string) error
+	Uninstall(ctx context.Context, pkg string) error
 }
 
 // NpmPackageManager implements PackageManager using npm
@@ -108,8 +124,11 @@ func ValidatePackageName(pkg string) error {
 	return nil
 }
 
-// Install installs a package using npm install
-func (p *NpmPackageManager) Install(pkg string) error {
+// Install installs a package using npm install. The call is bounded by the
+// package-level installTimeout (regression for HIGH-004: a child process must
+// not outlive its request context). If ctx is canceled before npm finishes,
+// the child is killed and Install returns a non-nil error.
+func (p *NpmPackageManager) Install(ctx context.Context, pkg string) error {
 	if err := ValidatePackageName(pkg); err != nil {
 		return err
 	}
@@ -117,7 +136,10 @@ func (p *NpmPackageManager) Install(pkg string) error {
 		return err
 	}
 
-	cmd := exec.Command(p.Bin, "install", "--no-fund", "--no-audit", pkg)
+	runCtx, cancel := context.WithTimeout(ctx, installTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(runCtx, p.Bin, "install", "--no-fund", "--no-audit", pkg)
 	cmd.Dir = p.WorkDir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -129,8 +151,9 @@ func (p *NpmPackageManager) Install(pkg string) error {
 	return nil
 }
 
-// Uninstall uninstalls a package using npm uninstall
-func (p *NpmPackageManager) Uninstall(pkg string) error {
+// Uninstall uninstalls a package using npm uninstall. Mirror of Install —
+// bounded by uninstallTimeout and respects the caller's context cancellation.
+func (p *NpmPackageManager) Uninstall(ctx context.Context, pkg string) error {
 	if err := ValidatePackageName(pkg); err != nil {
 		return err
 	}
@@ -138,7 +161,10 @@ func (p *NpmPackageManager) Uninstall(pkg string) error {
 		return err
 	}
 
-	cmd := exec.Command(p.Bin, "uninstall", "--no-fund", "--no-audit", pkg)
+	runCtx, cancel := context.WithTimeout(ctx, uninstallTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(runCtx, p.Bin, "uninstall", "--no-fund", "--no-audit", pkg)
 	cmd.Dir = p.WorkDir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

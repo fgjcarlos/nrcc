@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,14 +10,25 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"time"
 
 	"github.com/fgjcarlos/nrcc/internal/model"
 )
+
+// searchHTTPTimeout bounds the wait for a response from the npm registry.
+// Regression for HIGH-013: the previous implementation used `http.Get(...)`
+// with no timeout, so a stalled upstream could pin a handler goroutine
+// indefinitely. Tests may swap the client via WithHTTPClient.
+const searchHTTPTimeout = 30 * time.Second
 
 // LibraryService handles package library operations with npm.
 type LibraryService struct {
 	dataDir string
 	pm      PackageManager
+	// httpClient is the timeout-bounded HTTP client used by Search. It is
+	// a struct field (not a package var) so tests can swap it via
+	// WithHTTPClient without leaking across test cases.
+	httpClient *http.Client
 	// restart is an optional Node-RED restart hook fired after Install /
 	// Uninstall so the new set of nodes is picked up by the running
 	// process. nil disables the restart (external-Node-RED setups or
@@ -27,6 +39,7 @@ type LibraryService struct {
 }
 
 // NewLibraryService creates a new library service with default npm package manager
+// and a bounded HTTP client for registry searches.
 func NewLibraryService(dataDir string) *LibraryService {
 	return NewLibraryServiceWithPackageManager(dataDir, NewNpmPackageManager(dataDir))
 }
@@ -34,9 +47,25 @@ func NewLibraryService(dataDir string) *LibraryService {
 // NewLibraryServiceWithPackageManager creates a new library service with a custom package manager
 func NewLibraryServiceWithPackageManager(dataDir string, pm PackageManager) *LibraryService {
 	return &LibraryService{
-		dataDir: dataDir,
-		pm:      pm,
+		dataDir:    dataDir,
+		pm:         pm,
+		httpClient: &http.Client{Timeout: searchHTTPTimeout},
 	}
+}
+
+// WithHTTPClient replaces the HTTP client used by Search. Pass nil to restore
+// the production default (timeout-bounded client). Returns the receiver for
+// fluent chaining. Intended for tests; production code must not override it.
+func (s *LibraryService) WithHTTPClient(c *http.Client) *LibraryService {
+	if s == nil {
+		return s
+	}
+	if c == nil {
+		s.httpClient = &http.Client{Timeout: searchHTTPTimeout}
+		return s
+	}
+	s.httpClient = c
+	return s
 }
 
 // SetNodeRedRestart wires an optional Node-RED restart hook. Call this once
@@ -47,9 +76,10 @@ func (s *LibraryService) SetNodeRedRestart(restart func() error) {
 }
 
 // Install installs a package using npm install and (best-effort) restarts
-// Node-RED so the running editor picks up the new node.
-func (s *LibraryService) Install(pkg string) error {
-	if err := s.pm.Install(pkg); err != nil {
+// Node-RED so the running editor picks up the new node. The caller's ctx is
+// forwarded to the package manager so client cancellation aborts npm.
+func (s *LibraryService) Install(ctx context.Context, pkg string) error {
+	if err := s.pm.Install(ctx, pkg); err != nil {
 		return err
 	}
 	s.fireRestart()
@@ -57,9 +87,9 @@ func (s *LibraryService) Install(pkg string) error {
 }
 
 // Uninstall uninstalls a package using npm uninstall and (best-effort)
-// restarts Node-RED.
-func (s *LibraryService) Uninstall(pkg string) error {
-	if err := s.pm.Uninstall(pkg); err != nil {
+// restarts Node-RED. Mirror of Install — respects the caller's ctx.
+func (s *LibraryService) Uninstall(ctx context.Context, pkg string) error {
+	if err := s.pm.Uninstall(ctx, pkg); err != nil {
 		return err
 	}
 	s.fireRestart()
@@ -189,8 +219,11 @@ type searchRegistry struct {
 	} `json:"objects"`
 }
 
-// Search searches npm registry for packages via HTTP API
-func (s *LibraryService) Search(query string) ([]model.LibraryInfo, error) {
+// Search searches npm registry for packages via HTTP API. The call is bounded
+// by both the caller's ctx (cancellation propagates into the request via
+// http.NewRequestWithContext) and the service-level httpClient.Timeout
+// (regression for HIGH-013).
+func (s *LibraryService) Search(ctx context.Context, query string) ([]model.LibraryInfo, error) {
 	// Build registry URL with query parameters
 	registryURL := "https://registry.npmjs.org/-/v1/search"
 	params := url.Values{}
@@ -199,8 +232,12 @@ func (s *LibraryService) Search(query string) ([]model.LibraryInfo, error) {
 
 	fullURL := registryURL + "?" + params.Encode()
 
-	// Make HTTP GET request to npm registry
-	resp, err := http.Get(fullURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fullURL, nil)
+	if err != nil {
+		return []model.LibraryInfo{}, nil
+	}
+
+	resp, err := s.httpClient.Do(req)
 	if err != nil {
 		return []model.LibraryInfo{}, nil
 	}
@@ -250,7 +287,7 @@ func (s *LibraryService) Search(query string) ([]model.LibraryInfo, error) {
 // non-zero `npm view` exit — whether the package does not exist OR the
 // registry is unreachable — is reported as (false, nil); these two cases
 // are not currently distinguished.
-func (s *LibraryService) Check(pkg string) (bool, error) {
+func (s *LibraryService) Check(ctx context.Context, pkg string) (bool, error) {
 	// Validate before invoking npm: `npm view` would otherwise resolve local
 	// paths (file:...), URLs and git refs from the raw URL parameter.
 	if err := ValidatePackageName(pkg); err != nil {
@@ -265,13 +302,15 @@ func (s *LibraryService) Check(pkg string) (bool, error) {
 		return false, err
 	}
 
-	cmd := exec.Command(bin, "view", pkg)
+	runCtx, cancel := context.WithTimeout(ctx, checkTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(runCtx, bin, "view", pkg)
 	cmd.Dir = s.dataDir
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 
-	err := cmd.Run()
-	if err != nil {
+	if err := cmd.Run(); err != nil {
 		return false, nil // Package not found in registry
 	}
 
