@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"errors"
 	"net/http"
 	"runtime/debug"
 
@@ -27,12 +28,12 @@ func Recoverer(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if rec := recover(); rec != nil {
-				// Re-panic http.ErrAbortHandler — chi/net/http use this sentinel
-				// to abort the connection cleanly. Swallowing it would cause a
-				// goroutine leak or unexpected behaviour.
-				if rec == http.ErrAbortHandler {
-					panic(rec)
-				}
+			// Re-panic http.ErrAbortHandler — chi/net/http use this sentinel
+			// to abort the connection cleanly. Swallowing it would cause a
+			// goroutine leak or unexpected behaviour.
+			if e, ok := rec.(error); ok && errors.Is(e, http.ErrAbortHandler) {
+				panic(rec)
+			}
 
 				// Log panic value and stack SERVER-SIDE ONLY.
 				stack := debug.Stack()

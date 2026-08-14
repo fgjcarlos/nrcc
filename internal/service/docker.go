@@ -157,7 +157,7 @@ func (d *DockerService) DiscoverNodeRed() (*ContainerInfo, error) {
 		"--format", "{{.ID}}\t{{.Image}}\t{{.Names}}\t{{.Status}}\t{{.CreatedAt}}")
 	psOut, err := psCmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("%w: docker ps: %v", errDockerNotFound, err)
+		return nil, fmt.Errorf("%w: docker ps: %w", errDockerNotFound, err)
 	}
 
 	scanner := bufio.NewScanner(bytes.NewReader(psOut))
@@ -241,7 +241,7 @@ func (d *DockerService) runDocker(action, name string) error {
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("docker %s %s failed: %v: %s", action, name, err, strings.TrimSpace(stderr.String()))
+		return fmt.Errorf("docker %s %s failed: %w: %s", action, name, err, strings.TrimSpace(stderr.String()))
 	}
 	return nil
 }

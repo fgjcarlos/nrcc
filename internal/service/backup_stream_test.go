@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -187,7 +188,7 @@ func TestRestore_StreamsLargeArchive_BoundedMemory(t *testing.T) {
 	for i := range payload {
 		payload[i] = byte(i % 251)
 	}
-	if err := os.WriteFile(filepath.Join(dataDir, "flows.json"), payload, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dataDir, "flows.json"), payload, 0o600); err != nil {
 		t.Fatalf("seed flows.json: %v", err)
 	}
 
@@ -198,7 +199,7 @@ func TestRestore_StreamsLargeArchive_BoundedMemory(t *testing.T) {
 	}
 
 	// Mutate dataDir so Restore actually has work to do.
-	if err := os.WriteFile(filepath.Join(dataDir, "flows.json"), []byte("[overwritten]"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dataDir, "flows.json"), []byte("[overwritten]"), 0o600); err != nil {
 		t.Fatalf("overwrite: %v", err)
 	}
 
@@ -216,6 +217,7 @@ func TestRestore_StreamsLargeArchive_BoundedMemory(t *testing.T) {
 	runtime.ReadMemStats(&after)
 
 	const budget = 8 * 1024 * 1024 // 8 MiB
+	// #nosec G115 -- 64-bit platforms only; HeapAlloc is uint64 with delta bounded by test budget.
 	delta := int64(after.HeapAlloc) - int64(before.HeapAlloc)
 	if delta > budget {
 		t.Fatalf("Restore grew heap by %d bytes (budget %d). Restore is loading the whole archive into memory.", delta, budget)
@@ -223,6 +225,7 @@ func TestRestore_StreamsLargeArchive_BoundedMemory(t *testing.T) {
 	t.Logf("Heap delta after 50 MiB Restore: %d bytes (budget %d)", delta, budget)
 
 	// Sanity: the file was actually extracted with the original bytes.
+	// #nosec G304 -- dataDir is t.TempDir().
 	got, err := os.ReadFile(filepath.Join(dataDir, "flows.json"))
 	if err != nil {
 		t.Fatalf("read extracted flows.json: %v", err)
@@ -262,6 +265,7 @@ func TestRestore_FailsFastOnChecksumMismatch(t *testing.T) {
 	}
 
 	// dataDir/flows.json must still be the LIVE version — no partial restore.
+	// #nosec G304 -- dataDir is t.TempDir().
 	got, err := os.ReadFile(filepath.Join(dataDir, "flows.json"))
 	if err != nil {
 		t.Fatalf("read flows.json: %v", err)
@@ -324,6 +328,7 @@ func TestRestore_Regression_ExtractsFlows(t *testing.T) {
 	if err := svc.Restore(backup.ID); err != nil {
 		t.Fatalf("Restore: %v", err)
 	}
+	// #nosec G304 -- dataDir is t.TempDir().
 	got, err := os.ReadFile(filepath.Join(dataDir, "flows.json"))
 	if err != nil {
 		t.Fatalf("read: %v", err)
@@ -371,6 +376,7 @@ func TestDataDir_ExposesConfiguredDirectory(t *testing.T) {
 // longer matches the entry content). This requires re-zipping the archive.
 func corruptBackup(zipPath, target string) error {
 	// Read original archive.
+	// #nosec G304 -- zipPath is a t.TempDir() path built by the test scaffold.
 	src, err := os.ReadFile(zipPath)
 	if err != nil {
 		return err
@@ -437,13 +443,14 @@ func corruptBackup(zipPath, target string) error {
 	if err := zw.Close(); err != nil {
 		return err
 	}
-	return os.WriteFile(zipPath, dst.Bytes(), 0o644)
+	return os.WriteFile(zipPath, dst.Bytes(), 0o600)
 }
 
 // stripEntry removes `target` from the zip (re-zips without it) but
 // leaves the manifest untouched so verifyArchiveManifest sees a manifest
 // entry that is absent from the zip body.
 func stripEntry(zipPath, target string) error {
+	// #nosec G304 -- zipPath is a t.TempDir() path built by the test scaffold.
 	src, err := os.ReadFile(zipPath)
 	if err != nil {
 		return err
@@ -478,23 +485,10 @@ func stripEntry(zipPath, target string) error {
 	if err := zw.Close(); err != nil {
 		return err
 	}
-	return os.WriteFile(zipPath, dst.Bytes(), 0o644)
+	return os.WriteFile(zipPath, dst.Bytes(), 0o600)
 }
 
-// errorsIs is a tiny shim — avoids pulling in the errors import in the
-// helper scope; the production code wraps ErrBackupCorrupt with %w so
-// errors.Is works once the implementation lands.
+// errorsIs is a tiny shim — wraps errors.Is for the helper scope.
 func errorsIs(err, target error) bool {
-	for err != nil {
-		if err == target {
-			return true
-		}
-		type unwrapper interface{ Unwrap() error }
-		u, ok := err.(unwrapper)
-		if !ok {
-			return false
-		}
-		err = u.Unwrap()
-	}
-	return false
+	return errors.Is(err, target)
 }
