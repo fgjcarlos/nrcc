@@ -360,10 +360,10 @@ func TestBackupServiceObservabilityIncludesRecentEvents(t *testing.T) {
 
 func writeTestFile(t *testing.T, path, content string) {
 	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0750); err != nil {
 		t.Fatalf("MkdirAll failed: %v", err)
 	}
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(content), 0600); err != nil {
 		t.Fatalf("WriteFile failed: %v", err)
 	}
 }
@@ -371,11 +371,12 @@ func writeTestFile(t *testing.T, path, content string) {
 func createBackupArchive(t *testing.T, dataDir string, metadata backupMetadata) {
 	t.Helper()
 	backupDir := filepath.Join(dataDir, "backups")
-	if err := os.MkdirAll(backupDir, 0755); err != nil {
+	if err := os.MkdirAll(backupDir, 0750); err != nil {
 		t.Fatalf("MkdirAll failed: %v", err)
 	}
 
 	zipPath := filepath.Join(backupDir, metadata.ID+".zip")
+	// #nosec G304 -- zipPath is built from test-managed backupDir + metadata.ID; not request-derived.
 	file, err := os.Create(zipPath)
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
@@ -805,6 +806,7 @@ func TestExtractFileFromZipRestoresValidArchive(t *testing.T) {
 		}
 	}
 
+	// #nosec G304 -- restoreDir is t.TempDir().
 	content, err := os.ReadFile(filepath.Join(restoreDir, "flows.json"))
 	if err != nil {
 		t.Fatalf("read restored file: %v", err)
@@ -876,6 +878,7 @@ func TestExtractFileFromZip_AllowsEntryWithinLimit(t *testing.T) {
 
 func createZipWithEntry(t *testing.T, zipPath, entryName, content string) {
 	t.Helper()
+	// #nosec G304 -- zipPath is built from t.TempDir() + entryName; not request-derived.
 	f, err := os.Create(zipPath)
 	if err != nil {
 		t.Fatalf("create zip file: %v", err)

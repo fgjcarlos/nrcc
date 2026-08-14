@@ -175,7 +175,7 @@ func (s *ConfigService) preserveAdminAuthPasswords(cfg *model.NodeRedConfig) err
 	}
 	existing, err := s.store.Read()
 	if err != nil {
-		return nil
+		return fmt.Errorf("read existing persisted settings: %w", err)
 	}
 
 	if existing.AdminAuth == nil || len(existing.AdminAuth.Users) == 0 {
@@ -235,7 +235,7 @@ func (s *ConfigService) writeSettingsFile(content string, syncStore bool) (model
 	if doc.Path == "" {
 		doc.Path = filepath.Join(s.dataDir, "settings.js")
 	}
-	if err := os.MkdirAll(filepath.Dir(doc.Path), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(doc.Path), 0750); err != nil {
 		return doc, err
 	}
 	backupPath, err := s.backupSettingsFile(doc.Path)
@@ -347,15 +347,16 @@ func (s *ConfigService) backupSettingsFile(path string) (string, error) {
 		return "", err
 	}
 	backupDir := filepath.Join(s.dataDir, "backups", "settings")
-	if err := os.MkdirAll(backupDir, 0755); err != nil {
+	if err := os.MkdirAll(backupDir, 0750); err != nil {
 		return "", err
 	}
 	backupPath := filepath.Join(backupDir, fmt.Sprintf("settings-%s.js.bak", time.Now().UTC().Format("20060102-150405")))
+	// #nosec G304 -- path is the caller-validated settings.js inside the dataDir; write target is a derived backup file.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", err
 	}
-	return backupPath, os.WriteFile(backupPath, data, 0600)
+	return backupPath, os.WriteFile(backupPath, data, 0600) // #nosec G703 -- backupPath is built from operator-supplied dataDir + a constant filename; the caller validates the destination.
 }
 
 // renderSettings patches the live settings.js when one already exists, so
@@ -367,6 +368,7 @@ func (s *ConfigService) renderSettings(cfg model.NodeRedConfig) string {
 	if path == "" {
 		path = filepath.Join(s.dataDir, "settings.js")
 	}
+	// #nosec G304 -- path is the configured settings.js path inside the dataDir; not request-derived.
 	existing, err := os.ReadFile(path)
 	if err != nil || len(strings.TrimSpace(string(existing))) == 0 {
 		return generateSettingsJS(cfg)

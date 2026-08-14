@@ -194,7 +194,9 @@ func runAuditIPExtractionCase(t *testing.T, trustedProxies string, cases []audit
 	t.Helper()
 
 	if os.Getenv(auditIPChildEnv) != t.Name() {
-		cmd := exec.Command(os.Args[0], "-test.run=^"+regexp.QuoteMeta(t.Name())+"$")
+		// #nosec G702 -- test fixture: re-invokes the test binary with a fixed -test.run flag; the command is its own OS path, not user input.
+		// #nosec G204 -- test fixture: re-invokes the test binary to spawn a child with explicit env.
+		cmd := exec.Command(os.Args[0], "-test.run=^"+regexp.QuoteMeta(t.Name())+"$") //nolint:gosec // G702 G204 test fixtures
 		cmd.Env = append(
 			environmentWithout("NRCC_TRUSTED_PROXIES", auditIPChildEnv),
 			"NRCC_TRUSTED_PROXIES="+trustedProxies,

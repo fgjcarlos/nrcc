@@ -270,6 +270,7 @@ func (pm *ProcessManager) startLocked(resetCounter bool) error {
 		return fmt.Errorf("failed to create settings.js: %w", err)
 	}
 
+	// #nosec G204 -- pm.nodeRedCmd is operator-supplied via configuration; rt fields are derived from operator-controlled dataDir.
 	cmd := exec.Command(pm.nodeRedCmd,
 		"--userDir", rt.UserDir,
 		"--settings", rt.SettingsPath,
@@ -429,6 +430,7 @@ func (pm *ProcessManager) Status() model.RuntimeStatus {
 // Version returns the node-red version string (fetched once and cached).
 func (pm *ProcessManager) Version() string {
 	pm.versionOnce.Do(func() {
+		// #nosec G204 -- pm.nodeRedCmd is operator-supplied via configuration; "--version" is a fixed flag.
 		out, err := exec.Command(pm.nodeRedCmd, "--version").Output()
 		if err == nil {
 			pm.version = strings.TrimSpace(string(out))
@@ -531,5 +533,5 @@ func ensureSettings(path string) error {
     externalModules: {}
 }
 `
-	return os.WriteFile(path, []byte(defaultSettings), 0644)
+	return os.WriteFile(path, []byte(defaultSettings), 0600)
 }

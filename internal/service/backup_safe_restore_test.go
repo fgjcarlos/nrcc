@@ -25,7 +25,7 @@ func TestBackupServiceBackupDirOverride(t *testing.T) {
 	backupDir := filepath.Join(t.TempDir(), "dedicated-volume")
 	svc := NewBackupServiceWithBackupDir(dataDir, backupDir)
 
-	if err := os.WriteFile(filepath.Join(dataDir, "flows.json"), []byte(`[{"id":"1"}]`), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dataDir, "flows.json"), []byte(`[{"id":"1"}]`), 0600); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
 	backup, err := svc.CreateTyped(model.BackupTypeManual, "dedicated")
@@ -47,7 +47,7 @@ func TestBackupServiceBackupDirOverride(t *testing.T) {
 // .tmp file and either the final .zip is fully present or absent.
 func TestBackupServiceCreatePublishesAtomically(t *testing.T) {
 	dataDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dataDir, "flows.json"), []byte(`[{"id":"1"}]`), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dataDir, "flows.json"), []byte(`[{"id":"1"}]`), 0600); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
 
@@ -141,12 +141,12 @@ func TestBackupServiceManifestIncludesChecksums(t *testing.T) {
 func TestBackupServiceRestoreRejectsChecksumMismatch(t *testing.T) {
 	dataDir := t.TempDir()
 	preExisting := []byte(`[{"id":"PRESERVE"}]`)
-	if err := os.WriteFile(filepath.Join(dataDir, "flows.json"), preExisting, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dataDir, "flows.json"), preExisting, 0600); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
 
 	backupDir := filepath.Join(t.TempDir(), "backups")
-	if err := os.MkdirAll(backupDir, 0o755); err != nil {
+	if err := os.MkdirAll(backupDir, 0o750); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
 
@@ -176,7 +176,7 @@ func TestBackupServiceRestoreRejectsChecksumMismatch(t *testing.T) {
 		t.Fatalf("close: %v", err)
 	}
 
-	if err := os.WriteFile(filepath.Join(backupDir, "evil-1.zip"), buf.Bytes(), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(backupDir, "evil-1.zip"), buf.Bytes(), 0o600); err != nil {
 		t.Fatalf("write archive: %v", err)
 	}
 
@@ -190,6 +190,7 @@ func TestBackupServiceRestoreRejectsChecksumMismatch(t *testing.T) {
 	}
 
 	// The pre-existing file must NOT have been overwritten.
+	// #nosec G304 -- dataDir is t.TempDir().
 	got, err := os.ReadFile(filepath.Join(dataDir, "flows.json"))
 	if err != nil {
 		t.Fatalf("read dataDir/flows.json: %v", err)
@@ -204,12 +205,12 @@ func TestBackupServiceRestoreRejectsChecksumMismatch(t *testing.T) {
 // whose manifest lists an entry that is missing from the zip.
 func TestBackupServiceRestoreValidatesBeforeWriting(t *testing.T) {
 	dataDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dataDir, "flows.json"), []byte(`[{"id":"PRESERVE"}]`), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dataDir, "flows.json"), []byte(`[{"id":"PRESERVE"}]`), 0600); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
 
 	backupDir := filepath.Join(t.TempDir(), "backups")
-	if err := os.MkdirAll(backupDir, 0o755); err != nil {
+	if err := os.MkdirAll(backupDir, 0o750); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
 
@@ -236,7 +237,7 @@ func TestBackupServiceRestoreValidatesBeforeWriting(t *testing.T) {
 	if err := zw.Close(); err != nil {
 		t.Fatalf("close: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(backupDir, "evil-2.zip"), buf.Bytes(), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(backupDir, "evil-2.zip"), buf.Bytes(), 0o600); err != nil {
 		t.Fatalf("write archive: %v", err)
 	}
 
@@ -252,7 +253,7 @@ func TestBackupServiceRestoreValidatesBeforeWriting(t *testing.T) {
 			t.Fatalf("staging dir leaked: %s", e.Name())
 		}
 	}
-	if got, err := os.ReadFile(filepath.Join(dataDir, "flows.json")); err != nil || string(got) != `[{"id":"PRESERVE"}]` {
+	if got, err := os.ReadFile(filepath.Join(dataDir, "flows.json")); err != nil || string(got) != `[{"id":"PRESERVE"}]` { // #nosec G304 -- dataDir is t.TempDir().
 		t.Fatalf("dataDir flows.json corrupted: got=%q err=%v", got, err)
 	}
 }
@@ -268,7 +269,7 @@ func TestBackupServiceRestoreSwapsNestedFiles(t *testing.T) {
 	// Hand-craft an archive with a nested manifest entry so swap must walk
 	// the verified manifest instead of the staging directory listing.
 	backupDir := filepath.Join(t.TempDir(), "backups")
-	if err := os.MkdirAll(backupDir, 0o755); err != nil {
+	if err := os.MkdirAll(backupDir, 0o750); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
 
@@ -305,7 +306,7 @@ func TestBackupServiceRestoreSwapsNestedFiles(t *testing.T) {
 	if err := zw.Close(); err != nil {
 		t.Fatalf("close: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(backupDir, "nested-1.zip"), buf.Bytes(), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(backupDir, "nested-1.zip"), buf.Bytes(), 0o600); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 
@@ -314,6 +315,7 @@ func TestBackupServiceRestoreSwapsNestedFiles(t *testing.T) {
 		t.Fatalf("Restore nested: %v", err)
 	}
 
+	// #nosec G304 -- dataDir is t.TempDir().
 	gotFlows, err := os.ReadFile(filepath.Join(dataDir, "flows.json"))
 	if err != nil {
 		t.Fatalf("read flows.json: %v", err)
@@ -321,6 +323,7 @@ func TestBackupServiceRestoreSwapsNestedFiles(t *testing.T) {
 	if !strings.Contains(string(gotFlows), `"NEW"`) {
 		t.Fatalf("flows.json not restored: %s", gotFlows)
 	}
+	// #nosec G304 -- dataDir is t.TempDir().
 	gotNested, err := os.ReadFile(filepath.Join(dataDir, "nested", "settings.js"))
 	if err != nil {
 		t.Fatalf("read nested/settings.js: %v", err)
@@ -365,6 +368,7 @@ func TestBackupServiceRestoreSwapsFilesAtomic(t *testing.T) {
 		t.Fatalf("Restore: %v", err)
 	}
 
+	// #nosec G304 -- dataDir is t.TempDir().
 	got, err := os.ReadFile(filepath.Join(dataDir, "flows.json"))
 	if err != nil {
 		t.Fatalf("read flows.json after restore: %v", err)
@@ -372,6 +376,7 @@ func TestBackupServiceRestoreSwapsFilesAtomic(t *testing.T) {
 	if !strings.Contains(string(got), `"OLD"`) {
 		t.Fatalf("expected restored flows.json content, got %s", got)
 	}
+	// #nosec G304 -- dataDir is t.TempDir().
 	settings, err := os.ReadFile(filepath.Join(dataDir, "settings.js"))
 	if err != nil {
 		t.Fatalf("read settings.js after restore: %v", err)
@@ -557,12 +562,12 @@ func TestDeleteSurvivesCrashedRename(t *testing.T) {
 	writeTestFile(t, filepath.Join(dataDir, "flows.json"), `[{"id":"1"}]`)
 
 	backupDir := filepath.Join(t.TempDir(), "backups")
-	if err := os.MkdirAll(backupDir, 0o755); err != nil {
+	if err := os.MkdirAll(backupDir, 0o750); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
 	id := "crash-1"
 	zipPath := filepath.Join(backupDir, id+".zip")
-	if err := os.WriteFile(zipPath, []byte("not a real zip"), 0o644); err != nil {
+	if err := os.WriteFile(zipPath, []byte("not a real zip"), 0o600); err != nil {
 		t.Fatalf("seed zip: %v", err)
 	}
 	// Simulate the prior crashed run by pre-staging the .deleted marker.

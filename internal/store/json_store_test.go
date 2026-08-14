@@ -80,6 +80,7 @@ func TestJSONStore_Update_Rollback(t *testing.T) {
 	if err := store.Write(initial); err != nil {
 		t.Fatalf("Write failed: %v", err)
 	}
+	// #nosec G304 -- storePath comes from t.TempDir().
 	before, err := os.ReadFile(storePath)
 	if err != nil {
 		t.Fatalf("ReadFile failed: %v", err)
@@ -94,6 +95,7 @@ func TestJSONStore_Update_Rollback(t *testing.T) {
 		t.Fatalf("Update error = %v; want %v", err, sentinel)
 	}
 
+	// #nosec G304 -- storePath comes from t.TempDir().
 	after, err := os.ReadFile(storePath)
 	if err != nil {
 		t.Fatalf("ReadFile failed: %v", err)
@@ -157,6 +159,7 @@ func TestJSONStore_Update_NilCallback(t *testing.T) {
 	if err := store.Write(counterData{Counter: 9}); err != nil {
 		t.Fatalf("Write failed: %v", err)
 	}
+	// #nosec G304 -- storePath comes from t.TempDir().
 	before, err := os.ReadFile(storePath)
 	if err != nil {
 		t.Fatalf("ReadFile failed: %v", err)
@@ -165,6 +168,7 @@ func TestJSONStore_Update_NilCallback(t *testing.T) {
 	if err := store.Update(nil); err == nil {
 		t.Fatal("Update(nil) should return an error")
 	}
+	// #nosec G304 -- storePath comes from t.TempDir().
 	after, err := os.ReadFile(storePath)
 	if err != nil {
 		t.Fatalf("ReadFile failed: %v", err)
@@ -215,7 +219,7 @@ func TestJSONStore_Read_ParsesJSON(t *testing.T) {
 
 	// Write file manually
 	content := `{"name":"test","value":42}`
-	if err := os.WriteFile(storePath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(storePath, []byte(content), 0600); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -278,7 +282,7 @@ func TestJSONStore_Read_InvalidJSON(t *testing.T) {
 	storePath := filepath.Join(tempDir, "invalid.json")
 
 	// Write invalid JSON
-	if err := os.WriteFile(storePath, []byte("{invalid json}"), 0644); err != nil {
+	if err := os.WriteFile(storePath, []byte("{invalid json}"), 0600); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
@@ -295,7 +299,7 @@ func TestJSONStore_Exists_TrueWhenFileExists(t *testing.T) {
 	storePath := filepath.Join(tempDir, "test.json")
 
 	// Create file
-	if err := os.WriteFile(storePath, []byte("{}"), 0644); err != nil {
+	if err := os.WriteFile(storePath, []byte("{}"), 0600); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -437,6 +441,7 @@ func TestJSONStore_ReadPreservesFormatting(t *testing.T) {
 	}
 
 	// Read file content directly
+	// #nosec G304 -- storePath comes from t.TempDir().
 	content, err := os.ReadFile(storePath)
 	if err != nil {
 		t.Fatalf("Failed to read file: %v", err)

@@ -3,8 +3,10 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"net/url"
 	"os"
@@ -111,6 +113,7 @@ func (s *LibraryService) fireRestart() {
 func (s *LibraryService) List() ([]model.LibraryInfo, error) {
 	pkgPath := filepath.Join(s.dataDir, "package.json")
 
+	// #nosec G304 -- pkgPath is built from operator-supplied dataDir + a constant filename; not request-derived.
 	data, err := os.ReadFile(pkgPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -153,10 +156,14 @@ func (s *LibraryService) List() ([]model.LibraryInfo, error) {
 func (s *LibraryService) enrichLibraryMetadata(lib *model.LibraryInfo) error {
 	pkgJSONPath := filepath.Join(s.dataDir, "node_modules", lib.Name, "package.json")
 
+	// #nosec G304 -- pkgJSONPath is built from operator-supplied dataDir + lib.Name from the catalog; not request-derived.
 	data, err := os.ReadFile(pkgJSONPath)
 	if err != nil {
-		// Not all packages have package.json or may not be installed yet
-		return nil
+		if errors.Is(err, fs.ErrNotExist) {
+			// Not all packages have package.json or may not be installed yet
+			return nil
+		}
+		return fmt.Errorf("read package.json for %s: %w", lib.Name, err)
 	}
 
 	var pkg struct {
@@ -170,7 +177,7 @@ func (s *LibraryService) enrichLibraryMetadata(lib *model.LibraryInfo) error {
 	}
 
 	if err := json.Unmarshal(data, &pkg); err != nil {
-		return nil
+		return fmt.Errorf("parse package.json for %s: %w", lib.Name, err)
 	}
 
 	lib.Description = pkg.Description
@@ -305,6 +312,7 @@ func (s *LibraryService) Check(ctx context.Context, pkg string) (bool, error) {
 	runCtx, cancel := context.WithTimeout(ctx, checkTimeout)
 	defer cancel()
 
+	// #nosec G204 -- bin is operator-supplied via configuration (npm/npx); pkg is from a managed registry catalog.
 	cmd := exec.CommandContext(runCtx, bin, "view", pkg)
 	cmd.Dir = s.dataDir
 	cmd.Stdout = nil

@@ -23,6 +23,7 @@ func NewFlowService(dataDir string) *FlowService {
 func (s *FlowService) GetFlows() ([]interface{}, error) {
 	flowsPath := filepath.Join(s.dataDir, "flows.json")
 
+	// #nosec G304 -- flowsPath is built from operator-supplied dataDir + a constant filename; not request-derived.
 	data, err := os.ReadFile(flowsPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -64,6 +65,7 @@ func (s *FlowService) GetFlow(id string) (interface{}, error) {
 func (s *FlowService) ExportFlows() ([]byte, error) {
 	flowsPath := filepath.Join(s.dataDir, "flows.json")
 
+	// #nosec G304 -- flowsPath is built from operator-supplied dataDir + a constant filename; not request-derived.
 	data, err := os.ReadFile(flowsPath)
 	if err != nil {
 		if os.IsNotExist(err) {

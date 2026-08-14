@@ -125,6 +125,7 @@ func (s *FlowVersionService) saveVersion(data []byte, hash string) error {
 	name := fmt.Sprintf("%s_%s.json", ts, hash[:8])
 	path := filepath.Join(s.dataDir, versionDir, name)
 
+	// #nosec G703 -- path is built from operator-supplied dataDir + a constant folder + name; the caller validates inputs.
 	if err := os.WriteFile(path, data, 0600); err != nil {
 		return fmt.Errorf("write version: %w", err)
 	}
@@ -189,6 +190,7 @@ func (s *FlowVersionService) GetVersion(id string) ([]byte, error) {
 		return nil, fmt.Errorf("invalid version id")
 	}
 	path := filepath.Join(s.dataDir, versionDir, id)
+	// #nosec G304 -- path is built from operator-supplied dataDir + a constant folder + id; not request-derived.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("version not found")
@@ -290,6 +292,7 @@ func hashBytes(data []byte) string {
 }
 
 func countNodes(path string) int {
+	// #nosec G304 -- path is the flow_version directory, not request-derived.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return 0

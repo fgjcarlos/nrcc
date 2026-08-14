@@ -24,7 +24,8 @@ func TestHelperProcess(t *testing.T) {
 	}
 	cmdArgs := args[1:]
 	if recordFile := os.Getenv("NRCC_TEST_RECORD_FILE"); recordFile != "" && len(cmdArgs) > 0 {
-		f, err := os.OpenFile(recordFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		//nolint:gosec // G304,G703 -- recordFile is operator-supplied via env for test recording.
+		f, err := os.OpenFile(recordFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 		if err == nil {
 			_, _ = f.WriteString(strings.Join(cmdArgs, " ") + "\n")
 			_ = f.Close()
@@ -50,9 +51,10 @@ func TestHelperProcess(t *testing.T) {
 		os.Exit(0)
 	}
 	if len(cmdArgs) >= 4 && cmdArgs[1] == "uninstall" && cmdArgs[3] == "portless" {
-		if marker := os.Getenv("NRCC_TEST_PORTLESS_UNINSTALLED"); marker != "" {
-			_ = os.WriteFile(marker, []byte("1"), 0644)
-		}
+	if marker := os.Getenv("NRCC_TEST_PORTLESS_UNINSTALLED"); marker != "" {
+		// #nosec G703 -- marker is set by the test runner via env var; not request-derived.
+		_ = os.WriteFile(marker, []byte("1"), 0600)
+	}
 	}
 	os.Exit(0)
 }
@@ -172,7 +174,7 @@ func TestCanWrite_WithExistingFile(t *testing.T) {
 	testPath := filepath.Join(tempDir, "test.txt")
 
 	// Pre-create the file
-	if err := os.WriteFile(testPath, []byte("content"), 0644); err != nil {
+	if err := os.WriteFile(testPath, []byte("content"), 0600); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -190,15 +192,17 @@ func TestCanWrite_WithReadOnlyDir(t *testing.T) {
 
 	tempDir := t.TempDir()
 	roDir := filepath.Join(tempDir, "readonly")
-	if err := os.Mkdir(roDir, 0755); err != nil {
+	if err := os.Mkdir(roDir, 0750); err != nil {
 		t.Fatalf("Failed to create test dir: %v", err)
 	}
 
 	// Make it read-only
+	// #nosec G302 -- test fixture: read-only mode is required to assert `canWrite` returns false.
 	if err := os.Chmod(roDir, 0444); err != nil {
 		t.Fatalf("Failed to chmod: %v", err)
 	}
-	defer func() { _ = os.Chmod(roDir, 0755) }() // Restore for cleanup
+	// #nosec G302 -- test fixture: restoring the directory mode after the test finishes.
+	defer func() { _ = os.Chmod(roDir, 0750) }() // Restore for cleanup
 
 	testPath := filepath.Join(roDir, "test.txt")
 	result := canWrite(testPath)
@@ -224,7 +228,7 @@ func TestLatestBackupFile_WithBackups(t *testing.T) {
 
 	// Create some backup files with delays to ensure different timestamps
 	f1 := filepath.Join(tempDir, "backup1.bak")
-	if err := os.WriteFile(f1, []byte("old"), 0644); err != nil {
+	if err := os.WriteFile(f1, []byte("old"), 0600); err != nil {
 		t.Fatalf("Failed to create file: %v", err)
 	}
 
@@ -232,7 +236,7 @@ func TestLatestBackupFile_WithBackups(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	f2 := filepath.Join(tempDir, "backup2.bak")
-	if err := os.WriteFile(f2, []byte("new"), 0644); err != nil {
+	if err := os.WriteFile(f2, []byte("new"), 0600); err != nil {
 		t.Fatalf("Failed to create file: %v", err)
 	}
 
@@ -256,10 +260,10 @@ func TestLatestBackupFile_IgnoresDirectories(t *testing.T) {
 	// Create a file and a directory
 	f1 := filepath.Join(tempDir, "backup.bak")
 	d1 := filepath.Join(tempDir, "subdir")
-	if err := os.WriteFile(f1, []byte("content"), 0644); err != nil {
+	if err := os.WriteFile(f1, []byte("content"), 0600); err != nil {
 		t.Fatalf("Failed to create file: %v", err)
 	}
-	if err := os.Mkdir(d1, 0755); err != nil {
+	if err := os.Mkdir(d1, 0750); err != nil {
 		t.Fatalf("Failed to create dir: %v", err)
 	}
 
@@ -290,7 +294,7 @@ func TestIsDevNull_StatDevNull(t *testing.T) {
 func TestIsDevNull_StatRegularFile(t *testing.T) {
 	tmp := t.TempDir()
 	path := filepath.Join(tmp, "plain.txt")
-	if err := os.WriteFile(path, []byte("hi"), 0644); err != nil {
+	if err := os.WriteFile(path, []byte("hi"), 0600); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 	info, err := os.Stat(path)

@@ -12,7 +12,9 @@ func getDiskInfo(path string) (total, free, used uint64) {
 		return 0, 0, 0
 	}
 
+	// #nosec G115 -- 64-bit platforms only; stat.Blocks and stat.Bavail are uint64 on every supported target.
 	total = stat.Blocks * uint64(stat.Bsize)
+	// #nosec G115 -- 64-bit platforms only; stat.Blocks and stat.Bavail are uint64 on every supported target.
 	free = stat.Bavail * uint64(stat.Bsize)
 	used = total - free
 

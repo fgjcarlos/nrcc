@@ -234,6 +234,7 @@ func EncryptStream(rc io.Reader, password string, w io.Writer) error {
 			chunkNonce := deriveChunkNonce(baseNonce, counter)
 			sealed := gcm.Seal(nil, chunkNonce, buf[:n], nil)
 			lenBuf := make([]byte, 4)
+			// #nosec G115 -- len(sealed) is bounded by maxBackupChunkSize (well below 4 GiB).
 			binary.BigEndian.PutUint32(lenBuf, uint32(len(sealed)))
 			if _, err := w.Write(lenBuf); err != nil {
 				return fmt.Errorf("write chunk len: %w", err)

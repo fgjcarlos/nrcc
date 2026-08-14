@@ -76,6 +76,7 @@ func TestSave_GeneratesSettingsJSWhenMissing(t *testing.T) {
 
 func readFileString(t *testing.T, path string) string {
 	t.Helper()
+	// #nosec G304 -- path is a t.TempDir()-derived path; not request-derived.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)

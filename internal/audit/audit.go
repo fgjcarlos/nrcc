@@ -105,7 +105,9 @@ func (s *Service) Close() error {
 }
 
 func (s *Service) openLog() error {
+	// #nosec G304 -- path is built from operator-supplied audit directory + a constant filename; not request-derived.
 	path := filepath.Join(s.dir, fileName)
+	// #nosec G304 -- see path derivation above.
 	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {
 		return fmt.Errorf("open audit log: %w", err)

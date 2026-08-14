@@ -24,6 +24,7 @@ type execRunner interface {
 type defaultRunner struct{}
 
 func (r *defaultRunner) Run(ctx context.Context, name string, args ...string) ([]byte, error) {
+	// #nosec G204 -- name and args come from the version-check / update-installer pipeline which validates inputs upstream.
 	cmd := exec.CommandContext(ctx, name, args...)
 	return cmd.CombinedOutput()
 }
@@ -353,7 +354,7 @@ func (s *UpdateService) History() []model.BackupEntry {
 // Thread-safe via backupStore mutex.
 func (s *UpdateService) AppendBackup(entry model.BackupEntry) error {
 	// Ensure the data directory exists (parent of update_backups.json)
-	if err := os.MkdirAll(s.dataDir, 0755); err != nil {
+	if err := os.MkdirAll(s.dataDir, 0750); err != nil {
 		return fmt.Errorf("failed to create data directory: %w", err)
 	}
 

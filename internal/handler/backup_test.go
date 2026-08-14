@@ -153,7 +153,7 @@ func TestBackupHandlerStorageAndDetailEndpoints(t *testing.T) {
 func writeBackupFixture(t *testing.T, dataDir string) {
 	t.Helper()
 	svc := service.NewBackupService(dataDir)
-	if err := os.WriteFile(filepath.Join(dataDir, "flows.json"), []byte(`[{"id":"1"}]`), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dataDir, "flows.json"), []byte(`[{"id":"1"}]`), 0600); err != nil {
 		t.Fatalf("WriteFile failed: %v", err)
 	}
 	backup, err := svc.CreateTyped(model.BackupTypeAuto, "fixture-auto")
@@ -179,7 +179,7 @@ func TestGetBackupsPaginatedIntegration(t *testing.T) {
 	router.Get("/api/backups", handler.GetBackups)
 
 	// Create 5 test backups by writing flows.json and calling CreateTyped
-	if err := os.WriteFile(filepath.Join(tempDir, "flows.json"), []byte(`[{"id":"1"}]`), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(tempDir, "flows.json"), []byte(`[{"id":"1"}]`), 0600); err != nil {
 		t.Fatalf("WriteFile failed: %v", err)
 	}
 
@@ -270,7 +270,7 @@ func TestGetBackupsWithSortingIntegration(t *testing.T) {
 	router.Get("/api/backups", handler.GetBackups)
 
 	// Create test backups
-	if err := os.WriteFile(filepath.Join(tempDir, "flows.json"), []byte(`[{"id":"1"}]`), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(tempDir, "flows.json"), []byte(`[{"id":"1"}]`), 0600); err != nil {
 		t.Fatalf("WriteFile failed: %v", err)
 	}
 
@@ -317,7 +317,7 @@ func TestGetBackupsDefaultsIntegration(t *testing.T) {
 	router.Get("/api/backups", handler.GetBackups)
 
 	// Create test backup
-	if err := os.WriteFile(filepath.Join(tempDir, "flows.json"), []byte(`[{"id":"1"}]`), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(tempDir, "flows.json"), []byte(`[{"id":"1"}]`), 0600); err != nil {
 		t.Fatalf("WriteFile failed: %v", err)
 	}
 

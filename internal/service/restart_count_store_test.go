@@ -40,7 +40,7 @@ func TestRestartCountStore_CorruptFile_ReturnsZero(t *testing.T) {
 	store := newRestartCountStore(dir)
 
 	// Write garbage into the backing file.
-	if err := os.WriteFile(filepath.Join(dir, "restart_count.json"), []byte("not json"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "restart_count.json"), []byte("not json"), 0600); err != nil {
 		t.Fatalf("seed corrupt file: %v", err)
 	}
 

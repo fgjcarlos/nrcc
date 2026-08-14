@@ -31,6 +31,7 @@ const testResticPassword = "nrcc-integration-test-fixture-pw"
 func resticBinary(t *testing.T) string {
 	t.Helper()
 	if v := os.Getenv("NRCC_RESTIC_TEST_BIN"); v != "" {
+		// #nosec G703 -- v is set by the test runner via env var, not by request input.
 		if _, err := os.Stat(v); err == nil {
 			return v
 		}
@@ -65,7 +66,7 @@ func TestResticProviderSnapshotListRestore(t *testing.T) {
 
 	srcDir := t.TempDir()
 	secret := []byte(`[{"id":"node-1","type":"inject"}]`)
-	if err := os.WriteFile(filepath.Join(srcDir, "flows.json"), secret, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(srcDir, "flows.json"), secret, 0o600); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
 
@@ -93,6 +94,7 @@ func TestResticProviderSnapshotListRestore(t *testing.T) {
 	}
 	// restic preserves the absolute source path inside the snapshot; the
 	// restored file lives at <dst>/<srcDir>/flows.json.
+	// #nosec G304 -- dst is a t.TempDir() returned by the test scaffold.
 	got, err := os.ReadFile(filepath.Join(dst, srcDir, "flows.json"))
 	if err != nil {
 		t.Fatalf("read restored flows.json: %v", err)
@@ -119,7 +121,7 @@ func TestBackupServiceNoopProviderByDefault(t *testing.T) {
 	if name := svc.BackupProvider().Name(); name != "local" {
 		t.Fatalf("expected default provider %q, got %q", "local", name)
 	}
-	if err := os.WriteFile(filepath.Join(t.TempDir(), "noop-src"), []byte("x"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(t.TempDir(), "noop-src"), []byte("x"), 0o600); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
 }

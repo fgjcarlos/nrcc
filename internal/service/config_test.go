@@ -215,6 +215,7 @@ func TestConfigService_Save_RejectsPlaintextPassword(t *testing.T) {
 		password string
 	}{
 		{name: "plaintext", password: "password123"},
+		// #nosec G101 -- bcrypt regex test fixture: malformed prefix used to exercise the parser.
 		{name: "unsupported bcrypt prefix", password: "$2$10$unsupported"},
 		{name: "bare 2a prefix", password: "$2a$"},
 		{name: "bare 2b prefix", password: "$2b$"},
@@ -240,10 +241,12 @@ func TestConfigService_Save_RejectsPlaintextPassword(t *testing.T) {
 
 			configPath := filepath.Join(tempDir, "config.json")
 			settingsPath := filepath.Join(tempDir, "settings.js")
+			// #nosec G304 -- tempDir is t.TempDir().
 			configBefore, err := os.ReadFile(configPath)
 			if err != nil {
 				t.Fatalf("read baseline config: %v", err)
 			}
+			// #nosec G304 -- tempDir is t.TempDir().
 			settingsBefore, err := os.ReadFile(settingsPath)
 			if err != nil {
 				t.Fatalf("read baseline settings: %v", err)
@@ -256,10 +259,12 @@ func TestConfigService_Save_RejectsPlaintextPassword(t *testing.T) {
 				t.Fatalf("Save() error = %v, want ErrAdminAuthPlaintextPassword", err)
 			}
 
+			// #nosec G304 -- tempDir is t.TempDir().
 			configAfter, err := os.ReadFile(configPath)
 			if err != nil {
 				t.Fatalf("read config after rejection: %v", err)
 			}
+			// #nosec G304 -- tempDir is t.TempDir().
 			settingsAfter, err := os.ReadFile(settingsPath)
 			if err != nil {
 				t.Fatalf("read settings after rejection: %v", err)
@@ -293,10 +298,12 @@ func TestConfigService_SaveRawSettings_RejectsPlaintextPassword(t *testing.T) {
 
 	configPath := filepath.Join(tempDir, "config.json")
 	settingsPath := filepath.Join(tempDir, "settings.js")
+	// #nosec G304 -- tempDir is t.TempDir().
 	configBefore, err := os.ReadFile(configPath)
 	if err != nil {
 		t.Fatalf("read baseline config: %v", err)
 	}
+	// #nosec G304 -- tempDir is t.TempDir().
 	settingsBefore, err := os.ReadFile(settingsPath)
 	if err != nil {
 		t.Fatalf("read baseline settings: %v", err)
@@ -308,10 +315,12 @@ func TestConfigService_SaveRawSettings_RejectsPlaintextPassword(t *testing.T) {
 		t.Fatalf("SaveRawSettings() error = %v, want ErrAdminAuthPlaintextPassword", err)
 	}
 
+	// #nosec G304 -- tempDir is t.TempDir().
 	configAfter, err := os.ReadFile(configPath)
 	if err != nil {
 		t.Fatalf("read config after rejection: %v", err)
 	}
+	// #nosec G304 -- tempDir is t.TempDir().
 	settingsAfter, err := os.ReadFile(settingsPath)
 	if err != nil {
 		t.Fatalf("read settings after rejection: %v", err)
@@ -355,6 +364,7 @@ func TestConfigService_Save_AcceptsBcryptHash(t *testing.T) {
 			if got := saved.AdminAuth.Users[0].Password; got != hash {
 				t.Fatalf("saved password = %q, want %q", got, hash)
 			}
+			// #nosec G304 -- tempDir is t.TempDir()
 			settings, err := os.ReadFile(filepath.Join(tempDir, "settings.js"))
 			if err != nil {
 				t.Fatalf("read settings.js: %v", err)
@@ -376,7 +386,7 @@ func TestConfigService_SettingsJS_FilePermissions(t *testing.T) {
 	}
 	assertFileMode(t, doc.Path, 0o600)
 
-	if err := os.Chmod(doc.Path, 0o644); err != nil {
+	if err := os.Chmod(doc.Path, 0o600); err != nil {
 		t.Fatalf("prepare permissive existing settings.js: %v", err)
 	}
 	doc, err = svc.SaveRawSettings(strings.Replace(initial, "1880", "1881", 1))
@@ -869,7 +879,7 @@ func TestConfigService_RoundTripPreservation_WithCustomContent(t *testing.T) {
 
 	// Save the fixture
 	settingsPath := filepath.Join(tempDir, "settings.js")
-	if err := os.WriteFile(settingsPath, []byte(fixtureContent), 0644); err != nil {
+	if err := os.WriteFile(settingsPath, []byte(fixtureContent), 0600); err != nil {
 		t.Fatalf("Failed to write fixture: %v", err)
 	}
 

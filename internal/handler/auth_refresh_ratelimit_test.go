@@ -19,6 +19,7 @@ func setupRateLimitedAuthTest(t *testing.T) (*AuthHandler, *service.AuthService)
 func refreshRequest(token string) *http.Request {
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/refresh", nil)
 	if token != "" {
+		// #nosec G124 -- test fixture: incoming request cookie, not the response SetCookie (which is in production code).
 		req.AddCookie(&http.Cookie{Name: refreshCookieName, Value: token})
 	}
 	return req

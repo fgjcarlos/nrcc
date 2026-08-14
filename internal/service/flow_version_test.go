@@ -8,7 +8,7 @@ import (
 
 func writeTestFlows(t *testing.T, dir, content string) {
 	t.Helper()
-	if err := os.WriteFile(filepath.Join(dir, "flows.json"), []byte(content), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "flows.json"), []byte(content), 0600); err != nil {
 		t.Fatalf("write flows.json: %v", err)
 	}
 }
@@ -156,6 +156,7 @@ func TestFlowVersion_Revert(t *testing.T) {
 		t.Fatalf("Revert: %v", err)
 	}
 
+	// #nosec G304 -- dir is t.TempDir()
 	data, _ := os.ReadFile(filepath.Join(dir, "flows.json"))
 	if string(data) != original {
 		t.Errorf("flows.json not reverted, got %s", data)

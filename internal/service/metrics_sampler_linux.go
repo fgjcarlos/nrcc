@@ -124,7 +124,9 @@ func diskPercent(path string) float64 {
 	if stat.Blocks == 0 {
 		return 0
 	}
+	// #nosec G115 -- 64-bit platforms only; stat.Blocks and stat.Bfree are uint64 on every supported target.
 	total := stat.Blocks * uint64(stat.Bsize)
+	// #nosec G115 -- 64-bit platforms only; stat.Blocks and stat.Bfree are uint64 on every supported target.
 	free := stat.Bfree * uint64(stat.Bsize)
 	if total == 0 {
 		return 0

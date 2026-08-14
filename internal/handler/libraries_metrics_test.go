@@ -32,7 +32,7 @@ func setupLibraryHandlerWithMetrics(t *testing.T) (*LibraryHandler, *stubLibrary
 	tempDir := t.TempDir()
 	// Write a minimal package.json so the service can operate
 	pkgJSON := `{"name":"node-red","version":"3.0.0","dependencies":{}}`
-	if err := os.WriteFile(filepath.Join(tempDir, "package.json"), []byte(pkgJSON), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(tempDir, "package.json"), []byte(pkgJSON), 0600); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 	svc := service.NewLibraryService(tempDir)
@@ -108,7 +108,7 @@ func TestDeleteLibrary_RecordsUninstallOperation(t *testing.T) {
 func TestLibrary_NoMetricsNilGuard(t *testing.T) {
 	tempDir := t.TempDir()
 	pkgJSON := `{"name":"node-red","version":"3.0.0","dependencies":{}}`
-	if err := os.WriteFile(filepath.Join(tempDir, "package.json"), []byte(pkgJSON), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(tempDir, "package.json"), []byte(pkgJSON), 0600); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 	svc := service.NewLibraryService(tempDir)

@@ -820,6 +820,7 @@ func (h *AuthHandler) setRefreshCookieWithSecure(w http.ResponseWriter, userID s
 	if err != nil {
 		return err
 	}
+	// #nosec G124 -- Secure is computed via isSecureRequest which inspects r.TLS and X-Forwarded-Proto; cosmetically insecure over plain HTTP only.
 	http.SetCookie(w, &http.Cookie{
 		Name:  refreshCookieName,
 		Value: refreshToken,
@@ -839,6 +840,7 @@ func (h *AuthHandler) setRefreshCookieWithSecure(w http.ResponseWriter, userID s
 }
 
 func clearRefreshCookie(w http.ResponseWriter, r *http.Request) {
+	// #nosec G124 -- Secure is computed via isSecureRequest which inspects r.TLS and X-Forwarded-Proto; cosmetically insecure over plain HTTP only.
 	http.SetCookie(w, &http.Cookie{
 		Name:     refreshCookieName,
 		Value:    "",

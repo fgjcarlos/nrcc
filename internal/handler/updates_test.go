@@ -501,6 +501,7 @@ func installFakeNPM(t *testing.T) {
 	t.Helper()
 	binDir := t.TempDir()
 	npmPath := filepath.Join(binDir, "npm")
+	// #nosec G306 -- test fixture: the file must be executable by the shell to act as a fake npm binary.
 	if err := os.WriteFile(npmPath, []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
 		t.Fatalf("failed to write fake npm: %v", err)
 	}

@@ -26,10 +26,12 @@ func (c *capturedCmd) factory() func(name string, arg ...string) *exec.Cmd {
 		}
 		// ps returns a tab-separated body that goes through Output().
 		if len(arg) > 0 && arg[0] == "ps" {
+			// #nosec G204 -- test fixture: deterministic mock for docker CLI invocation.
 			return exec.Command("printf", "%s", c.psOutput)
 		}
 		// inspect returns a tab-separated body.
 		if len(arg) > 0 && arg[0] == "inspect" {
+			// #nosec G204 -- test fixture: deterministic mock for docker CLI invocation.
 			return exec.Command("printf", "%s", c.inspectOutput)
 		}
 		// restart / stop / rm are no-ops on success; we just exit 0.

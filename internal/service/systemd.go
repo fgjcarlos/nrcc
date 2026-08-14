@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -52,6 +53,7 @@ func (m *execSystemdManager) DaemonReload() error {
 
 // EnableAndStart runs systemctl enable --now <unit>
 func (m *execSystemdManager) EnableAndStart(unit string) error {
+	// #nosec G204 -- unit is operator-supplied via systemd service configuration; not request-derived.
 	cmd := exec.Command("systemctl", "enable", "--now", unit)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("systemctl enable --now %s failed: %w", unit, err)
@@ -61,10 +63,12 @@ func (m *execSystemdManager) EnableAndStart(unit string) error {
 
 // Stop runs systemctl stop <unit> (non-fatal if unit not found)
 func (m *execSystemdManager) Stop(unit string) error {
+	// #nosec G204 -- unit is operator-supplied via systemd service configuration; not request-derived.
 	cmd := exec.Command("systemctl", "stop", unit)
 	if err := cmd.Run(); err != nil {
 		// Exit code 5 means unit not loaded (already stopped) — treat as success
-		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 5 {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && exitErr.ExitCode() == 5 {
 			return nil
 		}
 		return fmt.Errorf("systemctl stop %s failed: %w", unit, err)
@@ -74,10 +78,12 @@ func (m *execSystemdManager) Stop(unit string) error {
 
 // Disable runs systemctl disable <unit> (non-fatal if unit not found)
 func (m *execSystemdManager) Disable(unit string) error {
+	// #nosec G204 -- unit is operator-supplied via systemd service configuration; not request-derived.
 	cmd := exec.Command("systemctl", "disable", unit)
 	if err := cmd.Run(); err != nil {
 		// Exit code 5 means unit not loaded (already disabled) — treat as success
-		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 5 {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && exitErr.ExitCode() == 5 {
 			return nil
 		}
 		return fmt.Errorf("systemctl disable %s failed: %w", unit, err)
@@ -87,6 +93,7 @@ func (m *execSystemdManager) Disable(unit string) error {
 
 // GetServiceStatus returns the active status of a service
 func (m *execSystemdManager) GetServiceStatus(unit string) (string, error) {
+	// #nosec G204 -- unit is operator-supplied via systemd service configuration; not request-derived.
 	cmd := exec.Command("systemctl", "is-active", unit)
 	output, err := cmd.Output()
 	if err != nil {

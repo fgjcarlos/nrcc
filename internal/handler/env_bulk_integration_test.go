@@ -35,7 +35,7 @@ func TestBulkEndpoint_400OnCapExceeded(t *testing.T) {
 
 func TestBulkEndpoint_FinalSyncFailure500(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.Mkdir(filepath.Join(dir, "flows.json"), 0o755); err != nil {
+	if err := os.Mkdir(filepath.Join(dir, "flows.json"), 0o750); err != nil {
 		t.Fatal(err)
 	}
 	handler := NewEnvHandler(service.NewEnvService(service.NewIsolatedConfigService(dir)), dir)
@@ -72,10 +72,12 @@ func testBulkEndpointCapRejection(t *testing.T, commit bool) {
 	if err := svc.Set("EXISTING", "keep", "string", "", false); err != nil {
 		t.Fatalf("seed state: %v", err)
 	}
+	// #nosec G304 -- test fixture: dir comes from t.TempDir().
 	beforeConfig, err := os.ReadFile(filepath.Join(dir, "config.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
+	// #nosec G304 -- test fixture: dir comes from t.TempDir().
 	beforeFlows, err := os.ReadFile(filepath.Join(dir, "flows.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -93,10 +95,12 @@ func testBulkEndpointCapRejection(t *testing.T, commit bool) {
 	if result.Valid || len(result.Issues) != 1 || !strings.Contains(result.Issues[0].Reason, "maximum 2") {
 		t.Fatalf("unexpected cap payload: %+v", result)
 	}
+	// #nosec G304 -- test fixture: dir comes from t.TempDir().
 	afterConfig, err := os.ReadFile(filepath.Join(dir, "config.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
+	// #nosec G304 -- test fixture: dir comes from t.TempDir().
 	afterFlows, err := os.ReadFile(filepath.Join(dir, "flows.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -164,7 +168,7 @@ func TestEnvHandler_RemainingEnvironmentEndpoints(t *testing.T) {
 
 func TestEnvHandler_EnvironmentErrorResponses(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte("{"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte("{"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	handler := NewEnvHandler(service.NewEnvService(service.NewIsolatedConfigService(dir)), dir)
@@ -175,7 +179,7 @@ func TestEnvHandler_EnvironmentErrorResponses(t *testing.T) {
 	}
 
 	dir = t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "flows.json"), []byte(`[{"type":"global-config","env":{}}]`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "flows.json"), []byte(`[{"type":"global-config","env":{}}]`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	handler = NewEnvHandler(service.NewEnvService(service.NewIsolatedConfigService(dir)), dir)
@@ -186,7 +190,7 @@ func TestEnvHandler_EnvironmentErrorResponses(t *testing.T) {
 	}
 
 	dataFile := filepath.Join(t.TempDir(), "data-file")
-	if err := os.WriteFile(dataFile, []byte("x"), 0o644); err != nil {
+	if err := os.WriteFile(dataFile, []byte("x"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	handler = NewEnvHandler(service.NewEnvService(service.NewIsolatedConfigService(t.TempDir())), dataFile)

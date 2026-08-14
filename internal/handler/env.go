@@ -157,7 +157,7 @@ func (h *EnvHandler) withManagedNodeRedStopped(change func() error) (bool, error
 	if err := change(); err != nil {
 		if wasRunning {
 			if restartErr := h.pm.Start(); restartErr != nil {
-				return true, fmt.Errorf("%w; restart Node-RED after failed update: %v", err, restartErr)
+				return true, fmt.Errorf("%w; restart Node-RED after failed update: %w", err, restartErr)
 			}
 		}
 		return wasRunning, err

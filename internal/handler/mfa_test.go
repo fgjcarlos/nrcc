@@ -293,6 +293,7 @@ func TestAuthHandler_LoginWithEnrollmentReturnsMfaRequired(t *testing.T) {
 		t.Fatalf("ConfirmEnrollment: %v", err)
 	}
 
+	// #nosec G117 -- test fixture; marshaling is asserted by the handler.
 	body, _ := json.Marshal(LoginRequest{Username: "admin", Password: "password123"})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
@@ -318,6 +319,7 @@ func TestAuthHandler_LoginWithEnrollmentReturnsMfaRequired(t *testing.T) {
 
 func TestAuthHandler_LoginWithoutEnrollmentIsUnchanged(t *testing.T) {
 	_, authHandler, _, _ := setupMfaHandlerTest(t)
+	// #nosec G117 -- test fixture; marshaling is asserted by the handler.
 	body, _ := json.Marshal(LoginRequest{Username: "admin", Password: "password123"})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(body))
 	rec := httptest.NewRecorder()

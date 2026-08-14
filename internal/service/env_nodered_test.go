@@ -12,6 +12,7 @@ import (
 
 func readTestFlows(t *testing.T, dir string) []map[string]json.RawMessage {
 	t.Helper()
+	// #nosec G304 -- dir is t.TempDir()
 	data, err := os.ReadFile(filepath.Join(dir, "flows.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -45,7 +46,7 @@ func TestEnvServiceSyncsNodeRed5GlobalEnvironment(t *testing.T) {
     {"id":"tab-1","type":"tab","label":"Main"},
     {"id":"manual-global","type":"global-config","env":[{"name":"MANUAL","value":"keep","type":"str"}],"modules":{"example":"1.0.0"}}
 ]`
-	if err := os.WriteFile(filepath.Join(dir, "flows.json"), []byte(initial), 0o640); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "flows.json"), []byte(initial), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -91,8 +92,8 @@ func TestEnvServiceSyncsNodeRed5GlobalEnvironment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode().Perm() != 0o640 {
-		t.Fatalf("flows.json permissions = %o, want 640", info.Mode().Perm())
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("flows.json permissions = %o, want 600", info.Mode().Perm())
 	}
 }
 
@@ -114,6 +115,7 @@ func TestEnvServiceUpdatesDeletesAndExcludesSecrets(t *testing.T) {
 	if len(env) != 1 || env[0] != (nodeRedGlobalEnv{Name: "VALUE", Value: "9", Type: "num"}) {
 		t.Fatalf("global env after update/secret = %#v", env)
 	}
+	// #nosec G304 -- dir is t.TempDir()
 	data, _ := os.ReadFile(filepath.Join(dir, "flows.json"))
 	if string(data) == "" || strings.Contains(string(data), "hidden") || strings.Contains(string(data), "SECRET") {
 		t.Fatalf("secret leaked into flows.json: %s", data)
@@ -132,7 +134,7 @@ func TestEnvServiceReportsPostCommitFailureForMalformedFlows(t *testing.T) {
 	dir := t.TempDir()
 	flowPath := filepath.Join(dir, "flows.json")
 	const malformed = `[{"id":]`
-	if err := os.WriteFile(flowPath, []byte(malformed), 0o644); err != nil {
+	if err := os.WriteFile(flowPath, []byte(malformed), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -143,6 +145,7 @@ func TestEnvServiceReportsPostCommitFailureForMalformedFlows(t *testing.T) {
 	} else if !strings.Contains(err.Error(), "environment JSON committed") {
 		t.Fatalf("Set() error = %q, want committed-state context", err)
 	}
+	// #nosec G304 -- flowPath comes from t.TempDir()
 	data, err := os.ReadFile(flowPath)
 	if err != nil {
 		t.Fatal(err)
@@ -161,7 +164,7 @@ func TestEnvServiceReportsPostCommitFailureForMalformedFlows(t *testing.T) {
 
 func TestEnvServiceCreatesSingleGlobalConfig(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "flows.json"), []byte(`[{"id":"tab-1","type":"tab"}]`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "flows.json"), []byte(`[{"id":"tab-1","type":"tab"}]`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	svc := NewEnvService(NewIsolatedConfigService(dir))
@@ -185,7 +188,7 @@ func TestEnvServiceCreatesSingleGlobalConfig(t *testing.T) {
 func TestEnvServicePreservesManualGlobalOnSecretCreate(t *testing.T) {
 	dir := t.TempDir()
 	flow := `[{"id":"manual-global","type":"global-config","env":[{"name":"MANUAL","value":"keep","type":"str"}]}]`
-	if err := os.WriteFile(filepath.Join(dir, "flows.json"), []byte(flow), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "flows.json"), []byte(flow), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	svc := NewEnvService(NewIsolatedConfigService(dir))
@@ -200,7 +203,7 @@ func TestEnvServicePreservesManualGlobalOnSecretCreate(t *testing.T) {
 
 func TestEnvServiceRejectsMultipleGlobalConfig(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "flows.json"), []byte(`[{"id":"a","type":"global-config","env":[]},{"id":"b","type":"global-config","env":[]}]`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "flows.json"), []byte(`[{"id":"a","type":"global-config","env":[]},{"id":"b","type":"global-config","env":[]}]`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	configSvc := NewIsolatedConfigService(dir)
