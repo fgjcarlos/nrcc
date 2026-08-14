@@ -131,6 +131,7 @@ func TestSetup_ConcurrentRecoveryConsumesTokenOnce(t *testing.T) {
 	const requests = 5
 	statuses := make([]int, requests)
 	runConcurrentHandler(t, requests, func(i int) {
+		// #nosec G115 -- test fixture; 'a' + i is always a valid ASCII code point.
 		response := performSetupRequest(h, "recovery-"+string(rune('a'+i))+"@example.com", token.Raw)
 		statuses[i] = response.Code
 	})

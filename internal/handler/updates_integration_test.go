@@ -78,8 +78,9 @@ func TestIntegration_BackupFailureBlocks_6_2(t *testing.T) {
 
 	// Create a read-only backup store to simulate permission denied
 	readOnlyBackupPath := filepath.Join(tmpDir, "update_backups.json")
+	// #nosec G306 -- test fixture: read-only mode is required to simulate permission denied.
 	_ = os.WriteFile(readOnlyBackupPath, []byte("[]"), 0444)
-	defer func() { _ = os.Chmod(readOnlyBackupPath, 0644) }() // Restore permissions for cleanup
+	defer func() { _ = os.Chmod(readOnlyBackupPath, 0600) }() // Restore permissions for cleanup
 
 	// POST /api/updates/apply should still return 200 (async operation)
 	req := httptest.NewRequest(http.MethodPost, "/api/updates/apply", nil)
@@ -176,6 +177,7 @@ func TestIntegration_BackupCatalogTrimming_6_4(t *testing.T) {
 
 	// Verify catalog still has exactly 5 entries
 	backupPath := filepath.Join(tmpDir, "update_backups.json")
+	// #nosec G304 -- backupPath comes from t.TempDir().
 	data, err := os.ReadFile(backupPath)
 	if err != nil {
 		if !os.IsNotExist(err) {

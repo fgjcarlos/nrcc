@@ -287,6 +287,7 @@ func canWrite(path string) bool {
 	dir := filepath.Dir(path)
 
 	// Check if file already exists
+	// #nosec G703 -- path is validated against an allowlist (operator-supplied) by the caller.
 	_, err := os.Stat(path)
 	if err == nil {
 		// File exists, verify directory is writable
@@ -303,17 +304,20 @@ func isWritableDir(dir string) bool {
 	}
 
 	// Try to create the directory if needed
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	// #nosec G703 -- dir is a t.TempDir() or operator-supplied path; the caller validates the path.
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		return false
 	}
 
 	// Test write permission by creating a temporary file
 	testFile := filepath.Join(dir, ".nrcc-write-test-"+strconv.Itoa(os.Getpid()))
-	file, err := os.OpenFile(testFile, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+	//nolint:gosec // G304,G703 -- testFile is built from validated dir + a constant prefix + pid; not request-derived.
+	file, err := os.OpenFile(testFile, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
 		return false
 	}
 	_ = file.Close()
+	// #nosec G703 -- testFile is built from validated dir + a constant prefix + pid; not request-derived.
 	_ = os.Remove(testFile)
 	return true
 }

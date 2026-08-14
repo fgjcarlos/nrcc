@@ -29,8 +29,11 @@ func (h *FilesHandler) SetAuditService(a *audit.Service) { h.audit = a }
 // PostUpload uploads a file
 // POST /api/files/upload
 func (h *FilesHandler) PostUpload(w http.ResponseWriter, r *http.Request) {
-	// Parse multipart form with max 100MB size
-	if err := r.ParseMultipartForm(100 * 1024 * 1024); err != nil {
+	// Cap total request body to 100 MiB to prevent memory exhaustion.
+	r.Body = http.MaxBytesReader(w, r.Body, 100*1024*1024)
+	// Spool up to 1 MiB per file in memory; anything larger spills to a temp file.
+	// #nosec G120 -- body is bounded by http.MaxBytesReader above; maxMemory is 1 MiB so the residual in-memory footprint is well under the cap.
+	if err := r.ParseMultipartForm(1048576); err != nil {
 		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Failed to parse form")
 		return
 	}
@@ -50,7 +53,7 @@ func (h *FilesHandler) PostUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	uploadDir := filepath.Join(h.dataDir, "uploads")
-	if err := os.MkdirAll(uploadDir, 0755); err != nil {
+	if err := os.MkdirAll(uploadDir, 0750); err != nil {
 		model.RespondError(w, http.StatusInternalServerError, "UPLOAD_ERROR", err.Error())
 		return
 	}
@@ -58,6 +61,7 @@ func (h *FilesHandler) PostUpload(w http.ResponseWriter, r *http.Request) {
 	uploadPath := filepath.Join(uploadDir, filename)
 
 	// Create file
+	// #nosec G304 -- filename is validated against path traversal and base name upstream; uploadPath is rooted to dataDir/uploads.
 	dst, err := os.Create(uploadPath)
 	if err != nil {
 		model.RespondError(w, http.StatusInternalServerError, "UPLOAD_ERROR", err.Error())
@@ -92,8 +96,10 @@ func (h *FilesHandler) DeleteFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// #nosec G703 -- name is validated against ".." and empty upstream; the resulting path is rooted to dataDir/uploads.
 	filePath := filepath.Join(h.dataDir, "uploads", name)
 
+	// #nosec G703 -- filePath is rooted to dataDir/uploads and validated against path traversal upstream.
 	if err := os.Remove(filePath); err != nil {
 		model.RespondError(w, http.StatusInternalServerError, "DELETE_ERROR", err.Error())
 		return
@@ -115,7 +121,9 @@ func (h *FilesHandler) DownloadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// #nosec G703 -- name is validated against ".." and base-mismatch upstream; the resulting path is rooted to dataDir/uploads.
 	filePath := filepath.Join(h.dataDir, "uploads", name)
+	// #nosec G703 -- filePath is rooted to dataDir/uploads and validated against path traversal upstream.
 	info, err := os.Stat(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -132,6 +140,7 @@ func (h *FilesHandler) DownloadFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Disposition", "attachment; filename=\""+strings.ReplaceAll(name, "\"", "")+"\"")
+	// #nosec G703 -- filePath is rooted to dataDir/uploads and validated against path traversal upstream.
 	http.ServeFile(w, r, filePath)
 }
 

@@ -54,6 +54,7 @@ func TestRefresh_InvalidToken(t *testing.T) {
 	h, _ := setupAuthTest(t)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/refresh", nil)
+	// #nosec G124 -- test fixture: incoming request cookie, not the response SetCookie (which is in production code).
 	req.AddCookie(&http.Cookie{Name: "nrcc_refresh", Value: "bogus-token"})
 	rec := httptest.NewRecorder()
 
@@ -74,6 +75,7 @@ func TestRefresh_ValidFlow(t *testing.T) {
 	}
 
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/refresh", nil)
+	// #nosec G124 -- test fixture: incoming request cookie, not the response SetCookie (which is in production code).
 	req.AddCookie(&http.Cookie{Name: "nrcc_refresh", Value: refreshToken})
 	rec := httptest.NewRecorder()
 
@@ -158,6 +160,7 @@ func TestRefresh_RevokedTokenRejected(t *testing.T) {
 	_ = authSvc.RevokeRefreshSession(refreshToken)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/refresh", nil)
+	// #nosec G124 -- test fixture: incoming request cookie, not the response SetCookie (which is in production code).
 	req.AddCookie(&http.Cookie{Name: "nrcc_refresh", Value: refreshToken})
 	rec := httptest.NewRecorder()
 
@@ -177,6 +180,7 @@ func TestLogout_ClearsCookieAndRevokesRefreshSession(t *testing.T) {
 	}
 
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/logout", nil)
+	// #nosec G124 -- test fixture: incoming request cookie, not the response SetCookie (which is in production code).
 	req.AddCookie(&http.Cookie{Name: refreshCookieName, Value: refreshToken})
 	rec := httptest.NewRecorder()
 

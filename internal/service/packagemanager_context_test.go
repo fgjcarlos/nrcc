@@ -119,6 +119,7 @@ func TestNpmInstallKillsChildOnCancel(t *testing.T) {
 	// process on the system should be gone. If a `sleep 30` is still listed
 	// by `pgrep`, the child was orphaned.
 	if pid, _ := exec.LookPath("pgrep"); pid != "" {
+		// #nosec G204 -- test fixture: pid is resolved from $PATH for pgrep and args are fixed.
 		out, _ := exec.Command(pid, "-f", "sleep 30").Output()
 		if len(out) > 0 {
 			t.Fatalf("child `sleep 30` still alive after Install returned; pgrep output: %q", string(out))

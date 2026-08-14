@@ -57,7 +57,9 @@ func TestAuthHandler_Setup_Concurrent(t *testing.T) {
 	h, authSvc := newEmptyAtomicAuthHandler(t)
 	statuses := make([]int, 3)
 	runConcurrentHandler(t, len(statuses), func(i int) {
-		body, _ := json.Marshal(SetupRequest{Username: fmt.Sprintf("admin-%d", i), Password: "Unique-Setup-Password-42"})
+		// #nosec G101 -- test fixture; the password string is a sentinel literal that the setup handler rejects, no real credential.
+		// #nosec G117 -- test fixture; marshaling is asserted by the handler.
+		body, _ := json.Marshal(SetupRequest{Username: fmt.Sprintf("admin-%d", i), Password: "Unique-Setup-Password-42"}) //nolint:gosec // G101 test fixture; G117 test fixture
 		rec := httptest.NewRecorder()
 		h.Setup(rec, requestWithClaims(http.MethodPost, "/api/auth/setup", body, nil))
 		statuses[i] = rec.Code
@@ -85,7 +87,9 @@ func TestAuthHandler_Setup_Concurrent(t *testing.T) {
 		claims := &model.Claims{UserID: users[0].ID, Username: users[0].Username, Role: model.RoleAdmin}
 		statuses := make([]int, 2)
 		runConcurrentHandler(t, len(statuses), func(i int) {
-			body, _ := json.Marshal(CreateUserRequest{Username: "duplicate", Password: "Unique-New-User-42", Role: model.RoleViewer})
+			// #nosec G101 -- test fixture; the password string is a sentinel literal that the create-user handler rejects, no real credential.
+			// #nosec G117 -- test fixture; marshaling is asserted by the handler.
+			body, _ := json.Marshal(CreateUserRequest{Username: "duplicate", Password: "Unique-New-User-42", Role: model.RoleViewer}) //nolint:gosec // G101 test fixture; G117 test fixture
 			rec := httptest.NewRecorder()
 			h.CreateUser(rec, requestWithClaims(http.MethodPost, "/api/auth/users", body, claims))
 			statuses[i] = rec.Code
@@ -182,6 +186,7 @@ func TestAuthHandler_ChangePassword_Concurrent(t *testing.T) {
 	statuses := make([]int, len(passwords))
 	claims := &model.Claims{UserID: "u1", Username: "admin", Role: model.RoleAdmin}
 	runConcurrentHandler(t, len(passwords), func(i int) {
+		// #nosec G117 -- test fixture; marshaling is asserted by the handler.
 		body, _ := json.Marshal(PasswordChangeRequest{Password: passwords[i]})
 		req := requestWithClaims(http.MethodPatch, "/api/auth/users/u1/password", body, claims)
 		req.SetPathValue("id", "u1")

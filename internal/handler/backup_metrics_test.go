@@ -31,7 +31,7 @@ func setupBackupHandlerWithMetrics(t *testing.T) (*BackupHandler, *stubBackupMet
 	t.Helper()
 	tempDir := t.TempDir()
 	// Write flows.json so CreateTyped can succeed
-	if err := os.WriteFile(filepath.Join(tempDir, "flows.json"), []byte(`[{"id":"1"}]`), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(tempDir, "flows.json"), []byte(`[{"id":"1"}]`), 0600); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 	svc := service.NewBackupService(tempDir)
@@ -94,7 +94,7 @@ func TestPostBackup_RecordsBackupCreatedAutoType(t *testing.T) {
 // calls RecordRestoreAttempt(true).
 func TestRestoreBackup_RecordsSuccessMetric(t *testing.T) {
 	tempDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(tempDir, "flows.json"), []byte(`[{"id":"1"}]`), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(tempDir, "flows.json"), []byte(`[{"id":"1"}]`), 0600); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 	svc := service.NewBackupService(tempDir)
@@ -161,7 +161,7 @@ func TestRestoreBackup_RecordsFailureMetric(t *testing.T) {
 // no metrics recorder is set.
 func TestBackup_NoMetricsNilGuard(t *testing.T) {
 	tempDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(tempDir, "flows.json"), []byte(`[{"id":"1"}]`), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(tempDir, "flows.json"), []byte(`[{"id":"1"}]`), 0600); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 	svc := service.NewBackupService(tempDir)

@@ -18,6 +18,7 @@ func getSystemStats() (uptime uint64, memTotal, memFree uint64) {
 	if err := syscall.Sysinfo(&sysinfo); err != nil {
 		return 0, 0, 0
 	}
+	// #nosec G115 -- 64-bit platforms only; uptime is non-negative since boot.
 	return uint64(sysinfo.Uptime), sysinfo.Totalram, sysinfo.Freeram
 }
 

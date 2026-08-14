@@ -385,6 +385,7 @@ func parseEnvFile(path string) (map[string]string, error) {
 	result := make(map[string]string)
 
 	// If file doesn't exist, return empty map (not an error)
+	// #nosec G304 -- path is built from operator-supplied dataDir + a constant filename; not request-derived.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -447,6 +448,7 @@ func (s *EnvService) GetAllMerged(dotenvPath string) (map[string]string, error) 
 // Returns empty string if file doesn't exist
 func ReadDotenv(dataDir string) (string, error) {
 	dotenvPath := filepath.Join(dataDir, ".env")
+	// #nosec G304 -- dotenvPath is built from operator-supplied dataDir + a constant filename; not request-derived.
 	content, err := os.ReadFile(dotenvPath)
 	if err != nil {
 		if os.IsNotExist(err) {

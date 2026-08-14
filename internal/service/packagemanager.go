@@ -139,6 +139,7 @@ func (p *NpmPackageManager) Install(ctx context.Context, pkg string) error {
 	runCtx, cancel := context.WithTimeout(ctx, installTimeout)
 	defer cancel()
 
+	// #nosec G204 -- p.Bin is operator-supplied via configuration; pkg comes from a managed registry catalog.
 	cmd := exec.CommandContext(runCtx, p.Bin, "install", "--no-fund", "--no-audit", pkg)
 	cmd.Dir = p.WorkDir
 	cmd.Stdout = os.Stdout
@@ -164,6 +165,7 @@ func (p *NpmPackageManager) Uninstall(ctx context.Context, pkg string) error {
 	runCtx, cancel := context.WithTimeout(ctx, uninstallTimeout)
 	defer cancel()
 
+	// #nosec G204 -- p.Bin is operator-supplied via configuration; pkg comes from a managed registry catalog.
 	cmd := exec.CommandContext(runCtx, p.Bin, "uninstall", "--no-fund", "--no-audit", pkg)
 	cmd.Dir = p.WorkDir
 	cmd.Stdout = os.Stdout

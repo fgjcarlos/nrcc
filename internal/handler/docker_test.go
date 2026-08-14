@@ -26,14 +26,18 @@ func (c *capturedCmd) factory() func(name string, arg ...string) *exec.Cmd {
 		rec := append([]string{name}, arg...)
 		c.recorded = append(c.recorded, rec)
 		if len(arg) > 0 && c.failOn[arg[0]] {
+			// #nosec G204 -- test fixture: deterministic mock for docker CLI invocation.
 			return exec.Command("sh", "-c", "echo docker-failed >&2; exit 1")
 		}
 		if len(arg) > 0 && arg[0] == "ps" {
+			// #nosec G204 -- test fixture: deterministic mock for docker CLI invocation.
 			return exec.Command("printf", "%s", c.psOutput)
 		}
 		if len(arg) > 0 && arg[0] == "inspect" {
+			// #nosec G204 -- test fixture: deterministic mock for docker CLI invocation.
 			return exec.Command("printf", "%s", c.inspectOutput)
 		}
+		// #nosec G204 -- test fixture: deterministic mock for docker CLI invocation.
 		return exec.Command("true")
 	}
 }

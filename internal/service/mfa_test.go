@@ -2,6 +2,7 @@ package service
 
 import (
 	"crypto/hmac"
+	// #nosec G505 -- sha1 is used to generate deterministic test fixtures, not for any cryptographic purpose.
 	"crypto/sha1"
 	"encoding/base32"
 	"encoding/binary"
@@ -47,6 +48,7 @@ func rfc6238Seed(t *testing.T) string {
 }
 
 func rfc6238Code(seed string, t time.Time) string {
+	// #nosec G115 -- 64-bit platforms only; t.Unix() returns a non-negative counter well within uint64 range.
 	counter := uint64(t.Unix()) / 30
 	h := hmac.New(sha1.New, []byte{}) // dummy, replaced below
 	_ = h
@@ -124,7 +126,7 @@ func TestMfaService_BeginEnrollmentRejectsSecondAttempt(t *testing.T) {
 	if _, _, err := svc.BeginEnrollment(uid); err != nil {
 		t.Fatalf("first enroll: %v", err)
 	}
-	if _, _, err := svc.BeginEnrollment(uid); err != ErrMfaAlreadyEnrolled {
+	if _, _, err := svc.BeginEnrollment(uid); !errors.Is(err, ErrMfaAlreadyEnrolled) {
 		t.Fatalf("want ErrMfaAlreadyEnrolled, got %v", err)
 	}
 }
@@ -169,7 +171,7 @@ func TestMfaService_ConfirmEnrollmentWrongCode(t *testing.T) {
 	if _, _, err := svc.BeginEnrollment(uid); err != nil {
 		t.Fatalf("BeginEnrollment: %v", err)
 	}
-	if _, err := svc.ConfirmEnrollment(uid, "000000"); err != ErrMfaInvalidCode {
+	if _, err := svc.ConfirmEnrollment(uid, "000000"); !errors.Is(err, ErrMfaInvalidCode) {
 		t.Fatalf("want ErrMfaInvalidCode, got %v", err)
 	}
 }
@@ -182,7 +184,7 @@ func TestMfaService_ConfirmEnrollmentMalformedCode(t *testing.T) {
 	}
 	cases := []string{"", "abc", "12345", "1234567", "12 456"}
 	for _, c := range cases {
-		if _, err := svc.ConfirmEnrollment(uid, c); err != ErrMfaInvalidCode {
+		if _, err := svc.ConfirmEnrollment(uid, c); !errors.Is(err, ErrMfaInvalidCode) {
 			t.Errorf("code %q: want ErrMfaInvalidCode, got %v", c, err)
 		}
 	}
@@ -192,7 +194,7 @@ func TestMfaService_ConfirmEnrollmentWithoutPending(t *testing.T) {
 	svc, _ := newMfaTestSetup(t)
 	uid := svc.authSvc.GetUserByUsername("admin").ID
 	// No BeginEnrollment called.
-	if _, err := svc.ConfirmEnrollment(uid, "123456"); err != ErrMfaPendingMissing {
+	if _, err := svc.ConfirmEnrollment(uid, "123456"); !errors.Is(err, ErrMfaPendingMissing) {
 		t.Fatalf("want ErrMfaPendingMissing, got %v", err)
 	}
 }
@@ -258,7 +260,7 @@ func TestMfaService_DisableRequiresPassword(t *testing.T) {
 		t.Fatalf("ConfirmEnrollment: %v", err)
 	}
 
-	if err := svc.Disable(uid, uid, "wrong", false); err != ErrMfaInvalidPassword {
+	if err := svc.Disable(uid, uid, "wrong", false); !errors.Is(err, ErrMfaInvalidPassword) {
 		t.Errorf("wrong password: want ErrMfaInvalidPassword, got %v", err)
 	}
 	if err := svc.Disable(uid, uid, "password123", false); err != nil {
@@ -306,7 +308,7 @@ func TestMfaService_IssueAndVerifyMfaToken(t *testing.T) {
 	}
 
 	user, method, err := svc.VerifyAndIssueSession(tok, "000000")
-	if err != ErrMfaInvalidCode {
+	if !errors.Is(err, ErrMfaInvalidCode) {
 		t.Fatalf("bad code: want ErrMfaInvalidCode, got %v", err)
 	}
 	if user != nil || method != "" {
@@ -333,7 +335,7 @@ func TestMfaService_MfaTokenExpires(t *testing.T) {
 	}
 	svc.mu.Unlock()
 
-	if _, _, err := svc.VerifyAndIssueSession(tok, "000000"); err != ErrMfaTokenExpired {
+	if _, _, err := svc.VerifyAndIssueSession(tok, "000000"); !errors.Is(err, ErrMfaTokenExpired) {
 		t.Errorf("want ErrMfaTokenExpired, got %v", err)
 	}
 }

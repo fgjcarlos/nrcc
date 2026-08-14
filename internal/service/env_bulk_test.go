@@ -231,7 +231,7 @@ func TestApplyBulkEnv_SyncCountOne(t *testing.T) {
 
 func TestApplyBulkEnv_PreservesManualGlobals(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "flows.json"), []byte(`[{"id":"global","type":"global-config","env":[{"name":"MANUAL","value":"keep","type":"str"}]}]`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "flows.json"), []byte(`[{"id":"global","type":"global-config","env":[{"name":"MANUAL","value":"keep","type":"str"}]}]`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	svc := NewEnvService(NewIsolatedConfigService(dir), "test-key")
@@ -239,6 +239,7 @@ func TestApplyBulkEnv_PreservesManualGlobals(t *testing.T) {
 	if _, err := svc.ApplyBulkEnv(parsed, nil); err != nil {
 		t.Fatalf("ApplyBulkEnv: %v", err)
 	}
+	// #nosec G304 -- dir is t.TempDir()
 	flows, err := os.ReadFile(filepath.Join(dir, "flows.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -281,6 +282,7 @@ func TestParseBulkEnv_SecretConversionRemovesGlobal(t *testing.T) {
 	if err != nil || plaintext != "private" {
 		t.Fatalf("stored secret decrypts to %q, err=%v", plaintext, err)
 	}
+	// #nosec G304 -- dir is t.TempDir()
 	flows, err := os.ReadFile(filepath.Join(dir, "flows.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -329,7 +331,7 @@ func TestImportFromNodeRed(t *testing.T) {
 	if err := os.WriteFile(
 		filepath.Join(dir, "flows.json"),
 		[]byte(`[{"id":"manual-global","type":"global-config","env":[{"name":"ALPHA","value":"1","type":"str"},{"name":"BETA","value":"true","type":"bool"},{"name":"GAMMA","value":"3","type":"num"}]}]`),
-		0o644,
+		0o600,
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -553,7 +555,7 @@ func TestNodeRedGlobalEnv_ErrorPaths(t *testing.T) {
 	})
 	t.Run("malformed global environment", func(t *testing.T) {
 		dir := t.TempDir()
-		if err := os.WriteFile(filepath.Join(dir, "flows.json"), []byte(`[{"type":"global-config","env":{}}]`), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(dir, "flows.json"), []byte(`[{"type":"global-config","env":{}}]`), 0o600); err != nil {
 			t.Fatal(err)
 		}
 		svc := NewEnvService(NewIsolatedConfigService(dir))
@@ -566,7 +568,7 @@ func TestNodeRedGlobalEnv_ErrorPaths(t *testing.T) {
 	})
 	t.Run("flow path is a directory", func(t *testing.T) {
 		dir := t.TempDir()
-		if err := os.Mkdir(filepath.Join(dir, "flows.json"), 0o755); err != nil {
+		if err := os.Mkdir(filepath.Join(dir, "flows.json"), 0o750); err != nil {
 			t.Fatal(err)
 		}
 		svc := NewEnvService(NewIsolatedConfigService(dir))

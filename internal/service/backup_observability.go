@@ -58,7 +58,9 @@ func (s *backupEventStore) Append(event model.BackupEvent) error {
 }
 
 func (s *backupEventStore) loadLocked() ([]model.BackupEvent, error) {
+	// #nosec G304 -- path is built from operator-supplied dataDir + a constant filename; not request-derived.
 	path := filepath.Join(s.dataDir, backupEventsFile)
+	// #nosec G304 -- see path derivation above.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -84,7 +86,7 @@ func (s *backupEventStore) loadLocked() ([]model.BackupEvent, error) {
 }
 
 func (s *backupEventStore) saveLocked(events []model.BackupEvent) error {
-	if err := os.MkdirAll(s.dataDir, 0755); err != nil {
+	if err := os.MkdirAll(s.dataDir, 0750); err != nil {
 		return fmt.Errorf("create data dir for backup event log: %w", err)
 	}
 
@@ -94,7 +96,7 @@ func (s *backupEventStore) saveLocked(events []model.BackupEvent) error {
 	}
 
 	path := filepath.Join(s.dataDir, backupEventsFile)
-	if err := os.WriteFile(path, data, 0644); err != nil {
+	if err := os.WriteFile(path, data, 0600); err != nil {
 		return fmt.Errorf("write backup event log: %w", err)
 	}
 

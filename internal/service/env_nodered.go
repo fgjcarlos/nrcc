@@ -220,7 +220,7 @@ func (s *EnvService) syncNodeRedGlobalEnvValues(cfg model.NodeRedConfig, keys []
 		return nil
 	}
 
-	if err := os.MkdirAll(filepath.Dir(flowPath), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(flowPath), 0o750); err != nil {
 		return fmt.Errorf("create Node-RED flow directory: %w", err)
 	}
 	tmp, err := os.CreateTemp(filepath.Dir(flowPath), ".flows-*.tmp")

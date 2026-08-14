@@ -142,7 +142,7 @@ func TestConfigService_Update_NilCallback(t *testing.T) {
 
 func TestConfigService_Save_PostCommitFailure(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.Mkdir(filepath.Join(dir, "settings.js"), 0o755); err != nil {
+	if err := os.Mkdir(filepath.Join(dir, "settings.js"), 0o750); err != nil {
 		t.Fatalf("create settings.js directory: %v", err)
 	}
 

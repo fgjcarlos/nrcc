@@ -54,7 +54,8 @@ func runServer() {
 	ui.Banner(Version, port, dataDir)
 
 	// Create data directory if it doesn't exist
-	if err := os.MkdirAll(dataDir, 0755); err != nil {
+	// #nosec G703 -- dataDir is an operator-supplied flag (--data-dir) or env var; not request-derived.
+	if err := os.MkdirAll(dataDir, 0750); err != nil {
 		log.Fatalf("Failed to create data directory: %v", err)
 	}
 
@@ -179,8 +180,10 @@ func resolveJWTSecret(dataDir string) (string, error) {
 	}
 
 	// No env var: generate and persist a local secret.
+	// #nosec G703 -- secretPath is built from operator-supplied dataDir + a constant filename; not request-derived.
 	secretPath := filepath.Join(dataDir, "jwt_secret")
-	if data, err := os.ReadFile(secretPath); err == nil {
+	// #nosec G304 -- secretPath is built from operator-supplied dataDir + a constant filename; not request-derived.
+	if data, err := os.ReadFile(secretPath); err == nil { //nolint:gosec // G304 G703 operator-supplied dataDir + constant filename
 		if s := strings.TrimSpace(string(data)); len(s) >= 32 {
 			ui.Info("Using persisted JWT secret from " + secretPath)
 			return s, nil
@@ -192,9 +195,11 @@ func resolveJWTSecret(dataDir string) (string, error) {
 		return "", fmt.Errorf("failed to auto-generate JWT secret: %w", err)
 	}
 
-	if err := os.MkdirAll(dataDir, 0755); err != nil {
+	// #nosec G703 -- dataDir is an operator-supplied flag (--data-dir) or env var; not request-derived.
+	if err := os.MkdirAll(dataDir, 0750); err != nil {
 		return "", err
 	}
+	// #nosec G703 -- secretPath is built from operator-supplied dataDir + a constant filename; not derived from request input.
 	if err := os.WriteFile(secretPath, []byte(generated+"\n"), 0600); err != nil {
 		return "", fmt.Errorf("failed to persist JWT secret: %w", err)
 	}

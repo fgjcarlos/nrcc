@@ -12,6 +12,7 @@ import (
 	"time"
 )
 
+// #nosec G101 -- this is a filename constant, not a credential.
 const SetupTokenFileName = ".nrcc-setup-token"
 
 var ensureTokenMu sync.Mutex
@@ -30,6 +31,7 @@ func GenerateToken() (SetupToken, error) {
 }
 
 func ReadTokenFile(path string) (SetupToken, error) {
+	// #nosec G304 -- path is built from operator-supplied dataDir + a constant filename; not request-derived.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return SetupToken{}, err

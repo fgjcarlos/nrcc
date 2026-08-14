@@ -81,7 +81,7 @@ func TestGetHealth_NilProcessManager_ReturnsZeroNoPanic(t *testing.T) {
 func seedRestartCountFile(t *testing.T, dir string, count int) {
 	t.Helper()
 	content := []byte(`{"cumulativeRestarts":` + itoa(count) + `}`)
-	if err := os.WriteFile(filepath.Join(dir, "restart_count.json"), content, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "restart_count.json"), content, 0600); err != nil {
 		t.Fatalf("seedRestartCountFile: %v", err)
 	}
 }

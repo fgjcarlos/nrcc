@@ -128,6 +128,7 @@ func (p *ResticProvider) env() []string {
 // stderr so admin-supplied values (id, destination) cannot leak through
 // the public error path.
 func (p *ResticProvider) run(ctx context.Context, args ...string) ([]byte, error) {
+	// #nosec G204 -- p.Binary is operator-supplied via configuration; args are validated by the restic provider.
 	cmd := exec.CommandContext(ctx, p.Binary, args...)
 	cmd.Env = p.env()
 	var stdout, stderr bytes.Buffer
@@ -193,6 +194,7 @@ func (p *ResticProvider) initRepoIfNeeded(ctx context.Context) error {
 		return v.(*initResult).err
 	}
 	res := actual.(*initResult)
+	// #nosec G204 -- p.Binary is operator-supplied via configuration; "init" is a fixed restic subcommand.
 	cmd := exec.CommandContext(ctx, p.Binary, "init")
 	cmd.Env = p.env()
 	var stderr bytes.Buffer
@@ -242,7 +244,7 @@ func (p *ResticProvider) Restore(ctx context.Context, remoteID, dstPath, root st
 	if err := ValidateRestoreDestination(dstPath, root); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(dstPath, 0o755); err != nil {
+	if err := os.MkdirAll(dstPath, 0o750); err != nil {
 		return err
 	}
 	if _, err := p.run(ctx, "restore", remoteID, "--target", dstPath); err != nil {

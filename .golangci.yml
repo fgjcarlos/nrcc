@@ -16,7 +16,7 @@ linters:
   #
   # NOT enabled yet — each has pre-existing findings that would fail the
   # repo-wide gate on day one (counts as of 2026-08-11):
-  #   gosec 27, revive 50, paralleltest 50, errorlint 9, nilerr 5
+  #   revive 50, paralleltest 50, errorlint 9, nilerr 5
   # Enable one per cleanup PR. Tracked in #626.
   enable:
     - gocritic
@@ -27,3 +27,4 @@ linters:
     - unconvert
     - wastedassign
     - usestdlibvars
+    - gosec
