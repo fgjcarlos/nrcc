@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io/fs"
 	"regexp"
 	"strings"
 	"sync"
@@ -243,7 +244,10 @@ func (s *MfaService) Disable(actingID, targetUserID, password string, actingIsAd
 func (s *MfaService) Status(userID string) (model.MfaStatusResponse, error) {
 	data, err := s.store.Read()
 	if err != nil {
-		return model.MfaStatusResponse{}, nil // no file → not enrolled
+		if errors.Is(err, fs.ErrNotExist) {
+			return model.MfaStatusResponse{}, nil // no file → not enrolled
+		}
+		return model.MfaStatusResponse{}, fmt.Errorf("read MFA store: %w", err)
 	}
 	row := findEnrollment(data, userID)
 	if row == nil || row.Pending {

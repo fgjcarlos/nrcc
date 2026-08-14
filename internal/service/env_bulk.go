@@ -199,10 +199,10 @@ func (s *EnvService) applyBulkEnvDirect(lines []BulkEnvLine) (bool, error) {
 	staged := make([]model.EnvVar, len(lines))
 	for i, line := range lines {
 		if err := ValidateEnvKey(line.Key); err != nil {
-			return false, nil
+			return false, fmt.Errorf("validate env key %q: %w", line.Key, err)
 		}
 		if err := ValidateValue(line.Value, line.Type); err != nil {
-			return false, nil
+			return false, fmt.Errorf("validate env value for %q: %w", line.Key, err)
 		}
 		value := line.Value
 		encrypted := line.Type == "secret"
@@ -210,7 +210,7 @@ func (s *EnvService) applyBulkEnvDirect(lines []BulkEnvLine) (bool, error) {
 			var err error
 			value, err = Encrypt(value, s.encryptionKey)
 			if err != nil {
-				return false, nil
+				return false, fmt.Errorf("encrypt env value for %q: %w", line.Key, err)
 			}
 		}
 		staged[i] = model.EnvVar{
