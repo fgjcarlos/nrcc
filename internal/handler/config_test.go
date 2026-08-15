@@ -297,3 +297,152 @@ func TestSaveConfigAdminAuthPreservePassword(t *testing.T) {
 		t.Errorf("Expected password %q, got '%s'", hash, savedCfg.AdminAuth.Users[0].Password)
 	}
 }
+
+// seedRedactionConfig writes a NodeRedConfig containing a bcrypt password and
+// two env vars (one encrypted blob, one cleartext secret) into the isolated
+// service so the GetConfig redaction tests have a deterministic fixture.
+func seedRedactionConfig(t *testing.T, configSvc *service.ConfigService, hash string) {
+	t.Helper()
+
+	initial := model.NodeRedConfig{
+		Port:          1880,
+		UIPort:        1880,
+		HTTPAdminRoot: "/",
+		HTTPNodeRoot:  "/",
+		AdminAuth: &model.AdminAuth{
+			Type: "credentials",
+			Users: []model.AdminAuthUser{
+				{
+					Username:    "admin",
+					Password:    hash,
+					Permissions: "*",
+				},
+			},
+		},
+		EnvVars: []model.EnvVar{
+			{Key: "PLAINTEXT_SECRET", Value: "supersecret-cleartext", Type: "string"},
+			{Key: "ENCRYPTED_SECRET", Value: "v1:already-encrypted-blob", Type: "secret", Encrypted: true},
+		},
+	}
+	if err := configSvc.Save(initial); err != nil {
+		t.Fatalf("seed config: %v", err)
+	}
+}
+
+// TestConfigHandler_GetConfig_Viewer_RedactsSecrets is the MEDIUM-015 RED
+// case: viewers must NOT see AdminAuth.Users[*].Password or
+// EnvVars[*].Value (cleartext). Encrypted env blobs are not in cleartext, so
+// they pass through unchanged.
+func TestConfigHandler_GetConfig_Viewer_RedactsSecrets(t *testing.T) {
+	configSvc := service.NewIsolatedConfigService(t.TempDir())
+	handler := NewConfigHandler(configSvc)
+	hash := mustConfigPasswordHash(t)
+	seedRedactionConfig(t, configSvc, hash)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	ctx := req.Context()
+	ctx = context.WithValue(ctx, middleware.CtxKeyUser, &model.Claims{
+		Username: "viewer",
+		Role:     model.RoleViewer,
+	})
+	req = req.WithContext(ctx)
+
+	w := httptest.NewRecorder()
+	handler.GetConfig(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d\nResponse: %s", w.Code, w.Body.String())
+	}
+
+	var resp model.ApiResponse[model.NodeRedConfig]
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("response must be valid JSON: %v\nbody: %s", err, w.Body.String())
+	}
+
+	cfg := resp.Data
+	if cfg.AdminAuth == nil || len(cfg.AdminAuth.Users) == 0 {
+		t.Fatalf("expected adminAuth.users to be present")
+	}
+	for i, u := range cfg.AdminAuth.Users {
+		if u.Password != "" {
+			t.Errorf("AdminAuth.Users[%d].Password must be redacted for viewer; got non-empty value (len=%d)", i, len(u.Password))
+		}
+	}
+
+	if len(cfg.EnvVars) != 2 {
+		t.Fatalf("expected 2 env vars in fixture, got %d", len(cfg.EnvVars))
+	}
+	for i, ev := range cfg.EnvVars {
+		if !ev.Encrypted {
+			if ev.Value != "********" {
+				t.Errorf("EnvVars[%d] (non-encrypted, key=%q): expected value %q for viewer, got %q", i, ev.Key, "********", ev.Value)
+			}
+		}
+	}
+
+	// Encrypted blob must pass through unchanged — the redaction must NOT
+	// touch the cipher blob, only cleartext values.
+	var foundEncrypted bool
+	for _, ev := range cfg.EnvVars {
+		if ev.Encrypted {
+			foundEncrypted = true
+			if ev.Value != "v1:already-encrypted-blob" {
+				t.Errorf("encrypted env var value must be preserved; got %q", ev.Value)
+			}
+		}
+	}
+	if !foundEncrypted {
+		t.Errorf("expected encrypted env var to be present in response")
+	}
+
+	if cfg.Port != 1880 {
+		t.Errorf("expected Port=1880 (non-sensitive field preserved), got %d", cfg.Port)
+	}
+}
+
+// TestConfigHandler_GetConfig_Admin_ReturnsFullConfig is the MEDIUM-015 GREEN
+// regression guard: admins still see AdminAuth.Users[*].Password and cleartext
+// EnvVar values without modification.
+func TestConfigHandler_GetConfig_Admin_ReturnsFullConfig(t *testing.T) {
+	configSvc := service.NewIsolatedConfigService(t.TempDir())
+	handler := NewConfigHandler(configSvc)
+	hash := mustConfigPasswordHash(t)
+	seedRedactionConfig(t, configSvc, hash)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	ctx := req.Context()
+	ctx = context.WithValue(ctx, middleware.CtxKeyUser, &model.Claims{
+		Username: "admin",
+		Role:     model.RoleAdmin,
+	})
+	req = req.WithContext(ctx)
+
+	w := httptest.NewRecorder()
+	handler.GetConfig(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d\nResponse: %s", w.Code, w.Body.String())
+	}
+
+	var resp model.ApiResponse[model.NodeRedConfig]
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("response must be valid JSON: %v\nbody: %s", err, w.Body.String())
+	}
+
+	cfg := resp.Data
+	if cfg.AdminAuth == nil || cfg.AdminAuth.Users[0].Password != hash {
+		t.Errorf("admin must see full password hash; got %q", cfg.AdminAuth.Users[0].Password)
+	}
+	var foundPlain bool
+	for _, ev := range cfg.EnvVars {
+		if !ev.Encrypted && ev.Value == "supersecret-cleartext" {
+			foundPlain = true
+		}
+		if ev.Encrypted && ev.Value != "v1:already-encrypted-blob" {
+			t.Errorf("encrypted env var corrupted: got %q", ev.Value)
+		}
+	}
+	if !foundPlain {
+		t.Errorf("admin must see cleartext env var value; not found in response")
+	}
+}

@@ -37,6 +37,23 @@ func (h *ConfigHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// MEDIUM-015: redact secrets for non-admin viewers. Password hashes and
+	// cleartext env values are not safe to expose to a logged-in viewer.
+	// Encrypted env blobs are cipher bytes, not cleartext, so they pass
+	// through unchanged.
+	if claims.Role != model.RoleAdmin {
+		if cfg.AdminAuth != nil {
+			for i := range cfg.AdminAuth.Users {
+				cfg.AdminAuth.Users[i].Password = ""
+			}
+		}
+		for i := range cfg.EnvVars {
+			if !cfg.EnvVars[i].Encrypted {
+				cfg.EnvVars[i].Value = "********"
+			}
+		}
+	}
+
 	model.RespondJSON(w, http.StatusOK, cfg)
 }
 
