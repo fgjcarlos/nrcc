@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/fgjcarlos/nrcc/internal/audit"
+	"github.com/fgjcarlos/nrcc/internal/middleware"
 	"github.com/fgjcarlos/nrcc/internal/model"
 	"github.com/fgjcarlos/nrcc/internal/service"
 	"github.com/go-chi/chi/v5"
@@ -400,6 +401,22 @@ func (h *BackupHandler) PatchStorageRetention(w http.ResponseWriter, r *http.Req
 // GetBackupProvider returns the currently configured backup provider name.
 // GET /api/backups/provider
 func (h *BackupHandler) GetBackupProvider(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.ClaimsFromContext(r)
+	if claims == nil {
+		model.RespondError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authentication required")
+		return
+	}
+	// MEDIUM-017: do not reveal to a non-admin whether a remote provider is
+	// configured; the existence of "restic" can fingerprint deployments and
+	// expose backup endpoints. Use *string so the JSON response carries an
+	// explicit null (distinct from any future "unknown" sentinel).
+	if claims.Role != model.RoleAdmin {
+		model.RespondJSON(w, http.StatusOK, map[string]*string{
+			"provider": nil,
+		})
+		return
+	}
+
 	provider := h.svc.BackupProvider()
 	model.RespondJSON(w, http.StatusOK, map[string]string{
 		"provider": provider.Name(),

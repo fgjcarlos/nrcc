@@ -30,8 +30,16 @@ func (h *SettingsHandler) SetAuditService(a *audit.Service) { h.audit = a }
 
 // GetRaw handles GET /api/settings/raw.
 func (h *SettingsHandler) GetRaw(w http.ResponseWriter, r *http.Request) {
-	if middleware.ClaimsFromContext(r) == nil {
+	claims := middleware.ClaimsFromContext(r)
+	if claims == nil {
 		model.RespondError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authentication required")
+		return
+	}
+	// MEDIUM-016: settings.js contains adminAuth hashes and secrets. There is
+	// no legitimate non-admin use, so gate the GET path on admin role with
+	// 403, mirroring the existing SaveRaw policy.
+	if claims.Role != model.RoleAdmin {
+		model.RespondError(w, http.StatusForbidden, "FORBIDDEN", "Admin access required")
 		return
 	}
 

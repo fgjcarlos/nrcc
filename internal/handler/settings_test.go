@@ -325,7 +325,7 @@ func TestSettingsHandler_SaveRaw_InvalidJSON_Body(t *testing.T) {
 	}
 }
 
-func TestSettingsHandler_GetRaw_WithEditor_Role(t *testing.T) {
+func TestSettingsHandler_GetRaw_WithViewer_Role_Returns403(t *testing.T) {
 	tempDir := t.TempDir()
 	configSvc := service.NewIsolatedConfigService(tempDir)
 	handler := NewSettingsHandler(configSvc)
@@ -344,9 +344,18 @@ func TestSettingsHandler_GetRaw_WithEditor_Role(t *testing.T) {
 
 	handler.GetRaw(w, req)
 
-	// Should be able to read (GetRaw checks for nil claims only)
-	if w.Code != http.StatusOK {
-		t.Errorf("Expected 200 to read settings, got %d", w.Code)
+	// MEDIUM-016: settings.js contains adminAuth hashes and secrets; viewer
+	// must be rejected with 403.
+	if w.Code != http.StatusForbidden {
+		t.Errorf("Expected 403 for viewer reading raw settings, got %d (body: %s)", w.Code, w.Body.String())
+	}
+
+	var resp model.ApiResponse[map[string]interface{}]
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("response must be valid JSON envelope: %v\nbody: %s", err, w.Body.String())
+	}
+	if resp.Error == nil || resp.Error.Code != "FORBIDDEN" {
+		t.Errorf("expected error code FORBIDDEN, got %+v", resp.Error)
 	}
 }
 
