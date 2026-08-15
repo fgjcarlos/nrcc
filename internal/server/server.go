@@ -40,6 +40,15 @@ type Server struct {
 	shutdownCh       chan struct{}
 }
 
+func initAuditService(dataDir string, reportf func(string, ...any)) *audit.Service {
+	svc, err := audit.NewService(dataDir)
+	if err != nil {
+		reportf("audit initialization failed: %v", err)
+		return nil
+	}
+	return svc
+}
+
 // NewServer creates and configures a new server
 func NewServer(authSvc *service.AuthService) *Server {
 	return NewServerWithConfig(authSvc, "./data", middleware.CORSConfig{})
@@ -123,7 +132,7 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 	aiHandler := handler.NewAIHandler()
 
 	// Initialize audit service
-	auditSvc, _ := audit.NewService(dataDir)
+	auditSvc := initAuditService(dataDir, log.Printf)
 	authHandler.SetAuditService(auditSvc)
 	configHandler.SetAuditService(auditSvc)
 	settingsHandler.SetAuditService(auditSvc)
