@@ -2,10 +2,12 @@ package service
 
 import (
 	"archive/zip"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -899,5 +901,80 @@ func createZipWithEntry(t *testing.T, zipPath, entryName, content string) {
 	}
 	if err := f.Close(); err != nil {
 		t.Fatalf("close file: %v", err)
+	}
+}
+
+// TestBackupServiceOpenForDownloadOpensRegularFile proves REQ-5 and
+// REQ-7: a regular backup file is opened successfully and the bytes
+// round-trip. Regression guard for the O_NOFOLLOW migration in #640.
+func TestBackupServiceOpenForDownloadOpensRegularFile(t *testing.T) {
+	dir := t.TempDir()
+	svc := NewBackupServiceWithBackupDir(dir, dir)
+	payload := []byte("PK\x03\x04backup-bytes")
+	id := "abcdef1234567890"
+	if err := os.WriteFile(filepath.Join(dir, id+".zip"), payload, 0o600); err != nil {
+		t.Fatalf("seed backup: %v", err)
+	}
+
+	rc, size, err := svc.OpenForDownload(id)
+	if err != nil {
+		t.Fatalf("OpenForDownload: %v", err)
+	}
+	defer rc.Close()
+
+	if size != int64(len(payload)) {
+		t.Errorf("size = %d, want %d", size, len(payload))
+	}
+	got, err := io.ReadAll(rc)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if !bytes.Equal(got, payload) {
+		t.Errorf("bytes mismatch: got %q, want %q", got, payload)
+	}
+}
+
+// TestBackupServiceOpenForDownloadRejectsSymlink proves REQ-6: when the
+// path passed to OpenForDownload (after ValidateBackupID + filepath.Join)
+// is a symlink, the open fails without reading the symlink target.
+func TestBackupServiceOpenForDownloadRejectsSymlink(t *testing.T) {
+	dir := t.TempDir()
+	svc := NewBackupServiceWithBackupDir(dir, dir)
+
+	target := filepath.Join(dir, "secret-target.txt")
+	if err := os.WriteFile(target, []byte("do-not-read"), 0o600); err != nil {
+		t.Fatalf("seed target: %v", err)
+	}
+	id := "symlinkid0001"
+	link := filepath.Join(dir, id+".zip")
+	if err := os.Symlink(target, link); err != nil {
+		t.Skipf("symlink unsupported on this platform: %v", err)
+	}
+
+	rc, _, err := svc.OpenForDownload(id)
+	if err == nil {
+		if rc != nil {
+			_ = rc.Close()
+		}
+		t.Fatal("expected symlink rejection, got nil error")
+	}
+}
+
+// TestBackupServiceOpenForDownloadRejectsDanglingSymlink proves REQ-6
+// also covers dangling symlinks (target absent): ELOOP must surface
+// from O_NOFOLLOW before the kernel attempts to resolve the target.
+func TestBackupServiceOpenForDownloadRejectsDanglingSymlink(t *testing.T) {
+	dir := t.TempDir()
+	svc := NewBackupServiceWithBackupDir(dir, dir)
+
+	id := "danglingid01"
+	link := filepath.Join(dir, id+".zip")
+	if err := os.Symlink(filepath.Join(dir, "does-not-exist"), link); err != nil {
+		t.Skipf("symlink unsupported on this platform: %v", err)
+	}
+
+	_, _, err := svc.OpenForDownload(id)
+	if err == nil {
+		t.Fatal("expected rejection of dangling symlink, got nil error")
 	}
 }

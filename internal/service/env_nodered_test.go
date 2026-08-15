@@ -2,9 +2,13 @@ package service
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"syscall"
 	"testing"
 
 	"github.com/fgjcarlos/nrcc/internal/model"
@@ -214,5 +218,98 @@ func TestEnvServiceRejectsMultipleGlobalConfig(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "multiple Node-RED global-config") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// TestSyncNodeRedGlobalEnv_ConcurrentGoroutinesAllKeysPresent proves REQ-1
+// and REQ-4: under contention from N goroutines that each set a distinct
+// key, the final flows.json must be valid JSON and contain every key.
+// Without flock, two concurrent read-modify-write cycles clobber each
+// other and the result is corruption (a missing key or invalid JSON).
+func TestSyncNodeRedGlobalEnv_ConcurrentGoroutinesAllKeysPresent(t *testing.T) {
+	dir := t.TempDir()
+	initial := `[{"id":"manual-global","type":"global-config","env":[],"modules":{}}]`
+	if err := os.WriteFile(filepath.Join(dir, "flows.json"), []byte(initial), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	svc := NewEnvService(NewIsolatedConfigService(dir))
+	const N = 10
+
+	var wg sync.WaitGroup
+	errCh := make(chan error, N)
+	for i := 0; i < N; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			key := fmt.Sprintf("KEY_%02d", i)
+			val := fmt.Sprintf("v%d", i)
+			if err := svc.Set(key, val, "string", "", false); err != nil {
+				errCh <- fmt.Errorf("Set %s: %w", key, err)
+			}
+		}(i)
+	}
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		t.Error(err)
+	}
+	if t.Failed() {
+		return
+	}
+
+	env := readGlobalEnv(t, dir)
+	if len(env) != N {
+		t.Fatalf("global env has %d entries, want %d: %#v", len(env), N, env)
+	}
+	seen := make(map[string]bool, N)
+	for _, e := range env {
+		seen[e.Name] = true
+	}
+	for i := 0; i < N; i++ {
+		k := fmt.Sprintf("KEY_%02d", i)
+		if !seen[k] {
+			t.Errorf("missing key %s in final global env", k)
+		}
+	}
+
+	// File must round-trip as valid JSON.
+	data, err := os.ReadFile(filepath.Join(dir, "flows.json"))
+	if err != nil {
+		t.Fatalf("read flows.json: %v", err)
+	}
+	var flows []map[string]json.RawMessage
+	if err := json.Unmarshal(data, &flows); err != nil {
+		t.Fatalf("flows.json not valid JSON after concurrent edits: %v\n%s", err, data)
+	}
+}
+
+// TestSyncNodeRedGlobalEnv_HoldsLockDuringRename pre-acquires the
+// flockExclusive lock on flows.json from the test, then calls Set
+// and asserts that Set fails with EWOULDBLOCK. This proves the lock is
+// taken before the read-modify-rename — without the lock fix, Set
+// would silently succeed even when the probe holds the flock.
+// Polling-based approaches were unreliable because the lock window is
+// ~0.6 ms while Set's full duration is ~700 ms.
+func TestSyncNodeRedGlobalEnv_HoldsLockDuringRename(t *testing.T) {
+	dir := t.TempDir()
+	initial := `[{"id":"manual-global","type":"global-config","env":[],"modules":{}}]`
+	if err := os.WriteFile(filepath.Join(dir, "flows.json"), []byte(initial), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	probePath := filepath.Join(dir, "flows.json")
+	probe, err := flockExclusive(probePath)
+	if err != nil {
+		t.Fatalf("probe acquire: %v", err)
+	}
+	defer func() { _ = probe.Close() }()
+
+	svc := NewEnvService(NewIsolatedConfigService(dir))
+	err = svc.Set("CONFLICT_KEY", "v", "string", "", false)
+	if err == nil {
+		t.Fatal("expected Set to fail while another flock holds flows.json.lock")
+	}
+	if !errors.Is(err, syscall.EWOULDBLOCK) && !errors.Is(err, syscall.EAGAIN) {
+		t.Fatalf("expected wrapped EWOULDBLOCK/EAGAIN, got %v", err)
 	}
 }

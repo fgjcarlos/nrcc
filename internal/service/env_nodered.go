@@ -112,6 +112,20 @@ func (s *EnvService) syncNodeRedGlobalEnvValues(cfg model.NodeRedConfig, keys []
 		return fmt.Errorf("flow file must stay inside Node-RED data directory")
 	}
 
+	// Hold an exclusive advisory flock on flows.json for the entire
+	// read-modify-rename. flock is OS-managed (auto-released on process
+	// death) and serializes against other flock-aware writers; Node-RED
+	// itself does not currently flock, so an unflocked third-party write
+	// can still race at the filesystem level — this is mitigated by the
+	// handler-side withManagedNodeRedStopped wrapper (best-effort) but is
+	// not enforced here. flockExclusive uses LOCK_NB so contention surfaces
+	// immediately instead of hanging a request handler.
+	lockFile, err := flockExclusive(flowPath)
+	if err != nil {
+		return fmt.Errorf("acquire flow file lock: %w", err)
+	}
+	defer func() { _ = lockFile.Close() }()
+
 	mode := os.FileMode(0o644)
 	data, err := os.ReadFile(flowPath)
 	if err != nil {
