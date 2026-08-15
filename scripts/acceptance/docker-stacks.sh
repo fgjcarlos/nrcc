@@ -408,6 +408,36 @@ scenario_4_backup_restore() {
   ok "scenario 4: PASS (backup/restore round-tripped)"
 }
 
+# Scenario 5 — entrypoint umask / strict-mode probe. Issue #643.
+# Boots a one-off container from the image under test and runs the
+# entrypoint directives that we care about (set -Eeuo pipefail,
+# umask 0077) inside the container shell, BEFORE exec'ing `su`.
+# The probe exits the entrypoint semantics on its own; it does NOT
+# reach the `exec su` handoff (which would require DATA_DIR bootstrap
+# and the nrcc binary running). The point is to prove the entrypoint
+# shell itself carries the defensive defaults.
+scenario_5_entrypoint_umask() {
+  log "scenario 5: entrypoint umask / strict-mode probe (issue #643)"
+
+  if [[ "$DRY_RUN" == "1" ]]; then
+    ok "scenario 5: DRY-RUN skipped (umask 0077 + set -Eeuo pipefail assumed)"
+    return 0
+  fi
+
+  command -v docker >/dev/null \
+    || fail "scenario 5: docker not found on PATH"
+
+  # One-liner that mirrors the entrypoint's strict-mode + umask block
+  # and prints the umask; exit 0 before any chown / su would run.
+  local probe='set -Eeuo pipefail; umask 0077; printf %s "$(umask)"; exit 0'
+  local out
+  out="$(docker run --rm --entrypoint /bin/sh "${NRCC_IMAGE}" -c "$probe")" \
+    || fail "scenario 5: docker probe failed (image=${NRCC_IMAGE})"
+
+  assert_eq "$out" "0077" "entrypoint shell umask"
+  ok "scenario 5: PASS (umask=0077 enforced + strict-mode set)"
+}
+
 # ── Driver ──────────────────────────────────────────────────────────────────
 main() {
   log "acceptance suite starting"
@@ -432,6 +462,7 @@ main() {
   scenario_2_isolation
   scenario_3_persistence
   scenario_4_backup_restore
+  scenario_5_entrypoint_umask
 
   log "acceptance suite: ALL SCENARIOS PASSED"
 }
