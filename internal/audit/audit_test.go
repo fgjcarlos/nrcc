@@ -12,7 +12,135 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 )
+
+type failingWriteFile struct {
+	auditFile
+	err error
+}
+
+func (f failingWriteFile) Write([]byte) (int, error) { return 0, f.err }
+
+type testFS struct {
+	osFileSystem
+	wrapOpen func(auditFile) auditFile
+	linkErr  error
+}
+
+func (f *testFS) OpenFile(name string, flag int, perm os.FileMode) (auditFile, error) {
+	file, err := f.osFileSystem.OpenFile(name, flag, perm)
+	if err == nil && f.wrapOpen != nil {
+		file = f.wrapOpen(file)
+	}
+	return file, err
+}
+
+func (f *testFS) Link(oldname, newname string) error {
+	if f.linkErr != nil {
+		return f.linkErr
+	}
+	return f.osFileSystem.Link(oldname, newname)
+}
+
+type reportRecorder struct{ reports []Report }
+
+func (r *reportRecorder) Report(report Report) { r.reports = append(r.reports, report) }
+
+func testDependencies(now time.Time, fs fileSystem, reporter Reporter) dependencies {
+	return dependencies{now: func() time.Time { return now }, fs: fs, reporter: reporter}
+}
+
+func TestService_RotationNames(t *testing.T) {
+	now := time.Date(2026, time.August, 15, 12, 34, 56, 123456789, time.UTC)
+	dir := t.TempDir()
+	svc, err := newService(dir, testDependencies(now, &testFS{}, &reportRecorder{}))
+	if err != nil {
+		t.Fatalf("newService: %v", err)
+	}
+	defer func() { _ = svc.Close() }()
+
+	want := []string{
+		"audit-20260815-123456.123456789-000000.jsonl",
+		"audit-20260815-123456.123456789-000001.jsonl",
+	}
+	for i, name := range want {
+		got, err := svc.selectBackupName()
+		if err != nil {
+			t.Fatalf("selectBackupName %d: %v", i, err)
+		}
+		if filepath.Base(got) != name {
+			t.Fatalf("candidate %d = %q, want %q", i, filepath.Base(got), name)
+		}
+		if err := os.WriteFile(got, []byte(fmt.Sprintf("payload-%d", i)), 0600); err != nil {
+			t.Fatalf("create candidate %d: %v", i, err)
+		}
+	}
+
+	first, err := os.ReadFile(filepath.Join(svc.dir, want[0]))
+	if err != nil {
+		t.Fatalf("read first candidate: %v", err)
+	}
+	if string(first) != "payload-0" {
+		t.Fatalf("existing candidate changed: %q", first)
+	}
+}
+
+func TestService_LogOutcomes(t *testing.T) {
+	writeErr := fmt.Errorf("disk full")
+	linkErr := fmt.Errorf("link denied")
+	tests := []struct {
+		name          string
+		configure     func(*Service, *testFS)
+		wantPersisted bool
+		wantKind      string
+		wantStage     string
+	}{
+		{
+			name: "event write failure",
+			configure: func(svc *Service, _ *testFS) {
+				svc.file = failingWriteFile{auditFile: svc.file, err: writeErr}
+			},
+			wantKind:  "event",
+			wantStage: "write",
+		},
+		{
+			name: "post-write rotation failure",
+			configure: func(svc *Service, fs *testFS) {
+				svc.size = maxSize - 1
+				fs.linkErr = linkErr
+			},
+			wantPersisted: true,
+			wantKind:      "maintenance",
+			wantStage:     "link-backup",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fs := &testFS{}
+			reporter := &reportRecorder{}
+			svc, err := newService(t.TempDir(), testDependencies(time.Now(), fs, reporter))
+			if err != nil {
+				t.Fatalf("newService: %v", err)
+			}
+			defer func() { _ = svc.Close() }()
+			tt.configure(svc, fs)
+
+			req := httptest.NewRequest(http.MethodPost, "/test", nil)
+			outcome := svc.Log(req, "user", "TEST", "", "ok", nil)
+			if outcome.Persisted != tt.wantPersisted {
+				t.Fatalf("Persisted = %v, want %v", outcome.Persisted, tt.wantPersisted)
+			}
+			if len(reporter.reports) != 1 {
+				t.Fatalf("reports = %d, want 1", len(reporter.reports))
+			}
+			if got := reporter.reports[0]; got.Kind != tt.wantKind || got.Stage != tt.wantStage || got.Persisted != tt.wantPersisted {
+				t.Fatalf("report = %+v, want kind=%q stage=%q persisted=%v", got, tt.wantKind, tt.wantStage, tt.wantPersisted)
+			}
+		})
+	}
+}
 
 func TestLog_WritesJSONLEvent(t *testing.T) {
 	svc, err := NewService(t.TempDir())
