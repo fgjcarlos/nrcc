@@ -646,6 +646,11 @@ func (s *BackupService) Delete(id string) error {
 // returning a reader and the file size. Callers (HTTP handlers) can use this to
 // detect missing/unreadable backups and set Content-Length BEFORE writing any
 // response body, avoiding truncated downloads served with a 200 status.
+//
+// The open uses O_NOFOLLOW so a symlink substituted into the backup path
+// between ValidateBackupID and open returns ELOOP rather than reading the
+// symlink target. openNoFollow additionally fstats the fd and rejects any
+// symlink that survives the kernel open — defense-in-depth.
 func (s *BackupService) OpenForDownload(id string) (io.ReadCloser, int64, error) {
 	if err := ValidateBackupID(id); err != nil {
 		return nil, 0, err
@@ -658,7 +663,7 @@ func (s *BackupService) OpenForDownload(id string) (io.ReadCloser, int64, error)
 	}
 
 	// #nosec G304 -- backupPath is built from operator-supplied dataDir + a constant filename; not request-derived.
-	file, err := os.Open(backupPath)
+	file, err := openNoFollow(backupPath)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to open backup: %w", err)
 	}
