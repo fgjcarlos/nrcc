@@ -18,6 +18,7 @@ import (
 // waiting for a lock held by another goroutine or process.
 func flockExclusive(path string) (*os.File, error) {
 	lockPath := path + ".lock"
+	// #nosec G304 -- lockPath is the sibling of an already-validated target path; not request-derived.
 	f, err := os.OpenFile(lockPath, os.O_RDWR|os.O_CREATE, 0o600)
 	if err != nil {
 		return nil, fmt.Errorf("open lock file %s: %w", lockPath, err)
@@ -37,6 +38,7 @@ func flockExclusive(path string) (*os.File, error) {
 // symlink via rename(2) on the same directory entry between open and
 // fstat. On the same fd this is atomic on Linux; the check is cheap.
 func openNoFollow(path string) (*os.File, error) {
+	// #nosec G304 -- path is supplied by the caller after ValidateBackupID + filepath.Join against an operator-supplied dataDir; not request-derived. openNoFollow is the choke point that enforces O_NOFOLLOW.
 	f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
 	if err != nil {
 		return nil, fmt.Errorf("open %s without follow: %w", path, err)

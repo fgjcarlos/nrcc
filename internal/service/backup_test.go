@@ -920,7 +920,7 @@ func TestBackupServiceOpenForDownloadOpensRegularFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("OpenForDownload: %v", err)
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 
 	if size != int64(len(payload)) {
 		t.Errorf("size = %d, want %d", size, len(payload))

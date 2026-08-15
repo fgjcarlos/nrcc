@@ -86,7 +86,7 @@ func TestFlockExclusive_LockFileIsSiblingOfTarget(t *testing.T) {
 	if err != nil {
 		t.Fatalf("acquire: %v", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	lockPath := target + ".lock"
 	info, err := os.Stat(lockPath)
@@ -110,7 +110,7 @@ func TestOpenNoFollow_OpensRegularFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	got, err := io.ReadAll(f)
 	if err != nil {

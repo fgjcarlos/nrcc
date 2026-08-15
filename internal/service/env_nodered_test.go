@@ -273,6 +273,7 @@ func TestSyncNodeRedGlobalEnv_ConcurrentGoroutinesAllKeysPresent(t *testing.T) {
 	}
 
 	// File must round-trip as valid JSON.
+	// #nosec G304 -- path is t.TempDir() + the test's own flows.json; not request-derived.
 	data, err := os.ReadFile(filepath.Join(dir, "flows.json"))
 	if err != nil {
 		t.Fatalf("read flows.json: %v", err)
