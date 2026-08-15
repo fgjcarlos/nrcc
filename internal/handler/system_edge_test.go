@@ -12,12 +12,25 @@ import (
 )
 
 // authedSystemInfoRequest builds a GET /api/system/info request carrying valid
-// auth claims, which GetSystemInfo requires.
+// admin auth claims, which GetSystemInfo requires.
 func authedSystemInfoRequest() *http.Request {
 	req := httptest.NewRequest(http.MethodGet, "/api/system/info", nil)
 	ctx := context.WithValue(req.Context(), middleware.CtxKeyUser, &model.Claims{
 		UserID:   "u-1",
 		Username: "admin",
+		Role:     model.RoleAdmin,
+	})
+	return req.WithContext(ctx)
+}
+
+// authedViewerSystemInfoRequest builds a GET /api/system/info request carrying
+// viewer auth claims; used by MEDIUM-018 redaction tests.
+func authedViewerSystemInfoRequest() *http.Request {
+	req := httptest.NewRequest(http.MethodGet, "/api/system/info", nil)
+	ctx := context.WithValue(req.Context(), middleware.CtxKeyUser, &model.Claims{
+		UserID:   "u-2",
+		Username: "viewer",
+		Role:     model.RoleViewer,
 	})
 	return req.WithContext(ctx)
 }
@@ -56,5 +69,41 @@ func TestGetSystemInfo_EdgeModeReflectsSetter(t *testing.T) {
 
 	if got := decodeSystemInfo(t, w); !got.EdgeMode {
 		t.Errorf("edgeMode = false, want true after SetEdgeMode(true)")
+	}
+}
+
+// TestGetSystemInfo_Viewer_HostnameEmpty is the MEDIUM-018 RED case: viewers
+// must NOT see the hostname, since it leaks internal network identity
+// ("prod-web-01.internal.example.com" and similar). Other system metrics must
+// stay populated so the operator dashboard still works for read-only users.
+func TestGetSystemInfo_Viewer_HostnameEmpty(t *testing.T) {
+	h := NewSystemHandler()
+
+	w := httptest.NewRecorder()
+	h.GetSystemInfo(w, authedViewerSystemInfoRequest())
+
+	got := decodeSystemInfo(t, w)
+	if got.Hostname != "" {
+		t.Errorf("hostname must be redacted for viewer; got %q", got.Hostname)
+	}
+	if got.Platform == "" {
+		t.Errorf("platform must remain populated for viewer diagnostics; got empty")
+	}
+	if got.Arch == "" {
+		t.Errorf("arch must remain populated for viewer diagnostics; got empty")
+	}
+}
+
+// TestGetSystemInfo_Admin_HostnamePopulated ensures admins still see the
+// real hostname (no regression).
+func TestGetSystemInfo_Admin_HostnamePopulated(t *testing.T) {
+	h := NewSystemHandler()
+
+	w := httptest.NewRecorder()
+	h.GetSystemInfo(w, authedSystemInfoRequest())
+
+	got := decodeSystemInfo(t, w)
+	if got.Hostname == "" {
+		t.Errorf("admin must see real hostname; got empty")
 	}
 }

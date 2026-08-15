@@ -114,6 +114,12 @@ func (h *SystemHandler) GetSystemInfo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	hostname, _ := os.Hostname()
+	// MEDIUM-018: hostname leaks the internal FQDN ("prod-web-01.internal"),
+	// which is useful for lateral movement. Strip it for non-admin viewers;
+	// admins still see the real value for incident response.
+	if claims.Role != model.RoleAdmin {
+		hostname = ""
+	}
 
 	// Get platform-specific system stats
 	uptime, memTotal, memFree := getSystemStats()
