@@ -9,6 +9,9 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -138,6 +141,9 @@ func newService(dataDir string, deps dependencies) (*Service, error) {
 	}
 
 	s := &Service{dir: dir, deps: deps}
+	if err := s.cleanupAliasedBackups(); err != nil {
+		return nil, err
+	}
 	if err := s.openActive(); err != nil {
 		return nil, err
 	}
@@ -174,7 +180,7 @@ func (s *Service) Log(r *http.Request, actor, action, target, result string, met
 	defer s.mu.Unlock()
 
 	if s.file == nil {
-		if err := s.openActive(); err != nil {
+		if err := s.ensureAvailable(); err != nil {
 			return s.failed(eventFailure("unavailable-writer", err))
 		}
 	}
@@ -243,6 +249,16 @@ func (s *Service) openActive() error {
 	return nil
 }
 
+func (s *Service) ensureAvailable() error {
+	if s.pendingBackup != "" {
+		if err := s.deps.fs.Remove(s.pendingBackup); err != nil {
+			return fmt.Errorf("remove pending backup alias: %w", err)
+		}
+		s.pendingBackup = ""
+	}
+	return s.openActive()
+}
+
 func (s *Service) selectBackupName() (string, error) {
 	prefix := s.deps.now().UTC().Format("20060102-150405.000000000")
 	for ordinal := 0; ordinal <= 999999; ordinal++ {
@@ -261,7 +277,7 @@ func (s *Service) rotate() *OpError {
 		if err := s.file.Close(); err != nil {
 			s.file = nil
 			s.size = 0
-			return &OpError{Stage: "close-active", Primary: err}
+			return &OpError{Stage: "close-active", Primary: err, Secondary: s.recoverActive()}
 		}
 		s.file = nil
 		s.size = 0
@@ -288,14 +304,127 @@ func (s *Service) rotate() *OpError {
 		return &OpError{Stage: "remove-active", Primary: err, Secondary: secondary}
 	}
 	if err := s.openActive(); err != nil {
-		return &OpError{Stage: "open-replacement", Primary: err}
+		return &OpError{Stage: "open-replacement", Primary: err, Secondary: s.recoverActive()}
 	}
-	return nil
+	return s.pruneOld()
 }
 
 func (s *Service) recoverActive() []SecondaryError {
 	if err := s.openActive(); err != nil {
 		return []SecondaryError{{Stage: "recover-active", Err: err}}
+	}
+	return nil
+}
+
+func (s *Service) cleanupAliasedBackups() error {
+	active := filepath.Join(s.dir, fileName)
+	activeInfo, err := s.deps.fs.Stat(active)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("inspect active audit file: %w", err)
+	}
+	entries, err := s.deps.fs.ReadDir(s.dir)
+	if err != nil {
+		return fmt.Errorf("list audit directory: %w", err)
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !isBackupName(entry.Name()) {
+			continue
+		}
+		path := filepath.Join(s.dir, entry.Name())
+		info, err := s.deps.fs.Stat(path)
+		if err != nil {
+			return fmt.Errorf("inspect backup alias %s: %w", entry.Name(), err)
+		}
+		if os.SameFile(activeInfo, info) {
+			if err := s.deps.fs.Remove(path); err != nil {
+				return fmt.Errorf("remove backup alias %s: %w", entry.Name(), err)
+			}
+		}
+	}
+	return nil
+}
+
+type backup struct {
+	name       string
+	path       string
+	rotatedAt  time.Time
+	generation int
+	ordinal    int
+}
+
+func isBackupName(name string) bool {
+	return strings.HasPrefix(name, "audit-") && strings.HasSuffix(name, ".jsonl") && name != fileName
+}
+
+func parseBackup(name string, info os.FileInfo) backup {
+	b := backup{name: name, rotatedAt: info.ModTime(), generation: 2}
+	if len(name) == 44 {
+		rotatedAt, timeErr := time.ParseInLocation("20060102-150405.000000000", name[6:31], time.UTC)
+		ordinal, ordinalErr := strconv.Atoi(name[32:38])
+		if timeErr == nil && ordinalErr == nil {
+			b.rotatedAt, b.generation, b.ordinal = rotatedAt, 1, ordinal
+			return b
+		}
+	}
+	if len(name) == 27 {
+		encoded, err := time.ParseInLocation("20060102-150405", name[6:21], time.UTC)
+		if err == nil {
+			b.rotatedAt, b.generation = encoded, 0
+			if modTime := info.ModTime(); !modTime.Before(encoded) && modTime.Before(encoded.Add(time.Second)) {
+				b.rotatedAt = modTime
+			}
+		}
+	}
+	return b
+}
+
+func (s *Service) listBackups() ([]backup, *OpError) {
+	entries, err := s.deps.fs.ReadDir(s.dir)
+	if err != nil {
+		return nil, &OpError{Stage: "list-backups", Primary: err}
+	}
+	backups := make([]backup, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() || !isBackupName(entry.Name()) {
+			continue
+		}
+		path := filepath.Join(s.dir, entry.Name())
+		info, err := s.deps.fs.Stat(path)
+		if err != nil {
+			return nil, &OpError{Stage: "inspect-backup", Primary: err}
+		}
+		item := parseBackup(entry.Name(), info)
+		item.path = path
+		backups = append(backups, item)
+	}
+	sort.Slice(backups, func(i, j int) bool {
+		a, b := backups[i], backups[j]
+		if !a.rotatedAt.Equal(b.rotatedAt) {
+			return a.rotatedAt.Before(b.rotatedAt)
+		}
+		if a.generation != b.generation {
+			return a.generation < b.generation
+		}
+		if a.ordinal != b.ordinal {
+			return a.ordinal < b.ordinal
+		}
+		return a.name < b.name
+	})
+	return backups, nil
+}
+
+func (s *Service) pruneOld() *OpError {
+	backups, opErr := s.listBackups()
+	if opErr != nil || len(backups) <= maxBackups {
+		return opErr
+	}
+	for _, item := range backups[:len(backups)-maxBackups] {
+		if err := s.deps.fs.Remove(item.path); err != nil {
+			return &OpError{Stage: "prune-backup", Primary: err}
+		}
 	}
 	return nil
 }
