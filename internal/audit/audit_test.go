@@ -217,6 +217,11 @@ func TestService_RotationRecovery(t *testing.T) {
 		if err != nil || svc.size != info.Size() {
 			t.Fatalf("size=%d stat=(%v,%v), want truthful recovered size", svc.size, info, err)
 		}
+		fs.linkErr = nil
+		later := svc.Log(httptest.NewRequest(http.MethodPost, "/", nil), "b", "B", "", "ok", nil)
+		if !later.Persisted || later.EventErr != nil || later.MaintenanceErr != nil {
+			t.Fatalf("later Log = %+v, want successful persistence", later)
+		}
 	})
 
 	t.Run("replacement open failure recovers", func(t *testing.T) {
@@ -230,6 +235,50 @@ func TestService_RotationRecovery(t *testing.T) {
 		outcome := svc.Log(httptest.NewRequest(http.MethodPost, "/", nil), "a", "A", "", "ok", nil)
 		if !outcome.Persisted || outcome.MaintenanceErr == nil || outcome.MaintenanceErr.Stage != "open-replacement" || svc.file == nil || svc.size != 0 {
 			t.Fatalf("outcome=%+v file=%v size=%d, want recovered empty active", outcome, svc.file, svc.size)
+		}
+		later := svc.Log(httptest.NewRequest(http.MethodPost, "/", nil), "b", "B", "", "ok", nil)
+		if !later.Persisted || later.EventErr != nil || later.MaintenanceErr != nil {
+			t.Fatalf("later Log = %+v, want successful persistence", later)
+		}
+	})
+
+	t.Run("active remove rollback and pending alias retry", func(t *testing.T) {
+		now := time.Date(2026, time.August, 15, 12, 34, 56, 0, time.UTC)
+		candidate := "audit-20260815-123456.000000000-000000.jsonl"
+		for _, tc := range []struct {
+			name            string
+			failRollback    bool
+			wantPendingPath bool
+		}{
+			{name: "rollback recovers active writer"},
+			{name: "pending alias is removed before retry", failRollback: true, wantPendingPath: true},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				fs := &testFS{removeErr: map[string]error{fileName: errors.New("active remove denied")}}
+				if tc.failRollback {
+					fs.removeErr[candidate] = errors.New("rollback remove denied")
+				}
+				svc, err := newService(t.TempDir(), testDependencies(now, fs, &reportRecorder{}))
+				if err != nil {
+					t.Fatal(err)
+				}
+				svc.size = maxSize
+				first := svc.Log(httptest.NewRequest(http.MethodPost, "/", nil), "a", "A", "", "ok", nil)
+				if !first.Persisted || first.MaintenanceErr == nil || first.MaintenanceErr.Stage != "remove-active" {
+					t.Fatalf("first Log = %+v, want persisted remove-active failure", first)
+				}
+				if got := svc.pendingBackup != ""; got != tc.wantPendingPath {
+					t.Fatalf("pendingBackup set = %v, want %v", got, tc.wantPendingPath)
+				}
+				fs.removeErr = nil
+				later := svc.Log(httptest.NewRequest(http.MethodPost, "/", nil), "b", "B", "", "ok", nil)
+				if !later.Persisted || later.EventErr != nil || later.MaintenanceErr != nil {
+					t.Fatalf("later Log = %+v, want successful persistence", later)
+				}
+				if _, err := os.Stat(filepath.Join(svc.dir, candidate)); tc.wantPendingPath && !os.IsNotExist(err) {
+					t.Fatalf("pending alias still exists: %v", err)
+				}
+			})
 		}
 	})
 
@@ -281,6 +330,61 @@ func TestService_RotationRecovery(t *testing.T) {
 
 func TestService_Prune(t *testing.T) {
 	now := time.Date(2026, time.August, 15, 12, 34, 56, 0, time.UTC)
+	t.Run("same timestamp ordinals retain newest", func(t *testing.T) {
+		svc, err := newService(t.TempDir(), testDependencies(now, &testFS{}, &reportRecorder{}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for ordinal := 0; ordinal < maxBackups+2; ordinal++ {
+			name := fmt.Sprintf("audit-20260815-123456.000000000-%06d.jsonl", ordinal)
+			if err := os.WriteFile(filepath.Join(svc.dir, name), []byte(name), 0600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if opErr := svc.pruneOld(); opErr != nil {
+			t.Fatalf("pruneOld: %v", opErr)
+		}
+		for ordinal := 0; ordinal < maxBackups+2; ordinal++ {
+			name := fmt.Sprintf("audit-20260815-123456.000000000-%06d.jsonl", ordinal)
+			_, err := os.Stat(filepath.Join(svc.dir, name))
+			if ordinal < 2 && !os.IsNotExist(err) {
+				t.Fatalf("old ordinal %d retained: %v", ordinal, err)
+			}
+			if ordinal >= 2 && err != nil {
+				t.Fatalf("new ordinal %d missing: %v", ordinal, err)
+			}
+		}
+	})
+
+	t.Run("delete failure after persistence keeps writer usable", func(t *testing.T) {
+		fs := &testFS{}
+		reporter := &reportRecorder{}
+		svc, err := newService(t.TempDir(), testDependencies(now, fs, reporter))
+		if err != nil {
+			t.Fatal(err)
+		}
+		oldest := "audit-20260815-123450.000000000-000000.jsonl"
+		for i := 0; i < maxBackups; i++ {
+			name := fmt.Sprintf("audit-20260815-12345%d.000000000-000000.jsonl", i)
+			if err := os.WriteFile(filepath.Join(svc.dir, name), []byte(name), 0600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		fs.removeErr = map[string]error{oldest: errors.New("remove denied")}
+		svc.size = maxSize
+		outcome := svc.Log(httptest.NewRequest(http.MethodPost, "/", nil), "a", "A", "", "ok", nil)
+		if !outcome.Persisted || outcome.MaintenanceErr == nil || outcome.MaintenanceErr.Stage != "prune-backup" {
+			t.Fatalf("Log = %+v, want persisted prune failure", outcome)
+		}
+		if len(reporter.reports) != 1 || !reporter.reports[0].Persisted || reporter.reports[0].Stage != "prune-backup" {
+			t.Fatalf("reports = %+v, want persisted prune maintenance report", reporter.reports)
+		}
+		fs.removeErr = nil
+		later := svc.Log(httptest.NewRequest(http.MethodPost, "/", nil), "b", "B", "", "ok", nil)
+		if !later.Persisted || later.EventErr != nil || later.MaintenanceErr != nil {
+			t.Fatalf("later Log = %+v, want successful persistence", later)
+		}
+	})
 	t.Run("mixed names retain newest rotation keys", func(t *testing.T) {
 		dataDir := t.TempDir()
 		fs := &testFS{}
@@ -399,7 +503,10 @@ func TestLog_WritesJSONLEvent(t *testing.T) {
 func TestLog_NilServiceIsNoop(t *testing.T) {
 	var svc *Service
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	svc.Log(req, "x", "X", "", "ok", nil)
+	outcome := svc.Log(req, "x", "X", "", "ok", nil)
+	if outcome.Persisted || outcome.EventErr == nil || outcome.EventErr.Stage != "unavailable-writer" {
+		t.Fatalf("Log = %+v, want unavailable writer outcome", outcome)
+	}
 }
 
 func TestLog_MultipleEvents(t *testing.T) {
