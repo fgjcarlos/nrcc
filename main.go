@@ -114,7 +114,11 @@ func runServer() {
 	server.SetEmbedFS(frontendFS)
 
 	// Create and configure server
-	srv := server.NewServerWithConfig(authSvc, dataDir, corsCfg)
+	srv := server.NewServerWithConfig(authSvc, server.Config{
+		DataDir:    dataDir,
+		CORS:       corsCfg,
+		HTTPLogger: server.NewDefaultHTTPLogger(),
+	})
 	if manageRuntime {
 		srv.SetProcessManager(pm)
 	}
