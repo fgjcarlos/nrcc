@@ -20,7 +20,7 @@ func newAuthzTestServer(t *testing.T) (*Server, *service.AuthService) {
 	userStore := store.NewJSONStore[model.CCUsers](dir + "/users.json")
 	sessionStore := store.NewJSONStore[model.RefreshSessions](dir + "/sessions.json")
 	authSvc := service.NewAuthService("test-secret", userStore, sessionStore)
-	srv := NewServerWithConfig(authSvc, dir, middleware.CORSConfig{})
+	srv := NewServerWithConfig(authSvc, Config{DataDir: dir, CORS: middleware.CORSConfig{}, HTTPLogger: discardHTTPLogger()})
 	return srv, authSvc
 }
 

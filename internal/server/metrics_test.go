@@ -18,7 +18,7 @@ func newTestServer(t *testing.T) *Server {
 	userStore := store.NewJSONStore[model.CCUsers](dir + "/users.json")
 	sessionStore := store.NewJSONStore[model.RefreshSessions](dir + "/sessions.json")
 	authSvc := service.NewAuthService("test-secret", userStore, sessionStore)
-	return NewServerWithConfig(authSvc, dir, middleware.CORSConfig{})
+	return NewServerWithConfig(authSvc, Config{DataDir: dir, CORS: middleware.CORSConfig{}, HTTPLogger: discardHTTPLogger()})
 }
 
 // TestMetricsEndpoint_Returns200 verifies that GET /metrics returns HTTP 200.

@@ -36,6 +36,7 @@ type Server struct {
 	metricsBuffer    *service.MetricsBuffer
 	metricsSampler   *service.MetricsSampler
 	flowVersionSvc   *service.FlowVersionService
+	httpLogger       *slog.Logger
 	ctx              context.Context
 	cancel           context.CancelFunc
 	shutdownCh       chan struct{}
@@ -52,21 +53,26 @@ func initAuditService(dataDir string, reportf func(string, ...any)) *audit.Servi
 
 // NewServer creates and configures a new server
 func NewServer(authSvc *service.AuthService) *Server {
-	return NewServerWithConfig(authSvc, "./data", middleware.CORSConfig{})
+	return NewServerWithConfig(authSvc, Config{DataDir: "./data", HTTPLogger: NewDefaultHTTPLogger()})
 }
 
-// NewServerWithConfig creates and configures a new server with config directory
-func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg middleware.CORSConfig) *Server {
+// NewServerWithConfig creates and configures a new server.
+func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
+	if cfg.HTTPLogger == nil {
+		panic("server: nil HTTP logger")
+	}
+	dataDir := cfg.DataDir
 	r := chi.NewRouter()
 
 	// Global middleware — Recoverer MUST be first so it wraps every downstream
 	// middleware and handler. A panic inside SecurityHeaders, CORS, or Logger
 	// would otherwise escape and drop the connection.
 	r.Use(middleware.Recoverer)
+	r.Use(middleware.RequestID)
+	r.Use(middleware.Logger(cfg.HTTPLogger))
 	r.Use(middleware.SecurityHeaders)
-	r.Use(middleware.CORS(corsCfg))
+	r.Use(middleware.CORS(cfg.CORS))
 	r.Use(middleware.BodyLimitMiddleware(middleware.DefaultBodyLimitConfig()))
-	r.Use(middleware.Logger(slog.Default()))
 
 	// Initialize handlers
 	authHandler := handler.NewAuthHandler(authSvc)
@@ -336,6 +342,7 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 		metricsBuffer:    metricsBuffer,
 		metricsSampler:   metricsSampler,
 		flowVersionSvc:   flowVersionSvc,
+		httpLogger:       cfg.HTTPLogger,
 	}
 
 	// Create a cancellable context for the server lifecycle

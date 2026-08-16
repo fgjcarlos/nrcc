@@ -20,7 +20,11 @@ func TestBodyLimit_ServerAppliesGloballyAfterCORS(t *testing.T) {
 		store.NewJSONStore[model.RefreshSessions](dir+"/sessions.json"),
 	)
 	const origin = "https://app.example.com"
-	srv := NewServerWithConfig(authSvc, dir, middleware.CORSConfig{AllowedOrigins: []string{origin}})
+	srv := NewServerWithConfig(authSvc, Config{
+		DataDir:    dir,
+		CORS:       middleware.CORSConfig{AllowedOrigins: []string{origin}},
+		HTTPLogger: discardHTTPLogger(),
+	})
 	t.Cleanup(srv.Shutdown)
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/setup", strings.NewReader(`{"username":"`+strings.Repeat("x", 2<<20)+`","password":"password123"}`))
 	req.Header.Set("Origin", origin)
