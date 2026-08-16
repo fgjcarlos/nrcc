@@ -82,7 +82,11 @@ func TestAuth_InvalidToken(t *testing.T) {
 		nextCalled = true
 	})
 
-	wrapped := authMiddleware(nextHandler)
+	var attributedUserID string
+	wrapped := RequestID(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authMiddleware(nextHandler).ServeHTTP(w, r)
+		attributedUserID = requestMetadataFromContext(r.Context()).userID
+	}))
 	req := httptest.NewRequest(http.MethodGet, "/api/test", nil)
 	req.Header.Set("Authorization", "Bearer invalid.token.here")
 	w := httptest.NewRecorder()
@@ -94,6 +98,9 @@ func TestAuth_InvalidToken(t *testing.T) {
 	}
 	if w.Code != http.StatusUnauthorized {
 		t.Errorf("Expected status 401, got %d", w.Code)
+	}
+	if attributedUserID != "" {
+		t.Errorf("invalid token attributed user %q", attributedUserID)
 	}
 }
 
@@ -122,9 +129,11 @@ func TestAuth_ValidToken(t *testing.T) {
 
 	nextCalled := false
 	capturedClaims := (*model.Claims)(nil)
+	var capturedUserID string
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		nextCalled = true
 		capturedClaims = ClaimsFromContext(r)
+		capturedUserID = requestMetadataFromContext(r.Context()).userID
 		w.WriteHeader(http.StatusOK)
 	})
 
@@ -146,6 +155,9 @@ func TestAuth_ValidToken(t *testing.T) {
 	}
 	if capturedClaims != nil && capturedClaims.Username != "admin" {
 		t.Errorf("Expected username 'admin', got %s", capturedClaims.Username)
+	}
+	if capturedUserID != "test-id" {
+		t.Errorf("verified metadata user ID = %q, want %q", capturedUserID, "test-id")
 	}
 }
 

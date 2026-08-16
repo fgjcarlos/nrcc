@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -65,7 +66,7 @@ func NewServerWithConfig(authSvc *service.AuthService, dataDir string, corsCfg m
 	r.Use(middleware.SecurityHeaders)
 	r.Use(middleware.CORS(corsCfg))
 	r.Use(middleware.BodyLimitMiddleware(middleware.DefaultBodyLimitConfig()))
-	r.Use(middleware.Logger)
+	r.Use(middleware.Logger(slog.Default()))
 
 	// Initialize handlers
 	authHandler := handler.NewAuthHandler(authSvc)

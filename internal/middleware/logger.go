@@ -1,46 +1,50 @@
 package middleware
 
 import (
+	"log/slog"
 	"net/http"
 	"time"
 
-	"github.com/fgjcarlos/nrcc/internal/ui"
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 )
 
-// Logger middleware logs HTTP requests with method, path, status, and duration
-func Logger(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
+// Logger emits one structured completion record for each HTTP request.
+func Logger(logger *slog.Logger) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			start := time.Now()
+			r, metadata := ensureRequestMetadata(r)
+			w.Header().Set(requestIDHeader, metadata.requestID)
+			wrapped := chimiddleware.NewWrapResponseWriter(w, r.ProtoMajor)
 
-		// Wrap response writer to capture status code
-		wrappedW := &statusCapturingWriter{ResponseWriter: w, statusCode: http.StatusOK}
+			status := http.StatusOK
+			defer func() {
+				if recovered := recover(); recovered != nil {
+					status = http.StatusInternalServerError
+					logRequestCompletion(logger, r, metadata, status, time.Since(start))
+					panic(recovered)
+				}
+				if wrapped.Status() != 0 {
+					status = wrapped.Status()
+				}
+				logRequestCompletion(logger, r, metadata, status, time.Since(start))
+			}()
 
-		next.ServeHTTP(wrappedW, r)
-
-		duration := time.Since(start)
-		ui.HTTPLog(r.Method, r.URL.Path, wrappedW.statusCode, duration)
-	})
-}
-
-// statusCapturingWriter wraps http.ResponseWriter to capture status code
-type statusCapturingWriter struct {
-	http.ResponseWriter
-	statusCode int
-	written    bool
-}
-
-func (w *statusCapturingWriter) WriteHeader(status int) {
-	if !w.written {
-		w.statusCode = status
-		w.written = true
-		w.ResponseWriter.WriteHeader(status)
+			next.ServeHTTP(wrapped, r)
+		})
 	}
 }
 
-func (w *statusCapturingWriter) Write(b []byte) (int, error) {
-	if !w.written {
-		w.statusCode = http.StatusOK
-		w.written = true
+func logRequestCompletion(logger *slog.Logger, r *http.Request, metadata *requestMetadata, status int, duration time.Duration) {
+	attrs := []any{
+		"method", r.Method,
+		"path", r.URL.Path,
+		"status", status,
+		"duration_ms", duration.Milliseconds(),
+		"request_id", metadata.requestID,
 	}
-	return w.ResponseWriter.Write(b)
+	if metadata.userID != "" {
+		attrs = append(attrs, "user_id", metadata.userID)
+	}
+	logger.InfoContext(r.Context(), "http_request_completed", attrs...)
 }

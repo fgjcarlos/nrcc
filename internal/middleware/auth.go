@@ -31,7 +31,8 @@ func Auth(authSvc *service.AuthService) func(http.Handler) http.Handler {
 				return
 			}
 
-			// Inject claims into context
+			r, metadata := ensureRequestMetadata(r)
+			metadata.userID = claims.UserID
 			ctx := context.WithValue(r.Context(), CtxKeyUser, claims)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
