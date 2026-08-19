@@ -169,13 +169,26 @@ func (h *BackupHandler) DeleteBackup(w http.ResponseWriter, r *http.Request) {
 // DownloadBackup downloads a backup
 // GET /api/backups/{id}/download[?password=...]
 //
-// If `password` is supplied, the zip bytes are wrapped with AES-256-GCM using
-// the operator's passphrase; the client must decrypt with the same passphrase
-// to recover the original archive. Without a password the raw zip is streamed
-// unchanged for back-compat with existing callers.
+// If a passphrase is supplied, the zip bytes are wrapped with AES-256-GCM
+// using the operator's passphrase; the client must decrypt with the same
+// passphrase to recover the original archive. Without a passphrase the
+// raw zip is streamed unchanged for back-compat with existing callers.
+//
+// The passphrase is read from the `X-Backup-Password` request header
+// (preferred) or, for one release cycle of backwards compatibility, from
+// the `?password=` query parameter. The query-parameter form is
+// deprecated (#670) — the URL ends up in browser history and in any
+// reverse-proxy access log, both of which leak the bearer secret that
+// unlocks the export.
 func (h *BackupHandler) DownloadBackup(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	password := r.URL.Query().Get("password")
+	password := r.Header.Get("X-Backup-Password")
+	if password == "" {
+		if legacy := r.URL.Query().Get("password"); legacy != "" {
+			h.audit.Log(r, "", "BACKUP_DOWNLOAD_PASSWORD_QUERY_DEPRECATED", id, "warn", nil)
+			password = legacy
+		}
+	}
 
 	// Validate before writing any headers so a malicious id never reaches the
 	// Content-Disposition filename and never resolves to a path outside backups.

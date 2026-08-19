@@ -2,6 +2,8 @@ package service
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -17,6 +19,16 @@ const (
 	AccessTokenLifetime  = 15 * time.Minute
 	RefreshTokenLifetime = 7 * 24 * time.Hour
 )
+
+// hashRefreshToken returns the SHA-256 hex digest of a refresh token. Used
+// to make the on-disk id of a refresh session unguessable from the file
+// alone — the raw token is what the client holds, only its digest is
+// persisted (#669). SHA-256 (no salt) is sufficient because the input is
+// 256 bits of CSPRNG output; there is no low-entropy material to brute force.
+func hashRefreshToken(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
+}
 
 var (
 	ErrAlreadyConfigured     = errors.New("system already configured")
@@ -311,6 +323,11 @@ func (s *AuthService) UpdateUserRole(id string, role model.UserRole, updatedAt s
 }
 
 // CreateRefreshSession creates a new refresh session and returns its opaque token.
+//
+// The returned token is the only secret the client ever sees. The session
+// record persisted to disk stores sha256(token) as its id, not the token
+// itself (#669), so a leaked sessions.json does not yield usable bearer
+// credentials.
 func (s *AuthService) CreateRefreshSession(userID string) (string, error) {
 	tokenBytes := make([]byte, 32)
 	if _, err := rand.Read(tokenBytes); err != nil {
@@ -320,7 +337,7 @@ func (s *AuthService) CreateRefreshSession(userID string) (string, error) {
 
 	now := time.Now()
 	session := model.RefreshSession{
-		ID:        token,
+		ID:        hashRefreshToken(token),
 		UserID:    userID,
 		ExpiresAt: now.Add(RefreshTokenLifetime).Unix(),
 		CreatedAt: now.Unix(),
@@ -343,16 +360,22 @@ func (s *AuthService) ValidateRefreshSession(token string) (*model.RefreshSessio
 		return nil, fmt.Errorf("read sessions: %w", err)
 	}
 
+	// Hash once and compare against every stored id in constant time
+	// (subtle.ConstantTimeCompare on equal-length hex strings). The
+	// raw token is never written to disk, so a stolen sessions.json is
+	// useless without the matching plaintext bearer (#669).
+	tokenHash := hashRefreshToken(token)
 	for _, sess := range sessions.Sessions {
-		if sess.ID == token {
-			if sess.Revoked {
-				return nil, fmt.Errorf("refresh token revoked")
-			}
-			if time.Now().Unix() > sess.ExpiresAt {
-				return nil, fmt.Errorf("refresh token expired")
-			}
-			return &sess, nil
+		if subtle.ConstantTimeCompare([]byte(sess.ID), []byte(tokenHash)) != 1 {
+			continue
 		}
+		if sess.Revoked {
+			return nil, fmt.Errorf("refresh token revoked")
+		}
+		if time.Now().Unix() > sess.ExpiresAt {
+			return nil, fmt.Errorf("refresh token expired")
+		}
+		return &sess, nil
 	}
 
 	return nil, fmt.Errorf("refresh token not found")
@@ -361,11 +384,13 @@ func (s *AuthService) ValidateRefreshSession(token string) (*model.RefreshSessio
 // RevokeRefreshSession marks a refresh session as revoked.
 func (s *AuthService) RevokeRefreshSession(token string) error {
 	return s.sessionStore.Update(func(sessions *model.RefreshSessions) error {
+		tokenHash := hashRefreshToken(token)
 		for i := range sessions.Sessions {
-			if sessions.Sessions[i].ID == token {
-				sessions.Sessions[i].Revoked = true
-				return nil
+			if subtle.ConstantTimeCompare([]byte(sessions.Sessions[i].ID), []byte(tokenHash)) != 1 {
+				continue
 			}
+			sessions.Sessions[i].Revoked = true
+			return nil
 		}
 
 		return fmt.Errorf("refresh token not found")

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/fgjcarlos/nrcc/internal/audit"
@@ -49,6 +50,15 @@ func initAuditService(dataDir string, reportf func(string, ...any)) *audit.Servi
 		return nil
 	}
 	return svc
+}
+
+// metricsArePublic reports whether the Prometheus /metrics endpoint should
+// be served unauthenticated. Default is false (#671) — the endpoint is
+// fingerprintable and the login-failure counter is a brute-force oracle.
+// Set NRCC_METRICS_PUBLIC=true to restore the previous open behaviour, for
+// example when the metrics port is bound to a private network.
+func metricsArePublic() bool {
+	return strings.EqualFold(os.Getenv("NRCC_METRICS_PUBLIC"), "true")
 }
 
 // NewServer creates and configures a new server
@@ -174,7 +184,15 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
-	r.Get("/metrics", metricsCollector.Handler().ServeHTTP)
+
+	// #671: /metrics is gated by default — it leaks login-failure counters
+	// (a brute-force oracle) and Go runtime fingerprinting data. Operators
+	// who run Prometheus on a private network can opt out with
+	// NRCC_METRICS_PUBLIC=true. The route is therefore conditionally
+	// registered in the public group or the auth group below.
+	if metricsArePublic() {
+		r.Get("/metrics", metricsCollector.Handler().ServeHTTP)
+	}
 
 	// Auth routes (public and protected mixed)
 	r.Route("/api/auth", func(r chi.Router) {
@@ -210,6 +228,13 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 		// HIGH-002). Generous enough for normal dashboard polling; expensive
 		// endpoints below get their own tighter caps.
 		r.Use(middleware.RateLimitIP(300, time.Minute))
+
+		// #671: when NRCC_METRICS_PUBLIC is not set, /metrics requires
+		// the same JWT as every other authenticated route. A Prometheus
+		// scrape config can supply the bearer token directly.
+		if !metricsArePublic() {
+			r.Get("/metrics", metricsCollector.Handler().ServeHTTP)
+		}
 
 		// Config routes
 		r.Route("/api/config", func(r chi.Router) {

@@ -70,6 +70,7 @@ OS env → EnvService → `.env`.
 | `NRCC_AI_ENDPOINT` | provider default | Custom AI endpoint URL | yes |
 | `NRCC_AI_MODEL` | provider default | Model id | yes |
 | `NRCC_AI_API_KEY` | none | AI provider API key (prefer secret file) | yes |
+| `NRCC_METRICS_PUBLIC` | `false` | When `true`, Prometheus `/metrics` is served unauthenticated. Default `false` gates `/metrics` behind the same JWT as other routes (#671); opt out only on a private metrics network. | yes |
 
 ## Node-RED runtime variables
 

@@ -101,3 +101,36 @@ func TestRefreshSession_InvalidTokenNotFound(t *testing.T) {
 		t.Fatal("expected error for unknown token")
 	}
 }
+
+// TestRefreshSession_TokenNotPersistedAsID is the #669 regression: a leaked
+// sessions.json must not yield any usable bearer credential. The on-disk
+// id is the SHA-256 of the token, never the token itself.
+func TestRefreshSession_TokenNotPersistedAsID(t *testing.T) {
+	svc := newTestAuthService(t)
+
+	token, err := svc.CreateRefreshSession("u1")
+	if err != nil {
+		t.Fatalf("CreateRefreshSession: %v", err)
+	}
+
+	sessions, err := svc.sessionStore.Read()
+	if err != nil {
+		t.Fatalf("read sessions: %v", err)
+	}
+	if got := len(sessions.Sessions); got != 1 {
+		t.Fatalf("expected 1 session on disk, got %d", got)
+	}
+	if sessions.Sessions[0].ID == token {
+		t.Fatalf("refresh token persisted in cleartext as session id (#669)")
+	}
+	// The id is the SHA-256 hex of the token (64 hex chars).
+	if len(sessions.Sessions[0].ID) != 64 {
+		t.Fatalf("expected 64-char hex id (sha256), got %d chars", len(sessions.Sessions[0].ID))
+	}
+
+	// Round-trip still works: the raw token validates, despite not being
+	// the stored id, because ValidateRefreshSession hashes the input.
+	if _, err := svc.ValidateRefreshSession(token); err != nil {
+		t.Fatalf("validate after hash round-trip: %v", err)
+	}
+}
