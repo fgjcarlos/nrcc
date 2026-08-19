@@ -47,6 +47,7 @@ var canonicalBootstrap = []string{
 	"NRCC_RESTIC_PASSWORD_FILE",
 	"NRCC_RESTIC_CACHE_DIR",
 	"NPM_BIN",
+	"NRCC_METRICS_PUBLIC",
 }
 
 // canonicalRuntimeChildEnv is the set of NODE_RED_* variables that
