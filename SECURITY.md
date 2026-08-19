@@ -21,6 +21,7 @@ Scans run on every PR, every push to `main`, and weekly on Monday at 06:00 UTC.
 - **`JWT_SECRET`** — must NOT be a known placeholder; rejected at startup by `main.resolveJWTSecret`. Same helper family.
 - **`NRCC_TRUSTED_PROXIES`** — CIDR list of reverse proxies permitted to send `X-Forwarded-For`. Audit log and rate-limit both honor this; untrusted XFF is silently ignored.
 - **`NRCC_CORS_ORIGINS`** — explicit origin allowlist for cross-origin browser requests. Empty default = deny-all. Wildcard (`*`) requires `NRCC_CORS_UNSAFE_WILDCARD=true`.
+- **`NRCC_METRICS_PUBLIC`** — when `true`, the Prometheus `/metrics` endpoint is served unauthenticated (legacy behaviour). Default is `false` (#671): `/metrics` requires the same JWT as every other authenticated route. Use the opt-out only when the metrics port is bound to a private network reachable by your scraper. The endpoint exposes login-failure counters (a brute-force oracle) and Go runtime fingerprinting data, so do not leave it open on a publicly reachable port.
 
 ## Triaging Failures
 

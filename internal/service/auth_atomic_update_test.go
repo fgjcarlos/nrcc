@@ -106,13 +106,24 @@ func TestAuthService_CreateRefreshSession_Concurrent(t *testing.T) {
 	if len(sessions.Sessions) != n {
 		t.Fatalf("persisted sessions=%d, want %d", len(sessions.Sessions), n)
 	}
+	// #669: the persisted id is sha256(token), not the token itself. The
+	// raw token is returned to the client and never written to disk, so
+	// checking it is absent on disk and its hash is present verifies the
+	// new contract.
 	seen := make(map[string]bool, n)
 	for _, session := range sessions.Sessions {
 		seen[session.ID] = true
 	}
 	for _, token := range tokens {
-		if token == "" || !seen[token] {
-			t.Fatalf("accepted token %q was not persisted", token)
+		if token == "" {
+			t.Fatalf("empty token returned")
+		}
+		if seen[token] {
+			t.Fatalf("raw token %q was persisted as session id (#669)", token)
+		}
+		tokenHash := hashRefreshToken(token)
+		if !seen[tokenHash] {
+			t.Fatalf("hash of token %q not found in session store", token)
 		}
 	}
 

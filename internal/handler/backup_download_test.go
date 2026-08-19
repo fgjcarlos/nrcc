@@ -83,15 +83,24 @@ func TestDownloadBackup_StreamsThroughRequestLogging(t *testing.T) {
 	for _, test := range []struct {
 		name, query, contentType, disposition string
 		raw                                   bool
+		header                                string
 	}{
 		{name: "raw", contentType: "application/zip", disposition: "backup-fixture-auto.zip", raw: true},
 		{name: "password", query: "?password=secret", contentType: "application/octet-stream", disposition: "backup-fixture-auto.zip.enc"},
+		// #670: passphrase now travels in the X-Backup-Password header so
+		// it does not end up in proxy access logs or browser history.
+		{name: "password-header", header: "X-Backup-Password: secret", contentType: "application/octet-stream", disposition: "backup-fixture-auto.zip.enc"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			var logs bytes.Buffer
 			router := loggedBackupRouter(NewBackupHandler(service.NewBackupService(tempDir)), &logs)
+			req := httptest.NewRequest(http.MethodGet, "/api/backups/fixture-auto/download"+test.query, nil)
+			if test.header != "" {
+				parts := strings.SplitN(test.header, ": ", 2)
+				req.Header.Set(parts[0], parts[1])
+			}
 			rec := httptest.NewRecorder()
-			router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/backups/fixture-auto/download"+test.query, nil))
+			router.ServeHTTP(rec, req)
 
 			if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != test.contentType {
 				t.Fatalf("status=%d content-type=%q body=%q", rec.Code, rec.Header().Get("Content-Type"), rec.Body.String())

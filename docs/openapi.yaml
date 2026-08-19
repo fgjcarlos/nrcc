@@ -975,25 +975,36 @@ paths:
       description: |
         Streams the backup as a binary ZIP file.
 
-        If the optional `password` query parameter is supplied, the zip bytes
-        are wrapped with AES-256-GCM using that passphrase (Content-Type
-        becomes `application/octet-stream`, filename suffix becomes
-        `.zip.enc`). The client decrypts with the same passphrase to recover
-        the original archive. Use this when exporting a backup off-host so
-        credentials and flow secrets do not leave the network in cleartext.
+        The archive contains `cc-users.json` (bcrypt password hashes),
+        `flows_cred.json` (Node-RED credential store), `settings.js`
+        (which may carry the `adminAuth` block), plus the usual
+        `flows.json`, `config.json` and `package.json`. For that reason
+        the endpoint is **admin-only** (#674): a viewer token receives
+        403 and cannot exfiltrate the hashes or Node-RED credentials.
+
+        If an optional passphrase is supplied, the zip bytes are wrapped
+        with AES-256-GCM using that passphrase (Content-Type becomes
+        `application/octet-stream`, filename suffix becomes `.zip.enc`).
+        The client decrypts with the same passphrase to recover the
+        original archive. Use this when exporting a backup off-host so
+        credentials and flow secrets do not leave the network in
+        cleartext.
+
+        **Passing the passphrase (#670):** send it in the
+        `X-Backup-Password` request header. The previous `?password=…`
+        query-parameter form is **deprecated** and will be removed in a
+        future release — the URL ends up in browser history and in any
+        reverse-proxy access log, both of which leak the bearer secret
+        that unlocks the export. The query form is still accepted for
+        one release cycle of backwards compatibility and emits a
+        deprecation warning in the server log.
       security:
         - bearerAuth: []
       parameters:
         - $ref: "#/components/parameters/BackupId"
-        - in: query
-          name: password
-          required: false
-          schema:
-            type: string
-          description: Optional passphrase; when present the response is an AES-256-GCM ciphertext.
       responses:
         "200":
-          description: ZIP archive (raw) or encrypted envelope (when `password` was supplied)
+          description: ZIP archive (raw) or encrypted envelope (when `X-Backup-Password` was supplied)
           content:
             application/zip:
               schema:
@@ -1005,6 +1016,8 @@ paths:
                 format: binary
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
 
