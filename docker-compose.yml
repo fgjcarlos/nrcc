@@ -28,6 +28,13 @@ services:
       DATA_DIR: /data
       NODE_RED_CMD: node-red
       JWT_SECRET: "${JWT_SECRET:-}"
+      # #664: the encryption key is required — without it, "encrypted"
+      # env vars are silently written to config.json in plaintext while
+      # still being labelled Encrypted: true. The :? form aborts compose
+      # startup with a readable error if the variable is unset instead
+      # of letting the stack boot in a degraded state. Generate one with
+      # `openssl rand -hex 32` and put it in .env before `docker compose up`.
+      NRCC_ENCRYPTION_KEY: "${NRCC_ENCRYPTION_KEY:?NRCC_ENCRYPTION_KEY must be set}"
     volumes:
       - nrcc_data:/data
       - nrcc_backups:/data/backups

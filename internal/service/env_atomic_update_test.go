@@ -87,7 +87,13 @@ func TestEnvService_Set_Concurrent(t *testing.T) {
 	if err := configSvc.store.Write(configSvc.GetDefault()); err != nil {
 		t.Fatalf("seed config: %v", err)
 	}
-	envSvc := NewEnvService(configSvc)
+	// #664: the original test used "secret" type so the concurrency
+	// assertion could compare plaintext against the caller's input. With
+	// fail-closed semantics the test now uses a real key and decrypts
+	// each committed value to verify the assertion; "secret" type is
+	// kept so the JSONStore.Update lock is exercised on the same
+	// encrypted branch as the production hot path.
+	envSvc := NewEnvService(configSvc, "concurrent-test-key")
 
 	const count = 24
 	errs := runConcurrent(t, count, func(i int) error {
@@ -108,8 +114,13 @@ func TestEnvService_Set_Concurrent(t *testing.T) {
 	}
 	for i := 0; i < count; i++ {
 		key := fmt.Sprintf("KEY_%02d", i)
-		if seen[key] != fmt.Sprintf("value-%02d", i) {
-			t.Errorf("%s = %q, want value-%02d", key, seen[key], i)
+		plaintext, derr := Decrypt(seen[key], "concurrent-test-key")
+		if derr != nil {
+			t.Errorf("%s = %q, failed to decrypt: %v", key, seen[key], derr)
+			continue
+		}
+		if plaintext != fmt.Sprintf("value-%02d", i) {
+			t.Errorf("%s decrypted = %q, want value-%02d", key, plaintext, i)
 		}
 	}
 }
@@ -119,7 +130,7 @@ func TestEnvService_Set_SameKey_Concurrent(t *testing.T) {
 	if err := configSvc.store.Write(configSvc.GetDefault()); err != nil {
 		t.Fatalf("seed config: %v", err)
 	}
-	envSvc := NewEnvService(configSvc)
+	envSvc := NewEnvService(configSvc, "concurrent-test-key")
 
 	const count = 20
 	errs := runConcurrent(t, count, func(i int) error {
@@ -134,15 +145,19 @@ func TestEnvService_Set_SameKey_Concurrent(t *testing.T) {
 	if len(config.EnvVars) != 1 || config.EnvVars[0].Key != "SHARED" {
 		t.Fatalf("EnvVars = %#v, want one SHARED entry", config.EnvVars)
 	}
+	plaintext, derr := Decrypt(config.EnvVars[0].Value, "concurrent-test-key")
+	if derr != nil {
+		t.Fatalf("SHARED decrypt: %v", derr)
+	}
 	valid := false
 	for i := 0; i < count; i++ {
-		if config.EnvVars[0].Value == fmt.Sprintf("value-%02d", i) {
+		if plaintext == fmt.Sprintf("value-%02d", i) {
 			valid = true
 			break
 		}
 	}
 	if !valid {
-		t.Fatalf("SHARED value = %q, want one committed caller value", config.EnvVars[0].Value)
+		t.Fatalf("SHARED decrypted = %q, want one committed caller value", plaintext)
 	}
 }
 

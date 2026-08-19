@@ -15,6 +15,7 @@ import (
 	"github.com/fgjcarlos/nrcc/internal/handler"
 	"github.com/fgjcarlos/nrcc/internal/metrics"
 	"github.com/fgjcarlos/nrcc/internal/middleware"
+	"github.com/fgjcarlos/nrcc/internal/model"
 	"github.com/fgjcarlos/nrcc/internal/service"
 	setupstate "github.com/fgjcarlos/nrcc/internal/setup"
 	"github.com/go-chi/chi/v5"
@@ -124,6 +125,23 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 	encKey := os.Getenv("NRCC_ENCRYPTION_KEY")
 	if err := service.ValidateSecret("NRCC_ENCRYPTION_KEY", encKey); err != nil {
 		log.Fatalf("Encryption key error: %v", err)
+	}
+	// #664: when the operator boots the binary without an encryption key
+	// but the persisted config already contains env vars flagged
+	// Encrypted: true, those entries are at rest in cleartext. Surface
+	// the count so the operator can either set a key and restart, or
+	// rotate the key after wiping the existing entries. The new
+	// fail-closed write path means new writes will be rejected, but
+	// the pre-existing plaintext stays in config.json until removed.
+	if encKey == "" {
+		if cfg, cfgErr := configSvc.Get(); cfgErr == nil {
+			count := countEncryptedEntries(cfg.EnvVars)
+			if count > 0 {
+				log.Printf("WARN: NRCC_ENCRYPTION_KEY is empty but %d encrypted entry(ies) exist in config.json — they are stored as plaintext. Set NRCC_ENCRYPTION_KEY, restart, and consider rotating the key after wiping the affected entries (#664)", count)
+			}
+		} else {
+			log.Printf("WARN: could not load config to scan for plaintext encrypted entries: %v", cfgErr)
+		}
 	}
 	envSvc := service.NewEnvService(configSvc, encKey)
 	envHandler := handler.NewEnvHandler(envSvc, dataDir) // TAREA 2c: Pass dataDir
@@ -467,4 +485,18 @@ func (s *Server) SetProcessManager(pm *service.ProcessManager) {
 // ServeHTTP implements http.Handler
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.router.ServeHTTP(w, r)
+}
+
+// countEncryptedEntries returns the number of persisted env vars flagged
+// Encrypted: true. Used at startup to surface a WARN when the binary
+// boots without NRCC_ENCRYPTION_KEY but the config still contains entries
+// that would be at rest in cleartext. See #664.
+func countEncryptedEntries(envVars []model.EnvVar) int {
+	n := 0
+	for _, ev := range envVars {
+		if ev.Encrypted {
+			n++
+		}
+	}
+	return n
 }

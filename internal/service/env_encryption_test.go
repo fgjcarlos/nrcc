@@ -1,8 +1,10 @@
 package service
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/fgjcarlos/nrcc/internal/model"
@@ -28,16 +30,71 @@ func TestSet_EncryptsSecretWhenKeyProvided(t *testing.T) {
 }
 
 func TestSet_PlaintextWhenNoKey(t *testing.T) {
+	// #664: storing an encrypted value while NRCC_ENCRYPTION_KEY is empty
+	// is now fail-closed at the service layer. The old behaviour
+	// (persisting the value as plaintext while still flagging it
+	// Encrypted: true) was the bug — see TestSet_RejectsEncryptedWriteWhenNoKey
+	// for the replacement that proves no plaintext reaches config.json.
 	configSvc := NewIsolatedConfigService(t.TempDir())
 	envSvc := NewEnvService(configSvc)
 
-	if err := envSvc.Set("API_KEY", "super-secret", "secret", "", true); err != nil {
-		t.Fatalf("Set() error: %v", err)
+	if err := envSvc.Set("API_KEY", "super-secret", "secret", "", true); !errors.Is(err, ErrEncryptionKeyRequired) {
+		t.Fatalf("Set() error = %v, want ErrEncryptionKeyRequired", err)
 	}
 
-	cfg, _ := configSvc.Get()
-	if cfg.EnvVars[0].Value != "super-secret" {
-		t.Errorf("without encryption key, value should remain plaintext, got %q", cfg.EnvVars[0].Value)
+	cfg, err := configSvc.Get()
+	if err != nil {
+		t.Fatalf("Get(): %v", err)
+	}
+	for _, ev := range cfg.EnvVars {
+		if ev.Key == "API_KEY" {
+			t.Errorf("API_KEY was persisted despite the rejected write: %+v", ev)
+		}
+	}
+}
+
+// TestSet_RejectsEncryptedWriteWhenNoKey is the explicit acceptance test
+// for #664: calling Set with encrypted=true while the encryption key is
+// empty must (a) return ErrEncryptionKeyRequired, (b) leave config.json
+// unchanged so no plaintext value reaches disk. The previous test only
+// asserts the error; this one also reads the on-disk JSON to prove the
+// rejection was atomic and no plaintext slipped through a different code
+// path (e.g. the bulk import).
+func TestSet_RejectsEncryptedWriteWhenNoKey(t *testing.T) {
+	dir := t.TempDir()
+	configSvc := NewIsolatedConfigService(dir)
+	envSvc := NewEnvService(configSvc) // empty key
+
+	const secretValue = "do-not-leak-me"
+	if err := envSvc.Set("API_KEY", secretValue, "secret", "", true); !errors.Is(err, ErrEncryptionKeyRequired) {
+		t.Fatalf("Set() error = %v, want ErrEncryptionKeyRequired", err)
+	}
+
+	// 1. in-memory state: nothing was committed.
+	cfg, err := configSvc.Get()
+	if err != nil {
+		t.Fatalf("Get(): %v", err)
+	}
+	if len(cfg.EnvVars) != 0 {
+		t.Errorf("config.EnvVars has %d entries, want 0 after rejected write: %#v", len(cfg.EnvVars), cfg.EnvVars)
+	}
+
+	// 2. on-disk state: config.json must not contain the secret value.
+	configPath := filepath.Join(dir, "config.json")
+	// #nosec G304 -- configPath is built from t.TempDir() + the constant
+	// filename the test owns; not request-derived.
+	raw, err := os.ReadFile(configPath)
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("ReadFile(%q): %v", configPath, err)
+		}
+		return // no file written — best possible outcome
+	}
+	if strings.Contains(string(raw), secretValue) {
+		t.Fatalf("plaintext secret value %q reached config.json despite the rejected write: %s", secretValue, raw)
+	}
+	if strings.Contains(string(raw), `"API_KEY"`) {
+		t.Errorf("API_KEY was persisted despite the rejected write: %s", raw)
 	}
 }
 

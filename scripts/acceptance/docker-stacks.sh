@@ -33,6 +33,14 @@ COMPOSE_FILE="${REPO_ROOT}/docker-compose.yml"
 # NRCC image under test. CI sets this from `docker buildx bake --load`.
 NRCC_IMAGE="${NRCC_IMAGE:-ghcr.io/fgjcarlos/nrcc:latest}"
 
+# #664: NRCC_ENCRYPTION_KEY is required by the :? form in
+# docker-compose.yml. Set a fixture for the acceptance environment
+# so a local developer can run the script without exporting anything;
+# CI overrides with a matching value via the workflow env block. The
+# fixture is well-known and never reused outside this script.
+export NRCC_ENCRYPTION_KEY="${NRCC_ENCRYPTION_KEY:-acceptance-fixture-encryption-key-not-a-secret}"
+# nosecret (acceptance fixture; not a real credential)
+
 # Stack A (canonical) — defaults work on a developer host.
 PROJECT_A="${PROJECT_A:-nrcc-acc-a}"
 HOST_API_A="${HOST_API_A:-3001}"
