@@ -45,11 +45,21 @@ var mutatingRoutes = []struct{ method, path string }{
 	{http.MethodPost, "/api/backups/"},
 	{http.MethodPost, "/api/backups/config"},
 	{http.MethodDelete, "/api/backups/some-id"},
+	// #674: backup download exposes cc-users.json (bcrypt hashes) and
+	// flows_cred.json — viewer must not reach it.
+	{http.MethodGet, "/api/backups/some-id/download"},
 	{http.MethodPost, "/api/backups/some-id/restore"},
+	// #675: provider snapshots leak provider name + remote repo layout
+	// (fingerprintable); the sibling GetBackupProvider is already gated
+	// for the same reason.
+	{http.MethodGet, "/api/backups/provider/snapshots"},
 	{http.MethodPost, "/api/scheduler/config"},
 	{http.MethodPatch, "/api/storage/retention"},
 	{http.MethodPost, "/api/env/"},
 	{http.MethodDelete, "/api/env/SOME_KEY"},
+	// #673: GET /api/env/dotenv returns raw .env unfiltered, defeating
+	// the masking on GET /api/env. Admin-only.
+	{http.MethodGet, "/api/env/dotenv"},
 	{http.MethodPut, "/api/env/dotenv"},
 	{http.MethodPost, "/api/flows/versions"},
 	{http.MethodPost, "/api/flows/versions/v1/revert"},

@@ -244,11 +244,17 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 			r.Get("/config", backupHandler.GetBackupConfig)
 			r.With(middleware.RequireAdmin).Post("/config", backupHandler.PostBackupConfig)
 			r.Get("/provider", backupHandler.GetBackupProvider)
-			r.Get("/provider/snapshots", backupHandler.ListProviderSnapshots)
+			// #675: remote-snapshot list exposes provider name, snapshot ids,
+			// timestamps, and the remote repository layout. The neighbouring
+			// GetBackupProvider already treats this as fingerprintable, so the
+			// same protection applies here. Admin-only.
+			r.With(middleware.RequireAdmin).Get("/provider/snapshots", backupHandler.ListProviderSnapshots)
 			r.With(middleware.RateLimitIP(10, time.Hour), middleware.RequireAdmin).Post("/provider/restore", backupHandler.RestoreProviderSnapshot)
 			r.Get("/{id}", backupHandler.GetBackupDetail)
 			r.With(middleware.RequireAdmin).Delete("/{id}", backupHandler.DeleteBackup)
-			r.Get("/{id}/download", backupHandler.DownloadBackup)
+			// #674: the archive contains cc-users.json (bcrypt hashes) plus
+			// flows_cred.json. A viewer must not be able to download it.
+			r.With(middleware.RequireAdmin).Get("/{id}/download", backupHandler.DownloadBackup)
 			r.With(middleware.RateLimitIP(10, time.Hour), middleware.RequireAdmin).Post("/{id}/restore", backupHandler.RestoreBackup)
 		})
 
@@ -270,7 +276,12 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 			r.With(middleware.RequireAdmin).Post("/bulk", envHandler.BulkEnv)
 			r.With(middleware.RequireAdmin).Post("/import-from-node-red", envHandler.ImportFromNodeRedEnv)
 			r.With(middleware.RequireAdmin).Delete("/{key}", envHandler.DeleteEnv)
-			r.Get("/dotenv", envHandler.GetDotenv)                               // TAREA 2c: Read .env file
+			// #673: GET /api/env/dotenv returns the raw .env file unfiltered,
+			// defeating the masking that GET /api/env applies. The endpoint
+			// exists to power DotenvEditor.tsx; the same caller already
+			// requires admin for the structured env surface, so require it
+			// here too. Closed: #673.
+			r.With(middleware.RequireAdmin).Get("/dotenv", envHandler.GetDotenv) // TAREA 2c: Read .env file
 			r.With(middleware.RequireAdmin).Put("/dotenv", envHandler.PutDotenv) // TAREA 2c: Write .env file
 		})
 
