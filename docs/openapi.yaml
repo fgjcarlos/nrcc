@@ -975,6 +975,13 @@ paths:
       description: |
         Streams the backup as a binary ZIP file.
 
+        The archive contains `cc-users.json` (bcrypt password hashes),
+        `flows_cred.json` (Node-RED credential store), `settings.js`
+        (which may carry the `adminAuth` block), plus the usual
+        `flows.json`, `config.json` and `package.json`. For that reason
+        the endpoint is **admin-only** (#674): a viewer token receives
+        403 and cannot exfiltrate the hashes or Node-RED credentials.
+
         If the optional `password` query parameter is supplied, the zip bytes
         are wrapped with AES-256-GCM using that passphrase (Content-Type
         becomes `application/octet-stream`, filename suffix becomes
@@ -1005,6 +1012,8 @@ paths:
                 format: binary
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
 
@@ -1064,6 +1073,14 @@ paths:
       description: |
         Returns the snapshots held by the configured off-host provider
         (Restic). Returns 503 when no provider is configured.
+
+        **Admin-only** (#675): the response reveals the provider name,
+        snapshot ids, timestamps and the remote repository layout, all of
+        which are deployment-fingerprintable. The neighbouring
+        `GET /api/backups/provider` already returns an empty body for
+        non-admins for the same reason. Non-admin requests receive
+        403 regardless of whether a provider is configured, so the
+        response does not leak configuration state.
       security:
         - bearerAuth: []
       responses:
@@ -1086,6 +1103,8 @@ paths:
                         size: { type: integer, format: int64 }
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "503":
           description: No remote provider configured
         "502":
@@ -1298,7 +1317,14 @@ paths:
       tags: [Environment]
       operationId: getDotenv
       summary: Get .env file content
-      description: Returns the raw text content of the `data/.env` file.
+      description: |
+        Returns the raw text content of the `data/.env` file.
+
+        **Admin-only** (#673): the response is unfiltered, so it
+        defeats the masking that `GET /api/env` applies. A viewer
+        token receives 403. The endpoint exists only to power
+        `DotenvEditor.tsx`; the structured endpoint already covers
+        normal env management with masking and at-rest encryption.
       security:
         - bearerAuth: []
       responses:
@@ -1310,6 +1336,8 @@ paths:
                 $ref: "#/components/schemas/SuccessEnvelope_DotenvContent"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
     put:
       tags: [Environment]
       operationId: putDotenv
