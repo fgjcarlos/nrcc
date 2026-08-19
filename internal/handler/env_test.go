@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/fgjcarlos/nrcc/internal/model"
@@ -243,9 +244,12 @@ func TestPostEnvValidationFlow(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Setup
+			// Setup — #664: a real encryption key is required to persist
+			// "secret" type entries, so the validation-flow test now uses
+			// one. The dedicated fail-closed coverage lives in
+			// TestPostEnvSecretRejectedWhenNoEncryptionKey below.
 			configSvc := service.NewIsolatedConfigService(t.TempDir())
-			envSvc := service.NewEnvService(configSvc)
+			envSvc := service.NewEnvService(configSvc, "handler-test-key")
 			handler := NewEnvHandler(envSvc, t.TempDir())
 
 			// Create request
@@ -766,7 +770,7 @@ func TestBulkEnvHandler(t *testing.T) {
 // TestPostEnvSecretHandling tests special handling of secret type variables
 func TestPostEnvSecretHandling(t *testing.T) {
 	configSvc := service.NewIsolatedConfigService(t.TempDir())
-	envSvc := service.NewEnvService(configSvc)
+	envSvc := service.NewEnvService(configSvc, "handler-secret-key")
 	handler := NewEnvHandler(envSvc, t.TempDir())
 
 	// Create a secret variable
@@ -806,5 +810,59 @@ func TestPostEnvSecretHandling(t *testing.T) {
 
 	if found.Type != "secret" {
 		t.Errorf("Expected type 'secret', got %s", found.Type)
+	}
+}
+
+// TestPostEnvSecretRejectedWhenNoEncryptionKey covers the fail-closed
+// contract from #664 at the HTTP boundary: a POST that asks for a
+// "secret" while NRCC_ENCRYPTION_KEY is empty must return 503 with the
+// explicit ENCRYPTION_KEY_REQUIRED error code so the UI can surface the
+// actionable message instead of a generic ENV_ERROR. The persisted
+// config must not contain the key.
+func TestPostEnvSecretRejectedWhenNoEncryptionKey(t *testing.T) {
+	dir := t.TempDir()
+	configSvc := service.NewIsolatedConfigService(dir)
+	envSvc := service.NewEnvService(configSvc) // empty key
+	handler := NewEnvHandler(envSvc, dir)
+
+	payload := map[string]interface{}{
+		"key":   "API_KEY",
+		"value": "do-not-leak-me",
+		"type":  "secret",
+	}
+	body, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/api/env", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	handler.PostEnv(w, req)
+
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503; body = %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		Success bool `json:"success"`
+		Error   *struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Error == nil || resp.Error.Code != "ENCRYPTION_KEY_REQUIRED" {
+		t.Fatalf("error code = %+v, want ENCRYPTION_KEY_REQUIRED; body = %s", resp.Error, w.Body.String())
+	}
+	if !strings.Contains(resp.Error.Message, "NRCC_ENCRYPTION_KEY") {
+		t.Errorf("error message lacks actionable hint: %q", resp.Error.Message)
+	}
+
+	cfg, err := configSvc.Get()
+	if err != nil {
+		t.Fatalf("Get(): %v", err)
+	}
+	for _, ev := range cfg.EnvVars {
+		if ev.Key == "API_KEY" {
+			t.Errorf("API_KEY was persisted despite the rejected write: %+v", ev)
+		}
 	}
 }

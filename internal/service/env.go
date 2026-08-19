@@ -185,6 +185,13 @@ func (s *EnvService) List() ([]model.EnvVar, error) {
 var errEnvMigrationStale = errors.New("environment changed while staging migration")
 var errEnvMigrationAlreadyDone = errors.New("environment migration already committed")
 
+// ErrEncryptionKeyRequired is returned when a caller attempts to persist an
+// encrypted env var while NRCC_ENCRYPTION_KEY is empty. The store would
+// otherwise write the value in plaintext while still labelling it Encrypted,
+// which is a fail-open security control. Detected via errors.Is so handlers
+// can map it to a 503 response with an actionable message. See #664.
+var ErrEncryptionKeyRequired = errors.New("NRCC_ENCRYPTION_KEY is not configured; cannot store an encrypted value")
+
 type envMigrationKey struct {
 	key   string
 	value string
@@ -246,6 +253,16 @@ func (s *EnvService) Set(key, value string, typ string, description string, encr
 func (s *EnvService) set(key, value string, typ string, description string, encrypted, syncGlobal bool) error {
 	if err := ValidateEnvKey(key); err != nil {
 		return err
+	}
+	// #664: fail-closed when the caller wants to store an encrypted value
+	// but the operator has not configured NRCC_ENCRYPTION_KEY. Persisting
+	// the plaintext value would still be flagged Encrypted: true in
+	// config.json and propagate into every backup, so reject the write
+	// before it can hit disk. An empty value is allowed (preserves the
+	// existing encrypted entry unchanged — see the committedValue branch
+	// below) because no new plaintext would be written.
+	if encrypted && value != "" && s.encryptionKey == "" {
+		return ErrEncryptionKeyRequired
 	}
 	stagedValue := value
 	var err error

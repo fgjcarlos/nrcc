@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"sync"
@@ -97,6 +98,14 @@ func (h *EnvHandler) PostEnv(w http.ResponseWriter, r *http.Request) {
 		return h.svc.Set(req.Key, normalizedValue, req.Type, req.Description, encrypted)
 	})
 	if err != nil {
+		// #664: NRCC_ENCRYPTION_KEY is a server-side misconfiguration.
+		// 503 signals "service unavailable due to configuration" and
+		// the explicit code lets the UI surface the actionable hint
+		// instead of a generic ENV_ERROR toast.
+		if errors.Is(err, service.ErrEncryptionKeyRequired) {
+			model.RespondError(w, http.StatusServiceUnavailable, "ENCRYPTION_KEY_REQUIRED", err.Error())
+			return
+		}
 		model.RespondError(w, http.StatusInternalServerError, "ENV_ERROR", err.Error())
 		return
 	}
@@ -235,6 +244,12 @@ func (h *EnvHandler) BulkEnv(w http.ResponseWriter, r *http.Request) {
 		return applyErr
 	})
 	if err != nil {
+		// #664: same fail-closed path as PostEnv — a secret line in a bulk
+		// payload would otherwise land in config.json as plaintext.
+		if errors.Is(err, service.ErrEncryptionKeyRequired) {
+			model.RespondError(w, http.StatusServiceUnavailable, "ENCRYPTION_KEY_REQUIRED", err.Error())
+			return
+		}
 		model.RespondError(w, http.StatusInternalServerError, "BULK_IMPORT_FAILED", err.Error())
 		return
 	}

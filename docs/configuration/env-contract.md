@@ -47,7 +47,7 @@ OS env → EnvService → `.env`.
 | `PORT` | `3001` | HTTP server port | yes |
 | `DATA_DIR` | `./data` | NRCC config + Node-RED userDir root | yes |
 | `JWT_SECRET` | generated/persisted | JWT signing secret. Required in prod. | yes |
-| `NRCC_ENCRYPTION_KEY` | none (encryption disabled) | Encrypts the persisted env/secret store | yes |
+| `NRCC_ENCRYPTION_KEY` | none (encryption disabled, but writes are rejected) | **Required** to store encrypted env vars. Encrypts the persisted env/secret store. `docker compose` refuses to start without it (#664); writes that request encryption while the key is empty return 503. | yes |
 | `NRCC_CORS_ORIGINS` | empty (deny all cross-origin requests) | Comma-separated allowed origins | yes |
 | `NRCC_CORS_UNSAFE_WILDCARD` | `false` | Allow `*` even when origins are set (dev only) | yes |
 | `NRCC_TRUSTED_PROXIES` | empty | Comma-separated CIDRs/IPs trusted for forwarded headers | yes |

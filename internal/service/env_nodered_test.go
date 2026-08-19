@@ -195,7 +195,10 @@ func TestEnvServicePreservesManualGlobalOnSecretCreate(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "flows.json"), []byte(flow), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	svc := NewEnvService(NewIsolatedConfigService(dir))
+	// #664: a real encryption key is required for the secret create to
+	// succeed. The test asserts the manual global env survives, not that
+	// the secret is silently stored as plaintext.
+	svc := NewEnvService(NewIsolatedConfigService(dir), "preserve-test-key")
 	if err := svc.Set("MANUAL", "ignored", "secret", "", true); err != nil {
 		t.Fatal(err)
 	}

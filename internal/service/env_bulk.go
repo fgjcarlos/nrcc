@@ -206,6 +206,13 @@ func (s *EnvService) applyBulkEnvDirect(lines []BulkEnvLine) (bool, error) {
 		}
 		value := line.Value
 		encrypted := line.Type == "secret"
+		// #664: fail-closed for the same reason as set(): writing a secret
+		// with NRCC_ENCRYPTION_KEY empty would store plaintext while still
+		// labelling the entry Encrypted: true, leaking through config.json
+		// and every backup.
+		if encrypted && value != "" && s.encryptionKey == "" {
+			return false, fmt.Errorf("line %d (%s): %w", line.Line, line.Key, ErrEncryptionKeyRequired)
+		}
 		if encrypted && value != "" && s.encryptionKey != "" {
 			var err error
 			value, err = Encrypt(value, s.encryptionKey)

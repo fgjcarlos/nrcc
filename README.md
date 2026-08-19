@@ -45,6 +45,9 @@ git clone https://github.com/fgjcarlos/nrcc.git
 cd nrcc
 cp .env.example .env
 # edit .env — set JWT_SECRET and NRCC_ENCRYPTION_KEY to real values
+# (e.g. `openssl rand -hex 32` for each). NRCC_ENCRYPTION_KEY is now
+# required — the compose stack refuses to start without it (#664),
+# and the API rejects encrypted writes with 503 when the key is empty.
 docker compose up -d --build
 ```
 
