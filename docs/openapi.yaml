@@ -982,7 +982,7 @@ paths:
         the endpoint is **admin-only** (#674): a viewer token receives
         403 and cannot exfiltrate the hashes or Node-RED credentials.
 
-If an optional passphrase is supplied, the zip bytes are wrapped
+        If an optional passphrase is supplied, the zip bytes are wrapped
         with AES-256-GCM using that passphrase (Content-Type becomes
         `application/octet-stream`, filename suffix becomes `.zip.enc`).
         The client decrypts with the same passphrase to recover the
