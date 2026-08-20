@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/fgjcarlos/nrcc/internal/audit"
@@ -71,6 +72,14 @@ func (h *SettingsHandler) SaveRaw(w http.ResponseWriter, r *http.Request) {
 
 	doc, err := h.configSvc.SaveRawSettings(req.Content)
 	if err != nil {
+		// settings.js sandbox timeouts must surface as a 4xx so the
+		// operator gets a clear "settings.js did not terminate" instead
+		// of a hung request, and so the bad content is rejected before
+		// being persisted to disk (issue #665).
+		if errors.Is(err, service.ErrSandboxTimeout) {
+			model.RespondError(w, http.StatusUnprocessableEntity, "SETTINGS_TIMEOUT", err.Error())
+			return
+		}
 		model.RespondError(w, http.StatusInternalServerError, "SETTINGS_WRITE_ERROR", err.Error())
 		return
 	}

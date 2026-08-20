@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/fgjcarlos/nrcc/internal/audit"
@@ -33,6 +34,13 @@ func (h *ConfigHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 
 	cfg, err := h.configSvc.Get()
 	if err != nil {
+		// settings.js sandbox timeouts must surface as a 4xx so the
+		// operator gets a clear "settings.js did not terminate" instead
+		// of a hung request (issue #665).
+		if errors.Is(err, service.ErrSandboxTimeout) {
+			model.RespondError(w, http.StatusUnprocessableEntity, "SETTINGS_TIMEOUT", err.Error())
+			return
+		}
 		model.RespondError(w, http.StatusInternalServerError, "CONFIG_ERROR", "Failed to read config")
 		return
 	}

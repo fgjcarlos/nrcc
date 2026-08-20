@@ -57,7 +57,9 @@ func (s *ConfigService) Get() (model.NodeRedConfig, error) {
 		return cfg, nil
 	}
 
-	if cfg, ok := s.readFromSettingsFile(); ok {
+	if cfg, ok, err := s.readFromSettingsFile(); err != nil {
+		return cfg, err
+	} else if ok {
 		s.decorateConfig(&cfg)
 		return cfg, nil
 	}
@@ -222,7 +224,12 @@ func (s *ConfigService) GetRawSettings() (model.SettingsDocument, error) {
 
 // SaveRawSettings writes the active settings.js document after backing up the previous version.
 func (s *ConfigService) SaveRawSettings(content string) (model.SettingsDocument, error) {
-	parsed := s.parseConfigFromContent(content)
+	parsed, err := s.parseConfigFromContent(content)
+	if err != nil {
+		// Propagate sandbox timeouts so the operator gets SETTINGS_TIMEOUT
+		// rather than the file being written and breaking the read path.
+		return model.SettingsDocument{}, err
+	}
 	if err := validateAdminAuthPasswords(parsed); err != nil {
 		return model.SettingsDocument{}, err
 	}
@@ -249,7 +256,10 @@ func (s *ConfigService) writeSettingsFile(content string, syncStore bool) (model
 		return doc, err
 	}
 	if syncStore {
-		parsed := s.parseConfigFromContent(content)
+		parsed, err := s.parseConfigFromContent(content)
+		if err != nil {
+			return doc, err
+		}
 		s.decorateConfig(&parsed)
 		if err := s.store.Write(parsed); err != nil {
 			return doc, err
@@ -331,12 +341,16 @@ func (s *ConfigService) decorateConfig(cfg *model.NodeRedConfig) {
 	cfg.SettingsSource = settings.Source
 }
 
-func (s *ConfigService) readFromSettingsFile() (model.NodeRedConfig, bool) {
+func (s *ConfigService) readFromSettingsFile() (model.NodeRedConfig, bool, error) {
 	doc, err := s.GetRawSettings()
 	if err != nil || doc.Content == "" {
-		return model.NodeRedConfig{}, false
+		return model.NodeRedConfig{}, false, nil
 	}
-	return s.parseConfigFromContent(doc.Content), true
+	cfg, err := s.parseConfigFromContent(doc.Content)
+	if err != nil {
+		return model.NodeRedConfig{}, false, err
+	}
+	return cfg, true, nil
 }
 
 func (s *ConfigService) backupSettingsFile(path string) (string, error) {
@@ -625,7 +639,7 @@ func renderLoggingBlock() string {
 	return "  logging: {\n    console: { level: 'info', metrics: false, audit: false },\n  },"
 }
 
-func (s *ConfigService) parseConfigFromContent(content string) model.NodeRedConfig {
+func (s *ConfigService) parseConfigFromContent(content string) (model.NodeRedConfig, error) {
 	cfg := model.DefaultNodeRedConfig()
 	cfg.Port = parseIntFromJS(content, "uiPort", parseIntFromJS(content, "port", cfg.Port))
 	cfg.UIPort = cfg.Port
@@ -638,8 +652,18 @@ func (s *ConfigService) parseConfigFromContent(content string) model.NodeRedConf
 	cfg.Lang = parseStringFromJS(content, "lang", cfg.Lang)
 	cfg.DisableEditor = parseBoolFromJS(content, "disableEditor", cfg.DisableEditor)
 	cfg.ProjectsEnabled = parseProjectsEnabledFromJS(content, cfg.ProjectsEnabled)
-	cfg.AdminAuth = parseAdminAuthFromJS(content)
-	return cfg
+	adminAuth, err := parseAdminAuthFromJS(content)
+	if err != nil {
+		// ErrSandboxTimeout is propagated so the HTTP handler can return
+		// SETTINGS_TIMEOUT; other sandbox errors fall back to the legacy
+		// contract of "no adminAuth parsed".
+		if errors.Is(err, ErrSandboxTimeout) {
+			return cfg, err
+		}
+		return cfg, nil
+	}
+	cfg.AdminAuth = adminAuth
+	return cfg, nil
 }
 
 func parseStringFromJS(content, key, fallback string) string {
@@ -680,17 +704,22 @@ func parseProjectsEnabledFromJS(content string, fallback bool) bool {
 //
 // Returns nil when the script does not export an adminAuth block or the
 // content cannot be parsed safely; preserves the legacy contract that callers
-// (parseConfigFromContent, LoadSettings) can simply check for nil.
-func parseAdminAuthFromJS(content string) *model.AdminAuth {
+// (parseConfigFromContent, LoadSettings) can simply check for nil. Sandbox
+// timeouts (ErrSandboxTimeout) are propagated so the HTTP layer can map them
+// to a 4xx response instead of silently dropping adminAuth.
+func parseAdminAuthFromJS(content string) (*model.AdminAuth, error) {
 	auth, err := ParseAdminAuthViaSandbox(content)
 	if err != nil {
-		// Surface the parse failure as nil to preserve the legacy contract;
-		// the sandbox still blocks forbidden host APIs and reports syntax
-		// errors via ErrSandboxRuntime / ErrSandboxSyntax if the caller wants
-		// to surface them.
-		return nil
+		// ErrSandboxTimeout must reach the handler so the operator gets a
+		// clear "settings.js did not terminate" instead of a hung request.
+		// Other sandbox errors (forbidden host APIs, syntax) keep the
+		// legacy contract of returning nil auth.
+		if errors.Is(err, ErrSandboxTimeout) {
+			return nil, err
+		}
+		return nil, nil
 	}
-	return auth
+	return auth, nil
 }
 
 func parseIntFromJS(content, key string, fallback int) int {

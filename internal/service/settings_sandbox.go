@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/dop251/goja"
 
@@ -16,7 +17,16 @@ var (
 	ErrAdminAuthMissing = errors.New("settings.js: adminAuth block not found")
 	ErrSandboxRuntime   = errors.New("settings.js: sandbox runtime error")
 	ErrSandboxSyntax    = errors.New("settings.js: syntax error in sandbox")
+	ErrSandboxTimeout   = errors.New("settings.js: sandbox execution timed out")
 )
+
+// sandboxTimeout caps how long ParseAdminAuthViaSandbox is allowed to run the
+// settings.js script. settings.js only declares a config object, so a healthy
+// parse finishes in well under 10 ms — 2 s is generous and short enough that
+// a single bad file cannot permanently exhaust goroutines via /api/config.
+// It is a package var (not a const) so tests can shorten it; production code
+// must not mutate it.
+var sandboxTimeout = 2 * time.Second
 
 // ParseAdminAuthViaSandbox extracts the adminAuth block from a settings.js
 // content string using a goja-backed JavaScript sandbox. Compared to the
@@ -26,6 +36,8 @@ var (
 //   - ignores comments (line `// ...` and block `/* ... */`) without false matches
 //   - reads whatever the script actually exported, not a regex guess
 //   - rejects forbidden host APIs (require, process, Buffer, etc.) explicitly
+//   - bounds execution time so a non-terminating script cannot hang the read
+//     path or leak goroutines (see issue #665)
 //
 // On missing adminAuth (e.g. the file does not export one) the function
 // returns ErrAdminAuthMissing. The caller decides whether that is fatal.
@@ -42,6 +54,22 @@ func ParseAdminAuthViaSandbox(content string) (*model.AdminAuth, error) {
 
 	rt := goja.New()
 
+	// Bound execution: a non-terminating script (while(true){}, infinite
+	// recursion, ...) would otherwise block RunString forever and leak the
+	// goroutine. After sandboxTimeout, goja's interrupt mechanism raises an
+	// *InterruptedError wrapping ErrSandboxTimeout, which we map to the
+	// caller-visible sentinel. The defer stops the timer and clears the
+	// interrupt on every path (success, syntax error, timeout) so the runtime
+	// is safe to reuse under concurrent callers.
+	timeout := sandboxTimeout
+	timer := time.AfterFunc(timeout, func() {
+		rt.Interrupt(ErrSandboxTimeout)
+	})
+	defer func() {
+		timer.Stop()
+		rt.ClearInterrupt()
+	}()
+
 	// Block host APIs explicitly. Setting to goja.Undefined() means any
 	// access throws a TypeError when the script tries to use them.
 	for _, name := range []string{
@@ -57,7 +85,11 @@ func ParseAdminAuthViaSandbox(content string) (*model.AdminAuth, error) {
 	}
 
 	if _, err := rt.RunString(wrapped); err != nil {
-		// Map goja syntax errors to a sentinel; everything else as runtime.
+		// errors.Is walks the Unwrap chain; goja's *InterruptedError.Unwrap
+		// returns the value we passed to rt.Interrupt, which is ErrSandboxTimeout.
+		if errors.Is(err, ErrSandboxTimeout) {
+			return nil, fmt.Errorf("%w: script did not terminate within %s", ErrSandboxTimeout, timeout)
+		}
 		if isGojaSyntaxError(err) {
 			return nil, fmt.Errorf("%w: %w", ErrSandboxSyntax, err)
 		}
