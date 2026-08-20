@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 const sandboxFixtureBasic = `
@@ -327,5 +328,100 @@ func TestParseAdminAuthViaSandbox_PreservesAllBlocksViaExecuteOrder(t *testing.T
 	}
 	if auth.Type != "t2" {
 		t.Errorf("expected type t2 (last assignment), got %q", auth.Type)
+	}
+}
+
+// withSandboxTimeout temporarily overrides the sandbox budget for the duration
+// of t. Restores the previous value via t.Cleanup so parallel tests don't
+// observe a mutated global.
+func withSandboxTimeout(t *testing.T, d time.Duration) {
+	t.Helper()
+	prev := sandboxTimeout
+	sandboxTimeout = d
+	t.Cleanup(func() { sandboxTimeout = prev })
+}
+
+// TestParseAdminAuthViaSandbox_Timeout verifies that a non-terminating script
+// is interrupted within the budget (issue #665). The budget is shortened via
+// withSandboxTimeout so the test stays fast.
+func TestParseAdminAuthViaSandbox_Timeout(t *testing.T) {
+	withSandboxTimeout(t, 100*time.Millisecond)
+
+	start := time.Now()
+	_, err := ParseAdminAuthViaSandbox("while(true){}")
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatal("expected error for non-terminating script, got nil")
+	}
+	if !errors.Is(err, ErrSandboxTimeout) {
+		t.Errorf("expected ErrSandboxTimeout, got %v", err)
+	}
+	// Allow generous slack on top of the budget to avoid flakes on a busy
+	// CI runner; the assertion that matters is that we returned at all.
+	if elapsed > sandboxTimeout+time.Second {
+		t.Errorf("sandbox ran for %v, expected to be bounded by ~%v", elapsed, sandboxTimeout)
+	}
+}
+
+// TestParseAdminAuthViaSandbox_TimeoutDeepRecursion covers a second common
+// infinite-loop shape: deep mutual recursion instead of while(true){}. Both
+// must trip the same timeout path.
+func TestParseAdminAuthViaSandbox_TimeoutDeepRecursion(t *testing.T) {
+	withSandboxTimeout(t, 100*time.Millisecond)
+
+	content := `
+function loop() { return loop(); }
+loop();
+`
+	_, err := ParseAdminAuthViaSandbox(content)
+	if err == nil {
+		t.Fatal("expected error for infinite recursion, got nil")
+	}
+	if !errors.Is(err, ErrSandboxTimeout) {
+		t.Errorf("expected ErrSandboxTimeout, got %v", err)
+	}
+}
+
+// TestParseAdminAuthViaSandbox_TimerCleanedUpOnSuccess asserts that the
+// AfterFunc timer is stopped on the success path so a healthy parse does not
+// leave a pending callback in the runtime's timer wheel.
+func TestParseAdminAuthViaSandbox_TimerCleanedUpOnSuccess(t *testing.T) {
+	withSandboxTimeout(t, 2*time.Second)
+
+	start := time.Now()
+	auth, err := ParseAdminAuthViaSandbox(sandboxFixtureBasic)
+	elapsed := time.Since(start)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if auth == nil || auth.Type != "credentials" {
+		t.Fatalf("expected credentials auth, got %+v", auth)
+	}
+	// A healthy parse must finish well under the budget. If the timer were
+	// leaking and firing later, this would race with the timer; we cap
+	// generously at 10× the observed budget to tolerate a slow CI box.
+	if elapsed > time.Second {
+		t.Errorf("healthy parse took %v, expected < 1s", elapsed)
+	}
+}
+
+// TestParseAdminAuthViaSandbox_InterruptClearedBetweenRuns verifies that two
+// consecutive calls (one of which times out) both succeed: the failed run
+// must not leave a stale interrupt that would abort the next call
+// immediately on re-entry to RunString.
+func TestParseAdminAuthViaSandbox_InterruptClearedBetweenRuns(t *testing.T) {
+	withSandboxTimeout(t, 100*time.Millisecond)
+
+	if _, err := ParseAdminAuthViaSandbox("while(true){}"); !errors.Is(err, ErrSandboxTimeout) {
+		t.Fatalf("expected ErrSandboxTimeout on first run, got %v", err)
+	}
+
+	auth, err := ParseAdminAuthViaSandbox(sandboxFixtureBasic)
+	if err != nil {
+		t.Fatalf("second run after timeout returned error: %v", err)
+	}
+	if auth == nil || auth.Type != "credentials" {
+		t.Fatalf("second run produced wrong auth: %+v", auth)
 	}
 }

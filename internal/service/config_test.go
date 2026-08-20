@@ -574,7 +574,10 @@ func TestConfigService_ParseConfigFromContent_ExtractsPort(t *testing.T) {
   httpNodeRoot: '/api'
 }`
 
-	cfg := svc.parseConfigFromContent(content)
+	cfg, err := svc.parseConfigFromContent(content)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	if cfg.Port != 3000 {
 		t.Errorf("Expected Port 3000, got %d", cfg.Port)
@@ -596,7 +599,10 @@ func TestConfigService_ParseConfigFromContent_WithLangAndFlowFile(t *testing.T) 
   disableEditor: true
 }`
 
-	cfg := svc.parseConfigFromContent(content)
+	cfg, err := svc.parseConfigFromContent(content)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	if cfg.Lang != "es" {
 		t.Errorf("Expected Lang 'es', got %s", cfg.Lang)
@@ -1067,7 +1073,10 @@ func TestParseAdminAuthFromJS_FromRawSettings(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := parseAdminAuthFromJS(tt.content)
+			result, err := parseAdminAuthFromJS(tt.content)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
 
 			if tt.expectNil {
 				if result != nil {
