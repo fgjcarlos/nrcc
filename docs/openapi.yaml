@@ -691,7 +691,7 @@ paths:
       tags: [Config]
       operationId: getSettingsRaw
       summary: Get raw settings.js content
-      description: Returns the raw text content of the Node-RED `settings.js` file.
+      description: "**Admin only.** Returns the raw text content of the Node-RED `settings.js` file. settings.js carries bcrypt hashes for `adminAuth` plus every other secret, so a viewer must never see it (MEDIUM-016)."
       security:
         - bearerAuth: []
       responses:
@@ -703,6 +703,8 @@ paths:
                 $ref: "#/components/schemas/SuccessEnvelope_SettingsDocument"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
     post:
       tags: [Config]
       operationId: postSettingsRaw

@@ -111,12 +111,14 @@ func (h *MfaHandler) EnrollConfirm(w http.ResponseWriter, r *http.Request) {
 // Disable handles POST /api/auth/mfa/disable — auth required.
 // Body: { password: "..." } (the calling user's password). For
 // admins, the optional { userId: "..." } field targets another user.
+//
+// Self-or-admin authorization is enforced by middleware.RequireSelfOrAdmin
+// on the route. The middleware peeks and restores the body to extract the
+// target userId without consuming it; this handler reads it normally and
+// trusts that the middleware already proved the caller is allowed to act
+// on that target.
 func (h *MfaHandler) Disable(w http.ResponseWriter, r *http.Request) {
 	claims := mw.ClaimsFromContext(r)
-	if claims == nil {
-		model.RespondError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authentication required")
-		return
-	}
 
 	var req model.MfaDisableRequest
 	if !DecodeJSON(w, r, &req) {
@@ -129,10 +131,6 @@ func (h *MfaHandler) Disable(w http.ResponseWriter, r *http.Request) {
 
 	target := claims.UserID
 	if req.UserID != "" && req.UserID != target {
-		if claims.Role != model.RoleAdmin {
-			model.RespondError(w, http.StatusForbidden, "FORBIDDEN", "Only admins can disable MFA for another user")
-			return
-		}
 		target = req.UserID
 	}
 

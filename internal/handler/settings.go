@@ -30,20 +30,10 @@ func NewSettingsHandler(configSvc *service.ConfigService) *SettingsHandler {
 func (h *SettingsHandler) SetAuditService(a *audit.Service) { h.audit = a }
 
 // GetRaw handles GET /api/settings/raw.
+// Authorization (admin role) is enforced by middleware.RequireAdmin on the
+// route; this handler trusts the request context to contain claims and never
+// makes the admin/non-admin decision itself.
 func (h *SettingsHandler) GetRaw(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.ClaimsFromContext(r)
-	if claims == nil {
-		model.RespondError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authentication required")
-		return
-	}
-	// MEDIUM-016: settings.js contains adminAuth hashes and secrets. There is
-	// no legitimate non-admin use, so gate the GET path on admin role with
-	// 403, mirroring the existing SaveRaw policy.
-	if claims.Role != model.RoleAdmin {
-		model.RespondError(w, http.StatusForbidden, "FORBIDDEN", "Admin access required")
-		return
-	}
-
 	doc, err := h.configSvc.GetRawSettings()
 	if err != nil {
 		model.RespondError(w, http.StatusInternalServerError, "SETTINGS_ERROR", err.Error())
@@ -54,12 +44,10 @@ func (h *SettingsHandler) GetRaw(w http.ResponseWriter, r *http.Request) {
 }
 
 // SaveRaw handles POST /api/settings/raw.
+// Authorization (admin role) is enforced by middleware.RequireAdmin on the
+// route. Claims are read from the context solely for audit logging.
 func (h *SettingsHandler) SaveRaw(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.ClaimsFromContext(r)
-	if claims == nil || claims.Role != model.RoleAdmin {
-		model.RespondError(w, http.StatusForbidden, "FORBIDDEN", "Admin access required")
-		return
-	}
 
 	var req RawSettingsRequest
 	if !DecodeJSON(w, r, &req) {

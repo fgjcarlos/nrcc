@@ -439,14 +439,10 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	model.RespondJSON(w, http.StatusOK, map[string]bool{"success": true})
 }
 
-// GetUsers handles GET /api/auth/users - protected, admin only
+// GetUsers handles GET /api/auth/users - protected, admin only.
+// Authorization (admin role) is enforced by middleware.RequireAdmin on the
+// route. This handler does not read claims — it just lists users.
 func (h *AuthHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
-	claims := mw.ClaimsFromContext(r)
-	if claims == nil || claims.Role != model.RoleAdmin {
-		model.RespondError(w, http.StatusForbidden, "FORBIDDEN", "Admin access required")
-		return
-	}
-
 	users, err := h.authSvc.GetAllUsers()
 	if err != nil {
 		model.RespondError(w, http.StatusInternalServerError, "FETCH_ERROR", "Failed to fetch users")
@@ -469,13 +465,11 @@ func (h *AuthHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
 	model.RespondJSON(w, http.StatusOK, resp)
 }
 
-// CreateUser handles POST /api/auth/users - protected, admin only
+// CreateUser handles POST /api/auth/users - protected, admin only.
+// Authorization (admin role) is enforced by middleware.RequireAdmin on the
+// route. Claims are read from the context solely for audit logging.
 func (h *AuthHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	claims := mw.ClaimsFromContext(r)
-	if claims == nil || claims.Role != model.RoleAdmin {
-		model.RespondError(w, http.StatusForbidden, "FORBIDDEN", "Admin access required")
-		return
-	}
 
 	var req CreateUserRequest
 	if !DecodeJSON(w, r, &req) {
@@ -536,13 +530,11 @@ func (h *AuthHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	model.RespondJSON(w, http.StatusCreated, resp)
 }
 
-// DeleteUser handles DELETE /api/auth/users/:id - protected, admin only
+// DeleteUser handles DELETE /api/auth/users/:id - protected, admin only.
+// Authorization (admin role) is enforced by middleware.RequireAdmin on the
+// route. Claims are read from the context solely for audit logging.
 func (h *AuthHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	claims := mw.ClaimsFromContext(r)
-	if claims == nil || claims.Role != model.RoleAdmin {
-		model.RespondError(w, http.StatusForbidden, "FORBIDDEN", "Admin access required")
-		return
-	}
 
 	userID := r.PathValue("id")
 	if userID == "" {
@@ -573,23 +565,15 @@ func (h *AuthHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	model.RespondJSON(w, http.StatusOK, map[string]bool{"success": true})
 }
 
-// ChangePassword handles PATCH /api/auth/users/:id/password - protected, admin or self
+// ChangePassword handles PATCH /api/auth/users/:id/password - protected, admin or self.
+// Self-or-admin authorization is enforced by middleware.RequireSelfOrAdmin on
+// the route. Claims are read from the context solely for audit logging.
 func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	claims := mw.ClaimsFromContext(r)
-	if claims == nil {
-		model.RespondError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authentication required")
-		return
-	}
 
 	userID := r.PathValue("id")
 	if userID == "" {
 		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "User ID is required")
-		return
-	}
-
-	// Only admin or self can change password
-	if claims.Role != model.RoleAdmin && claims.UserID != userID {
-		model.RespondError(w, http.StatusForbidden, "FORBIDDEN", "You can only change your own password")
 		return
 	}
 
@@ -635,13 +619,11 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	model.RespondJSON(w, http.StatusOK, map[string]bool{"success": true})
 }
 
-// UpdateUser handles PATCH /api/auth/users/:id - protected, admin only
+// UpdateUser handles PATCH /api/auth/users/:id - protected, admin only.
+// Authorization (admin role) is enforced by middleware.RequireAdmin on the
+// route. Claims are read from the context solely for audit logging.
 func (h *AuthHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	claims := mw.ClaimsFromContext(r)
-	if claims == nil || claims.Role != model.RoleAdmin {
-		model.RespondError(w, http.StatusForbidden, "FORBIDDEN", "Admin access required")
-		return
-	}
 
 	userID := r.PathValue("id")
 	if userID == "" {

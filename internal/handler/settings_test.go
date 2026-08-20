@@ -97,21 +97,6 @@ func TestBootstrapHandler_GetStatus_NodeRedEnvironment(t *testing.T) {
 	_ = status.NodeRed.Detected
 }
 
-func TestSettingsHandler_GetRaw_RequiresAuth(t *testing.T) {
-	configSvc := service.NewIsolatedConfigService(t.TempDir())
-	handler := NewSettingsHandler(configSvc)
-
-	req := httptest.NewRequest(http.MethodGet, "/api/settings/raw", nil)
-	// No auth token
-	w := httptest.NewRecorder()
-
-	handler.GetRaw(w, req)
-
-	if w.Code != http.StatusUnauthorized {
-		t.Errorf("Expected 401 without auth, got %d", w.Code)
-	}
-}
-
 func TestSettingsHandler_GetRaw_WithAuth_Returns200(t *testing.T) {
 	tempDir := t.TempDir()
 	configSvc := service.NewIsolatedConfigService(tempDir)
@@ -164,52 +149,6 @@ func TestSettingsHandler_GetRaw_ReturnsValidJSON(t *testing.T) {
 	// Verify basic fields
 	_ = doc.Path
 	_ = doc.Content
-}
-
-func TestSettingsHandler_SaveRaw_RequiresAuth(t *testing.T) {
-	configSvc := service.NewIsolatedConfigService(t.TempDir())
-	handler := NewSettingsHandler(configSvc)
-
-	payload := RawSettingsRequest{Content: "module.exports = {}"}
-	body, _ := json.Marshal(payload)
-
-	req := httptest.NewRequest(http.MethodPost, "/api/settings/raw", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	// No auth
-	w := httptest.NewRecorder()
-
-	handler.SaveRaw(w, req)
-
-	if w.Code != http.StatusForbidden {
-		t.Errorf("Expected 403 without auth, got %d", w.Code)
-	}
-}
-
-func TestSettingsHandler_SaveRaw_RequiresAdminRole(t *testing.T) {
-	configSvc := service.NewIsolatedConfigService(t.TempDir())
-	handler := NewSettingsHandler(configSvc)
-
-	payload := RawSettingsRequest{Content: "module.exports = {}"}
-	body, _ := json.Marshal(payload)
-
-	req := httptest.NewRequest(http.MethodPost, "/api/settings/raw", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-
-	// Inject non-admin auth
-	ctx := req.Context()
-	ctx = context.WithValue(ctx, middleware.CtxKeyUser, &model.Claims{
-		Username: "viewer",
-		Role:     model.RoleViewer,
-	})
-	req = req.WithContext(ctx)
-
-	w := httptest.NewRecorder()
-
-	handler.SaveRaw(w, req)
-
-	if w.Code != http.StatusForbidden {
-		t.Errorf("Expected 403 for non-admin, got %d", w.Code)
-	}
 }
 
 func TestSettingsHandler_SaveRaw_WithAdmin_Returns200(t *testing.T) {
@@ -322,67 +261,6 @@ func TestSettingsHandler_SaveRaw_InvalidJSON_Body(t *testing.T) {
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("Expected 400 for invalid JSON, got %d", w.Code)
-	}
-}
-
-func TestSettingsHandler_GetRaw_WithViewer_Role_Returns403(t *testing.T) {
-	tempDir := t.TempDir()
-	configSvc := service.NewIsolatedConfigService(tempDir)
-	handler := NewSettingsHandler(configSvc)
-
-	req := httptest.NewRequest(http.MethodGet, "/api/settings/raw", nil)
-
-	// Inject viewer (read-only) auth
-	ctx := req.Context()
-	ctx = context.WithValue(ctx, middleware.CtxKeyUser, &model.Claims{
-		Username: "viewer",
-		Role:     model.RoleViewer,
-	})
-	req = req.WithContext(ctx)
-
-	w := httptest.NewRecorder()
-
-	handler.GetRaw(w, req)
-
-	// MEDIUM-016: settings.js contains adminAuth hashes and secrets; viewer
-	// must be rejected with 403.
-	if w.Code != http.StatusForbidden {
-		t.Errorf("Expected 403 for viewer reading raw settings, got %d (body: %s)", w.Code, w.Body.String())
-	}
-
-	var resp model.ApiResponse[map[string]interface{}]
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("response must be valid JSON envelope: %v\nbody: %s", err, w.Body.String())
-	}
-	if resp.Error == nil || resp.Error.Code != "FORBIDDEN" {
-		t.Errorf("expected error code FORBIDDEN, got %+v", resp.Error)
-	}
-}
-
-func TestSettingsHandler_SaveRaw_WithViewer_Role_Forbidden(t *testing.T) {
-	configSvc := service.NewIsolatedConfigService(t.TempDir())
-	handler := NewSettingsHandler(configSvc)
-
-	payload := RawSettingsRequest{Content: "module.exports = {}"}
-	body, _ := json.Marshal(payload)
-
-	req := httptest.NewRequest(http.MethodPost, "/api/settings/raw", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-
-	// Inject viewer auth (not admin)
-	ctx := req.Context()
-	ctx = context.WithValue(ctx, middleware.CtxKeyUser, &model.Claims{
-		Username: "viewer",
-		Role:     model.RoleViewer,
-	})
-	req = req.WithContext(ctx)
-
-	w := httptest.NewRecorder()
-
-	handler.SaveRaw(w, req)
-
-	if w.Code != http.StatusForbidden {
-		t.Errorf("Expected 403 for viewer saving, got %d", w.Code)
 	}
 }
 

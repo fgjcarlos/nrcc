@@ -65,13 +65,11 @@ func (h *ConfigHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 	model.RespondJSON(w, http.StatusOK, cfg)
 }
 
-// SaveConfig handles POST /api/config - protected, admin only
+// SaveConfig handles POST /api/config - protected, admin only.
+// Authorization (admin role) is enforced by middleware.RequireAdmin on the
+// route. Claims are read from the context solely for audit logging.
 func (h *ConfigHandler) SaveConfig(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.ClaimsFromContext(r)
-	if claims == nil || claims.Role != model.RoleAdmin {
-		model.RespondError(w, http.StatusForbidden, "FORBIDDEN", "Admin access required")
-		return
-	}
 
 	var cfg model.NodeRedConfig
 	if !DecodeJSON(w, r, &cfg) {
