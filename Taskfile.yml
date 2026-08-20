@@ -37,8 +37,17 @@ tasks:
     cmds:
       - "{{.COMPOSE}} logs -f"
 
+  stub-dist:
+    desc: Create the frontend/dist placeholder required by //go:embed
+    status:
+      - test -d frontend/dist
+    cmds:
+      - mkdir -p frontend/dist
+      - echo "placeholder" > frontend/dist/placeholder
+
   test:
     desc: Run Go tests
+    deps: [stub-dist]
     cmds:
       - go test ./...
 
