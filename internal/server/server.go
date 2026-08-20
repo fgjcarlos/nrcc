@@ -1,7 +1,10 @@
 package server
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"io"
 	"log"
 	"log/slog"
 	"net/http"
@@ -226,14 +229,19 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 			r.Use(middleware.Auth(authSvc))
 			r.Get("/me", authHandler.GetMe)
 			r.Post("/logout", authHandler.Logout)
-			r.Get("/users", authHandler.GetUsers)
-			r.Post("/users", authHandler.CreateUser)
-			r.Delete("/users/{id}", authHandler.DeleteUser)
-			r.Patch("/users/{id}", authHandler.UpdateUser)
-			r.Patch("/users/{id}/password", authHandler.ChangePassword)
+			r.With(middleware.RequireAdmin).Get("/users", authHandler.GetUsers)
+			r.With(middleware.RequireAdmin).Post("/users", authHandler.CreateUser)
+			r.With(middleware.RequireAdmin).Delete("/users/{id}", authHandler.DeleteUser)
+			r.With(middleware.RequireAdmin).Patch("/users/{id}", authHandler.UpdateUser)
+			// Self-or-admin: a user may change their own password; an admin
+			// may change anyone's. The target is the path {id}; the
+			// middleware extractor below pulls it from the route context.
+			r.With(middleware.RequireSelfOrAdmin(changePasswordTarget)).Patch("/users/{id}/password", authHandler.ChangePassword)
 			r.Post("/mfa/enroll", mfaHandler.Enroll)
 			r.Post("/mfa/enroll/confirm", mfaHandler.EnrollConfirm)
-			r.Post("/mfa/disable", mfaHandler.Disable)
+			// Self-or-admin: target userId lives in the request body, so the
+			// extractor peeks and restores r.Body. See mfaDisableTarget.
+			r.With(middleware.RequireSelfOrAdmin(mfaDisableTarget)).Post("/mfa/disable", mfaHandler.Disable)
 			r.Get("/mfa/status", mfaHandler.Status)
 		})
 	})
@@ -257,14 +265,16 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 		// Config routes
 		r.Route("/api/config", func(r chi.Router) {
 			r.Get("/", configHandler.GetConfig)
-			r.Post("/", configHandler.SaveConfig)
+			r.With(middleware.RequireAdmin).Post("/", configHandler.SaveConfig)
 			r.Get("/default", configHandler.GetDefaultConfig)
 			r.Post("/validate", configHandler.ValidateConfig)
 		})
 
 		r.Route("/api/settings", func(r chi.Router) {
-			r.Get("/raw", settingsHandler.GetRaw)
-			r.Post("/raw", settingsHandler.SaveRaw)
+			// MEDIUM-016: settings.js carries adminAuth hashes and secrets.
+			// Both reads and writes are admin-only on the router.
+			r.With(middleware.RequireAdmin).Get("/raw", settingsHandler.GetRaw)
+			r.With(middleware.RequireAdmin).Post("/raw", settingsHandler.SaveRaw)
 		})
 
 		r.Route("/api/bootstrap", func(r chi.Router) {
@@ -499,4 +509,38 @@ func countEncryptedEntries(envVars []model.EnvVar) int {
 		}
 	}
 	return n
+}
+
+// changePasswordTarget extracts the target user id from the {id} path
+// parameter for PATCH /api/auth/users/{id}/password. Returned alongside
+// ok so RequireSelfOrAdmin can reject requests where the path is missing
+// the id entirely.
+func changePasswordTarget(r *http.Request) (string, bool) {
+	id := chi.URLParam(r, "id")
+	return id, id != ""
+}
+
+// mfaDisableTarget extracts the target user id from the JSON body of
+// POST /api/auth/mfa/disable. The body is read, decoded, and restored so
+// the handler sees the same bytes; the extractor runs once at middleware
+// dispatch and the handler runs once at serve time.
+//
+// Reading the body twice is cheap: the payload is a small JSON control
+// plane message. We refuse to follow up with the service if the JSON is
+// unparseable, returning ok=false so the middleware produces a clean 403
+// rather than letting a malformed request reach the handler and crash.
+func mfaDisableTarget(r *http.Request) (string, bool) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		return "", false
+	}
+	r.Body = io.NopCloser(bytes.NewReader(body))
+
+	var req struct {
+		UserID string `json:"userId"`
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		return "", false
+	}
+	return req.UserID, true
 }

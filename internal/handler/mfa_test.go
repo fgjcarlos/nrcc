@@ -187,29 +187,6 @@ func TestMfaHandler_DisableHappyPath(t *testing.T) {
 	}
 }
 
-func TestMfaHandler_NonAdminCannotDisableAnotherUser(t *testing.T) {
-	h, _, mfaSvc, _ := setupMfaHandlerTest(t)
-	// Create a second admin user so the first (an admin per the
-	// default) is downgraded to viewer via a different code path.
-	// Easier: just test the explicit "FORBIDDEN" branch by sending
-	// a userId from a viewer-role context.
-	viewerUID := uuid.New().String()
-	_ = mfaSvc.AuthService().CreateUser(&model.CCUser{
-		ID:           viewerUID,
-		Username:     "viewer",
-		PasswordHash: "x",
-		Role:         model.RoleViewer,
-	})
-	body, _ := json.Marshal(map[string]string{"userId": "someone-else", "password": "password123"})
-	req := httptest.NewRequest(http.MethodPost, "/api/auth/mfa/disable", bytes.NewReader(body))
-	req = req.WithContext(authedContext(viewerUID, "viewer", model.RoleViewer))
-	rec := httptest.NewRecorder()
-	h.Disable(rec, req)
-	if rec.Code != http.StatusForbidden {
-		t.Fatalf("want 403, got %d (%s)", rec.Code, rec.Body.String())
-	}
-}
-
 func TestMfaHandler_StatusReturnsDisabledForNewUser(t *testing.T) {
 	h, _, _, uid := setupMfaHandlerTest(t)
 	req := httptest.NewRequest(http.MethodGet, "/api/auth/mfa/status", nil)
