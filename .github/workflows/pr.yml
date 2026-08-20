@@ -41,15 +41,21 @@ jobs:
       - name: Download modules
         run: go mod download
 
+      - name: Install task
+        # `task` is not pre-installed on GitHub-hosted runners. Used by the
+        # stub-dist step below to keep CI in lock-step with the local
+        # `task test` / `task stub-dist` workflow (issue #668).
+        # The official install script takes the version as a positional arg.
+        run: sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin v3.44.0
+
       # `embed.go` declares `//go:embed frontend/dist` — the pattern needs at
       # least one *embeddable* file or `go vet`/`build` fails. Go embed skips
       # files starting with `.` or `_` by default, so a dotfile is not enough.
       # A real frontend build isn't needed for backend validation either, so a
       # plain placeholder satisfies the directive without wasting CI time.
+      # Defined once in Taskfile.yml so local + CI share the same workaround.
       - name: Stub frontend/dist for go:embed
-        run: |
-          mkdir -p frontend/dist
-          echo "ci placeholder" > frontend/dist/placeholder
+        run: task stub-dist
 
       - name: Vet
         run: go vet ./...
@@ -151,11 +157,13 @@ jobs:
           cache-dependency-path: go.sum
 
       # golangci-lint type-checks the packages, so go:embed needs a real file.
-      # Same placeholder trick as the backend job.
+      # Same `task stub-dist` workaround as the backend job — single definition
+      # lives in Taskfile.yml so local and CI cannot drift apart (issue #668).
+      - name: Install task
+        run: sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin v3.44.0
+
       - name: Stub frontend/dist for go:embed
-        run: |
-          mkdir -p frontend/dist
-          echo "ci placeholder" > frontend/dist/placeholder
+        run: task stub-dist
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a  # pin to commit (v9.0.0)
