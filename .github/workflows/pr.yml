@@ -45,7 +45,8 @@ jobs:
         # `task` is not pre-installed on GitHub-hosted runners. Used by the
         # stub-dist step below to keep CI in lock-step with the local
         # `task test` / `task stub-dist` workflow (issue #668).
-        run: sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin -v v3.44.0
+        # The official install script takes the version as a positional arg.
+        run: sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin v3.44.0
 
       # `embed.go` declares `//go:embed frontend/dist` — the pattern needs at
       # least one *embeddable* file or `go vet`/`build` fails. Go embed skips
@@ -159,7 +160,7 @@ jobs:
       # Same `task stub-dist` workaround as the backend job — single definition
       # lives in Taskfile.yml so local and CI cannot drift apart (issue #668).
       - name: Install task
-        run: sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin -v v3.44.0
+        run: sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin v3.44.0
 
       - name: Stub frontend/dist for go:embed
         run: task stub-dist
