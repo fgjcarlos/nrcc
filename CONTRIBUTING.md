@@ -2,6 +2,15 @@
 
 Thanks for your interest. This document covers how to get set up locally, what the workflow looks like, and how to send a change.
 
+## Supported platforms
+
+nrcc is **Linux-only at compile time** (see [ADR 0004 — Linux-only build](docs/adr/0004-linux-only-build.md)). The Go backend uses POSIX-only syscall symbols (`syscall.Flock`, `syscall.Stat_t`, `syscall.O_NOFOLLOW`, …) that don't exist on Windows or macOS, and the rest of the codebase (`/proc/stat`, `syscall.Sysinfo`, lockfiles) is Linux-specific by design.
+
+- **Build & test on Linux** (amd64, arm64) — the only supported path.
+- **On macOS or Windows:** use Docker ([ADR 0003](docs/adr/0003-docker-first-one-stack-per-node-red.md) is the canonical deployment model anyway). A Linux VM also works.
+
+If `go build ./...` fails on your machine with `undefined: syscall.Flock` or `undefined: syscall.Stat_t`, the build is failing because you're not on Linux — not because of a bug. Either run the build inside the project's Docker image or move to a Linux host.
+
 ## Local setup
 
 Requirements:
