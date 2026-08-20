@@ -341,9 +341,24 @@ func (s *ConfigService) decorateConfig(cfg *model.NodeRedConfig) {
 	cfg.SettingsSource = settings.Source
 }
 
+// readFromSettingsFile tries to parse the persisted settings.js into a
+// NodeRedConfig. It returns:
+//
+//   - (cfg, true, nil)        when the file exists and parses cleanly;
+//   - (zero, false, nil)      when the file is absent, unreadable, or empty —
+//     the caller falls back to defaults;
+//   - (zero, false, err)      when the content is present but the sandbox
+//     raised a typed error (notably ErrSandboxTimeout from #665) — the caller
+//     surfaces it as SETTINGS_TIMEOUT instead of silently booting a broken
+//     config.
+//
+// Swallowing the GetRawSettings error in the "absent/unreadable" branch is
+// intentional: a missing settings.js is the default state on a fresh
+// deployment, not a failure.
 func (s *ConfigService) readFromSettingsFile() (model.NodeRedConfig, bool, error) {
 	doc, err := s.GetRawSettings()
 	if err != nil || doc.Content == "" {
+		//nolint:nilerr // see function doc: missing/unreadable settings.js falls back to defaults, not an error.
 		return model.NodeRedConfig{}, false, nil
 	}
 	cfg, err := s.parseConfigFromContent(doc.Content)
