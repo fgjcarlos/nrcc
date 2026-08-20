@@ -1,3 +1,5 @@
+//go:build linux
+
 package service
 
 import (
@@ -441,5 +443,4 @@ func nodeRedTypeToValueType(nodeRedType string) string {
 // keep imports referenced when running tests on stripped builds
 var _ = time.Now
 var _ = strconv.Atoi
-var _ = bytes.Equal
 var _ bufio.Scanner
