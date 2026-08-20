@@ -29,6 +29,8 @@ A single-binary management UI for one Node-RED instance. The canonical deploymen
 - Go 1.25+ (to build from source)
 - For source/frontend builds: Node.js 22+ and pnpm 11+
 
+> **Build target: Linux only.** The Go backend uses POSIX-only syscalls (see [ADR 0004](docs/adr/0004-linux-only-build.md)). Building natively on macOS or Windows is not supported — use Docker or a Linux VM.
+
 ## Quick Start — Docker (canonical)
 
 One stack = one NRCC + one Node-RED + one persistent volume. Distinct

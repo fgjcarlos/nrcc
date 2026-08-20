@@ -4,15 +4,69 @@ package service
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/fgjcarlos/nrcc/internal/model"
 )
+
+// MetricsSampler periodically samples host metrics and stores them in a MetricsBuffer.
+type MetricsSampler struct {
+	buffer   *MetricsBuffer
+	interval time.Duration
+	lastCPU  float64
+	mu       sync.Mutex
+}
+
+// NewMetricsSampler creates a MetricsSampler that writes into buf at the given interval.
+func NewMetricsSampler(buf *MetricsBuffer, interval time.Duration) *MetricsSampler {
+	return &MetricsSampler{
+		buffer:   buf,
+		interval: interval,
+	}
+}
+
+// Start begins periodic sampling. It collects an initial sample immediately, then
+// repeats on every tick. It returns when ctx is cancelled.
+func (ms *MetricsSampler) Start(ctx context.Context) {
+	ms.sample()
+
+	ticker := time.NewTicker(ms.interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			ms.sample()
+		}
+	}
+}
+
+// LastCPU returns the CPU percentage captured by the most recent sample.
+func (ms *MetricsSampler) LastCPU() float64 {
+	ms.mu.Lock()
+	defer ms.mu.Unlock()
+	return ms.lastCPU
+}
+
+// sample collects one snapshot and pushes it to the buffer.
+func (ms *MetricsSampler) sample() {
+	snap := sampleHost()
+	snap.Timestamp = time.Now().UTC().Format(time.RFC3339)
+	ms.buffer.Push(snap)
+
+	ms.mu.Lock()
+	ms.lastCPU = snap.CPUPercent
+	ms.mu.Unlock()
+}
 
 // sampleHost collects CPU, memory, and disk metrics on Linux.
 // CPU is measured by reading /proc/stat twice with a 200 ms sleep to compute a delta.
