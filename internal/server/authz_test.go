@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -132,5 +133,49 @@ func TestAuthz_ViewerCanReadGetEndpoints(t *testing.T) {
 		if rec.Code == http.StatusForbidden || rec.Code == http.StatusUnauthorized {
 			t.Errorf("viewer GET %s: read access regressed, got %d", path, rec.Code)
 		}
+	}
+}
+
+func TestSecurityPostureAuthzBoundary(t *testing.T) {
+	srv, authSvc := newAuthzTestServer(t)
+	defer srv.Shutdown()
+
+	tests := []struct {
+		name       string
+		token      string
+		wantStatus int
+	}{
+		{name: "unauthenticated", wantStatus: http.StatusUnauthorized},
+		{name: "viewer", token: tokenForRole(t, authSvc, "viewer-posture", model.RoleViewer), wantStatus: http.StatusForbidden},
+		{name: "admin", token: tokenForRole(t, authSvc, "admin-posture", model.RoleAdmin), wantStatus: http.StatusOK},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/api/system/security-posture", nil)
+			if tt.token != "" {
+				req.Header.Set("Authorization", "Bearer "+tt.token)
+			}
+			rec := httptest.NewRecorder()
+			srv.ServeHTTP(rec, req)
+
+			if rec.Code != tt.wantStatus {
+				t.Fatalf("status = %d, want %d; body=%s", rec.Code, tt.wantStatus, rec.Body.String())
+			}
+			var body map[string]any
+			if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+			if tt.wantStatus != http.StatusOK {
+				if _, exposed := body["data"]; exposed {
+					t.Fatalf("unauthorized response exposed posture data: %v", body)
+				}
+				return
+			}
+			data, ok := body["data"].(map[string]any)
+			if !ok || data["activeRefreshSessions"] != float64(0) {
+				t.Fatalf("admin response missing canonical zero counts: %v", body)
+			}
+		})
 	}
 }
