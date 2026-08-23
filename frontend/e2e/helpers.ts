@@ -16,12 +16,18 @@ import {
 } from '../src/test/msw/fixtures'
 
 export type Scenario = 'initialized' | 'setup-required'
+export type PostureScenario = 'healthy' | 'degraded' | 'critical'
 
 export type JsonValue = Record<string, unknown> | unknown[] | string | number | boolean | null
 
 export const envelope = (data: JsonValue) => ({ success: true, data, timestamp: new Date(0).toISOString() })
 
-export async function installApiMocks(page: Page, scenario: Scenario = 'initialized') {
+export async function installApiMocks(page: Page, scenario: Scenario = 'initialized', posture: PostureScenario = 'healthy') {
+  const securityPosture = {
+    healthy: { encryptionKeyConfigured: true, backupDownloadAdminOnly: true, activeRefreshSessions: 0, mfa: { enrolledAdmins: 2, totalAdmins: 2 } },
+    degraded: { encryptionKeyConfigured: true, backupDownloadAdminOnly: true, activeRefreshSessions: 3, mfa: { enrolledAdmins: 1, totalAdmins: 2 } },
+    critical: { encryptionKeyConfigured: false, backupDownloadAdminOnly: false, activeRefreshSessions: 0, mfa: { enrolledAdmins: 0, totalAdmins: 2 } },
+  };
   await page.route(/\/api\//, async (route, request) => {
     // Only intercept calls to the actual backend API. Vite-dev serves ESM
     // modules under paths like /src/shared/api/index.ts which also contain
@@ -49,6 +55,7 @@ export async function installApiMocks(page: Page, scenario: Scenario = 'initiali
 
     if (method === 'GET' && path === '/bootstrap/status') return json(envelope(hostStatus))
     if (method === 'GET' && path === '/system/info') return json(envelope(systemInfo))
+    if (method === 'GET' && path === '/system/security-posture') return json(envelope(securityPosture[posture]))
     if (method === 'GET' && path === '/system/history') return json(envelope([]))
     if (method === 'GET' && path === '/docker/status') {
       return json(envelope({
@@ -107,8 +114,8 @@ export async function installApiMocks(page: Page, scenario: Scenario = 'initiali
   })
 }
 
-export async function login(page: Page) {
-  await installApiMocks(page)
+export async function login(page: Page, posture: PostureScenario = 'healthy') {
+  await installApiMocks(page, 'initialized', posture)
   await page.goto('/login')
   await page.getByLabel('Username').fill('admin')
   await page.getByLabel('Password').fill('password123')
