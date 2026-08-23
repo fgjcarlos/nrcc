@@ -89,6 +89,7 @@ var routeAuthz = map[string]authzLevel{
 
 	// ── admin only ───────────────────────────────────────────────────────
 	"POST /api/config/":                          authzAdmin,
+	"GET /api/system/security-posture":            authzAdmin,
 	"GET /api/settings/raw":                      authzAdmin,
 	"POST /api/settings/raw":                     authzAdmin,
 	"POST /api/backups/":                         authzAdmin,

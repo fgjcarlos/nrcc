@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io/fs"
 	"time"
 
 	"github.com/fgjcarlos/nrcc/internal/model"
@@ -351,6 +352,26 @@ func (s *AuthService) CreateRefreshSession(userID string) (string, error) {
 	}
 
 	return token, nil
+}
+
+// CountActiveRefreshSessions returns sessions that are neither revoked nor
+// expired at now. A missing store represents zero sessions on a fresh install.
+func (s *AuthService) CountActiveRefreshSessions(now time.Time) (int, error) {
+	sessions, err := s.sessionStore.Read()
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("read refresh sessions: %w", err)
+	}
+
+	count := 0
+	for _, session := range sessions.Sessions {
+		if !session.Revoked && session.ExpiresAt >= now.Unix() {
+			count++
+		}
+	}
+	return count, nil
 }
 
 // ValidateRefreshSession checks that a refresh token is valid, not expired, and not revoked.

@@ -136,7 +136,7 @@ func TestSecurityPostureServiceSnapshot(t *testing.T) {
 		EncryptionKeyConfigured: true,
 		BackupDownloadAdminOnly: true,
 		ActiveRefreshSessions:   2,
-		MFA: SecurityPostureMFA{EnrolledAdmins: 1, TotalAdmins: 2},
+		MFA:                     SecurityPostureMFA{EnrolledAdmins: 1, TotalAdmins: 2},
 	}
 	if got != want {
 		t.Fatalf("Snapshot = %+v, want %+v", got, want)

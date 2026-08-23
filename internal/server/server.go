@@ -147,6 +147,8 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 		}
 	}
 	envSvc := service.NewEnvService(configSvc, encKey)
+	postureSvc := service.NewSecurityPostureService(encKey != "", true, authSvc, mfaSvc)
+	postureHandler := handler.NewSecurityPostureHandler(postureSvc)
 	envHandler := handler.NewEnvHandler(envSvc, dataDir) // TAREA 2c: Pass dataDir
 	flowSvc := service.NewFlowService(dataDir)
 	flowVersionSvc := service.NewFlowVersionService(dataDir)
@@ -284,6 +286,7 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 		// System routes
 		r.Get("/api/system/info", systemHandler.GetSystemInfo)
 		r.Get("/api/system/history", systemHandler.GetSystemHistory)
+		r.With(middleware.RequireAdmin).Get("/api/system/security-posture", postureHandler.Get)
 		r.Get("/api/runtime/history", systemHandler.GetRuntimeHistory)
 
 		// Backup routes — reads are open to any authenticated user; all

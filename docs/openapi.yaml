@@ -772,6 +772,28 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
+  /api/system/security-posture:
+    get:
+      tags: [System]
+      operationId: getSystemSecurityPosture
+      summary: Get the current security posture
+      description: |
+        Returns canonical, server-derived security controls and counts. This
+        endpoint is restricted to administrators.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current security posture
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_SecurityPosture"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   # ─── Backups ───────────────────────────────────────────────────────────────────
 
   /api/backups:
@@ -2761,6 +2783,36 @@ components:
           description: Whether NRCC runs in edge mode (EDGE_MODE). Default false.
           example: false
 
+    SecurityPostureMfa:
+      type: object
+      required: [enrolledAdmins, totalAdmins]
+      properties:
+        enrolledAdmins:
+          type: integer
+          minimum: 0
+          description: Administrators with a confirmed, non-pending MFA enrollment.
+        totalAdmins:
+          type: integer
+          minimum: 0
+          description: Current number of administrator accounts.
+
+    SecurityPosture:
+      type: object
+      required: [encryptionKeyConfigured, backupDownloadAdminOnly, activeRefreshSessions, mfa]
+      properties:
+        encryptionKeyConfigured:
+          type: boolean
+          description: Whether NRCC_ENCRYPTION_KEY was configured at process startup.
+        backupDownloadAdminOnly:
+          type: boolean
+          description: Whether backup archive downloads require an administrator.
+        activeRefreshSessions:
+          type: integer
+          minimum: 0
+          description: Non-expired, non-revoked refresh sessions.
+        mfa:
+          $ref: "#/components/schemas/SecurityPostureMfa"
+
     # ── Backups ────────────────────────────────────────────────────────────────────
 
     BackupType:
@@ -3682,6 +3734,22 @@ components:
           properties:
             data:
               $ref: "#/components/schemas/SystemInfo"
+
+    SuccessEnvelope_SecurityPosture:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/SecurityPosture"
 
     SuccessEnvelope_Backup:
       allOf:

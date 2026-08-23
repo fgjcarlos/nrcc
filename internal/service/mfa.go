@@ -273,6 +273,30 @@ func (s *MfaService) IsEnrolled(userID string) bool {
 	return row != nil && !row.Pending
 }
 
+// CountEnrolled returns how many supplied users have a confirmed MFA
+// enrollment. Pending enrollments do not count as enrolled.
+func (s *MfaService) CountEnrolled(userIDs []string) (int, error) {
+	data, err := s.store.Read()
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("read MFA store: %w", err)
+	}
+
+	adminIDs := make(map[string]struct{}, len(userIDs))
+	for _, userID := range userIDs {
+		adminIDs[userID] = struct{}{}
+	}
+	count := 0
+	for _, enrollment := range data.Enrollments {
+		if _, ok := adminIDs[enrollment.UserID]; ok && !enrollment.Pending {
+			count++
+		}
+	}
+	return count, nil
+}
+
 // IssueMfaToken creates a single-use, 5-minute token that the client
 // must present to /api/auth/mfa/verify with a TOTP code.
 func (s *MfaService) IssueMfaToken(userID string) (string, error) {

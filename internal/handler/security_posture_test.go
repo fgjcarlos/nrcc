@@ -28,7 +28,7 @@ func TestSecurityPostureHandlerGet(t *testing.T) {
 		EncryptionKeyConfigured: true,
 		BackupDownloadAdminOnly: true,
 		ActiveRefreshSessions:   3,
-		MFA: service.SecurityPostureMFA{EnrolledAdmins: 1, TotalAdmins: 2},
+		MFA:                     service.SecurityPostureMFA{EnrolledAdmins: 1, TotalAdmins: 2},
 	}
 	h := NewSecurityPostureHandler(securityPostureSnapshotStub{posture: want})
 	rec := httptest.NewRecorder()
