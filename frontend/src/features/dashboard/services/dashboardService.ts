@@ -1,4 +1,5 @@
 import api from '@/shared/lib';
+import type { SecurityPosture } from '../types';
 import type { ApiResponse } from '@/shared/types';
 import { bootstrapService } from '@/features/bootstrap/services';
 import type { ContainerInfo } from '@/shared/types';
@@ -14,6 +15,7 @@ export const dashboardService = {
   // always sees a usable response without having to wire `docker-cli`.
   getDockerStatus: () => api.get<ApiResponse<ContainerInfo>>('/docker/status'),
   getSystemInfo: () => systemService.getInfo(),
+  getSecurityPosture: () => api.get<ApiResponse<SecurityPosture>>('/system/security-posture'),
   getConfig: () => configService.getConfig(),
   getHostStatus: () => bootstrapService.getStatus(),
   getBackupObservability: () => backupService.getObservability(),

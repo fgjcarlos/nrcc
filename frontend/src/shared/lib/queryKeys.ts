@@ -54,6 +54,7 @@ export const queryKeys = {
   },
   system: {
     info: ['system', 'info'] as const,
+    securityPosture: ['system', 'security-posture'] as const,
     history: ['system', 'history'] as const,
   },
   updates: {

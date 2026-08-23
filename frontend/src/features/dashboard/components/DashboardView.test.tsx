@@ -3,6 +3,9 @@ import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { DashboardView } from './DashboardView'
 import * as dashboardHooks from '../hooks'
+import { useAuth } from '@/features/auth/hooks/useAuth'
+
+vi.mock('@/features/auth/hooks/useAuth', () => ({ useAuth: vi.fn() }))
 
 vi.mock('../hooks', () => ({
   useDashboardData: vi.fn(),
@@ -34,6 +37,7 @@ const renderDashboard = () =>
 describe('DashboardView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(useAuth).mockReturnValue({ user: { id: 'admin', username: 'admin', role: 'admin', createdAt: '2026-01-01T00:00:00Z' } } as ReturnType<typeof useAuth>)
     vi.mocked(dashboardHooks.useDashboardActions).mockReturnValue({
       pendingConfirm: false,
       isRestarting: false,
@@ -65,6 +69,9 @@ describe('DashboardView', () => {
         recommendations: [],
       },
       backups: undefined,
+      securityPosture: undefined,
+      securityPostureLoading: false,
+      securityPostureError: false,
       dockerSuccess: true,
       dockerLoading: false,
       dockerError: false,
@@ -78,6 +85,20 @@ describe('DashboardView', () => {
     expect(screen.getByText('Check environment for issues')).toBeInTheDocument()
   })
 
+  it('renders the security posture only for admins', () => {
+    vi.mocked(dashboardHooks.useDashboardData).mockReturnValue({
+      container: undefined, system: undefined, config: undefined, host: undefined, backups: undefined,
+      securityPosture: { encryptionKeyConfigured: true, backupDownloadAdminOnly: true, activeRefreshSessions: 0, mfa: { enrolledAdmins: 1, totalAdmins: 1 } },
+      securityPostureLoading: false, securityPostureError: false, dockerSuccess: false, dockerLoading: false, dockerError: false,
+    })
+    renderDashboard()
+    expect(screen.getByTestId('security-posture-card')).toBeInTheDocument()
+
+    vi.mocked(useAuth).mockReturnValue({ user: { id: 'viewer', username: 'viewer', role: 'viewer', createdAt: '2026-01-01T00:00:00Z' } } as ReturnType<typeof useAuth>)
+    renderDashboard()
+    expect(screen.getAllByTestId('security-posture-card')).toHaveLength(1)
+  })
+
   it('renders fallback telemetry placeholders when dashboard data is missing', () => {
     vi.mocked(dashboardHooks.useDashboardData).mockReturnValue({
       container: undefined,
@@ -85,6 +106,9 @@ describe('DashboardView', () => {
       config: undefined,
       host: undefined,
       backups: undefined,
+      securityPosture: undefined,
+      securityPostureLoading: false,
+      securityPostureError: false,
       dockerSuccess: false,
       dockerLoading: false,
       dockerError: false,

@@ -4,7 +4,9 @@ import type { DashboardContainerStatus, DashboardData } from '../types';
 import type { HostStatus } from '@/shared/types';
 
 import { queryKeys } from '@/shared/lib/queryKeys';
+import { useSecurityPosture } from './useSecurityPosture';
 export function useDashboardData(): DashboardData {
+  const securityPosture = useSecurityPosture();
   const { data: dockerData, isLoading: dockerLoading, isError: dockerError } = useQuery({
     queryKey: queryKeys.docker.status,
     queryFn: () => dashboardService.getDockerStatus(),
@@ -46,6 +48,9 @@ export function useDashboardData(): DashboardData {
     config: configData?.data?.data as unknown as Record<string, unknown> | undefined,
     host: hostData,
     backups: backupObservability,
+    securityPosture: securityPosture.data,
+    securityPostureLoading: securityPosture.isLoading,
+    securityPostureError: securityPosture.isError,
     dockerSuccess: dockerData?.data?.success === true,
     dockerLoading,
     dockerError,

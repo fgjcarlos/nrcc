@@ -23,6 +23,12 @@ export type NrccMswScenario = 'initialized' | 'setup-required'
 export function createNrccApiHandlers(scenario: NrccMswScenario = 'initialized'): HttpHandler[] {
   const authStatus = scenario === 'setup-required' ? authStatusSetupRequired : authStatusInitialized
 
+  const securityPosture = {
+    healthy: { encryptionKeyConfigured: true, backupDownloadAdminOnly: true, activeRefreshSessions: 0, mfa: { enrolledAdmins: 2, totalAdmins: 2 } },
+    degraded: { encryptionKeyConfigured: true, backupDownloadAdminOnly: true, activeRefreshSessions: 3, mfa: { enrolledAdmins: 1, totalAdmins: 2 } },
+    critical: { encryptionKeyConfigured: false, backupDownloadAdminOnly: false, activeRefreshSessions: 0, mfa: { enrolledAdmins: 0, totalAdmins: 2 } },
+  };
+
   return [
     http.get('/api/auth/status', () => ok(authStatus)),
     http.post('/api/auth/setup', async () => ok(authResponse)),
@@ -34,6 +40,7 @@ export function createNrccApiHandlers(scenario: NrccMswScenario = 'initialized')
 
     http.get('/api/bootstrap/status', () => ok(hostStatus)),
     http.get('/api/system/info', () => ok(systemInfo)),
+    http.get('/api/system/security-posture', () => ok(securityPosture.healthy)),
     http.get('/api/docker/status', () => ok({
       id: 'nrcc-smoke',
       name: 'nrcc-smoke-node-red',

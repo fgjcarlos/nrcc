@@ -5,6 +5,13 @@ export type { MetricsSnapshot, RestartEvent } from './history';
 import type { SystemInfo, HostStatus } from '@/shared/types';
 import type { BackupObservability } from '@/features/backups/services';
 
+export interface SecurityPosture {
+  encryptionKeyConfigured: boolean;
+  backupDownloadAdminOnly: boolean;
+  activeRefreshSessions: number;
+  mfa: { enrolledAdmins: number; totalAdmins: number };
+}
+
 export interface DashboardContainerStatus {
   inDocker: boolean;
   status: string;
@@ -17,6 +24,9 @@ export interface DashboardData {
   config?: Record<string, unknown>;
   host?: HostStatus;
   backups?: BackupObservability;
+  securityPosture?: SecurityPosture;
+  securityPostureLoading: boolean;
+  securityPostureError: boolean;
   dockerSuccess: boolean;
   dockerLoading: boolean;
   dockerError: boolean;

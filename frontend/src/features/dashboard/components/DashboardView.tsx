@@ -1,13 +1,16 @@
 import { useDashboardActions, useDashboardData } from '../hooks';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 import { DashboardDetails } from './DashboardDetails';
 import { DashboardHeader } from './DashboardHeader';
 import { DashboardStatusCards } from './DashboardStatusCards';
 import { DashboardWarnings } from './DashboardWarnings';
 import { RestartConfirmationModal } from './RestartConfirmationModal';
 import { SystemHealthCard } from './SystemHealthCard';
+import { SecurityPostureCard } from './SecurityPostureCard';
 
 export function DashboardView() {
-  const { container, system, config, host, backups, dockerSuccess, dockerLoading, dockerError } = useDashboardData();
+  const { container, system, config, host, backups, securityPosture, securityPostureLoading, securityPostureError, dockerSuccess, dockerLoading, dockerError } = useDashboardData();
+  const { user } = useAuth();
   const {
     pendingConfirm,
     isRestarting,
@@ -38,6 +41,7 @@ export function DashboardView() {
         onRequestRestart={() => setPendingConfirm(true)}
         onOpenNodeRed={handleOpenNodeRed}
       />
+      {user?.role === 'admin' ? <SecurityPostureCard posture={securityPosture} isLoading={securityPostureLoading} isError={securityPostureError} /> : null}
       <DashboardDetails
         system={system}
         backups={backups}
