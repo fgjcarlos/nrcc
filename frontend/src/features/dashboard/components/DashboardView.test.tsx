@@ -94,8 +94,8 @@ describe('DashboardView', () => {
 
     expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument()
     expect(screen.getByText('Disk Usage')).toBeInTheDocument()
-    expect(screen.getByText('Quick Actions')).toBeInTheDocument()
-    expect(screen.getByText('Sin detectar')).toBeInTheDocument()
+    expect(screen.queryByText('Quick Actions')).not.toBeInTheDocument()
+    expect(screen.getAllByText('unavailable').length).toBeGreaterThan(0)
     expect(screen.getByText('Sin backups')).toBeInTheDocument()
     expect(screen.getByText('Cargando observabilidad')).toBeInTheDocument()
   })

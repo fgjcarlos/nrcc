@@ -54,6 +54,9 @@ describe('DashboardStatusCards — with system history', () => {
         inDocker={false}
         container={null}
         host={undefined}
+            isRestarting={false}
+            onRequestRestart={vi.fn()}
+            onOpenNodeRed={vi.fn()}
       />
     );
 
@@ -76,13 +79,22 @@ describe('DashboardStatusCards — with system history', () => {
         inDocker={false}
         container={null}
         host={undefined}
+            isRestarting={false}
+            onRequestRestart={vi.fn()}
+            onOpenNodeRed={vi.fn()}
       />
     );
 
     expect(screen.getByText('50%')).toBeInTheDocument();
   });
 
-  it('displays Disk usage chart section', () => {
+  it('renders Runtime, CPU, and Memory in status-card order', () => {
+    vi.mocked(useSystemHistoryModule.useSystemHistory).mockReturnValue({ data: mockHistory, isLoading: false, isError: false });
+    const { container } = render(<DashboardStatusCards system={mockSystem} inDocker={true} container={{ inDocker: true, status: 'running', image: 'nodered:4.1' }} host={undefined} isRestarting={false} onRequestRestart={vi.fn()} onOpenNodeRed={vi.fn()} />);
+    expect(Array.from(container.querySelectorAll('[data-dashboard-status-card]')).map((card) => card.getAttribute('data-dashboard-status-card'))).toEqual(['Runtime', 'CPU', 'Memory']);
+  });
+
+  it('does not render Disk in the metric row', () => {
     vi.mocked(useSystemHistoryModule.useSystemHistory).mockReturnValue({
       data: mockHistory,
       isLoading: false,
@@ -95,11 +107,13 @@ describe('DashboardStatusCards — with system history', () => {
         inDocker={false}
         container={null}
         host={undefined}
+            isRestarting={false}
+            onRequestRestart={vi.fn()}
+            onOpenNodeRed={vi.fn()}
       />
     );
 
-    expect(screen.getByText('Disk')).toBeInTheDocument();
-    expect(screen.getByText('60%')).toBeInTheDocument();
+    expect(screen.queryByText('Disk')).not.toBeInTheDocument();
   });
 
   it('shows chart loading skeletons when history is loading', () => {
@@ -115,11 +129,14 @@ describe('DashboardStatusCards — with system history', () => {
         inDocker={false}
         container={null}
         host={undefined}
+            isRestarting={false}
+            onRequestRestart={vi.fn()}
+            onOpenNodeRed={vi.fn()}
       />
     );
 
     // Loading skeletons have role="status"
     const skeletons = screen.getAllByRole('status');
-    expect(skeletons.length).toBeGreaterThanOrEqual(3);
+    expect(skeletons.length).toBeGreaterThanOrEqual(2);
   });
 });
