@@ -55,6 +55,7 @@ var routeAuthz = map[string]authzLevel{
 	"GET /api/bootstrap/status":             authzAuthenticated,
 	"GET /api/system/info":                  authzAuthenticated,
 	"GET /api/system/history":               authzAuthenticated,
+	"GET /api/system/security-posture":      authzAdmin,
 	"GET /api/runtime/history":              authzAuthenticated,
 	"GET /api/backups/":                     authzAuthenticated,
 	"GET /api/backups/status":               authzAuthenticated,
