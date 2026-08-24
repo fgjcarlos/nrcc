@@ -1,6 +1,11 @@
 /**
- * Centralized UI copy constants (English only)
- * Used across all frontend components for consistency
+ * Centralized UI copy constants.
+ *
+ * Language policy: English only. The codebase has no i18n setup; mixing
+ * languages inside one constant file (and inside a single screen) was
+ * the source of the audit issue #677. Keep new entries in English.
+ * If a future change introduces translation, do it via a single i18n
+ * provider — not by appending Spanish strings to this object.
  */
 
 export const UI_COPY = {
@@ -61,21 +66,21 @@ export const UI_COPY = {
     noUsersYet: 'No users yet',
     addFirstUser: 'Add the first user to get started',
     // Backup Actions
-   backupConfigurationSaved: 'Configuración del backup guardada',
-   backupCreated: 'Backup creado correctamente',
-   backupRestored: 'Backup restaurado correctamente',
-   backupDeleted: 'Backup eliminado',
-   retentionPolicySaved: 'Política de retención guardada',
-   preRestoreBackupNotice: (id: string) => `Se creó un backup de seguridad: ${id}`,
-   backupIdentifierInvalid: 'El backup no tiene un identificador válido',
-   backupCronRequired: 'Ingresá una expresión cron para el scheduler personalizado',
-   backupDownloadStarted: 'Descarga iniciada',
-   backupDownloadFailed: 'No se pudo descargar el backup',
-   couldNotCreateBackup: 'No se pudo crear el backup',
-   couldNotRestoreBackup: 'No se pudo restaurar el backup',
-   couldNotDeleteBackup: 'No se pudo eliminar el backup',
-   couldNotSaveRetentionPolicy: 'No se pudo guardar la política de retención',
-   couldNotSaveBackupConfiguration: 'No se pudo guardar la configuración del backup',
+   backupConfigurationSaved: 'Backup configuration saved',
+   backupCreated: 'Backup created successfully',
+   backupRestored: 'Backup restored successfully',
+   backupDeleted: 'Backup deleted',
+   retentionPolicySaved: 'Retention policy saved',
+   preRestoreBackupNotice: (id: string) => `A safety backup was created: ${id}`,
+   backupIdentifierInvalid: 'The backup has no valid identifier',
+   backupCronRequired: 'Enter a cron expression for the custom scheduler',
+   backupDownloadStarted: 'Download started',
+   backupDownloadFailed: 'Could not download the backup',
+   couldNotCreateBackup: 'Could not create the backup',
+   couldNotRestoreBackup: 'Could not restore the backup',
+   couldNotDeleteBackup: 'Could not delete the backup',
+   couldNotSaveRetentionPolicy: 'Could not save the retention policy',
+   couldNotSaveBackupConfiguration: 'Could not save the backup configuration',
   // Flows
   loadingFlows: 'Loading flows',
   failedToLoadFlows: 'Failed to load flows',
