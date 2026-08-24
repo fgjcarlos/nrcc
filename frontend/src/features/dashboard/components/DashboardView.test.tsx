@@ -94,7 +94,10 @@ describe('DashboardView', () => {
 
     expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument()
     expect(screen.getByText('Disk Usage')).toBeInTheDocument()
-    expect(screen.getByText('Quick Actions')).toBeInTheDocument()
+    // Runtime card promoted to the top row (issue #676 item 1) carries the
+    // Restart + Open actions; QuickActionsCard was removed from this row.
+    expect(screen.getByRole('button', { name: /restart/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /open/i })).toBeInTheDocument()
     expect(screen.getByText('Sin detectar')).toBeInTheDocument()
     expect(screen.getByText('Sin backups')).toBeInTheDocument()
     expect(screen.getByText('Cargando observabilidad')).toBeInTheDocument()

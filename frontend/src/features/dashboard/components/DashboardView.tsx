@@ -34,13 +34,13 @@ export function DashboardView() {
         host={host}
         inDocker={inDocker}
         container={container}
+        isRestarting={isRestarting}
+        onRequestRestart={() => setPendingConfirm(true)}
+        onOpenNodeRed={handleOpenNodeRed}
       />
       <DashboardDetails
         system={system}
         backups={backups}
-        isRestarting={isRestarting}
-        onRequestRestart={() => setPendingConfirm(true)}
-        onOpenNodeRed={handleOpenNodeRed}
       />
       <RestartConfirmationModal
         isOpen={pendingConfirm}
