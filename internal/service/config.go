@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"golang.org/x/crypto/bcrypt"
 	"time"
 
 	"github.com/fgjcarlos/nrcc/internal/model"
@@ -98,11 +100,42 @@ func (s *ConfigService) Update(fn func(*model.NodeRedConfig) error) (model.NodeR
 // authoritative for the committed slice. EnvService.Set/Delete are the supported
 // path for env-var mutations and also route through this same Update, so concurrent
 // Save+Set on the same store coordinate via the JSONStore lock.
+// upgradePlaintextAdminAuthPasswords hashes any cleartext password sent by
+// the frontend. The UI never hashes (and shouldn't — exposing a hashing
+// primitive to the browser would weaken the contract), so the only safe
+// interpretation of a non-bcrypt password on the wire is "this is the
+// new cleartext password the admin wants to set". Hashing here also makes
+// the autofill scenario (#706) harmless: even if a browser autofills the
+// real password after the admin types a different one, that cleartext is
+// exactly what would be stored anyway, so the round-trip is identity.
+func upgradePlaintextAdminAuthPasswords(cfg model.NodeRedConfig) error {
+	if cfg.AdminAuth == nil {
+		return nil
+	}
+	for i, user := range cfg.AdminAuth.Users {
+		if user.Password == "" || isBcryptHash(user.Password) {
+			continue
+		}
+		hash, err := bcrypt.GenerateFromPassword([]byte(user.Password), BcryptCost)
+		if err != nil {
+			return fmt.Errorf("adminAuth user %d (%q): %w", i, user.Username, err)
+		}
+		cfg.AdminAuth.Users[i].Password = string(hash)
+	}
+	return nil
+}
+
+// Save commits the configuration to the JSON store and renders settings.js.
+// Plaintext passwords in AdminAuth are upgraded to bcrypt hashes here so the
+// frontend can submit cleartext when changing the admin password without the
+// validation rejecting it (#706).
 func (s *ConfigService) Save(cfg model.NodeRedConfig) error {
 	committed, err := s.Update(func(current *model.NodeRedConfig) error {
 		candidate := cfg
 		preserveAdminAuthPasswords(current, &candidate)
-
+		if err := upgradePlaintextAdminAuthPasswords(candidate); err != nil {
+			return err
+		}
 		if err := validateAdminAuthPasswords(candidate); err != nil {
 			return err
 		}
