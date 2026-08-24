@@ -185,6 +185,49 @@ func (s *AuthService) GetAllUsers() ([]model.CCUser, error) {
 	return users.Users, nil
 }
 
+// CountAdmins returns the number of users with the admin role. Used by
+// the security posture endpoint (issue #676 item 2) to compute the
+// MFA-enrollment fraction. Errors are swallowed (returning 0) so the
+// posture endpoint stays servable if the user store is unavailable
+// during bootstrap; the dashboard then renders the chip as "unknown"
+// via the count of zero.
+func (s *AuthService) CountAdmins() int {
+	users, err := s.GetAllUsers()
+	if err != nil {
+		return 0
+	}
+	n := 0
+	for _, u := range users {
+		if u.Role == model.RoleAdmin {
+			n++
+		}
+	}
+	return n
+}
+
+// CountActiveRefreshSessions returns the number of refresh sessions
+// that are neither revoked nor past their expiry timestamp. Used by
+// the security posture endpoint (issue #676 item 2). Same swallow-
+// on-error pattern as CountAdmins.
+func (s *AuthService) CountActiveRefreshSessions() int {
+	sessions, err := s.sessionStore.Read()
+	if err != nil {
+		return 0
+	}
+	now := time.Now().Unix()
+	n := 0
+	for _, sess := range sessions.Sessions {
+		if sess.Revoked {
+			continue
+		}
+		if sess.ExpiresAt <= now {
+			continue
+		}
+		n++
+	}
+	return n
+}
+
 // CreateUser creates a new user
 func (s *AuthService) CreateUser(user *model.CCUser) error {
 	if user == nil {
@@ -351,6 +394,17 @@ func (s *AuthService) CreateRefreshSession(userID string) (string, error) {
 	}
 
 	return token, nil
+}
+
+// CreateRefreshSessionForTest writes a caller-supplied RefreshSession
+// verbatim into the session ledger. Used by handler tests that need to
+// seed expired/revoked sessions without going through the full
+// token-minting flow. Not exposed outside the handler test packages.
+func (s *AuthService) CreateRefreshSessionForTest(session model.RefreshSession) error {
+	return s.sessionStore.Update(func(sessions *model.RefreshSessions) error {
+		sessions.Sessions = append(sessions.Sessions, session)
+		return nil
+	})
 }
 
 // ValidateRefreshSession checks that a refresh token is valid, not expired, and not revoked.

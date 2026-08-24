@@ -148,6 +148,10 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 	}
 	envSvc := service.NewEnvService(configSvc, encKey)
 	envHandler := handler.NewEnvHandler(envSvc, dataDir) // TAREA 2c: Pass dataDir
+	// #676 item 2: wire the security-posture endpoint dependencies.
+	systemHandler.SetEnvService(envSvc)
+	systemHandler.SetAuthService(authSvc)
+	systemHandler.SetMfaService(mfaSvc)
 	flowSvc := service.NewFlowService(dataDir)
 	flowVersionSvc := service.NewFlowVersionService(dataDir)
 	flowVersionSvc.StartPolling()
@@ -285,6 +289,11 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 		r.Get("/api/system/info", systemHandler.GetSystemInfo)
 		r.Get("/api/system/history", systemHandler.GetSystemHistory)
 		r.Get("/api/runtime/history", systemHandler.GetRuntimeHistory)
+		// #676 item 2: backs the SecurityPostureCard. Returns the four
+		// boolean/count chips that surface the silent-degradation failure
+		// mode in issue #04 (encrypted env vars written in clear when
+		// NRCC_ENCRYPTION_KEY is missing).
+		r.With(middleware.RequireAdmin).Get("/api/system/security-posture", systemHandler.GetSecurityPosture)
 
 		// Backup routes — reads are open to any authenticated user; all
 		// state-mutating operations require the admin role.

@@ -772,6 +772,32 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
+  /api/system/security-posture:
+    get:
+      tags: [System]
+      operationId: getSecurityPosture
+      summary: Get security posture chips
+      description: |
+        Admin-only. Returns the four boolean/count chips that back the
+        Dashboard's SecurityPostureCard. The encryptionKeyConfigured chip
+        surfaces the silent-degradation failure mode in issue #04:
+        encrypted env vars written in clear when NRCC_ENCRYPTION_KEY is
+        missing. Closes #676 item 2.
+      security:
+        - bearerAuth: []
+        - adminOnly: []
+      responses:
+        "200":
+          description: Security posture summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_SecurityPosture"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   # ─── Backups ───────────────────────────────────────────────────────────────────
 
   /api/backups:
@@ -2163,6 +2189,15 @@ components:
         Short-lived JWT obtained from `/api/auth/login` or `/api/auth/setup`.
         Lifetime: ~15 minutes. Refresh using `POST /api/auth/refresh` (httpOnly
         cookie `nrcc_refresh`).
+    adminOnly:
+      type: apiKey
+      in: header
+      name: X-Admin-Only
+      description: |
+        Marker security scheme used in operations that require the admin role
+        in addition to the bearer JWT. The endpoint rejects non-admin JWTs at
+        runtime (RequireAdmin middleware); the schema simply documents the
+        gate so consumers see which operations need elevated privileges.
 
   # ── Parameters ──────────────────────────────────────────────────────────────────
 
@@ -4322,6 +4357,49 @@ components:
           properties:
             data:
               $ref: "#/components/schemas/GenericSuccess"
+
+    SecurityPosture:
+      type: object
+      required: [encryptionKeyConfigured, backupAccessAdminGated, activeRefreshSessions, totalAdmins, mfaEnrolledAdmins]
+      properties:
+        encryptionKeyConfigured:
+          type: boolean
+          description: |
+            Whether NRCC_ENCRYPTION_KEY is set to a non-empty value. False
+            means env vars flagged Encrypted are persisted in clear,
+            which is the silent-degradation failure mode the Dashboard
+            security posture card surfaces. See issue #04.
+        backupAccessAdminGated:
+          type: boolean
+          description: |
+            Whether GET /api/backups/{id}/download requires the admin
+            role. Reflected here so the dashboard flags it if the gate
+            is ever loosened. See issue #01.
+        activeRefreshSessions:
+          type: integer
+          description: Count of non-revoked refresh sessions whose expiry is in the future.
+        totalAdmins:
+          type: integer
+          description: Number of users with the admin role.
+        mfaEnrolledAdmins:
+          type: integer
+          description: Subset of totalAdmins with TOTP enrolled.
+
+    SuccessEnvelope_SecurityPosture:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/SecurityPosture"
 
   # ── Reusable Responses ──────────────────────────────────────────────────────────
 

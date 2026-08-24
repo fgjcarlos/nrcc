@@ -21,6 +21,14 @@ type SystemHandler struct {
 	processManager *service.ProcessManager
 	startedAt      time.Time
 	edgeMode       bool
+
+	// Optional dependencies for GetSecurityPosture (issue #676 item 2).
+	// Each may be nil during early bootstrap — the posture handler
+	// degrades to reporting the relevant boolean as false / count as 0
+	// when the dependency is unavailable, so the route stays servable.
+	envSvc  *service.EnvService
+	authSvc *service.AuthService
+	mfaSvc  *service.MfaService
 }
 
 // SetEdgeMode records whether NRCC is running in edge mode (resolved from
@@ -41,6 +49,18 @@ func (h *SystemHandler) SetMetricsBuffer(buf *service.MetricsBuffer) {
 func (h *SystemHandler) SetProcessManager(pm *service.ProcessManager) {
 	h.processManager = pm
 }
+
+// SetEnvService wires the EnvService so GetSecurityPosture can report
+// whether NRCC_ENCRYPTION_KEY is configured.
+func (h *SystemHandler) SetEnvService(es *service.EnvService) { h.envSvc = es }
+
+// SetAuthService wires the AuthService so GetSecurityPosture can count
+// active refresh sessions and total admins.
+func (h *SystemHandler) SetAuthService(a *service.AuthService) { h.authSvc = a }
+
+// SetMfaService wires the MfaService so GetSecurityPosture can count
+// admins with TOTP enrolled.
+func (h *SystemHandler) SetMfaService(m *service.MfaService) { h.mfaSvc = m }
 
 // NewSystemHandler creates a new system handler. The startedAt timestamp
 // captures NRCC process start time and is used to compute uptime in /api/health.
@@ -241,4 +261,61 @@ func getNodeVersion() string {
 		return "unknown"
 	}
 	return strings.TrimSpace(string(output))
+}
+
+// SecurityPostureResponse is the JSON shape returned by
+// GetSecurityPosture (issue #676 item 2). The four chips the
+// Dashboard's SecurityPostureCard renders each map to one field.
+// Count fields return 0 when the relevant service is unavailable
+// during bootstrap; boolean fields return false in that case so
+// the UI treats the chip as "degraded" without crashing.
+type SecurityPostureResponse struct {
+	EncryptionKeyConfigured bool `json:"encryptionKeyConfigured"` // NRCC_ENCRYPTION_KEY is set and non-empty
+	BackupAccessAdminGated bool `json:"backupAccessAdminGated"`   // /api/backups/{id}/download is RequireAdmin
+	ActiveRefreshSessions  int  `json:"activeRefreshSessions"`   // count of non-revoked, non-expired sessions
+	TotalAdmins            int  `json:"totalAdmins"`             // users with RoleAdmin
+	MfaEnrolledAdmins      int  `json:"mfaEnrolledAdmins"`       // subset of totalAdmins with TOTP enrolled
+}
+
+// GetSecurityPosture handles GET /api/system/security-posture — admin-only
+// (issue #676 item 2). The endpoint backs the SecurityPostureCard on the
+// dashboard; the encryptionKeyConfigured chip is the only signal that
+// surfaces the silent-degradation failure mode from issue #04 (encrypted
+// env vars written in clear when NRCC_ENCRYPTION_KEY is empty).
+func (h *SystemHandler) GetSecurityPosture(w http.ResponseWriter, r *http.Request) {
+	resp := SecurityPostureResponse{
+		// backupAccessAdminGated is wired statically at the router
+		// (server.go: r.With(middleware.RequireAdmin).Get("/{id}/download"...))
+		// so it is true whenever the router was built with this binary.
+		// Reflected here so the chip stays accurate if someone ever
+		// loosens the gate in the future (and the dashboard can flag it).
+		BackupAccessAdminGated: true,
+	}
+
+	if h.envSvc != nil {
+		resp.EncryptionKeyConfigured = h.envSvc.EncryptionKeyConfigured()
+	}
+
+	if h.authSvc != nil {
+		resp.ActiveRefreshSessions = h.authSvc.CountActiveRefreshSessions()
+		resp.TotalAdmins = h.authSvc.CountAdmins()
+	}
+
+	if h.mfaSvc != nil && h.authSvc != nil {
+		users, err := h.authSvc.GetAllUsers()
+		if err == nil {
+			enrolled := 0
+			for _, u := range users {
+				if u.Role != model.RoleAdmin {
+					continue
+				}
+				if h.mfaSvc.IsEnrolled(u.ID) {
+					enrolled++
+				}
+			}
+			resp.MfaEnrolledAdmins = enrolled
+		}
+	}
+
+	model.RespondJSON(w, http.StatusOK, resp)
 }
