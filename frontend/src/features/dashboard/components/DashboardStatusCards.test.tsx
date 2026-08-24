@@ -111,11 +111,13 @@ describe('DashboardStatusCards — Runtime + metric charts', () => {
     expect(screen.getByText('Runtime')).toBeInTheDocument();
     expect(screen.getByText('running')).toBeInTheDocument();
     expect(screen.getByText('nodered:4.0.0')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /restart/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /open/i })).toBeInTheDocument();
+    // Spanish copy kept in sync with the existing dashboard (issue #676
+    // explicitly defers the Spanish→English cleanup to #677 follow-ups).
+    expect(screen.getByRole('button', { name: 'Reiniciar' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Abrir' })).toBeInTheDocument();
   });
 
-  it('shows Restart button as "Restarting…" and disables it while isRestarting', () => {
+  it('shows Restart button as "Reiniciando…" and disables it while isRestarting', () => {
     vi.mocked(useSystemHistoryModule.useSystemHistory).mockReturnValue({
       data: mockHistory,
       isLoading: false,
@@ -124,7 +126,7 @@ describe('DashboardStatusCards — Runtime + metric charts', () => {
 
     renderCards({ isRestarting: true });
 
-    const restartBtn = screen.getByRole('button', { name: /restarting/i });
+    const restartBtn = screen.getByRole('button', { name: 'Reiniciando…' });
     expect(restartBtn).toBeInTheDocument();
     expect(restartBtn).toBeDisabled();
   });

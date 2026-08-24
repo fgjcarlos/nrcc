@@ -15,7 +15,10 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
   test('login flow opens the dashboard with representative status responses', async ({ page }) => {
     await login(page)
     await expect(page.getByText('System Health')).toBeVisible()
-    await expect(page.getByText('Quick Actions')).toBeVisible()
+    // Issue #676 promoted the Runtime card (with Restart/Open actions) out of
+    // the metric row; QuickActionsCard was removed in favor of those buttons.
+    await expect(page.getByRole('button', { name: 'Reiniciar' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Abrir' })).toBeVisible()
   })
 
   test('restart flow drives the real Reiniciar button and shows the success toast', async ({ page }) => {

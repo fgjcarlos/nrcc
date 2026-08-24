@@ -64,7 +64,7 @@ function RuntimeCard({
             <RefreshCw className={cn('w-4 h-4', isRestarting && 'animate-spin')} />
           </div>
           <span className="text-base font-medium">
-            {isRestarting ? 'Restarting…' : 'Restart'}
+            {isRestarting ? 'Reiniciando…' : 'Reiniciar'}
           </span>
         </button>
         <button
@@ -74,7 +74,7 @@ function RuntimeCard({
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-info/10 text-info transition-colors group-hover:bg-info/20">
             <ExternalLink className="w-4 h-4" />
           </div>
-          <span className="text-base font-medium">Open</span>
+          <span className="text-base font-medium">Abrir</span>
         </button>
       </div>
     </div>
