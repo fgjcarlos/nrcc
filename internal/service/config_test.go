@@ -209,74 +209,54 @@ func TestConfigService_SaveRawSettings_WritesContent(t *testing.T) {
 	}
 }
 
-func TestConfigService_Save_RejectsPlaintextPassword(t *testing.T) {
-	tests := []struct {
-		name     string
-		password string
-	}{
-		{name: "plaintext", password: "password123"},
-		// #nosec G101 -- bcrypt regex test fixture: malformed prefix used to exercise the parser.
-		{name: "unsupported bcrypt prefix", password: "$2$10$unsupported"},
-		{name: "bare 2a prefix", password: "$2a$"},
-		{name: "bare 2b prefix", password: "$2b$"},
-		{name: "bare 2y prefix", password: "$2y$"},
+// TestConfigService_Save_HashesCleartextPassword is the #706 behaviour:
+// cleartext passwords from the frontend are upgraded to bcrypt by the
+// backend so the UI can change the admin password without needing to
+// ship a hashing primitive to the browser.
+func TestConfigService_Save_HashesCleartextPassword(t *testing.T) {
+	hash := mustBcryptHash(t, "baseline-password")
+	tempDir := t.TempDir()
+	svc := NewIsolatedConfigService(tempDir)
+	baseline := svc.GetDefault()
+	baseline.AdminAuth = &model.AdminAuth{
+		Type: "credentials",
+		Users: []model.AdminAuthUser{{
+			Username:    "admin",
+			Password:    hash,
+			Permissions: "*",
+		}},
+	}
+	if err := svc.Save(baseline); err != nil {
+		t.Fatalf("save baseline: %v", err)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tempDir := t.TempDir()
-			svc := NewIsolatedConfigService(tempDir)
-			baseline := svc.GetDefault()
-			baseline.AdminAuth = &model.AdminAuth{
-				Type: "credentials",
-				Users: []model.AdminAuthUser{{
-					Username:    "admin",
-					Password:    mustBcryptHash(t, "baseline-password"),
-					Permissions: "*",
-				}},
-			}
-			if err := svc.Save(baseline); err != nil {
-				t.Fatalf("save baseline: %v", err)
-			}
-
-			configPath := filepath.Join(tempDir, "config.json")
-			settingsPath := filepath.Join(tempDir, "settings.js")
-			// #nosec G304 -- tempDir is t.TempDir().
-			configBefore, err := os.ReadFile(configPath)
-			if err != nil {
-				t.Fatalf("read baseline config: %v", err)
-			}
-			// #nosec G304 -- tempDir is t.TempDir().
-			settingsBefore, err := os.ReadFile(settingsPath)
-			if err != nil {
-				t.Fatalf("read baseline settings: %v", err)
-			}
-
-			candidate := baseline
-			candidate.AdminAuth.Users[0].Password = tt.password
-			err = svc.Save(candidate)
-			if !errors.Is(err, ErrAdminAuthPlaintextPassword) {
-				t.Fatalf("Save() error = %v, want ErrAdminAuthPlaintextPassword", err)
-			}
-
-			// #nosec G304 -- tempDir is t.TempDir().
-			configAfter, err := os.ReadFile(configPath)
-			if err != nil {
-				t.Fatalf("read config after rejection: %v", err)
-			}
-			// #nosec G304 -- tempDir is t.TempDir().
-			settingsAfter, err := os.ReadFile(settingsPath)
-			if err != nil {
-				t.Fatalf("read settings after rejection: %v", err)
-			}
-			if string(configAfter) != string(configBefore) {
-				t.Fatal("rejected Save changed config.json")
-			}
-			if string(settingsAfter) != string(settingsBefore) {
-				t.Fatal("rejected Save changed settings.js")
-			}
-		})
+	// Cleartext password → must be re-hashed and persisted as a bcrypt
+	// hash. Subsequent reads see a hash that compares equal to the new
+	// cleartext, not the baseline.
+	candidate := baseline
+	candidate.AdminAuth.Users[0].Password = "new-plaintext-12345"
+	if err := svc.Save(candidate); err != nil {
+		t.Fatalf("Save with cleartext password: %v", err)
 	}
+	loaded, err := svc.Get()
+	if err != nil {
+		t.Fatalf("Get after save: %v", err)
+	}
+	if !strings.HasPrefix(loaded.AdminAuth.Users[0].Password, "$2") {
+		t.Errorf("persisted password not a bcrypt hash: %q", loaded.AdminAuth.Users[0].Password)
+	}
+	if !compareHash(t, loaded.AdminAuth.Users[0].Password, "new-plaintext-12345") {
+		t.Error("persisted hash does not match the cleartext we sent")
+	}
+	if compareHash(t, loaded.AdminAuth.Users[0].Password, "baseline-password") {
+		t.Error("persisted hash matches the baseline cleartext — cleartext was not actually upgraded")
+	}
+}
+
+func compareHash(t *testing.T, hash, cleartext string) bool {
+	t.Helper()
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(cleartext))
+	return err == nil
 }
 
 func TestConfigService_SaveRawSettings_RejectsPlaintextPassword(t *testing.T) {
