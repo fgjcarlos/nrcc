@@ -1,4 +1,4 @@
-import { useEnvironment } from '@/features/environment/hooks/useEnvironment';
+import { useEnvironment } from '@/features/bootstrap/hooks/useEnvironment';
 import {
   AlertCircle,
   CheckCircle2,

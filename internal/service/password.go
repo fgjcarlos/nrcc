@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 	"strings"
+	"testing"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -25,9 +26,15 @@ var (
 
 // SetBcryptCostForTest lowers the bcrypt cost used by service code paths
 // when running under `go test`. Production binaries keep BcryptCost at
-// ProductionBcryptCost unless this helper is explicitly invoked. Tests should
-// pair it with `bcrypt.MinCost` (4).
-func SetBcryptCostForTest(c int) { BcryptCost = c }
+// ProductionBcryptCost; the testing.Testing() guard makes this setter a
+// no-op when called outside `go test`, so production callers (including
+// another package's production code) cannot lower the cost process-wide.
+func SetBcryptCostForTest(c int) {
+	if !testing.Testing() {
+		return
+	}
+	BcryptCost = c
+}
 
 var commonPasswords = map[string]bool{
 	"password": true, "12345678": true, "123456789": true, "1234567890": true,

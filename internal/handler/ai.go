@@ -39,10 +39,10 @@ func (h *AIHandler) PostAnalyzeFlow(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, http.ErrHandlerTimeout) {
 			status = http.StatusGatewayTimeout
 		}
-		if err.Error() == "AI flow assistance is disabled; set NRCC_AI_ENABLED=true to enable" {
+		if errors.Is(err, service.ErrAIDisabled) {
 			status = http.StatusServiceUnavailable
 			code = "AI_DISABLED"
-		} else if err.Error() == "AI provider API key is required for non-offline providers" || err.Error() == "AI provider endpoint is required" {
+		} else if errors.Is(err, service.ErrAIKeyRequired) || errors.Is(err, service.ErrAIEndpointReqd) {
 			status = http.StatusServiceUnavailable
 			code = "AI_NOT_CONFIGURED"
 		}
