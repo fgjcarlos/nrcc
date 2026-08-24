@@ -58,7 +58,7 @@ function CpuCard({ system }: MetricCardProps) {
           data={history}
           dataKey="cpuPercent"
           label="CPU usage"
-          color="#3b82f6"
+          color="var(--color-accent)"
           loading={isLoading}
         />
       </div>
@@ -84,7 +84,7 @@ function MemoryCard({ system }: MetricCardProps) {
           data={history}
           dataKey="memoryPercent"
           label="Memory usage"
-          color="#8b5cf6"
+          color="var(--color-info)"
           loading={isLoading}
         />
       </div>
@@ -110,7 +110,7 @@ function DiskCard({ system }: MetricCardProps) {
           data={history}
           dataKey="diskPercent"
           label="Disk usage"
-          color="#10b981"
+          color="var(--color-success)"
           loading={isLoading}
         />
       </div>
