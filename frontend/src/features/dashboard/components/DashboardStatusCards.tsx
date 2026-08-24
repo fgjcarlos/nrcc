@@ -1,25 +1,43 @@
 import { formatBytes } from '@/shared/lib';
 import { formatPercent } from '@/features/dashboard/lib';
 import type { HostStatus, SystemInfo } from '@/shared/types';
-import { Cpu, HardDrive, MemoryStick, Server } from 'lucide-react';
+import { Cpu, ExternalLink, MemoryStick, RefreshCw, Server } from 'lucide-react';
 import type { DashboardContainerStatus } from '../types';
 import { getDeploymentLabel } from '../lib';
 import { useSystemHistory } from '../hooks/useSystemHistory';
 import { LazyMetricsChart as MetricsChart } from './LazyMetricsChart';
+import { cn } from '@/shared/lib';
 
 interface DashboardStatusCardsProps {
   container?: DashboardContainerStatus | null;
   host?: HostStatus;
   inDocker: boolean;
   system?: SystemInfo;
+  isRestarting: boolean;
+  onRequestRestart: () => void;
+  onOpenNodeRed: () => void;
 }
 
-function DeploymentCard({ container, host, inDocker }: Pick<DashboardStatusCardsProps, 'container' | 'host' | 'inDocker'>) {
+// "Runtime" card — promoted out of the metric row (issue #676 item 1).
+// Carries Node-RED process state, container image / settings path, and
+// the Restart + Open actions that previously lived further down the page
+// in QuickActionsCard (DashboardDetails.tsx).
+function RuntimeCard({
+  container,
+  host,
+  inDocker,
+  isRestarting,
+  onRequestRestart,
+  onOpenNodeRed,
+}: Pick<
+  DashboardStatusCardsProps,
+  'container' | 'host' | 'inDocker' | 'isRestarting' | 'onRequestRestart' | 'onOpenNodeRed'
+>) {
   return (
     <div className="p-6 border card surface-card border-border">
       <div className="flex items-center gap-3">
         <Server className="w-5 h-5 text-body-secondary" />
-        <span className="text-sm font-medium">Deployment</span>
+        <span className="text-sm font-medium">Runtime</span>
       </div>
       {inDocker ? (
         <>
@@ -31,9 +49,34 @@ function DeploymentCard({ container, host, inDocker }: Pick<DashboardStatusCards
       ) : (
         <>
           <p className="mt-2 text-2xl font-bold">{getDeploymentLabel(host?.nodeRed.mode)}</p>
-          <p className="mt-1 text-sm text-body-secondary">{host?.settings.path || 'Sin ruta de settings.js detectada'}</p>
+          <p className="mt-1 text-sm text-body-secondary">{host?.settings.path || 'No settings.js path detected'}</p>
         </>
       )}
+
+      {/* Actions co-located with the process state they act on (issue #676 item 1). */}
+      <div className="grid grid-cols-2 gap-2.5 mt-5">
+        <button
+          onClick={onRequestRestart}
+          disabled={isRestarting}
+          className="group action-btn-secondary flex items-center justify-center gap-3 rounded-xl p-4"
+        >
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-warning/10 text-warning transition-colors group-hover:bg-warning/20">
+            <RefreshCw className={cn('w-4 h-4', isRestarting && 'animate-spin')} />
+          </div>
+          <span className="text-base font-medium">
+            {isRestarting ? 'Reiniciando…' : 'Reiniciar'}
+          </span>
+        </button>
+        <button
+          onClick={onOpenNodeRed}
+          className="group action-btn-secondary flex items-center justify-center gap-3 rounded-xl p-4"
+        >
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-info/10 text-info transition-colors group-hover:bg-info/20">
+            <ExternalLink className="w-4 h-4" />
+          </div>
+          <span className="text-base font-medium">Abrir</span>
+        </button>
+      </div>
     </div>
   );
 }
@@ -92,39 +135,22 @@ function MemoryCard({ system }: MetricCardProps) {
   );
 }
 
-function DiskCard({ system }: MetricCardProps) {
-  const { data: history, isLoading } = useSystemHistory();
-
-  return (
-    <div className="p-6 border card surface-card border-border">
-      <div className="flex items-center gap-3">
-        <HardDrive className="w-5 h-5 text-body-secondary" />
-        <span className="text-sm font-medium">Disk</span>
-      </div>
-      <p className="mt-2 text-2xl font-bold">{system ? formatPercent(system.disk.usagePercent) : '--'}</p>
-      <p className="mt-1 text-sm text-body-secondary">
-        {system ? `${formatBytes(system.disk.used)} / ${formatBytes(system.disk.total)}` : '--'}
-      </p>
-      <div className="mt-3">
-        <MetricsChart
-          data={history}
-          dataKey="diskPercent"
-          label="Disk usage"
-          color="var(--color-success)"
-          loading={isLoading}
-        />
-      </div>
-    </div>
-  );
-}
+// Disk moved out of the top metric row (issue #676 item 3). The detail
+// breakdown now lives in DiskUsageCard inside DashboardDetails.tsx.
 
 export function DashboardStatusCards(props: DashboardStatusCardsProps) {
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-      <DeploymentCard container={props.container} host={props.host} inDocker={props.inDocker} />
+      <RuntimeCard
+        container={props.container}
+        host={props.host}
+        inDocker={props.inDocker}
+        isRestarting={props.isRestarting}
+        onRequestRestart={props.onRequestRestart}
+        onOpenNodeRed={props.onOpenNodeRed}
+      />
       <CpuCard system={props.system} />
       <MemoryCard system={props.system} />
-      <DiskCard system={props.system} />
     </div>
   );
 }

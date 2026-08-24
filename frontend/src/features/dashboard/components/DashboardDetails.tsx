@@ -2,12 +2,12 @@ import { formatBytes, cn } from '@/shared/lib';
 import { formatPercent } from '@/features/dashboard/lib';
 import type { BackupObservability } from '@/features/backups/services';
 import type { SystemInfo } from '@/shared/types';
-import { Activity, Archive, CheckCircle2, ExternalLink, HardDrive, RefreshCw } from 'lucide-react';
+import { Archive, CheckCircle2, HardDrive } from 'lucide-react';
 
 interface DashboardDetailsProps {
-  isRestarting: boolean;
-  onOpenNodeRed: () => void;
-  onRequestRestart: () => void;
+  // Restart/Open actions moved up to the RuntimeCard inside DashboardStatusCards
+  // (issue #676 item 1). This component now only renders the detail cards
+  // (disk breakdown, backups) that live below the metric row.
   backups?: BackupObservability;
   system?: SystemInfo;
 }
@@ -45,49 +45,6 @@ function DiskUsageCard({ system }: Pick<DashboardDetailsProps, 'system'>) {
             style={{ width: `${system?.disk.usagePercent || 0}%` }}
           />
         </div>
-      </div>
-    </div>
-  );
-}
-
-function QuickActionsCard({
-  isRestarting,
-  onOpenNodeRed,
-  onRequestRestart,
-}: Omit<DashboardDetailsProps, 'system' | 'backups'>) {
-  return (
-    <div className="p-6 border card surface-card border-border">
-      <div className="flex items-center gap-3 mb-5">
-        <Activity className="w-5 h-5 text-body-secondary" />
-        <span className="text-sm font-semibold tracking-wide uppercase opacity-90">Quick Actions</span>
-      </div>
-      <div className="grid grid-cols-2 gap-2.5">
-        {/* Restart */}
-        <button
-          onClick={onRequestRestart}
-          disabled={isRestarting}
-          className="group action-btn-secondary flex items-center justify-center gap-3 rounded-xl p-4"
-        >
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-warning/10 text-warning transition-colors group-hover:bg-warning/20">
-            <RefreshCw className={cn('w-4 h-4', isRestarting && 'animate-spin')} />
-          </div>
-          <span className="text-base font-medium">
-            {isRestarting ? 'Reiniciando…' : 'Reiniciar'}
-          </span>
-        </button>
-
-        {/* Open Node-RED */}
-        <button
-          onClick={onOpenNodeRed}
-          className="group action-btn-secondary flex items-center justify-center gap-3 rounded-xl p-4"
-        >
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-info/10 text-info transition-colors group-hover:bg-info/20">
-            <ExternalLink className="w-4 h-4" />
-          </div>
-          <span className="text-base font-medium">Abrir</span>
-        </button>
-
-        {/* Start / Stop disabled - no runtime management */}
       </div>
     </div>
   );
@@ -161,11 +118,6 @@ export function DashboardDetails(props: DashboardDetailsProps) {
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
       <DiskUsageCard system={props.system} />
-      <QuickActionsCard
-        isRestarting={props.isRestarting}
-        onOpenNodeRed={props.onOpenNodeRed}
-        onRequestRestart={props.onRequestRestart}
-      />
       <BackupStatusCard backups={props.backups} />
     </div>
   );

@@ -36,7 +36,24 @@ const mockHistory: MetricsSnapshot[] = [
   { timestamp: '2024-01-01T00:00:30Z', cpuPercent: 42.5, memoryPercent: 50, diskPercent: 60 },
 ];
 
-describe('DashboardStatusCards — with system history', () => {
+const noop = () => {};
+
+function renderCards(overrides: Partial<React.ComponentProps<typeof DashboardStatusCards>> = {}) {
+  return render(
+    <DashboardStatusCards
+      system={mockSystem}
+      inDocker={false}
+      container={null}
+      host={undefined}
+      isRestarting={false}
+      onRequestRestart={noop}
+      onOpenNodeRed={noop}
+      {...overrides}
+    />
+  );
+}
+
+describe('DashboardStatusCards — Runtime + metric charts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -48,14 +65,7 @@ describe('DashboardStatusCards — with system history', () => {
       isError: false,
     });
 
-    render(
-      <DashboardStatusCards
-        system={mockSystem}
-        inDocker={false}
-        container={null}
-        host={undefined}
-      />
-    );
+    renderCards();
 
     // formatPercent rounds: 42.5 -> 43%
     expect(screen.getByText('43%')).toBeInTheDocument();
@@ -70,36 +80,55 @@ describe('DashboardStatusCards — with system history', () => {
       isError: false,
     });
 
-    render(
-      <DashboardStatusCards
-        system={mockSystem}
-        inDocker={false}
-        container={null}
-        host={undefined}
-      />
-    );
+    renderCards();
 
     expect(screen.getByText('50%')).toBeInTheDocument();
   });
 
-  it('displays Disk usage chart section', () => {
+  it('does NOT render a Disk chart — Disk moved out of the top row (issue #676 item 3)', () => {
     vi.mocked(useSystemHistoryModule.useSystemHistory).mockReturnValue({
       data: mockHistory,
       isLoading: false,
       isError: false,
     });
 
-    render(
-      <DashboardStatusCards
-        system={mockSystem}
-        inDocker={false}
-        container={null}
-        host={undefined}
-      />
-    );
+    renderCards();
 
-    expect(screen.getByText('Disk')).toBeInTheDocument();
-    expect(screen.getByText('60%')).toBeInTheDocument();
+    // No "Disk" header in the metric row. The disk card now lives in
+    // DashboardDetails below.
+    expect(screen.queryByText('Disk')).not.toBeInTheDocument();
+  });
+
+  it('promotes the Runtime card with status and image, plus Restart + Open actions', () => {
+    vi.mocked(useSystemHistoryModule.useSystemHistory).mockReturnValue({
+      data: mockHistory,
+      isLoading: false,
+      isError: false,
+    });
+
+    renderCards({ inDocker: true, container: { inDocker: true, status: 'running', image: 'nodered:4.0.0' } });
+
+    expect(screen.getByText('Runtime')).toBeInTheDocument();
+    expect(screen.getByText('running')).toBeInTheDocument();
+    expect(screen.getByText('nodered:4.0.0')).toBeInTheDocument();
+    // Spanish copy kept in sync with the existing dashboard (issue #676
+    // explicitly defers the Spanish→English cleanup to #677 follow-ups).
+    expect(screen.getByRole('button', { name: 'Reiniciar' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Abrir' })).toBeInTheDocument();
+  });
+
+  it('shows Restart button as "Reiniciando…" and disables it while isRestarting', () => {
+    vi.mocked(useSystemHistoryModule.useSystemHistory).mockReturnValue({
+      data: mockHistory,
+      isLoading: false,
+      isError: false,
+    });
+
+    renderCards({ isRestarting: true });
+
+    const restartBtn = screen.getByRole('button', { name: 'Reiniciando…' });
+    expect(restartBtn).toBeInTheDocument();
+    expect(restartBtn).toBeDisabled();
   });
 
   it('shows chart loading skeletons when history is loading', () => {
@@ -109,17 +138,10 @@ describe('DashboardStatusCards — with system history', () => {
       isError: false,
     });
 
-    render(
-      <DashboardStatusCards
-        system={mockSystem}
-        inDocker={false}
-        container={null}
-        host={undefined}
-      />
-    );
+    renderCards();
 
-    // Loading skeletons have role="status"
+    // Two charts in the top row now: CPU + Memory (Disk moved out).
     const skeletons = screen.getAllByRole('status');
-    expect(skeletons.length).toBeGreaterThanOrEqual(3);
+    expect(skeletons.length).toBe(2);
   });
 });
