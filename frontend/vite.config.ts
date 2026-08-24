@@ -24,6 +24,13 @@ export default defineConfig({
       shared: path.resolve(__dirname, './src/shared'),
     },
   },
+  build: {
+    // ponytail: workaround for #697 — daisyUI 5.7.x emits selectors
+    // (.carousel: [object Object]) that lightningcss 1.33.0 (Vite 8 default
+    // minifier) cannot parse. Switch to esbuild until upstream fixes it.
+    // Remove once daisyUI ≥ 5.8 ships a lightningcss-safe selector emit.
+    cssMinify: 'esbuild',
+  },
   server: {
     port: 5173,
     host: true, // needed inside Docker to bind 0.0.0.0
