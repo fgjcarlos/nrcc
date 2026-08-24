@@ -4,6 +4,7 @@ import { configService, settingsService } from '../services';
 import type { NodeRedConfigFormData } from '@/shared/types';
 import { formDataToConfigPayload } from '../lib/configTransformers';
 
+import { errorMessage } from '@/shared/lib/errorMessage';
 import { queryKeys } from '@/shared/lib/queryKeys';
 export function useConfigurationActions() {
   const queryClient = useQueryClient();
@@ -17,7 +18,7 @@ export function useConfigurationActions() {
       queryClient.invalidateQueries({ queryKey: queryKeys.config.root });
     },
     onError: (error) => {
-      toast.error(`Failed to save: ${error}`);
+      toast.error(`Failed to save: ${errorMessage(error)}`);
     },
   });
 
@@ -30,7 +31,7 @@ export function useConfigurationActions() {
       queryClient.invalidateQueries({ queryKey: queryKeys.bootstrap.status });
     },
     onError: (error) => {
-      toast.error(`Failed to save settings.js: ${error}`);
+      toast.error(`Failed to save settings.js: ${errorMessage(error)}`);
     },
   });
 
