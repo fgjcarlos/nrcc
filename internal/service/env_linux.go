@@ -40,6 +40,16 @@ func NewEnvService(configSvc *ConfigService, encryptionKey ...string) *EnvServic
 	return s
 }
 
+// EncryptionKeyConfigured reports whether NRCC_ENCRYPTION_KEY is set
+// non-empty. Used by the security posture endpoint (issue #676 item 2)
+// to flag the silent-degradation failure mode where Encrypted env vars
+// are written in clear when the key is missing.
+func (s *EnvService) EncryptionKeyConfigured() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.encryptionKey != ""
+}
+
 // SetProcessManager records the active ProcessManager so env sync can reuse
 // the same runtime contract as ProcessManager.Start.
 func (s *EnvService) SetProcessManager(pm *ProcessManager) {
@@ -189,9 +199,8 @@ var errEnvMigrationAlreadyDone = errors.New("environment migration already commi
 
 // ErrEncryptionKeyRequired is returned when a caller attempts to persist an
 // encrypted env var while NRCC_ENCRYPTION_KEY is empty. The store would
-// otherwise write the value in plaintext while still labelling it Encrypted,
-// which is a fail-open security control. Detected via errors.Is so handlers
-// can map it to a 503 response with an actionable message. See #664.
+// otherwise silently write the secret in clear — the exact silent
+// degradation failure mode that the SecurityPostureCard surfaces.
 var ErrEncryptionKeyRequired = errors.New("NRCC_ENCRYPTION_KEY is not configured; cannot store an encrypted value")
 
 type envMigrationKey struct {
