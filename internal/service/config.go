@@ -673,11 +673,206 @@ func renderAdminAuthBlock(cfg model.NodeRedConfig) string {
 	return builder.String()
 }
 
-// renderEditorThemeBlock renders editorTheme as a block string
+// renderEditorThemeBlock renders editorTheme as a block string. The block is
+// reconstructed from `cfg.EditorTheme` (interface{} from the JSON store), so
+// every sub-key the frontend sends — page, header, palette, codeEditor,
+// deployButton, login, logout, userMenu, tours, projects — round-trips into
+// settings.js. Previously this function hardcoded `projects.enabled` and
+// dropped everything else, which is why #707 reported that Editor Theme
+// changes never propagated to the live Node-RED config.
+//
+// The encoder is intentionally lenient: keys with non-string / non-primitive
+// values are skipped (we never want to inject unparseable JS into
+// settings.js), and unset sub-objects are omitted entirely so the output
+// stays minimal.
 func renderEditorThemeBlock(cfg model.NodeRedConfig) string {
+	theme, _ := cfg.EditorTheme.(map[string]any)
+	if len(theme) == 0 {
+		// Fall back to the historical minimal block when nothing is set,
+		// so first-write settings.js still emits a syntactically valid
+		// editorTheme entry.
+		return fmt.Sprintf("  editorTheme: {\n    projects: { enabled: %t },\n  },", cfg.ProjectsEnabled)
+	}
+
+	quote := func(s string) string { return fmt.Sprintf("%q", s) }
+	boolLit := func(v any) (string, bool) {
+		b, ok := v.(bool)
+		if !ok {
+			return "", false
+		}
+		return fmt.Sprintf("%t", b), true
+	}
+	intLit := func(v any) (string, bool) {
+		switch n := v.(type) {
+		case int:
+			return fmt.Sprintf("%d", n), true
+		case int64:
+			return fmt.Sprintf("%d", n), true
+		case float64:
+			return fmt.Sprintf("%d", int(n)), true
+		}
+		return "", false
+	}
+	stringLit := func(v any) (string, bool) {
+		s, ok := v.(string)
+		if !ok {
+			return "", false
+		}
+		return quote(s), true
+	}
+
 	var builder strings.Builder
 	builder.WriteString("  editorTheme: {\n")
-	fmt.Fprintf(&builder, "    projects: { enabled: %t },\n", cfg.ProjectsEnabled)
+
+	// page { title, favicon, css }
+	if page, ok := theme["page"].(map[string]any); ok {
+		parts := []string{}
+		if s, ok := stringLit(page["title"]); ok {
+			parts = append(parts, fmt.Sprintf("title: %s", s))
+		}
+		if s, ok := stringLit(page["favicon"]); ok {
+			parts = append(parts, fmt.Sprintf("favicon: %s", s))
+		}
+		// css can be a string OR an array of strings (Node-RED accepts both)
+		switch css := page["css"].(type) {
+		case string:
+			if css != "" {
+				parts = append(parts, fmt.Sprintf("css: %s", quote(css)))
+			}
+		case []any:
+			quoted := []string{}
+			for _, item := range css {
+				if s, ok := item.(string); ok {
+					quoted = append(quoted, quote(s))
+				}
+			}
+			if len(quoted) > 0 {
+				parts = append(parts, "css: ["+strings.Join(quoted, ", ")+"]")
+			}
+		}
+		if len(parts) > 0 {
+			fmt.Fprintf(&builder, "    page: { %s },\n", strings.Join(parts, ", "))
+		}
+	}
+
+	// header { title, image, url }
+	if header, ok := theme["header"].(map[string]any); ok {
+		parts := []string{}
+		if s, ok := stringLit(header["title"]); ok {
+			parts = append(parts, fmt.Sprintf("title: %s", s))
+		}
+		if s, ok := stringLit(header["image"]); ok {
+			parts = append(parts, fmt.Sprintf("image: %s", s))
+		}
+		if s, ok := stringLit(header["url"]); ok {
+			parts = append(parts, fmt.Sprintf("url: %s", s))
+		}
+		if len(parts) > 0 {
+			fmt.Fprintf(&builder, "    header: { %s },\n", strings.Join(parts, ", "))
+		}
+	}
+
+	// deployButton { type, label, icon }
+	if db, ok := theme["deployButton"].(map[string]any); ok {
+		parts := []string{}
+		if s, ok := stringLit(db["type"]); ok {
+			parts = append(parts, fmt.Sprintf("type: %s", s))
+		}
+		if s, ok := stringLit(db["label"]); ok {
+			parts = append(parts, fmt.Sprintf("label: %s", s))
+		}
+		if s, ok := stringLit(db["icon"]); ok {
+			parts = append(parts, fmt.Sprintf("icon: %s", s))
+		}
+		if len(parts) > 0 {
+			fmt.Fprintf(&builder, "    deployButton: { %s },\n", strings.Join(parts, ", "))
+		}
+	}
+
+	// login { image }
+	if login, ok := theme["login"].(map[string]any); ok {
+		if s, ok := stringLit(login["image"]); ok && s != `""` {
+			fmt.Fprintf(&builder, "    login: { image: %s },\n", s)
+		}
+	}
+
+	// logout { redirect }
+	if logout, ok := theme["logout"].(map[string]any); ok {
+		if s, ok := stringLit(logout["redirect"]); ok && s != `""` {
+			fmt.Fprintf(&builder, "    logout: { redirect: %s },\n", s)
+		}
+	}
+
+	// palette { editable, catalogues }
+	if palette, ok := theme["palette"].(map[string]any); ok {
+		parts := []string{}
+		if b, ok := boolLit(palette["editable"]); ok {
+			parts = append(parts, fmt.Sprintf("editable: %s", b))
+		}
+		switch cats := palette["catalogues"].(type) {
+		case []any:
+			quoted := []string{}
+			for _, item := range cats {
+				if s, ok := item.(string); ok {
+					quoted = append(quoted, quote(s))
+				}
+			}
+			if len(quoted) > 0 {
+				parts = append(parts, "catalogues: ["+strings.Join(quoted, ", ")+"]")
+			}
+		case string:
+			if cats != "" {
+				parts = append(parts, fmt.Sprintf("catalogues: %s", quote(cats)))
+			}
+		}
+		if len(parts) > 0 {
+			fmt.Fprintf(&builder, "    palette: { %s },\n", strings.Join(parts, ", "))
+		}
+	}
+
+	// projects { enabled } — also reflected from cfg.ProjectsEnabled for
+	// backward compatibility with configs that don't carry an explicit
+	// editorTheme.projects block.
+	projectsEnabled := cfg.ProjectsEnabled
+	if projects, ok := theme["projects"].(map[string]any); ok {
+		if b, ok := boolLit(projects["enabled"]); ok {
+			projectsEnabled = b == "true"
+		}
+	}
+	fmt.Fprintf(&builder, "    projects: { enabled: %t },\n", projectsEnabled)
+
+	// codeEditor { lib, options { theme, fontSize } }
+	if ce, ok := theme["codeEditor"].(map[string]any); ok {
+		parts := []string{}
+		if s, ok := stringLit(ce["lib"]); ok {
+			parts = append(parts, fmt.Sprintf("lib: %s", s))
+		}
+		if opts, ok := ce["options"].(map[string]any); ok {
+			optParts := []string{}
+			if s, ok := stringLit(opts["theme"]); ok {
+				optParts = append(optParts, fmt.Sprintf("theme: %s", s))
+			}
+			if n, ok := intLit(opts["fontSize"]); ok {
+				optParts = append(optParts, fmt.Sprintf("fontSize: %s", n))
+			}
+			if len(optParts) > 0 {
+				parts = append(parts, "options: { "+strings.Join(optParts, ", ")+" }")
+			}
+		}
+		if len(parts) > 0 {
+			fmt.Fprintf(&builder, "    codeEditor: { %s },\n", strings.Join(parts, ", "))
+		}
+	}
+
+	// userMenu and tours are booleans; render only when explicitly set so
+	// we don't override existing settings.js values with implicit defaults.
+	if um, ok := boolLit(theme["userMenu"]); ok {
+		fmt.Fprintf(&builder, "    userMenu: %s,\n", um)
+	}
+	if tr, ok := boolLit(theme["tours"]); ok {
+		fmt.Fprintf(&builder, "    tours: %s,\n", tr)
+	}
+
 	builder.WriteString("  },")
 	return builder.String()
 }
