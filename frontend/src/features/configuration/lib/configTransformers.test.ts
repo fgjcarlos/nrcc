@@ -880,7 +880,7 @@ describe('configTransformers', () => {
 
       expect(result.editorTheme?.codeEditor).toEqual({
         lib: 'monaco',
-        options: { theme: 'vs-dark' },
+        options: { theme: 'vs-dark', fontSize: 14 },
       });
     });
 
@@ -934,7 +934,8 @@ describe('configTransformers', () => {
 
       const result = formDataToConfigPayload(formData);
 
-      expect(result.editorTheme?.codeEditor).toBeUndefined();
+      // Even with ace, fontSize is forwarded (#707: previously dropped).
+      expect(result.editorTheme?.codeEditor).toEqual({ options: { fontSize: 12 } });
     });
 
     it('should handle disabled user menu and tours', () => {

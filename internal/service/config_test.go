@@ -1202,3 +1202,75 @@ func TestPatchSettingsJS_ReplacesExistingEnvArray(t *testing.T) {
 		t.Fatalf("patched settings.js should preserve unrelated blocks:\n%s", content)
 	}
 }
+
+func TestRenderEditorThemeBlock_RoundTrip(t *testing.T) {
+	cfg := model.NodeRedConfig{
+		ProjectsEnabled: true,
+		EditorTheme: map[string]any{
+			"page": map[string]any{
+				"title":   "My Node-RED",
+				"favicon": "/img/favicon.png",
+				"css":     ".my-class { color: red; }",
+			},
+			"header":       map[string]any{"title": "Ops", "image": "/img/logo.png", "url": "https://example.com"},
+			"deployButton": map[string]any{"type": "simple", "label": "Deploy now", "icon": "/img/deploy.png"},
+			"login":        map[string]any{"image": "/img/login-bg.png"},
+			"logout":       map[string]any{"redirect": "https://example.com/leaving"},
+			"palette":      map[string]any{"editable": false, "catalogues": []any{"https://catalogue.nodered.org/catalogue.json"}},
+			"projects":     map[string]any{"enabled": true},
+			"codeEditor":   map[string]any{"lib": "monaco", "options": map[string]any{"theme": "vs-dark", "fontSize": 14}},
+			"userMenu":     true,
+			"tours":        false,
+		},
+	}
+	block := renderEditorThemeBlock(cfg)
+
+	wants := []string{
+		"title: \"My Node-RED\"",
+		"favicon: \"/img/favicon.png\"",
+		"css: \".my-class { color: red; }\"",
+		"header: { title: \"Ops\", image: \"/img/logo.png\", url: \"https://example.com\" }",
+		"deployButton: { type: \"simple\", label: \"Deploy now\", icon: \"/img/deploy.png\" }",
+		"login: { image: \"/img/login-bg.png\" }",
+		"logout: { redirect: \"https://example.com/leaving\" }",
+		"palette: { editable: false",
+		"https://catalogue.nodered.org/catalogue.json",
+		"projects: { enabled: true }",
+		"codeEditor: { lib: \"monaco\", options: { theme: \"vs-dark\", fontSize: 14 } }",
+		"userMenu: true,",
+		"tours: false,",
+	}
+	for _, want := range wants {
+		if !strings.Contains(block, want) {
+			t.Errorf("renderEditorThemeBlock missing %q in output:\n%s", want, block)
+		}
+	}
+}
+
+func TestRenderEditorThemeBlock_EmptyFallback(t *testing.T) {
+	cfg := model.NodeRedConfig{ProjectsEnabled: false}
+	block := renderEditorThemeBlock(cfg)
+	want := "  editorTheme: {\n    projects: { enabled: false },\n  },"
+	if block != want {
+		t.Errorf("empty fallback mismatch:\nwant: %q\ngot:  %q", want, block)
+	}
+}
+
+func TestRenderEditorThemeBlock_IgnoresNonStringScalars(t *testing.T) {
+	cfg := model.NodeRedConfig{
+		EditorTheme: map[string]any{
+			"page":    map[string]any{"title": 1234, "favicon": "/img/favicon.png"},
+			"palette": map[string]any{"editable": "yes"},
+		},
+	}
+	block := renderEditorThemeBlock(cfg)
+	if strings.Contains(block, "title: 1234") {
+		t.Errorf("non-string title leaked: %s", block)
+	}
+	if !strings.Contains(block, "favicon: \"/img/favicon.png\"") {
+		t.Errorf("expected favicon to render: %s", block)
+	}
+	if strings.Contains(block, "editable: yes") {
+		t.Errorf("string 'editable' leaked: %s", block)
+	}
+}

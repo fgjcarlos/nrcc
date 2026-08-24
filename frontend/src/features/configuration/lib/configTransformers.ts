@@ -162,19 +162,35 @@ export function formDataToConfigPayload(formData: NodeRedConfigFormData): Config
   // Editor Theme
   const editorTheme: Record<string, unknown> = {};
 
-  // Page settings (title, favicon)
+  // Page settings (title, favicon, css). Use `!== undefined` rather than
+  // truthy so clearing an input to "" actually clears the persisted value
+  // instead of silently keeping the previous one.
   const page: Record<string, unknown> = {};
-  if (formData.editorPageTitle) page.title = formData.editorPageTitle;
-  if (formData.editorPageFavicon) page.favicon = formData.editorPageFavicon;
-  if (formData.editorPageCss) page.css = formData.editorPageCss;
+  if (formData.editorPageTitle !== undefined) page.title = formData.editorPageTitle;
+  if (formData.editorPageFavicon !== undefined) page.favicon = formData.editorPageFavicon;
+  if (formData.editorPageCss !== undefined) page.css = formData.editorPageCss;
   if (Object.keys(page).length > 0) editorTheme.page = page;
 
-  // Header settings (title, image, url)
+  // Header settings (title, image, url). Same explicit-undefined rule so
+  // emptying the Header Title field actually clears it server-side.
   const header: Record<string, unknown> = {};
-  if (formData.editorHeaderTitle) header.title = formData.editorHeaderTitle;
-  if (formData.editorHeaderImage) header.image = formData.editorHeaderImage;
-  if (formData.editorHeaderUrl) header.url = formData.editorHeaderUrl;
+  if (formData.editorHeaderTitle !== undefined) header.title = formData.editorHeaderTitle;
+  if (formData.editorHeaderImage !== undefined) header.image = formData.editorHeaderImage;
+  if (formData.editorHeaderUrl !== undefined) header.url = formData.editorHeaderUrl;
   if (Object.keys(header).length > 0) editorTheme.header = header;
+
+  // Deploy Button (#707: previously dropped on the floor by the transformer).
+  if (
+    formData.editorDeployType !== undefined ||
+    formData.editorDeployLabel !== undefined ||
+    formData.editorDeployIcon !== undefined
+  ) {
+    const deployButton: Record<string, unknown> = {};
+    if (formData.editorDeployType !== undefined) deployButton.type = formData.editorDeployType;
+    if (formData.editorDeployLabel !== undefined) deployButton.label = formData.editorDeployLabel;
+    if (formData.editorDeployIcon !== undefined) deployButton.icon = formData.editorDeployIcon;
+    editorTheme.deployButton = deployButton;
+  }
 
   // Login/Logout settings
   if (formData.editorLoginImage) {
@@ -193,14 +209,33 @@ export function formDataToConfigPayload(formData: NodeRedConfigFormData): Config
   if (formData.editorProjectsEnabled) {
     editorTheme.projects = { enabled: true };
   }
+  // Code Editor: include fontSize when monaco and the user actually set it
+  // (#707: previously missing). Also include userMenu/tours in BOTH
+  // directions so toggling back to true actually persists (the old
+  // `if (!formData.editorUserMenu)` elided the on value).
   if (formData.editorCodeLib !== 'ace') {
-    editorTheme.codeEditor = {
+    const codeEditor: Record<string, unknown> = {
       lib: formData.editorCodeLib,
-      options: { theme: formData.editorCodeTheme },
     };
+    const codeOptions: Record<string, unknown> = {};
+    if (formData.editorCodeTheme) codeOptions.theme = formData.editorCodeTheme;
+    if (typeof formData.editorCodeFontSize === 'number' && formData.editorCodeFontSize > 0) {
+      codeOptions.fontSize = formData.editorCodeFontSize;
+    }
+    codeEditor.options = codeOptions;
+    editorTheme.codeEditor = codeEditor;
+  } else {
+    // Even with ace, still forward fontSize so users who switch libraries
+    // later see their preferred size.
+    if (typeof formData.editorCodeFontSize === 'number' && formData.editorCodeFontSize > 0) {
+      editorTheme.codeEditor = { options: { fontSize: formData.editorCodeFontSize } };
+    }
   }
-  if (!formData.editorUserMenu) editorTheme.userMenu = false;
-  if (!formData.editorTours) editorTheme.tours = false;
+  // Always forward the boolean state of userMenu / tours so toggling back
+  // to true after a previous false persists. Closes #707 (was: only sent
+  // when false).
+  if (formData.editorUserMenu !== undefined) editorTheme.userMenu = formData.editorUserMenu;
+  if (formData.editorTours !== undefined) editorTheme.tours = formData.editorTours;
 
   if (Object.keys(editorTheme).length > 0) {
     config.editorTheme = editorTheme;
