@@ -16,6 +16,15 @@ import (
 
 const redactedValue = "[REDACTED]"
 
+// Sentinels for AI service failures that the HTTP layer translates to
+// specific status codes. Use errors.Is to match — never compare err.Error()
+// strings; reworded messages silently change HTTP responses.
+var (
+	ErrAIDisabled     = errors.New("AI flow assistance is disabled; set NRCC_AI_ENABLED=true to enable")
+	ErrAIKeyRequired  = errors.New("AI provider API key is required for non-offline providers")
+	ErrAIEndpointReqd = errors.New("AI provider endpoint is required")
+)
+
 // AIConfig controls optional AI flow assistance. AI is disabled unless explicitly enabled.
 type AIConfig struct {
 	Enabled  bool
@@ -105,7 +114,7 @@ func NewAIService(cfg AIConfig) *AIService {
 
 func (s *AIService) AssistFlow(ctx context.Context, req AIFlowRequest) (AIFlowResponse, error) {
 	if !s.cfg.Enabled {
-		return AIFlowResponse{}, errors.New("AI flow assistance is disabled; set NRCC_AI_ENABLED=true to enable")
+		return AIFlowResponse{}, ErrAIDisabled
 	}
 	providerReq, err := s.BuildProviderRequest(req)
 	if err != nil {
@@ -149,10 +158,10 @@ func (s *AIService) AssistFlow(ctx context.Context, req AIFlowRequest) (AIFlowRe
 	}
 
 	if s.cfg.APIKey == "" {
-		return AIFlowResponse{}, errors.New("AI provider API key is required for non-offline providers")
+		return AIFlowResponse{}, ErrAIKeyRequired
 	}
 	if s.cfg.Endpoint == "" {
-		return AIFlowResponse{}, errors.New("AI provider endpoint is required")
+		return AIFlowResponse{}, ErrAIEndpointReqd
 	}
 
 	body, err := json.Marshal(map[string]interface{}{"model": providerReq.Model, "messages": providerReq.Messages})

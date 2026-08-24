@@ -314,7 +314,7 @@ func (h *EnvHandler) PutDotenv(w http.ResponseWriter, r *http.Request) {
 	restarted := h.restartIfRunning()
 	h.audit.Log(r, "", "DOTENV_UPDATE", "", "ok", nil)
 	model.RespondJSON(w, http.StatusOK, map[string]interface{}{
-		"message":   "Archivo .env guardado",
+		"message":   ".env file saved",
 		"restarted": restarted,
 	})
 }

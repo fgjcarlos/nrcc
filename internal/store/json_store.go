@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"sync"
 )
 
@@ -41,9 +42,16 @@ func (s *JSONStore[T]) readUnlocked() (T, error) {
 	return val, err
 }
 
-// Write overwrites the file atomically with mode 0600 via a temporary file and
-// rename. Write is not atomic with a preceding Read; use Update for compound
-// mutations.
+// Write overwrites the file atomically with mode 0600 via a temporary file
+// and rename. Write is not atomic with a preceding Read; use Update for
+// compound mutations.
+//
+// Durability: the temp file is fsync'd before rename so its contents are
+// guaranteed on stable storage when the rename publishes the file name.
+// The parent directory is fsync'd afterwards so the rename itself is
+// durable across a power loss — without that, a crash can leave a
+// correctly-named but zero-length file (the rename published before the
+// dir-entry change hit disk).
 func (s *JSONStore[T]) Write(val T) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -57,14 +65,42 @@ func (s *JSONStore[T]) writeUnlocked(val T) error {
 		return err
 	}
 
-	// Write to temp file first (atomic on POSIX)
+	// Write to temp file first (atomic on POSIX), fsync the contents, then
+	// rename. Fsync the parent directory afterwards so the rename is durable.
 	tmpPath := s.path + ".tmp"
-	if err := os.WriteFile(tmpPath, data, 0600); err != nil {
+	// ponytail: gosec G304 — tmpPath is derived from s.path (the JSON store
+	// path the caller already controls) plus the literal suffix ".tmp". Not
+	// user input; safe to include.
+	// #nosec G304
+	f, err := os.OpenFile(tmpPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
 		return err
 	}
-
-	// Atomic rename
-	return os.Rename(tmpPath, s.path)
+	// Write the data; on error, capture the close error and join with the
+	// write error so neither is swallowed.
+	if _, werr := f.Write(data); werr != nil {
+		if cerr := f.Close(); cerr != nil {
+			return errors.Join(werr, cerr)
+		}
+		return werr
+	}
+	if serr := f.Sync(); serr != nil {
+		if cerr := f.Close(); cerr != nil {
+			return errors.Join(serr, cerr)
+		}
+		return serr
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmpPath, s.path); err != nil {
+		return err
+	}
+	if d, err := os.Open(filepath.Dir(s.path)); err == nil {
+		_ = d.Sync()
+		_ = d.Close()
+	}
+	return nil
 }
 
 // Update is the supported API for compound read-modify-write mutations. The
