@@ -68,17 +68,27 @@ func (s *JSONStore[T]) writeUnlocked(val T) error {
 	// Write to temp file first (atomic on POSIX), fsync the contents, then
 	// rename. Fsync the parent directory afterwards so the rename is durable.
 	tmpPath := s.path + ".tmp"
+	// ponytail: gosec G304 — tmpPath is derived from s.path (the JSON store
+	// path the caller already controls) plus the literal suffix ".tmp". Not
+	// user input; safe to include.
+	// #nosec G304
 	f, err := os.OpenFile(tmpPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
 	}
-	if _, err := f.Write(data); err != nil {
-		f.Close()
-		return err
+	// Write the data; on error, capture the close error and join with the
+	// write error so neither is swallowed.
+	if _, werr := f.Write(data); werr != nil {
+		if cerr := f.Close(); cerr != nil {
+			return errors.Join(werr, cerr)
+		}
+		return werr
 	}
-	if err := f.Sync(); err != nil {
-		f.Close()
-		return err
+	if serr := f.Sync(); serr != nil {
+		if cerr := f.Close(); cerr != nil {
+			return errors.Join(serr, cerr)
+		}
+		return serr
 	}
 	if err := f.Close(); err != nil {
 		return err
