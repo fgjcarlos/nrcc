@@ -823,7 +823,7 @@ export interface paths {
         };
         /**
          * List all flows
-         * @description Returns all Node-RED flows.
+         * @description Returns one summary per Node-RED tab, derived from the flat flows document.
          */
         get: operations["getFlows"];
         put?: never;
@@ -848,26 +848,6 @@ export interface paths {
         get: operations["exportFlows"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/flows/analyze": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Analyze flows
-         * @description Analyzes the current flows. Returns analysis results (stub implementation).
-         */
-        post: operations["analyzeFlows"];
         delete?: never;
         options?: never;
         head?: never;
@@ -951,6 +931,23 @@ export interface paths {
          * @description Returns a single flow by its ID.
          */
         get: operations["getFlowById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/flows/{id}/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get structural metrics for one flow */
+        get: operations["getFlowMetrics"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1972,17 +1969,36 @@ export interface components {
         FlowNode: {
             id: string;
             type: string;
-            label?: string;
-            pos?: number[];
-            size?: number[];
-            props?: {
-                [key: string]: unknown;
-            };
+            name?: string;
+            z?: string;
+            wires?: string[][];
+            [key: string]: unknown;
+        };
+        FlowSummary: {
+            id: string;
+            label: string;
+            nodes: number;
+            connections: number;
+            disabled: boolean;
+        };
+        FlowList: {
+            available: boolean;
+            flows: components["schemas"]["FlowSummary"][];
         };
         Flow: {
             id: string;
-            label?: string;
-            nodes?: components["schemas"]["FlowNode"][];
+            label: string;
+            nodes: components["schemas"]["FlowNode"][];
+        };
+        FlowMetrics: {
+            nodeCount: number;
+            connectionCount: number;
+            entryPoints: string[];
+            exitPoints: string[];
+            nodeTypes: {
+                [key: string]: number;
+            };
+            disabledNodes: number;
         };
         FlowVersion: {
             id: string;
@@ -2378,7 +2394,7 @@ export interface components {
             /** Format: date-time */
             timestamp: string;
         } & {
-            data?: components["schemas"]["Flow"][];
+            data?: components["schemas"]["FlowList"];
         };
         SuccessEnvelope_Flow: {
             /** @enum {boolean} */
@@ -2387,6 +2403,14 @@ export interface components {
             timestamp: string;
         } & {
             data?: components["schemas"]["Flow"];
+        };
+        SuccessEnvelope_FlowMetrics: {
+            /** @enum {boolean} */
+            success: true;
+            /** Format: date-time */
+            timestamp: string;
+        } & {
+            data?: components["schemas"]["FlowMetrics"];
         };
         SuccessEnvelope_FlowVersionList: {
             /** @enum {boolean} */
@@ -3937,27 +3961,6 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
         };
     };
-    analyzeFlows: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Analysis result */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SuccessEnvelope_AnyObject"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-        };
-    };
     getFlowVersions: {
         parameters: {
             query?: never;
@@ -4073,6 +4076,31 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SuccessEnvelope_Flow"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getFlowMetrics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Flow tab ID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Calculated flow metrics */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope_FlowMetrics"];
                 };
             };
             401: components["responses"]["Unauthorized"];

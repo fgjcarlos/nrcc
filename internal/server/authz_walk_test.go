@@ -41,6 +41,7 @@ var routeAuthz = map[string]authzLevel{
 	// variant exists only for operators on a private metrics network.
 	"GET /api/health":           authzPublic,
 	"GET /healthz":              authzPublic,
+	"GET /uploads/{name}":       authzPublic,
 	"GET /api/auth/status":      authzPublic,
 	"POST /api/auth/setup":      authzPublic,
 	"POST /api/auth/login":      authzPublic,
@@ -71,6 +72,7 @@ var routeAuthz = map[string]authzLevel{
 	"GET /api/flows/versions":               authzAuthenticated,
 	"GET /api/flows/versions/{from}/diff/{to}": authzAuthenticated,
 	"GET /api/flows/{id}":                   authzAuthenticated,
+	"GET /api/flows/{id}/metrics":           authzAuthenticated,
 	"GET /api/libraries/":                   authzAuthenticated,
 	"GET /api/libraries/{name}/check":       authzAuthenticated,
 	"GET /api/updates/status":               authzAuthenticated,

@@ -18,8 +18,19 @@ export const flowService = {
   },
 
   analyzeFlow: async (flowId: string): Promise<AnalysisResult> => {
-    const response = await api.post<{ data: AnalysisResult }>(`/flows/${flowId}/analyze`);
-    return response.data.data;
+    const flow = await flowService.getFlowById(flowId);
+    const response = await flowService.requestAIAssistance({
+      action: 'audit',
+      flow: { id: flow.id, label: flow.label, nodes: flow.nodes },
+    });
+    return {
+      flowId,
+      summary: response.summary,
+      pros: [],
+      cons: response.auditFindings ?? [],
+      suggestions: response.suggestions ?? [],
+      analyzedAt: new Date().toISOString(),
+    };
   },
 
   requestAIAssistance: async (input: {

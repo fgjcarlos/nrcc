@@ -77,36 +77,39 @@ func (s *LibraryService) SetNodeRedRestart(restart func() error) {
 	s.restart = restart
 }
 
-// Install installs a package using npm install and (best-effort) restarts
+// Install installs a package using npm install and restarts
 // Node-RED so the running editor picks up the new node. The caller's ctx is
 // forwarded to the package manager so client cancellation aborts npm.
 func (s *LibraryService) Install(ctx context.Context, pkg string) error {
 	if err := s.pm.Install(ctx, pkg); err != nil {
 		return err
 	}
-	s.fireRestart()
+	if err := s.fireRestart(); err != nil {
+		return fmt.Errorf("package installed, but Node-RED restart failed: %w", err)
+	}
 	return nil
 }
 
-// Uninstall uninstalls a package using npm uninstall and (best-effort)
-// restarts Node-RED. Mirror of Install — respects the caller's ctx.
+// Uninstall uninstalls a package using npm uninstall and reloads a running
+// Node-RED process. Mirror of Install — respects the caller's ctx.
 func (s *LibraryService) Uninstall(ctx context.Context, pkg string) error {
 	if err := s.pm.Uninstall(ctx, pkg); err != nil {
 		return err
 	}
-	s.fireRestart()
+	if err := s.fireRestart(); err != nil {
+		return fmt.Errorf("package uninstalled, but Node-RED restart failed: %w", err)
+	}
 	return nil
 }
 
-// fireRestart invokes the configured restart hook, ignoring the error.
-// Install/Uninstall must not fail when the runtime is unavailable
-// (external Node-RED, tests, dev loop with no running NR); the operator
-// can always restart manually.
-func (s *LibraryService) fireRestart() {
+// fireRestart invokes the configured restart hook. A missing hook is valid for
+// external Node-RED deployments; a configured hook must report failures so the
+// UI never claims that new nodes are active when the runtime did not reload.
+func (s *LibraryService) fireRestart() error {
 	if s.restart == nil {
-		return
+		return nil
 	}
-	_ = s.restart()
+	return s.restart()
 }
 
 // List returns installed npm packages with metadata from node_modules

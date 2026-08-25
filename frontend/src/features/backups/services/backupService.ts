@@ -450,7 +450,11 @@ export const backupService = {
   },
 
   restore: async (id: string): Promise<RestoreBackupResponse> => {
-    const response = await api.post<ApiEnvelope<RestoreBackupResponse> | RestoreBackupResponse>(`/backups/${encodeURIComponent(id)}/restore`);
+    const response = await api.post<ApiEnvelope<RestoreBackupResponse> | RestoreBackupResponse>(
+      `/backups/${encodeURIComponent(id)}/restore`,
+      undefined,
+      { timeout: 10 * 60_000 }
+    );
     const result = unwrapData(response.data);
 
     return {
@@ -467,6 +471,7 @@ export const backupService = {
   download: async (id: string): Promise<Blob> => {
     const response = await api.get<Blob>(`/backups/${encodeURIComponent(id)}/download`, {
       responseType: 'blob',
+      timeout: 10 * 60_000,
     });
     return response.data;
   },

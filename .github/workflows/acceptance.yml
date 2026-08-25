@@ -56,6 +56,44 @@ jobs:
           NRCC_ENCRYPTION_KEY: acceptance-fixture-encryption-key-not-a-secret
         run: docker compose build
 
+      - name: Setup pnpm via corepack
+        working-directory: frontend
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.12.0 --activate
+          pnpm --version
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # pin to commit (v7.0.0)
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install frontend and Playwright Chromium
+        working-directory: frontend
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium
+
+      - name: Start real stack for browser acceptance
+        env:
+          NRCC_ENCRYPTION_KEY: acceptance-fixture-encryption-key-not-a-secret
+        run: docker compose up -d --wait --wait-timeout 180
+
+      - name: Playwright against NRCC and Node-RED
+        working-directory: frontend
+        env:
+          E2E_BASE_URL: http://127.0.0.1:3001
+          E2E_NODE_RED_URL: http://127.0.0.1:1880
+        run: pnpm test:e2e:stack
+
+      - name: Stop real browser-acceptance stack
+        if: always()
+        env:
+          NRCC_ENCRYPTION_KEY: acceptance-fixture-encryption-key-not-a-secret
+        run: docker compose down -v --remove-orphans
+
       - name: Install jq for JSON parsing
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends jq
 

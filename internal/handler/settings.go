@@ -12,8 +12,9 @@ import (
 
 // SettingsHandler exposes the raw settings.js editor.
 type SettingsHandler struct {
-	configSvc *service.ConfigService
-	audit     *audit.Service
+	configSvc      *service.ConfigService
+	processManager *service.ProcessManager
+	audit          *audit.Service
 }
 
 // RawSettingsRequest is the payload for raw settings updates.
@@ -28,6 +29,10 @@ func NewSettingsHandler(configSvc *service.ConfigService) *SettingsHandler {
 
 // SetAuditService injects the audit logger.
 func (h *SettingsHandler) SetAuditService(a *audit.Service) { h.audit = a }
+
+// SetProcessManager wires the managed Node-RED lifecycle. Raw settings edits
+// affect the runtime only after a restart, exactly like structured config.
+func (h *SettingsHandler) SetProcessManager(pm *service.ProcessManager) { h.processManager = pm }
 
 // GetRaw handles GET /api/settings/raw.
 // Authorization (admin role) is enforced by middleware.RequireAdmin on the
@@ -70,6 +75,14 @@ func (h *SettingsHandler) SaveRaw(w http.ResponseWriter, r *http.Request) {
 		}
 		model.RespondError(w, http.StatusInternalServerError, "SETTINGS_WRITE_ERROR", err.Error())
 		return
+	}
+	if h.processManager != nil && !h.processManager.IsExternalMode() {
+		if status := h.processManager.Status(); status.Status == "running" {
+			if err := h.processManager.Restart(); err != nil {
+				model.RespondError(w, http.StatusInternalServerError, "SETTINGS_SAVED_RESTART_FAILED", "settings.js was saved, but Node-RED could not restart: "+err.Error())
+				return
+			}
+		}
 	}
 	h.audit.Log(r, claims.Username, "SETTINGS_UPDATE", "", "ok", nil)
 	model.RespondJSON(w, http.StatusOK, doc)

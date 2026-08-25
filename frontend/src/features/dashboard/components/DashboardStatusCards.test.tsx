@@ -45,6 +45,7 @@ function renderCards(overrides: Partial<React.ComponentProps<typeof DashboardSta
       inDocker={false}
       container={null}
       host={undefined}
+      runtime={undefined}
       isRestarting={false}
       onRequestRestart={noop}
       onOpenNodeRed={noop}
@@ -106,11 +107,15 @@ describe('DashboardStatusCards — Runtime + metric charts', () => {
       isError: false,
     });
 
-    renderCards({ inDocker: true, container: { inDocker: true, status: 'running', image: 'nodered:4.0.0' } });
+    renderCards({
+      inDocker: true,
+      container: { inDocker: true, status: 'running', image: 'nodered:4.0.0' },
+      runtime: { status: 'running', pid: 123, uptime: 10 },
+    });
 
     expect(screen.getByText('Runtime')).toBeInTheDocument();
     expect(screen.getByText('running')).toBeInTheDocument();
-    expect(screen.getByText('nodered:4.0.0')).toBeInTheDocument();
+    expect(screen.getByText('PID 123 · nodered:4.0.0')).toBeInTheDocument();
     // Spanish copy kept in sync with the existing dashboard (issue #676
     // explicitly defers the Spanish→English cleanup to #677 follow-ups).
     expect(screen.getByRole('button', { name: 'Reiniciar' })).toBeInTheDocument();

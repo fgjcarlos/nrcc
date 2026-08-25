@@ -12,9 +12,10 @@ import (
 
 // FlowHandler handles flow endpoints
 type FlowHandler struct {
-	svc        *service.FlowService
-	versionSvc *service.FlowVersionService
-	audit      *audit.Service
+	svc            *service.FlowService
+	versionSvc     *service.FlowVersionService
+	processManager *service.ProcessManager
+	audit          *audit.Service
 }
 
 // NewFlowHandler creates a new flow handler
@@ -24,6 +25,10 @@ func NewFlowHandler(svc *service.FlowService) *FlowHandler {
 
 // SetVersionService injects the flow version service.
 func (h *FlowHandler) SetVersionService(vs *service.FlowVersionService) { h.versionSvc = vs }
+
+// SetProcessManager lets version reverts quiesce Node-RED before replacing
+// flows.json and start it again so the reverted flow is actually active.
+func (h *FlowHandler) SetProcessManager(pm *service.ProcessManager) { h.processManager = pm }
 
 // SetAuditService injects the audit logger.
 func (h *FlowHandler) SetAuditService(a *audit.Service) { h.audit = a }
@@ -35,10 +40,6 @@ func (h *FlowHandler) GetFlows(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		model.RespondError(w, http.StatusInternalServerError, "FLOW_ERROR", err.Error())
 		return
-	}
-
-	if flows == nil {
-		flows = []interface{}{}
 	}
 
 	model.RespondJSON(w, http.StatusOK, flows)
@@ -56,6 +57,18 @@ func (h *FlowHandler) GetFlow(w http.ResponseWriter, r *http.Request) {
 	}
 
 	model.RespondJSON(w, http.StatusOK, flow)
+}
+
+// GetFlowMetrics returns structural metrics for a single flow tab.
+// GET /api/flows/{id}/metrics
+func (h *FlowHandler) GetFlowMetrics(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	metrics, err := h.svc.GetFlowMetrics(id)
+	if err != nil {
+		model.RespondError(w, http.StatusNotFound, "FLOW_NOT_FOUND", "Flow not found")
+		return
+	}
+	model.RespondJSON(w, http.StatusOK, metrics)
 }
 
 // ExportFlows exports all flows
@@ -119,15 +132,35 @@ func (h *FlowHandler) PostRevert(w http.ResponseWriter, r *http.Request) {
 	}
 
 	versionID := chi.URLParam(r, "id")
+	wasRunning := h.processManager != nil && !h.processManager.IsExternalMode() && h.processManager.Status().Status == "running"
+	if wasRunning {
+		if err := h.processManager.Stop(); err != nil {
+			model.RespondError(w, http.StatusInternalServerError, "RUNTIME_QUIESCE_ERROR", "Failed to stop Node-RED before reverting flows: "+err.Error())
+			return
+		}
+	}
+	restartAfterFailure := func() {
+		if wasRunning {
+			_ = h.processManager.Start()
+		}
+	}
 
 	if err := h.versionSvc.CaptureNow(); err != nil {
+		restartAfterFailure()
 		model.RespondError(w, http.StatusInternalServerError, "VERSION_ERROR", "Failed to snapshot current state")
 		return
 	}
 
 	if err := h.versionSvc.Revert(versionID); err != nil {
+		restartAfterFailure()
 		model.RespondError(w, http.StatusInternalServerError, "VERSION_ERROR", err.Error())
 		return
+	}
+	if wasRunning {
+		if err := h.processManager.Start(); err != nil {
+			model.RespondError(w, http.StatusInternalServerError, "FLOW_REVERTED_RESTART_FAILED", "Flows were reverted, but Node-RED could not restart: "+err.Error())
+			return
+		}
 	}
 
 	actor := ""

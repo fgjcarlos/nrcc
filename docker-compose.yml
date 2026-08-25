@@ -18,11 +18,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: nrcc
     restart: unless-stopped
     ports:
-      - "127.0.0.1:3001:3001"   # nrcc web UI + API (Tailscale-reachable)
-      - "127.0.0.1:1880:1880"   # Node-RED editor (Tailscale-reachable)
+      - "127.0.0.1:${NRCC_HOST_PORT:-3001}:3001"   # nrcc web UI + API (Tailscale-reachable)
+      - "127.0.0.1:${NODE_RED_HOST_PORT:-1880}:1880"   # Node-RED editor (Tailscale-reachable)
     environment:
       PORT: "3001"
       DATA_DIR: /data

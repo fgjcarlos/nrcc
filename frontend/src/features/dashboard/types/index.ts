@@ -2,7 +2,7 @@
 // These were originally in shared/types but are only used by dashboard
 export type { SystemInfo } from '@/shared/types';
 export type { MetricsSnapshot, RestartEvent } from './history';
-import type { SystemInfo, HostStatus } from '@/shared/types';
+import type { SystemInfo, HostStatus, RuntimeInfo } from '@/shared/types';
 import type { BackupObservability } from '@/features/backups/services';
 
 export interface DashboardContainerStatus {
@@ -16,6 +16,7 @@ export interface DashboardData {
   system?: SystemInfo;
   config?: Record<string, unknown>;
   host?: HostStatus;
+  runtime?: RuntimeInfo;
   backups?: BackupObservability;
   dockerSuccess: boolean;
   dockerLoading: boolean;

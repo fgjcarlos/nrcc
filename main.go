@@ -126,10 +126,14 @@ func runServer() {
 	// Create HTTP server
 	ui.SectionHeader("Server Starting")
 	httpSrv := &http.Server{
-		Addr:         ":" + port,
-		Handler:      srv,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
+		Addr:              ":" + port,
+		Handler:           srv,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		// npm installs and safe restores are intentionally synchronous so
+		// callers learn whether Node-RED actually reloaded. Their handlers
+		// cap work below this server-level deadline.
+		WriteTimeout: 11 * time.Minute,
 		IdleTimeout:  60 * time.Second,
 	}
 

@@ -37,6 +37,8 @@ type Server struct {
 	envHandler       *handler.EnvHandler
 	dockerHandler    *handler.DockerHandler
 	configHandler    *handler.ConfigHandler
+	settingsHandler  *handler.SettingsHandler
+	flowHandler      *handler.FlowHandler
 	systemHandler    *handler.SystemHandler
 	metricsCollector *metrics.MetricsCollector
 	metricsBuffer    *service.MetricsBuffer
@@ -210,6 +212,9 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
+	// Public image assets referenced by Node-RED's editorTheme. The handler
+	// verifies content bytes and refuses to serve non-images.
+	r.Get("/uploads/{name}", filesHandler.ServeImage)
 
 	// #671: /metrics is gated by default — it leaks login-failure counters
 	// (a brute-force oracle) and Go runtime fingerprinting data. Operators
@@ -363,6 +368,7 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 			r.With(middleware.RequireAdmin).Post("/versions", flowHandler.PostSnapshot)
 			r.Get("/versions/{from}/diff/{to}", flowHandler.GetVersionDiff)
 			r.With(middleware.RequireAdmin).Post("/versions/{id}/revert", flowHandler.PostRevert)
+			r.Get("/{id}/metrics", flowHandler.GetFlowMetrics)
 			r.Get("/{id}", flowHandler.GetFlow)
 		})
 
@@ -419,6 +425,8 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 		envHandler:       envHandler,
 		dockerHandler:    dockerHandler,
 		configHandler:    configHandler,
+		settingsHandler:  settingsHandler,
+		flowHandler:      flowHandler,
 		systemHandler:    systemHandler,
 		metricsCollector: metricsCollector,
 		metricsBuffer:    metricsBuffer,
@@ -479,6 +487,12 @@ func (s *Server) SetProcessManager(pm *service.ProcessManager) {
 	if s.configHandler != nil {
 		s.configHandler.SetProcessManager(pm)
 	}
+	if s.settingsHandler != nil {
+		s.settingsHandler.SetProcessManager(pm)
+	}
+	if s.flowHandler != nil {
+		s.flowHandler.SetProcessManager(pm)
+	}
 	// Wire process manager into metrics collector for runtime status gauges
 	if s.metricsCollector != nil {
 		s.metricsCollector.SetProcessManager(pm)
@@ -501,13 +515,15 @@ func (s *Server) SetProcessManager(pm *service.ProcessManager) {
 			return nil
 		})
 	}
-	// Wire the library service so npm install/uninstall triggers a Node-RED
-	// restart and the editor picks up new nodes without a container
-	// recreation. The restart is best-effort: a failing hook must not turn
-	// into an HTTP 500 on the install endpoint.
+	// Wire the library service so npm install/uninstall reloads a running
+	// Node-RED process. Restart failures propagate to the caller; otherwise
+	// the UI would claim the node set is active when only package.json changed.
 	if s.librarySvc != nil {
 		start := pm.Start
 		s.librarySvc.SetNodeRedRestart(func() error {
+			if pm.Status().Status != "running" {
+				return nil
+			}
 			if err := pm.Stop(); err != nil {
 				return err
 			}

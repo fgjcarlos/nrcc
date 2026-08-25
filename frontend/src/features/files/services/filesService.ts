@@ -13,6 +13,7 @@ export const filesService = {
 
     return api.post<ApiResponse<UploadedFileResponse>>('/files/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 2 * 60_000,
     });
   },
 

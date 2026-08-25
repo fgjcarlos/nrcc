@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { dashboardService } from '../services';
+import { dashboardService, historyService } from '../services';
 import type { DashboardContainerStatus, DashboardData } from '../types';
 import type { HostStatus } from '@/shared/types';
 
@@ -35,9 +35,18 @@ export function useDashboardData(): DashboardData {
   });
 
   const { data: backupObservability } = useQuery({
-	queryKey: queryKeys.backups.observability,
-	queryFn: () => dashboardService.getBackupObservability(),
-	refetchInterval: 15000,
+    queryKey: queryKeys.backups.observability,
+    queryFn: () => dashboardService.getBackupObservability(),
+    refetchInterval: 15000,
+  });
+
+  const { data: runtimeData } = useQuery({
+    queryKey: queryKeys.runtime.status,
+    queryFn: async () => {
+      const response = await historyService.getRuntimeHistory(1);
+      return response.data.data.status;
+    },
+    refetchInterval: 5000,
   });
 
   return {
@@ -45,6 +54,7 @@ export function useDashboardData(): DashboardData {
     system: systemData?.data?.data,
     config: configData?.data?.data as unknown as Record<string, unknown> | undefined,
     host: hostData,
+    runtime: runtimeData,
     backups: backupObservability,
     dockerSuccess: dockerData?.data?.success === true,
     dockerLoading,
