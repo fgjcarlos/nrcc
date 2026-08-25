@@ -53,15 +53,18 @@ services:
       - "no-new-privileges:true"
     cap_drop:
       - ALL
-    # BusyBox `su -- node-red` (in docker/entrypoint.sh) needs CAP_SETGID
+    # The entrypoint needs CAP_CHOWN only while it repairs root-owned named
+    # volumes under /data. BusyBox `su -- node-red` then needs CAP_SETGID
     # (for setgroups() to attach node-red's supplementary groups) and
     # CAP_SETUID (for setuid() to actually drop to uid 1000). With
     # cap_drop: ALL alone, the entrypoint exits 1 on first boot with
     # `su: can't set groups: Operation not permitted` (or `su: setuid:`
     # once CAP_SETGID is added) and Docker restarts the container in a
-    # loop. These two caps are the standard minimum for privilege-drop
-    # to an unprivileged user; no others are added back.
+    # loop. `su` clears all permitted/effective/inheritable/ambient caps when
+    # it hands off to uid 1000; acceptance verifies the long-running nrcc
+    # process retains none. Do not add capabilities to the nrcc executable.
     cap_add:
+      - CAP_CHOWN
       - CAP_SETGID
       - CAP_SETUID
     # Do not set RLIMIT_NPROC here. Linux accounts it by real host UID,

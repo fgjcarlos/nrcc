@@ -15,6 +15,8 @@
 #      `compose down` then `compose up`, verify the state survived.
 #   4. Backup → wipe → restore   — create a backup, simulate a destructive
 #      restore into a fresh stack, verify health comes back.
+# Scenario 1 also seeds root-owned backup/node_modules volumes, proves uid 1000
+# writes both after startup, and proves nrcc retains no capabilities.
 #
 # Sibling-container safety: this script never mounts the Docker socket and
 # never references another stack by container_name. Each scenario uses its
@@ -219,8 +221,8 @@ api_call_authed() {
 # ── Cleanup (always run, even on failure) ───────────────────────────────────
 STACKS_TO_CLEAN=()
 cleanup() {
-  log "cleanup: removing stacks ${STACKS_TO_CLEAN[*]:-(none)}"
   local rc=$?
+  log "cleanup: removing stacks ${STACKS_TO_CLEAN[*]:-(none)}"
   for stack in "${STACKS_TO_CLEAN[@]:-}"; do
     [[ -z "$stack" ]] && continue
     if [[ "$DRY_RUN" == "1" ]]; then
@@ -238,12 +240,40 @@ register_stack() { STACKS_TO_CLEAN+=("$1"); }
 
 # ── Scenarios ───────────────────────────────────────────────────────────────
 
+# Prepare the two nested volumes in the exact broken shape from issue #720:
+# an existing Compose volume whose root is owned by root and not writable by
+# uid 1000. The image's entrypoint must repair this before handing off to nrcc.
+prepare_root_owned_runtime_volumes() {
+  if [[ "$DRY_RUN" == "1" ]]; then
+    log "DRY-RUN skipped root-owned volume fixture"
+    return 0
+  fi
+
+  compose_call "$PROJECT_A" create
+
+  local container image destination volume
+  container="$(docker compose -p "$PROJECT_A" -f "$COMPOSE_FILE" ps -aq nrcc | head -1)"
+  [[ -n "$container" ]] || fail "ownership fixture: no nrcc container in A"
+  image="$(docker inspect --format '{{.Config.Image}}' "$container")"
+
+  for destination in /data/backups /data/node_modules; do
+    volume="$(docker inspect --format \
+      "{{range .Mounts}}{{if eq .Destination \"${destination}\"}}{{.Name}}{{end}}{{end}}" \
+      "$container")"
+    [[ -n "$volume" ]] || fail "ownership fixture: no volume mounted at ${destination}"
+    docker run --rm --user 0:0 --entrypoint /bin/sh \
+      -v "${volume}:/target" "$image" -c \
+      'chown -R 0:0 /target && chmod 0755 /target && touch /target/root-owned-fixture'
+  done
+}
+
 # Scenario 1 — single-stack happy path.
 scenario_1_single_stack() {
   log "scenario 1: single-stack happy path (project=${PROJECT_A})"
   register_stack "$PROJECT_A"
   set_compose_env "$PROJECT_A" "$HOST_API_A" "$HOST_NR_A"
 
+  prepare_root_owned_runtime_volumes
   compose_call "$PROJECT_A" up -d --wait --wait-timeout "$TIMEOUT_NODE"
 
   # NRCC health endpoint must be live.
@@ -254,7 +284,7 @@ scenario_1_single_stack() {
   # node-red uses UID 1000, setting it can make BusyBox su fail to exec /bin/sh
   # with EAGAIN on otherwise healthy hosts. pids_limit is the isolated control.
   if [[ "$DRY_RUN" != "1" ]]; then
-    local container_a ulimits pids_limit
+    local container_a ulimits pids_limit process_security
     container_a="$(docker compose -p "$PROJECT_A" -f "$COMPOSE_FILE" ps -q nrcc | head -1)"
     ulimits="$(docker inspect --format '{{json .HostConfig.Ulimits}}' "$container_a")"
     if [[ "$ulimits" == *'"Name":"nproc"'* ]]; then
@@ -262,6 +292,30 @@ scenario_1_single_stack() {
     fi
     pids_limit="$(docker inspect --format '{{.HostConfig.PidsLimit}}' "$container_a")"
     assert_eq "$pids_limit" "512" "container-scoped PID limit"
+
+    # The entrypoint starts as root only long enough to repair volume
+    # ownership. The long-running nrcc process must be uid/gid 1000 with no
+    # permitted, effective, inheritable, or ambient capabilities.
+    process_security="$(docker exec "$container_a" sh -c '
+      set -- $(pidof nrcc)
+      pid="$1"
+      awk '\''
+        /^Uid:/ { uid=$2 }
+        /^Gid:/ { gid=$2 }
+        /^CapInh:/ { inh=$2 }
+        /^CapPrm:/ { prm=$2 }
+        /^CapEff:/ { eff=$2 }
+        /^CapAmb:/ { amb=$2 }
+        END { printf "%s:%s:%s:%s:%s:%s", uid, gid, inh, prm, eff, amb }
+      '\'' "/proc/${pid}/status"
+    ')"
+    assert_eq "$process_security" \
+      "1000:1000:0000000000000000:0000000000000000:0000000000000000:0000000000000000" \
+      "nrcc runtime identity and capabilities"
+
+    docker exec --user 1000:1000 "$container_a" sh -c \
+      'touch /data/backups/.uid-1000-write && touch /data/node_modules/.uid-1000-write'
+    ok "uid 1000 writes to repaired backup and node_modules volumes"
   fi
 
   # First-boot bootstrap — completes the setup wizard so we have a session.
@@ -276,6 +330,39 @@ scenario_1_single_stack() {
   GLOBAL_TOKEN="$(login_api "$HOST_API_A")" \
     || fail "scenario 1: login failed"
   [[ -n "$GLOBAL_TOKEN" ]] || fail "scenario 1: empty token"
+
+  if [[ "$DRY_RUN" != "1" ]]; then
+    local ownership_backup_resp ownership_backup_id
+    ownership_backup_resp="$(api_call_authed POST \
+      "http://localhost:${HOST_API_A}/api/backups/" "$GLOBAL_TOKEN" \
+      '{"name":"ownership-acceptance","type":"manual"}')" \
+      || fail "scenario 1: backup on repaired volume failed: ${ownership_backup_resp}"
+    ownership_backup_id="$(printf '%s' "$ownership_backup_resp" \
+      | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')"
+    [[ -n "$ownership_backup_id" ]] \
+      || fail "scenario 1: no backup id in ownership response"
+    docker exec "$container_a" test -s "/data/backups/${ownership_backup_id}.zip" \
+      || fail "scenario 1: backup archive missing from repaired volume"
+    ok "backup API writes a real archive to the repaired volume"
+
+    docker exec --user 0:0 "$container_a" sh -c '
+      rm -rf /tmp/nrcc-acceptance-fixture
+      mkdir -p /tmp/nrcc-acceptance-fixture
+      printf "%s\n" \
+        "{\"name\":\"@nrcc/acceptance-fixture\",\"version\":\"0.0.1\"}" \
+        > /tmp/nrcc-acceptance-fixture/package.json
+      chmod -R a+rX /tmp/nrcc-acceptance-fixture
+    '
+    docker exec --user 1000:1000 "$container_a" sh -c '
+      cd /data
+      npm install --ignore-scripts --no-audit --no-fund --no-package-lock \
+        /tmp/nrcc-acceptance-fixture
+    ' || fail "scenario 1: local fixture npm install failed"
+    docker exec "$container_a" \
+      test -f /data/node_modules/@nrcc/acceptance-fixture/package.json \
+      || fail "scenario 1: local fixture missing from Node-RED user directory"
+    ok "local fixture package installed in the Node-RED user directory"
+  fi
 
   # Node-RED editor reachable on its port.
   http_get "http://localhost:${HOST_NR_A}/" \
@@ -340,9 +427,9 @@ scenario_3_persistence() {
                   ps -q nrcc | head -1)"
     [[ -n "$container" ]] || fail "scenario 3: no nrcc container in A"
 
-    docker exec "$container" sh -c \
+    docker exec --user 1000:1000 "$container" sh -c \
       "echo 'sentinel-from-scenario-3' > ${user_dir}/sentinel.txt"
-    docker exec "$container" sh -c \
+    docker exec --user 1000:1000 "$container" sh -c \
       "echo '{\"name\":\"@nrcc/acceptance-fixture\",\"version\":\"0.0.1\"}' \
         > ${user_dir}/package.json.add"
   fi
@@ -397,8 +484,14 @@ scenario_4_backup_restore() {
                   ps -q nrcc | head -1)"
     [[ -n "$container" ]] || fail "scenario 4: no nrcc container in C"
 
+    # Stop Node-RED before replacing flows.json; otherwise its live runtime can
+    # publish its in-memory flow set between our fixture write and backup.
+    api_call_authed POST \
+      "http://localhost:${HOST_API_C}/api/runtime/stop" "$token_c" \
+      >/dev/null || fail "scenario 4: could not stop Node-RED before seeding"
+
     # Seed a known flows file so we can prove restore round-tripped.
-    docker exec "$container" sh -c \
+    docker exec --user 1000:1000 "$container" sh -c \
       "echo '[{\"id\":\"acceptance-test\",\"type\":\"tab\"}]' > /data/flows.json"
 
     # POST a manual backup via the public API. The Local provider (#431)
@@ -414,7 +507,7 @@ scenario_4_backup_restore() {
     [[ -n "$backup_id" ]] || fail "scenario 4: no backup id in response"
 
     # Simulate disaster: nuke the live data.
-    docker exec "$container" sh -c \
+    docker exec --user 1000:1000 "$container" sh -c \
       "rm -f /data/flows.json && echo 'wiped' > /tmp/wiped"
 
     # Restore.
@@ -428,7 +521,8 @@ scenario_4_backup_restore() {
       || fail "scenario 4: NRCC health did not return after restore"
 
     local restored
-    restored="$(docker exec "$container" cat /data/flows.json 2>/dev/null || true)"
+    restored="$(docker exec --user 1000:1000 "$container" \
+                  cat /data/flows.json 2>/dev/null || true)"
     assert_contains "$restored" "acceptance-test" \
       "flows.json restored from backup"
   fi
@@ -457,6 +551,8 @@ scenario_5_entrypoint_umask() {
 
   # One-liner that mirrors the entrypoint's strict-mode + umask block
   # and prints the umask; exit 0 before any chown / su would run.
+  # Command substitution runs inside the container, not in this shell.
+  # shellcheck disable=SC2016
   local probe='set -Eeuo pipefail; umask 0077; printf %s "$(umask)"; exit 0'
   local out image container
   container="$(docker compose -p "$PROJECT_A" -f "$COMPOSE_FILE" ps -q nrcc | head -1)"

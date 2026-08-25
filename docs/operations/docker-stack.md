@@ -130,6 +130,21 @@ Recommended: mount `<DATA_DIR>/backups` on a separate volume (the
 shipped `docker-compose.yml` does this — `nrcc_backups`) so a stack
 recreation does not lose history.
 
+### Volume ownership and capability boundary
+
+Docker can materialise `/data`, `/data/backups`, and
+`/data/node_modules` as root-owned volumes. The container entrypoint starts as
+root and uses the narrowly-scoped `CAP_CHOWN` capability to repair those paths
+before handing off to the `node-red` account (UID/GID 1000). `CAP_SETUID` and
+`CAP_SETGID` exist only for that handoff.
+
+The long-running NRCC and Node-RED processes do not run as root and retain no
+permitted, effective, inheritable, or ambient capabilities. Keep
+`no-new-privileges:true`; do not add file capabilities to the NRCC binary. The
+Docker acceptance suite seeds root-owned backup and module volumes, exercises a
+real backup plus a local npm fixture install, and checks the final process
+identity and capability sets.
+
 ## Restore
 
 Restores happen from the **Backups** UI panel. Pick a snapshot, pick
