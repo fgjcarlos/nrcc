@@ -44,7 +44,11 @@ export function useDashboardData(): DashboardData {
     queryKey: queryKeys.runtime.status,
     queryFn: async () => {
       const response = await historyService.getRuntimeHistory(1);
-      return response.data.data.status;
+      const status = response.data.data?.status;
+      if (!status) {
+        throw new Error('Runtime status missing from API response');
+      }
+      return status;
     },
     refetchInterval: 5000,
   });

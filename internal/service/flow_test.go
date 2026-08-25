@@ -15,7 +15,7 @@ const testFlowsJSON = `[
   {"id":"global-config","type":"global-config"}
 ]`
 
-func writeTestFlows(t *testing.T) string {
+func writeFlowServiceFixture(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "flows.json"), []byte(testFlowsJSON), 0600); err != nil {
@@ -25,7 +25,7 @@ func writeTestFlows(t *testing.T) string {
 }
 
 func TestFlowServiceBuildsTabSummariesFromFlatNodeRedDocument(t *testing.T) {
-	svc := NewFlowService(writeTestFlows(t))
+	svc := NewFlowService(writeFlowServiceFixture(t))
 	result, err := svc.GetFlows()
 	if err != nil {
 		t.Fatal(err)
@@ -43,7 +43,7 @@ func TestFlowServiceBuildsTabSummariesFromFlatNodeRedDocument(t *testing.T) {
 }
 
 func TestFlowServiceReturnsDetailAndMetricsForTab(t *testing.T) {
-	svc := NewFlowService(writeTestFlows(t))
+	svc := NewFlowService(writeFlowServiceFixture(t))
 	detail, err := svc.GetFlow("tab-a")
 	if err != nil {
 		t.Fatal(err)
