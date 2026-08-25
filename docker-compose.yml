@@ -64,6 +64,11 @@ services:
     cap_add:
       - CAP_SETGID
       - CAP_SETUID
+    # Do not set RLIMIT_NPROC here. Linux accounts it by real host UID,
+    # not by Compose project/container. The node-red user is UID 1000, so
+    # a busy host can exhaust a seemingly generous limit before BusyBox su
+    # execs /bin/sh, causing EAGAIN: "Resource temporarily unavailable".
+    # pids_limit is the container-scoped process limit.
     pids_limit: 512
     mem_limit: 512m
     cpus: "1.0"
@@ -73,7 +78,6 @@ services:
       nofile:
         soft: 65535
         hard: 65535
-      nproc: 1024
 
 volumes:
   nrcc_data:
