@@ -110,7 +110,7 @@ test('unknown API routes fail as JSON instead of returning the SPA', async () =>
 test('flow list and detail are derived from the live Node-RED flows document', async ({ page }) => {
   await seedProbeFlow()
   await login(page)
-  await page.goto('/flows')
+  await page.getByRole('link', { name: 'Flows', exact: true }).click()
 
   await expect(page.getByRole('heading', { name: 'Flows' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'NRCC E2E Flow' })).toBeVisible()
@@ -148,7 +148,7 @@ test('dashboard restart changes the managed Node-RED process PID', async ({ page
 test('environment action reaches a live Node-RED flow after its restart', async ({ page }) => {
   await seedProbeFlow()
   await login(page)
-  await page.goto('/environment')
+  await page.getByRole('link', { name: 'Environment', exact: true }).click()
   await page.getByRole('button', { name: 'Add' }).click()
   await page.getByPlaceholder('MY_VARIABLE').fill('NRCC_E2E_PROBE')
   await page.getByTestId('env-var-value-field').locator('input').fill('propagated-through-node-red')
