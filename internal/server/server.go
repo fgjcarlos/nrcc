@@ -36,6 +36,7 @@ type Server struct {
 	librarySvc       *service.LibraryService
 	envHandler       *handler.EnvHandler
 	dockerHandler    *handler.DockerHandler
+	configHandler    *handler.ConfigHandler
 	systemHandler    *handler.SystemHandler
 	metricsCollector *metrics.MetricsCollector
 	metricsBuffer    *service.MetricsBuffer
@@ -288,6 +289,13 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 		// System routes
 		r.Get("/api/system/info", systemHandler.GetSystemInfo)
 		r.Get("/api/system/history", systemHandler.GetSystemHistory)
+		// #715: dashboard restart/start/stop buttons were hitting the SPA
+		// fallback (200 HTML) instead of a real handler. Wire them to the
+		// SystemHandler's runtime controls (admin-only — these mutate the
+		// managed Node-RED process).
+		r.With(middleware.RequireAdmin).Post("/api/runtime/restart", systemHandler.RestartNodeRed)
+		r.With(middleware.RequireAdmin).Post("/api/runtime/start", systemHandler.StartNodeRed)
+		r.With(middleware.RequireAdmin).Post("/api/runtime/stop", systemHandler.StopNodeRed)
 		r.Get("/api/runtime/history", systemHandler.GetRuntimeHistory)
 		// #676 item 2: backs the SecurityPostureCard. Returns the four
 		// boolean/count chips that surface the silent-degradation failure
@@ -410,6 +418,7 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 		librarySvc:       librarySvc,
 		envHandler:       envHandler,
 		dockerHandler:    dockerHandler,
+		configHandler:    configHandler,
 		systemHandler:    systemHandler,
 		metricsCollector: metricsCollector,
 		metricsBuffer:    metricsBuffer,
@@ -464,6 +473,12 @@ func (s *Server) SetProcessManager(pm *service.ProcessManager) {
 	pm.SetEnvService(s.envSvc)
 	// Wire process manager into env handler so it restarts node-red on env changes
 	s.envHandler.SetProcessManager(pm)
+	// Wire process manager into config handler so a successful SaveConfig
+	// auto-restarts Node-RED and the new settings.js is actually picked up
+	// by the running process (#715).
+	if s.configHandler != nil {
+		s.configHandler.SetProcessManager(pm)
+	}
 	// Wire process manager into metrics collector for runtime status gauges
 	if s.metricsCollector != nil {
 		s.metricsCollector.SetProcessManager(pm)

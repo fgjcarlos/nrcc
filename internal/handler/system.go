@@ -45,7 +45,7 @@ func (h *SystemHandler) SetMetricsBuffer(buf *service.MetricsBuffer) {
 }
 
 // SetProcessManager wires the ProcessManager into the SystemHandler so it can
-// serve the /api/runtime/history endpoint.
+// serve the /api/runtime/* endpoints.
 func (h *SystemHandler) SetProcessManager(pm *service.ProcessManager) {
 	h.processManager = pm
 }
@@ -318,4 +318,69 @@ func (h *SystemHandler) GetSecurityPosture(w http.ResponseWriter, r *http.Reques
 	}
 
 	model.RespondJSON(w, http.StatusOK, resp)
+}
+
+// RestartNodeRed, StartNodeRed and StopNodeRed power the dashboard's
+// runtime controls. They were missing from the codebase since #486 (which
+// dropped /docker/restart and /docker/stop): the dashboard's restart
+// button already pointed at /api/runtime/restart, but no handler
+// existed, so the SPA fallback served index.html with status 200 and the
+// UI showed a false "Node-RED reiniciado" toast without actually
+// restarting anything (#715).
+//
+// Each handler:
+//   - 503s when the ProcessManager is not wired (edge mode, tests).
+//   - 409s for restart/stop when Node-RED is externally managed — there
+//     is no process for nrcc to control, and silently no-oping was the
+//     bug we just fixed.
+//   - 202s restart (the call returns before the stop+start cycle finishes
+//     so the dashboard does not hang on a slow restart). Stop / start are
+//     synchronous because the underlying ProcessManager methods already
+//     wait for the process to exit / spawn.
+
+// RestartNodeRed handles POST /api/runtime/restart — admin only.
+func (h *SystemHandler) RestartNodeRed(w http.ResponseWriter, r *http.Request) {
+	if h.processManager == nil {
+		model.RespondError(w, http.StatusServiceUnavailable, "PROCESS_MANAGER_UNAVAILABLE", "Node-RED management is not available in this deployment")
+		return
+	}
+	if h.processManager.IsExternalMode() {
+		model.RespondError(w, http.StatusConflict, "EXTERNAL_NODE_RED", "cannot restart an externally managed Node-RED instance")
+		return
+	}
+	// Run in the background so the HTTP request does not hang on a slow
+	// Node-RED restart cycle. The frontend polls /api/runtime/status to
+	// observe the transition; any error surfaces there.
+	go func() { _ = h.processManager.Restart() }()
+	model.RespondJSON(w, http.StatusAccepted, map[string]any{"message": "Node-RED restart initiated"})
+}
+
+// StartNodeRed handles POST /api/runtime/start — admin only.
+func (h *SystemHandler) StartNodeRed(w http.ResponseWriter, r *http.Request) {
+	if h.processManager == nil {
+		model.RespondError(w, http.StatusServiceUnavailable, "PROCESS_MANAGER_UNAVAILABLE", "Node-RED management is not available in this deployment")
+		return
+	}
+	if err := h.processManager.Start(); err != nil {
+		model.RespondError(w, http.StatusConflict, "START_FAILED", err.Error())
+		return
+	}
+	model.RespondJSON(w, http.StatusOK, map[string]any{"message": "Node-RED started"})
+}
+
+// StopNodeRed handles POST /api/runtime/stop — admin only.
+func (h *SystemHandler) StopNodeRed(w http.ResponseWriter, r *http.Request) {
+	if h.processManager == nil {
+		model.RespondError(w, http.StatusServiceUnavailable, "PROCESS_MANAGER_UNAVAILABLE", "Node-RED management is not available in this deployment")
+		return
+	}
+	if h.processManager.IsExternalMode() {
+		model.RespondError(w, http.StatusConflict, "EXTERNAL_NODE_RED", "cannot stop an externally managed Node-RED instance")
+		return
+	}
+	if err := h.processManager.Stop(); err != nil {
+		model.RespondError(w, http.StatusInternalServerError, "STOP_FAILED", err.Error())
+		return
+	}
+	model.RespondJSON(w, http.StatusOK, map[string]any{"message": "Node-RED stopped"})
 }
