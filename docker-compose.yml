@@ -54,6 +54,17 @@ services:
       - "no-new-privileges:true"
     cap_drop:
       - ALL
+    # BusyBox `su -- node-red` (in docker/entrypoint.sh) needs CAP_SETGID
+    # (for setgroups() to attach node-red's supplementary groups) and
+    # CAP_SETUID (for setuid() to actually drop to uid 1000). With
+    # cap_drop: ALL alone, the entrypoint exits 1 on first boot with
+    # `su: can't set groups: Operation not permitted` (or `su: setuid:`
+    # once CAP_SETGID is added) and Docker restarts the container in a
+    # loop. These two caps are the standard minimum for privilege-drop
+    # to an unprivileged user; no others are added back.
+    cap_add:
+      - CAP_SETGID
+      - CAP_SETUID
     pids_limit: 512
     mem_limit: 512m
     cpus: "1.0"
