@@ -41,6 +41,9 @@ fi
 # Drop to node-red (uid 1000). BusyBox su clears $HOME/$PATH/$USER by
 # default; we want that — the runtime inside nrcc reads DATA_DIR from
 # the original env, which su inherits because it does not -l.
-# -- separates options from positional args; "$@" forwards any
-# container extra args (e.g. --help) to the nrcc binary.
-exec su -- node-red -s /bin/sh -c 'exec /usr/local/bin/nrcc "$@"' _ "$@"
+# No `--` here: BusyBox su (Alpine 3.24, BusyBox 1.37, used by
+# nodered/node-red:5.0.4-24-minimal) does not parse `--` as an
+# end-of-options marker; it treats `--` as the username positional and
+# silently exits 0 without running the command. Forward any container
+# extra args (e.g. --help) via "$@" to the nrcc binary.
+exec su node-red -s /bin/sh -c 'exec /usr/local/bin/nrcc "$@"' _ "$@"
