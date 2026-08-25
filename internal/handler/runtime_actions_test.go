@@ -10,14 +10,6 @@ import (
 	"github.com/fgjcarlos/nrcc/internal/service"
 )
 
-// runtimeActionResponse matches the JSON shape returned by the three
-// /api/runtime/* handlers added in #715.
-type runtimeActionResponse struct {
-	Success bool            `json:"success"`
-	Data    map[string]any  `json:"data"`
-	Error   *model.ApiError `json:"error,omitempty"`
-}
-
 // All three handlers refuse to do anything when no ProcessManager is wired
 // (edge mode, tests). Without this guard the dashboard's "Restart" button
 // would silently no-op — the exact bug that #715 fixes.

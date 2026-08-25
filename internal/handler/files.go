@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -157,7 +158,8 @@ func (h *FilesHandler) ServeImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	filePath := filepath.Join(h.dataDir, "uploads", name)
-	file, err := os.Open(filePath) // #nosec G304 -- path is rooted and name is base-validated above.
+	// #nosec G304,G703 -- filePath is rooted to dataDir/uploads and name is base-validated above.
+	file, err := os.Open(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			model.RespondError(w, http.StatusNotFound, "NOT_FOUND", "Image not found")
@@ -174,7 +176,7 @@ func (h *FilesHandler) ServeImage(w http.ResponseWriter, r *http.Request) {
 	}
 	header := make([]byte, 512)
 	n, err := file.Read(header)
-	if err != nil && err != io.EOF {
+	if err != nil && !errors.Is(err, io.EOF) {
 		model.RespondError(w, http.StatusInternalServerError, "IMAGE_ERROR", err.Error())
 		return
 	}
