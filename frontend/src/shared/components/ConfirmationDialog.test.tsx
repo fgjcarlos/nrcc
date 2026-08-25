@@ -38,6 +38,88 @@ describe('ConfirmationDialog', () => {
     expect(dialog).toHaveAccessibleName('Delete User');
   });
 
+  it('renders the shared dialog in the document top layer (#721)', () => {
+    render(
+      <div data-testid="page-shell">
+        <ConfirmationDialog
+          isOpen={true}
+          title="Update Node-RED"
+          description="Apply the update?"
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+        />
+      </div>
+    );
+
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.closest('[data-confirmation-dialog-portal]')?.parentElement).toBe(document.body);
+    expect(screen.getByTestId('page-shell')).not.toContainElement(dialog);
+  });
+
+  it('moves focus safely, traps Tab in both directions, and restores the trigger (#721)', async () => {
+    const user = userEvent.setup();
+    const trigger = document.createElement('button');
+    trigger.textContent = 'Open update dialog';
+    document.body.appendChild(trigger);
+    trigger.focus();
+
+    const { rerender } = render(
+      <ConfirmationDialog
+        isOpen={true}
+        title="Update Node-RED"
+        description="Apply the update?"
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />
+    );
+
+    const cancel = await screen.findByRole('button', { name: UI_COPY.cancel });
+    await waitFor(() => expect(cancel).toHaveFocus());
+
+    const close = screen.getByRole('button', { name: 'Close dialog' });
+    const confirm = screen.getByRole('button', { name: UI_COPY.confirm });
+    close.focus();
+    await user.tab({ shift: true });
+    expect(confirm).toHaveFocus();
+    await user.tab();
+    expect(close).toHaveFocus();
+
+    rerender(
+      <ConfirmationDialog
+        isOpen={false}
+        title="Update Node-RED"
+        description="Apply the update?"
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />
+    );
+    expect(trigger).toHaveFocus();
+    trigger.remove();
+  });
+
+  it('submits once when Enter activates the focused confirm button (#721)', async () => {
+    const user = userEvent.setup();
+    const onConfirm = vi.fn();
+    render(
+      <ConfirmationDialog
+        isOpen={true}
+        title="Update Node-RED"
+        description="Apply the update?"
+        onConfirm={onConfirm}
+        onCancel={vi.fn()}
+      />
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: UI_COPY.cancel })).toHaveFocus()
+    );
+    const confirm = screen.getByRole('button', { name: UI_COPY.confirm });
+    confirm.focus();
+    await user.keyboard('{Enter}');
+
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
   it('does not render when isOpen is false', () => {
     render(
       <ConfirmationDialog

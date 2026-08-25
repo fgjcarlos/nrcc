@@ -27,9 +27,10 @@ The confirmation dialog is used for destructive actions (delete, remove, clear, 
 
 #### Auto-Focus on Open
 
-When the dialog opens with a `confirmText` prop (type-to-confirm pattern):
-- The text input automatically receives focus (after a brief 100ms delay to allow DOM rendering)
-- This enables keyboard-first confirmation workflows for destructive actions
+When the dialog opens:
+- The text input receives focus when a `confirmText` gate is present
+- Otherwise, the Cancel button receives focus so a destructive action is never the default target
+- Closing the dialog restores focus to the control that opened it
 
 #### Focus Trap
 
@@ -37,6 +38,12 @@ Once the dialog is open:
 - Tab and Shift+Tab cycle through all focusable elements within the dialog
 - Focus wraps: tabbing forward from the last element moves to the first; tabbing backward from the first moves to the last
 - Focus CANNOT escape to background content (no tabbing to hidden elements)
+
+#### Top Layer
+
+The shared dialog is portaled directly to `document.body` with a layer above page drawers and
+other local stacking contexts. Feature pages must use this shared dialog rather than adding a
+feature-specific modal implementation.
 
 #### Focus Restoration
 
@@ -170,7 +177,8 @@ useEffect(() => {
 
 ### Keyboard Event Handling
 
-- **ConfirmationDialog**: Handles Escape, Enter on `keydown` event
+- **ConfirmationDialog**: Handles Escape, Tab trapping, and Enter outside native buttons on
+  `keydown`; native buttons handle Enter themselves to avoid duplicate confirmation
 - **UserMenu**: Handles Escape on `keydown` event
 - Both use document-level listeners for predictable capture (keyboard events bubble)
 
