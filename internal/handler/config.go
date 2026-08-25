@@ -14,6 +14,13 @@ import (
 type ConfigHandler struct {
 	configSvc *service.ConfigService
 	audit     *audit.Service
+
+	// Optional ProcessManager wire-up. When non-nil, SaveConfig triggers
+	// a Node-RED restart after the settings.js write so Editor Theme,
+	// Editor Library, Logging, Projects etc. changes take effect without
+	// a separate manual restart click. Stays nil in unit tests where
+	// there is no managed Node-RED process — #715.
+	processManager *service.ProcessManager
 }
 
 // NewConfigHandler creates a new config handler
@@ -23,6 +30,11 @@ func NewConfigHandler(configSvc *service.ConfigService) *ConfigHandler {
 
 // SetAuditService injects the audit logger.
 func (h *ConfigHandler) SetAuditService(a *audit.Service) { h.audit = a }
+
+// SetProcessManager wires the ProcessManager so a successful Save
+// triggers a Node-RED restart. Pass nil to disable auto-restart
+// (used in edge mode and in tests).
+func (h *ConfigHandler) SetProcessManager(pm *service.ProcessManager) { h.processManager = pm }
 
 // GetConfig handles GET /api/config - protected
 func (h *ConfigHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
@@ -79,6 +91,18 @@ func (h *ConfigHandler) SaveConfig(w http.ResponseWriter, r *http.Request) {
 	if err := h.configSvc.Save(cfg); err != nil {
 		model.RespondError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
 		return
+	}
+
+	// #715: Node-RED reads settings.js only at start, so any Editor Theme /
+	// Editor Library / Logging / Projects change is invisible to the running
+	// process unless we restart it. Trigger a background restart here so
+	// the user does not have to click the dashboard Restart button after
+	// every Save. Skipped when the PM is not wired (edge mode / tests) or
+	// when Node-RED is externally managed (we cannot control it).
+	if h.processManager != nil && !h.processManager.IsExternalMode() {
+		if status := h.processManager.Status(); status.Status == "running" {
+			go func() { _ = h.processManager.Restart() }()
+		}
 	}
 
 	h.audit.Log(r, claims.Username, "CONFIG_SAVE", "", "ok", nil)

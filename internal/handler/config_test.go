@@ -446,3 +446,92 @@ func TestConfigHandler_GetConfig_Admin_ReturnsFullConfig(t *testing.T) {
 		t.Errorf("admin must see cleartext env var value; not found in response")
 	}
 }
+
+// TestSaveConfig_NoProcessManager_DoesNotPanic is the regression guard for
+// #715: ConfigHandler.SaveConfig previously had no dependency on a
+// ProcessManager; adding the auto-restart hook must not break any existing
+// test setup that uses NewConfigHandler without SetProcessManager.
+func TestSaveConfig_NoProcessManager_DoesNotPanic(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("SaveConfig panicked without ProcessManager: %v", r)
+		}
+	}()
+	configSvc := service.NewIsolatedConfigService(t.TempDir())
+	handler := NewConfigHandler(configSvc) // processManager intentionally nil
+
+	payload := map[string]interface{}{
+		"uiPort":          1880,
+		"uiHost":          "0.0.0.0",
+		"httpAdminRoot":   "/",
+		"httpNodeRoot":    "/",
+		"flowFile":        "flows.json",
+		"projectsEnabled": false,
+		"logging":         map[string]interface{}{},
+	}
+	body, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/api/config/", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := req.Context()
+	ctx = context.WithValue(ctx, middleware.CtxKeyUser, &model.Claims{
+		Username: "admin",
+		Role:     model.RoleAdmin,
+	})
+	req = req.WithContext(ctx)
+	w := httptest.NewRecorder()
+
+	handler.SaveConfig(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body = %s", w.Code, w.Body.String())
+	}
+}
+
+// TestSaveConfig_WiredButStopped_DoesNotCallRestart pins that an unwired
+// or stopped Node-RED process does NOT receive a Restart call after a
+// successful Save. The dashboard's editor-theme save should auto-restart
+// only when the runtime is actually running (#715).
+func TestSaveConfig_WiredButStopped_DoesNotCallRestart(t *testing.T) {
+	// We cannot substitute a mock ProcessManager (it is a concrete type),
+	// so the strongest claim we can make without starting a real Node-RED
+	// is: the handler completes synchronously without panicking when the
+	// wired PM reports Status() == "stopped" (the default for a freshly
+	// constructed PM). This is the negative half of the auto-restart
+	// contract: the path the user expects (running → restart) is covered
+	// by the integration test scripts/acceptance/docker-stacks.sh.
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("SaveConfig panicked with stopped ProcessManager: %v", r)
+		}
+	}()
+
+	configSvc := service.NewIsolatedConfigService(t.TempDir())
+	handler := NewConfigHandler(configSvc)
+	handler.SetProcessManager(service.NewProcessManager("node-red", t.TempDir()))
+
+	payload := map[string]interface{}{
+		"uiPort":          1880,
+		"uiHost":          "0.0.0.0",
+		"httpAdminRoot":   "/",
+		"httpNodeRoot":    "/",
+		"flowFile":        "flows.json",
+		"projectsEnabled": false,
+		"logging":         map[string]interface{}{},
+	}
+	body, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/api/config/", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := req.Context()
+	ctx = context.WithValue(ctx, middleware.CtxKeyUser, &model.Claims{
+		Username: "admin",
+		Role:     model.RoleAdmin,
+	})
+	req = req.WithContext(ctx)
+	w := httptest.NewRecorder()
+
+	handler.SaveConfig(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body = %s", w.Code, w.Body.String())
+	}
+}
