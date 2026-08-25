@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useId } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertTriangle, X } from 'lucide-react';
 import { UI_COPY } from '@/shared/constants/uiCopy';
 
@@ -30,6 +31,10 @@ export function ConfirmationDialog({
   const [inputValue, setInputValue] = useState('');
   const [acknowledged, setAcknowledged] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+  const titleId = useId();
 
   // Memoize canConfirm to prevent stale closures in useEffect dependency array.
   // The Confirm button is enabled only when every gate has been satisfied:
@@ -44,24 +49,82 @@ export function ConfirmationDialog({
     [confirmText, inputValue, acknowledgement, acknowledged]
   );
 
-  // Reset state when the dialog opens, then focus the input.
+  // Reset gated state whenever the dialog opens.
   useEffect(() => {
     if (isOpen) {
       setInputValue('');
       setAcknowledged(false);
-      if (confirmText) {
-        setTimeout(() => inputRef.current?.focus(), 100);
-      }
     }
-  }, [isOpen, confirmText]);
+  }, [isOpen]);
 
-  // Handle escape / enter
+  // Move focus into the modal and return it to the invoking control on close.
+  // The text gate is the safest useful target when present; otherwise Cancel
+  // avoids placing initial focus on a destructive action.
+  useEffect(() => {
+    if (!isOpen) return;
+
+    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
+    const focusTimer = window.setTimeout(() => {
+      (inputRef.current ?? cancelButtonRef.current)?.focus();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(focusTimer);
+      const previouslyFocused = previouslyFocusedRef.current;
+      previouslyFocusedRef.current = null;
+      if (previouslyFocused?.isConnected) previouslyFocused.focus();
+    };
+  }, [isOpen]);
+
+  // Keep keyboard focus inside the modal and preserve keyboard shortcuts.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen && !isPending) {
+      if (!isOpen) return;
+
+      if (e.key === 'Escape' && !isPending) {
+        e.preventDefault();
         onCancel();
+        return;
       }
-      if (e.key === 'Enter' && isOpen && !isPending && canConfirm()) {
+
+      if (e.key === 'Tab') {
+        const dialog = dialogRef.current;
+        if (!dialog) return;
+
+        const focusable = Array.from(
+          dialog.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+          )
+        );
+        if (focusable.length === 0) {
+          e.preventDefault();
+          dialog.focus();
+          return;
+        }
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        const active = document.activeElement;
+        if (e.shiftKey && (active === first || !dialog.contains(active))) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && (active === last || !dialog.contains(active))) {
+          e.preventDefault();
+          first.focus();
+        }
+        return;
+      }
+
+      // Native buttons already synthesize one click for Enter. Handling that
+      // key globally as well would submit twice.
+      if (
+        e.key === 'Enter' &&
+        !e.repeat &&
+        !isPending &&
+        canConfirm() &&
+        !(e.target instanceof HTMLButtonElement)
+      ) {
+        e.preventDefault();
         onConfirm();
       }
     };
@@ -97,19 +160,25 @@ export function ConfirmationDialog({
 
   const styles = getVariantStyles();
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center"
+      data-confirmation-dialog-portal
+    >
       {/* Backdrop */}
       <div
         className="absolute inset-0 modal-overlay"
+        aria-hidden="true"
         onClick={isPending ? undefined : onCancel}
       />
 
       {/* Dialog */}
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="confirmation-dialog-title"
+        aria-labelledby={titleId}
+        tabIndex={-1}
         className={`relative surface-panel border ${styles.border} w-full max-w-md mx-4 overflow-hidden shadow-glow`}
       >
         {/* Header */}
@@ -118,11 +187,12 @@ export function ConfirmationDialog({
             <div className={`rounded-2xl bg-base-200/70 p-2 ${styles.icon}`}>
               <AlertTriangle className="w-5 h-5" />
             </div>
-            <h3 id="confirmation-dialog-title" className="text-lg font-semibold text-base-content">{title}</h3>
+            <h3 id={titleId} className="text-lg font-semibold text-base-content">{title}</h3>
           </div>
           <button
             onClick={onCancel}
             disabled={isPending}
+            aria-label="Close dialog"
             className="text-body-secondary transition-colors hover:text-base-content disabled:opacity-50"
           >
             <X className="w-5 h-5" />
@@ -168,6 +238,7 @@ export function ConfirmationDialog({
          {/* Footer */}
          <div className="flex justify-end gap-3 border-t ghost-divider modal-inner px-6 py-4">
            <button
+             ref={cancelButtonRef}
              onClick={onCancel}
              disabled={isPending}
              className="action-btn-secondary"
@@ -186,6 +257,7 @@ export function ConfirmationDialog({
            </button>
          </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
