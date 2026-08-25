@@ -126,7 +126,17 @@ api.interceptors.request.use(
 );
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // A valid API request never returns the SPA document. Historically an
+    // unknown /api route fell through to index.html with HTTP 200, so every
+    // mutation displayed a success toast even though no backend handler ran.
+    // Blob downloads are intentionally not JSON and remain exempt.
+    const contentType = String(response.headers?.['content-type'] ?? '');
+    if (response.config.responseType !== 'blob' && contentType && !contentType.includes('application/json')) {
+      return Promise.reject(new Error(`API returned an unexpected ${contentType || 'non-JSON'} response`));
+    }
+    return response;
+  },
   async (error: AxiosError<ApiResponse<unknown>>) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 

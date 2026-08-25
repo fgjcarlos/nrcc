@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -11,6 +12,8 @@ import (
 	"github.com/fgjcarlos/nrcc/internal/model"
 	"github.com/go-chi/chi/v5"
 )
+
+const maxPublicImageBytes = 2 * 1024 * 1024
 
 // FilesHandler handles file upload/management endpoints
 type FilesHandler struct {
@@ -142,6 +145,54 @@ func (h *FilesHandler) DownloadFile(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", "attachment; filename=\""+strings.ReplaceAll(name, "\"", "")+"\"")
 	// #nosec G703 -- filePath is rooted to dataDir/uploads and validated against path traversal upstream.
 	http.ServeFile(w, r, filePath)
+}
+
+// ServeImage serves an uploaded image without authentication so Node-RED's
+// editor can load favicon/header/login artwork referenced from settings.js.
+// Only actual image payloads up to the same 2 MiB UI limit are exposed; other
+// uploaded files remain behind the authenticated download endpoint.
+func (h *FilesHandler) ServeImage(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+	if strings.Contains(name, "..") || name == "" || filepath.Base(name) != name {
+		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid filename")
+		return
+	}
+	filePath := filepath.Join(h.dataDir, "uploads", name)
+	// #nosec G304,G703 -- filePath is rooted to dataDir/uploads and name is base-validated above.
+	file, err := os.Open(filePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			model.RespondError(w, http.StatusNotFound, "NOT_FOUND", "Image not found")
+			return
+		}
+		model.RespondError(w, http.StatusInternalServerError, "IMAGE_ERROR", err.Error())
+		return
+	}
+	defer func() { _ = file.Close() }()
+	info, err := file.Stat()
+	if err != nil || info.IsDir() || info.Size() > maxPublicImageBytes {
+		model.RespondError(w, http.StatusNotFound, "NOT_FOUND", "Image not found")
+		return
+	}
+	header := make([]byte, 512)
+	n, err := file.Read(header)
+	if err != nil && !errors.Is(err, io.EOF) {
+		model.RespondError(w, http.StatusInternalServerError, "IMAGE_ERROR", err.Error())
+		return
+	}
+	contentType := http.DetectContentType(header[:n])
+	if !strings.HasPrefix(contentType, "image/") {
+		model.RespondError(w, http.StatusUnsupportedMediaType, "NOT_AN_IMAGE", "Uploaded file is not an image")
+		return
+	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		model.RespondError(w, http.StatusInternalServerError, "IMAGE_ERROR", err.Error())
+		return
+	}
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Cache-Control", "public, max-age=3600")
+	w.WriteHeader(http.StatusOK)
+	_, _ = io.Copy(w, file)
 }
 
 // GetList lists uploaded files

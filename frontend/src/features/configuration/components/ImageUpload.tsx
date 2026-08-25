@@ -50,7 +50,8 @@ export function ImageUpload({ label, value, onChange, type, help }: ImageUploadP
       const response = await fileService.uploadImage(type, file);
       
       if (response.data.success && response.data.data) {
-        const { url, filename } = response.data.data;
+        const { path, filename } = response.data.data;
+        const url = new URL(path, window.location.origin).toString();
         setPreview(url);
         onChange(url);
         toast.success(`Uploaded ${filename}`);

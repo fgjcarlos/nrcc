@@ -16,12 +16,12 @@ export const libraryService = {
     const response = await api.post<{ data: InstallResponse }>('/libraries/install', {
       name,
       alias: alias || name,
-    });
+    }, { timeout: 5 * 60_000 });
     return response.data.data;
   },
 
   uninstallLibrary: async (name: string): Promise<void> => {
-    await api.delete(`/libraries/${encodeURIComponent(name)}`);
+    await api.delete(`/libraries/${encodeURIComponent(name)}`, { timeout: 5 * 60_000 });
   },
 
   checkLibrary: async (name: string): Promise<{ name: string; installed: boolean }> => {

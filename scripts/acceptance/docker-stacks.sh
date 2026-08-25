@@ -118,8 +118,10 @@ compose_call() {
 # via `docker buildx bake --load release`). Add image-override via env
 # interpolation in compose when a second image flavor appears.
 set_compose_env() {
-  local project="$1" _api_port="$2" _nr_port="$3"
+  local project="$1" api_port="$2" nr_port="$3"
   export COMPOSE_PROJECT_NAME="$project"
+  export NRCC_HOST_PORT="$api_port"
+  export NODE_RED_HOST_PORT="$nr_port"
 }
 
 # HTTP probe against the API or Node-RED. Returns 0 on 2xx, 1 otherwise.
@@ -250,7 +252,7 @@ scenario_1_single_stack() {
 
   # First-boot bootstrap — completes the setup wizard so we have a session.
   local bootstrap
-  bootstrap="$(http_post_json "http://localhost:${HOST_API_A}/api/setup" \
+  bootstrap="$(http_post_json "http://localhost:${HOST_API_A}/api/auth/setup" \
     "{\"username\":\"${BOOTSTRAP_USER}\",\"password\":\"${BOOTSTRAP_PASS}\"}")" \
     || fail "scenario 1: bootstrap failed"
   assert_contains "$bootstrap" "success" "bootstrap response"
@@ -296,14 +298,12 @@ scenario_2_isolation() {
   # Cross-check: the two stacks must not share any named volume.
   if [[ "$DRY_RUN" != "1" ]]; then
     local vol_a vol_b
-    vol_a="$(docker compose -p "$PROJECT_A" -f "$COMPOSE_FILE" config \
-              | awk '/^volumes:/{flag=1;next}/^[a-z]/{flag=0}flag && /^  [a-z]/{print $1}' \
-              | sort -u)"
-    vol_b="$(docker compose -p "$PROJECT_B" -f "$COMPOSE_FILE" config \
-              | awk '/^volumes:/{flag=1;next}/^[a-z]/{flag=0}flag && /^  [a-z]/{print $1}' \
-              | sort -u)"
-    if [[ "$vol_a" == "$vol_b" ]]; then
-      fail "scenario 2: stacks A and B share named volumes: $vol_a"
+    vol_a="$(docker volume ls --filter "label=com.docker.compose.project=${PROJECT_A}" --format '{{.Name}}' | sort -u)"
+    vol_b="$(docker volume ls --filter "label=com.docker.compose.project=${PROJECT_B}" --format '{{.Name}}' | sort -u)"
+    [[ -n "$vol_a" && -n "$vol_b" ]] \
+      || fail "scenario 2: could not resolve project-owned volumes"
+    if comm -12 <(printf '%s\n' "$vol_a") <(printf '%s\n' "$vol_b") | grep -q .; then
+      fail "scenario 2: stacks A and B share a named volume"
     fi
     ok "scenarios A/B volumes distinct"
   fi
@@ -368,6 +368,12 @@ scenario_4_backup_restore() {
   # scenario-1 token would fail because the C API is on a different port
   # and its admin user (if we bootstrapped with the same creds) is
   # separate from A's user store.
+  local bootstrap_c
+  bootstrap_c="$(http_post_json "http://localhost:${HOST_API_C}/api/auth/setup" \
+    "{\"username\":\"${BOOTSTRAP_USER}\",\"password\":\"${BOOTSTRAP_PASS}\"}")" \
+    || fail "scenario 4: bootstrap C failed"
+  assert_contains "$bootstrap_c" "success" "stack C bootstrap response"
+
   local token_c
   token_c="$(login_api "$HOST_API_C")" || fail "scenario 4: login to C failed"
 
@@ -438,9 +444,11 @@ scenario_5_entrypoint_umask() {
   # One-liner that mirrors the entrypoint's strict-mode + umask block
   # and prints the umask; exit 0 before any chown / su would run.
   local probe='set -Eeuo pipefail; umask 0077; printf %s "$(umask)"; exit 0'
-  local out
-  out="$(docker run --rm --entrypoint /bin/sh "${NRCC_IMAGE}" -c "$probe")" \
-    || fail "scenario 5: docker probe failed (image=${NRCC_IMAGE})"
+  local out image container
+  container="$(docker compose -p "$PROJECT_A" -f "$COMPOSE_FILE" ps -q nrcc | head -1)"
+  image="$(docker inspect --format '{{.Config.Image}}' "$container")"
+  out="$(docker run --rm --entrypoint /bin/sh "$image" -c "$probe")" \
+    || fail "scenario 5: docker probe failed (image=${image})"
 
   assert_eq "$out" "0077" "entrypoint shell umask"
   ok "scenario 5: PASS (umask=0077 enforced + strict-mode set)"

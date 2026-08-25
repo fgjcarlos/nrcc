@@ -161,3 +161,18 @@ describe('auth bootstrap gate (issue #517 — race between useAuth and TanStack 
     expect(r.status).toBe(200);
   });
 });
+
+describe('API response contract', () => {
+  it('rejects a successful HTML response so an SPA fallback cannot fake a mutation success', async () => {
+    const adapter = vi.fn(async (config: { url?: string }) => ({
+      data: '<!doctype html><html></html>',
+      status: 200,
+      statusText: 'OK',
+      headers: { 'content-type': 'text/html; charset=utf-8' },
+      config,
+    }));
+    (api.defaults as { adapter?: unknown }).adapter = adapter;
+
+    await expect(api.post('/runtime/restart')).rejects.toThrow('unexpected text/html');
+  });
+});

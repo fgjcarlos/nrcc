@@ -17,12 +17,13 @@ export const configService = {
 export const fileService = {
   uploadImage: (type: 'favicon' | 'header' | 'login', file: File) => {
     const formData = new FormData();
-    formData.append('image', file);
+    formData.append('file', file, `${type}-${file.name}`);
     
-    return api.post<ApiResponse<{ path: string; url: string; filename: string }>>(`/files/upload/${type}`, formData, {
+    return api.post<ApiResponse<{ path: string; filename: string }>>('/files/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      timeout: 2 * 60_000,
     });
   },
   
@@ -30,9 +31,6 @@ export const fileService = {
     return api.delete<ApiResponse<{ deleted: boolean }>>(`/files/${encodeURIComponent(path)}`);
   },
   
-  listImages: (type: 'favicon' | 'header' | 'login') => {
-    return api.get<ApiResponse<string[]>>(`/files/list/${type}`);
-  },
 };
 
 export const settingsService = {

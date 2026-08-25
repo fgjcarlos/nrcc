@@ -93,15 +93,16 @@ func (h *ConfigHandler) SaveConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// #715: Node-RED reads settings.js only at start, so any Editor Theme /
-	// Editor Library / Logging / Projects change is invisible to the running
-	// process unless we restart it. Trigger a background restart here so
-	// the user does not have to click the dashboard Restart button after
-	// every Save. Skipped when the PM is not wired (edge mode / tests) or
-	// when Node-RED is externally managed (we cannot control it).
+	// Node-RED reads settings.js only at start. Do not acknowledge the save
+	// until a managed running process has successfully reloaded it; otherwise
+	// the UI would claim success while the active runtime still used the old
+	// configuration.
 	if h.processManager != nil && !h.processManager.IsExternalMode() {
 		if status := h.processManager.Status(); status.Status == "running" {
-			go func() { _ = h.processManager.Restart() }()
+			if err := h.processManager.Restart(); err != nil {
+				model.RespondError(w, http.StatusInternalServerError, "CONFIG_SAVED_RESTART_FAILED", "Configuration was saved, but Node-RED could not restart: "+err.Error())
+				return
+			}
 		}
 	}
 

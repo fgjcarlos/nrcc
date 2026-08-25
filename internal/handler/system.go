@@ -333,10 +333,9 @@ func (h *SystemHandler) GetSecurityPosture(w http.ResponseWriter, r *http.Reques
 //   - 409s for restart/stop when Node-RED is externally managed — there
 //     is no process for nrcc to control, and silently no-oping was the
 //     bug we just fixed.
-//   - 202s restart (the call returns before the stop+start cycle finishes
-//     so the dashboard does not hang on a slow restart). Stop / start are
-//     synchronous because the underlying ProcessManager methods already
-//     wait for the process to exit / spawn.
+//   - Completes the requested lifecycle action before reporting success.
+//     Returning before Restart finished caused the dashboard to show another
+//     false-success state whenever the background restart failed.
 
 // RestartNodeRed handles POST /api/runtime/restart — admin only.
 func (h *SystemHandler) RestartNodeRed(w http.ResponseWriter, r *http.Request) {
@@ -348,11 +347,11 @@ func (h *SystemHandler) RestartNodeRed(w http.ResponseWriter, r *http.Request) {
 		model.RespondError(w, http.StatusConflict, "EXTERNAL_NODE_RED", "cannot restart an externally managed Node-RED instance")
 		return
 	}
-	// Run in the background so the HTTP request does not hang on a slow
-	// Node-RED restart cycle. The frontend polls /api/runtime/status to
-	// observe the transition; any error surfaces there.
-	go func() { _ = h.processManager.Restart() }()
-	model.RespondJSON(w, http.StatusAccepted, map[string]any{"message": "Node-RED restart initiated"})
+	if err := h.processManager.Restart(); err != nil {
+		model.RespondError(w, http.StatusInternalServerError, "RESTART_FAILED", err.Error())
+		return
+	}
+	model.RespondJSON(w, http.StatusOK, map[string]any{"message": "Node-RED restarted"})
 }
 
 // StartNodeRed handles POST /api/runtime/start — admin only.

@@ -7,7 +7,7 @@ import { RestartConfirmationModal } from './RestartConfirmationModal';
 import { SystemHealthCard } from './SystemHealthCard';
 
 export function DashboardView() {
-  const { container, system, config, host, backups, dockerSuccess, dockerLoading, dockerError } = useDashboardData();
+  const { container, system, config, host, runtime, backups, dockerSuccess, dockerLoading, dockerError } = useDashboardData();
   const {
     pendingConfirm,
     isRestarting,
@@ -32,6 +32,7 @@ export function DashboardView() {
       <DashboardStatusCards
         system={system}
         host={host}
+        runtime={runtime}
         inDocker={inDocker}
         container={container}
         isRestarting={isRestarting}

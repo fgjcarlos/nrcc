@@ -1,6 +1,6 @@
 import { formatBytes } from '@/shared/lib';
 import { formatPercent } from '@/features/dashboard/lib';
-import type { HostStatus, SystemInfo } from '@/shared/types';
+import type { HostStatus, RuntimeInfo, SystemInfo } from '@/shared/types';
 import { Cpu, ExternalLink, MemoryStick, RefreshCw, Server } from 'lucide-react';
 import type { DashboardContainerStatus } from '../types';
 import { getDeploymentLabel } from '../lib';
@@ -11,6 +11,7 @@ import { cn } from '@/shared/lib';
 interface DashboardStatusCardsProps {
   container?: DashboardContainerStatus | null;
   host?: HostStatus;
+  runtime?: RuntimeInfo;
   inDocker: boolean;
   system?: SystemInfo;
   isRestarting: boolean;
@@ -25,14 +26,17 @@ interface DashboardStatusCardsProps {
 function RuntimeCard({
   container,
   host,
+  runtime,
   inDocker,
   isRestarting,
   onRequestRestart,
   onOpenNodeRed,
 }: Pick<
   DashboardStatusCardsProps,
-  'container' | 'host' | 'inDocker' | 'isRestarting' | 'onRequestRestart' | 'onOpenNodeRed'
+  'container' | 'host' | 'runtime' | 'inDocker' | 'isRestarting' | 'onRequestRestart' | 'onOpenNodeRed'
 >) {
+  const runtimeStatus = runtime?.status ?? (host?.nodeRed.running ? 'running' : 'unknown');
+
   return (
     <div className="p-6 border card surface-card border-border">
       <div className="flex items-center gap-3">
@@ -41,9 +45,9 @@ function RuntimeCard({
       </div>
       {inDocker ? (
         <>
-          <p className="mt-2 text-2xl font-bold capitalize">{container?.status ?? '—'}</p>
+          <p className="mt-2 text-2xl font-bold capitalize">{runtimeStatus}</p>
           <p className="mt-1 text-sm truncate text-body-secondary" title={container?.image}>
-            {container?.image || 'Docker'}
+            {runtime?.pid ? `PID ${runtime.pid} · ${container?.image || 'Docker'}` : container?.image || 'Docker'}
           </p>
         </>
       ) : (
@@ -144,6 +148,7 @@ export function DashboardStatusCards(props: DashboardStatusCardsProps) {
       <RuntimeCard
         container={props.container}
         host={props.host}
+        runtime={props.runtime}
         inDocker={props.inDocker}
         isRestarting={props.isRestarting}
         onRequestRestart={props.onRequestRestart}

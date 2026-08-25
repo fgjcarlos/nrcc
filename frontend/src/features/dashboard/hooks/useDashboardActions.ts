@@ -116,7 +116,12 @@ export function useDashboardActions({ uiPort }: UseDashboardActionsOptions) {
   };
 
   const handleOpenNodeRed = () => {
-    window.open(`http://localhost:${uiPort || 1880}`, '_blank');
+    const url = new URL(window.location.href);
+    url.port = String(uiPort || 1880);
+    url.pathname = '/';
+    url.search = '';
+    url.hash = '';
+    window.open(url.toString(), '_blank', 'noopener,noreferrer');
   };
 
   return {

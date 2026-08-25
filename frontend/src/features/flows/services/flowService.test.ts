@@ -57,14 +57,34 @@ describe('flowService', () => {
   });
 
   describe('analyzeFlow', () => {
-    it('calls POST /flows/:id/analyze and returns analysis result', async () => {
-      const analysis = { flowId: 'f1', summary: 'ok', pros: [], cons: [], suggestions: [], analyzedAt: '2026-01-01T00:00:00Z' };
-      mockApi.post.mockResolvedValueOnce(ok(analysis));
+    it('loads the real flow and sends it to the existing AI audit endpoint', async () => {
+      const flow = { id: 'f1', label: 'Flow 1', nodes: [] };
+      mockApi.get.mockResolvedValueOnce(ok(flow));
+      mockApi.post.mockResolvedValueOnce(ok({
+        enabled: true,
+        provider: 'openai',
+        action: 'audit',
+        reviewOnly: true,
+        redacted: true,
+        summary: 'ok',
+        suggestions: ['add retry'],
+        auditFindings: ['missing catch'],
+      }));
 
       const result = await flowService.analyzeFlow('f1');
 
-      expect(mockApi.post).toHaveBeenCalledWith('/flows/f1/analyze');
-      expect(result).toEqual(analysis);
+      expect(mockApi.get).toHaveBeenCalledWith('/flows/f1');
+      expect(mockApi.post).toHaveBeenCalledWith('/ai/analyze/flow', {
+        action: 'audit',
+        flow,
+      });
+      expect(result).toMatchObject({
+        flowId: 'f1',
+        summary: 'ok',
+        pros: [],
+        cons: ['missing catch'],
+        suggestions: ['add retry'],
+      });
     });
   });
 

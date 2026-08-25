@@ -90,13 +90,15 @@ func TestLibraryServiceInstallWithoutHook(t *testing.T) {
 	}
 }
 
-// TestLibraryServiceInstallIgnoresRestartError proves a failing restart
-// hook never turns a successful install into an HTTP 500.
-func TestLibraryServiceInstallIgnoresRestartError(t *testing.T) {
+// TestLibraryServiceInstallReportsRestartError proves the UI cannot receive a
+// false success when npm changed the package set but Node-RED failed to reload.
+func TestLibraryServiceInstallReportsRestartError(t *testing.T) {
 	pm := &stubPM{}
 	svc := NewLibraryServiceWithPackageManager(t.TempDir(), pm)
-	svc.SetNodeRedRestart(func() error { return errors.New("node-red already stopped") })
-	if err := svc.Install(context.Background(), "node-red-dashboard"); err != nil {
-		t.Fatalf("install should ignore restart error, got %v", err)
+	restartErr := errors.New("node-red already stopped")
+	svc.SetNodeRedRestart(func() error { return restartErr })
+	err := svc.Install(context.Background(), "node-red-dashboard")
+	if err == nil || !errors.Is(err, restartErr) {
+		t.Fatalf("install error = %v, want wrapped restart error", err)
 	}
 }

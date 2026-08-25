@@ -23,6 +23,7 @@ export function useLibrariesActions() {
       setSearchResults([]);
     },
     onError: (error: unknown) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.libraries.root });
       const err = error as { response?: { data?: { error?: { message?: string } } } };
       toast.error(err.response?.data?.error?.message || 'Failed to install library');
     },
@@ -35,6 +36,7 @@ export function useLibrariesActions() {
       toast.success('Library uninstalled successfully');
     },
     onError: (error: unknown) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.libraries.root });
       const err = error as { response?: { data?: { error?: { message?: string } } } };
       toast.error(err.response?.data?.error?.message || 'Failed to uninstall library');
     },

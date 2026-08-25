@@ -16,6 +16,7 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:e2e": "playwright test",
+    "test:e2e:stack": "playwright test --config playwright.stack.config.ts",
     "typecheck": "tsc --noEmit",
     "gen:api": "openapi-typescript ../docs/openapi.yaml -o src/shared/api/schema.ts"
   },
