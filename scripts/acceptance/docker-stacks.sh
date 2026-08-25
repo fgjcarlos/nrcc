@@ -250,6 +250,20 @@ scenario_1_single_stack() {
   http_get "http://localhost:${HOST_API_A}/healthz" \
     || fail "scenario 1: NRCC /healthz did not respond within ${TIMEOUT_HEALTH}s"
 
+  # RLIMIT_NPROC is counted by real UID on the host, not per container. Since
+  # node-red uses UID 1000, setting it can make BusyBox su fail to exec /bin/sh
+  # with EAGAIN on otherwise healthy hosts. pids_limit is the isolated control.
+  if [[ "$DRY_RUN" != "1" ]]; then
+    local container_a ulimits pids_limit
+    container_a="$(docker compose -p "$PROJECT_A" -f "$COMPOSE_FILE" ps -q nrcc | head -1)"
+    ulimits="$(docker inspect --format '{{json .HostConfig.Ulimits}}' "$container_a")"
+    if [[ "$ulimits" == *'"Name":"nproc"'* ]]; then
+      fail "scenario 1: container must not set host-UID-scoped nproc ulimit"
+    fi
+    pids_limit="$(docker inspect --format '{{.HostConfig.PidsLimit}}' "$container_a")"
+    assert_eq "$pids_limit" "512" "container-scoped PID limit"
+  fi
+
   # First-boot bootstrap — completes the setup wizard so we have a session.
   local bootstrap
   bootstrap="$(http_post_json "http://localhost:${HOST_API_A}/api/auth/setup" \
