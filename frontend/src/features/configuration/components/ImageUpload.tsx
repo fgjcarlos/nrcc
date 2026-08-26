@@ -53,7 +53,7 @@ export function ImageUpload({ label, value, onChange, type, help }: ImageUploadP
         const { path, filename } = response.data.data;
         const url = new URL(path, window.location.origin).toString();
         setPreview(url);
-        onChange(url);
+        onChange(path);
         toast.success(`Uploaded ${filename}`);
       } else {
         const errorMsg = response.data.error?.message || 'Failed to upload image';

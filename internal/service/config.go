@@ -531,7 +531,29 @@ func patchSettingsJS(existingContent string, cfg model.NodeRedConfig) string {
 	content = replaceBlockKey(content, "adminAuth", renderAdminAuthBlock(cfg))
 	content = replaceBlockKey(content, "editorTheme", renderEditorThemeBlock(cfg))
 	content = replaceBlockKey(content, "logging", renderLoggingBlock())
+	content = ensureHTTPStatic(content, "uploads")
 
+	return content
+}
+
+// ensureHTTPStatic makes Node-RED serve the configured uploads directory
+// under its own origin so editorTheme image URLs (e.g. "/foo.png") resolve
+// at http://<host>:1880/<filename>. Relative paths resolve against
+// Node-RED's userDir; in the default all-in-one image, dataDir == userDir
+// so "uploads" lands at <dataDir>/uploads. Idempotent: existing
+// httpStatic (operator-authored, absolute or different relative path) is
+// preserved — we only add the default when missing.
+func ensureHTTPStatic(content, relDir string) string {
+	re := regexp.MustCompile(`(?m)^\s*httpStatic\s*:`)
+	if re.MatchString(content) {
+		return content
+	}
+	insertPattern := `\n\s*\}\s*$`
+	appendRe := regexp.MustCompile(insertPattern)
+	if appendRe.MatchString(content) {
+		entry := fmt.Sprintf("  httpStatic: %q,\n", relDir)
+		return appendRe.ReplaceAllString(content, "\n"+entry+"}\n")
+	}
 	return content
 }
 
