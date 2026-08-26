@@ -16,10 +16,10 @@ func imageLocalProcessManager(t *testing.T) (*ProcessManager, string) {
 	t.Helper()
 	root := t.TempDir()
 	executable := filepath.Join(root, "usr", "src", "node-red", "node_modules", ".bin", "node-red")
-	if err := os.MkdirAll(filepath.Dir(executable), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(executable), 0o750); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(executable, []byte("#!/bin/sh\n"), 0o755); err != nil {
+	if err := os.WriteFile(executable, []byte("#!/bin/sh\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	return NewProcessManager(executable, root), executable
@@ -29,14 +29,14 @@ func npmGlobalProcessManager(t *testing.T) (*ProcessManager, string) {
 	t.Helper()
 	root := t.TempDir()
 	target := filepath.Join(root, "usr", "local", "lib", "node_modules", "node-red", "bin", "node-red.js")
-	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(target, []byte("#!/usr/bin/env node\n"), 0o755); err != nil {
+	if err := os.WriteFile(target, []byte("#!/usr/bin/env node\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	executable := filepath.Join(root, "usr", "local", "bin", "node-red")
-	if err := os.MkdirAll(filepath.Dir(executable), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(executable), 0o750); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Symlink(target, executable); err != nil {

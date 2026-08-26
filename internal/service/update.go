@@ -654,17 +654,17 @@ func (s *UpdateService) getInstalledVersionInternal(ctx context.Context) (string
 		return version, nil
 	}
 	if managed.Strategy != StrategyNpmGlobal {
-		return "", fmt.Errorf("%w: %s --version: %v", ErrVersionUndetectable, managed.Executable, err)
+		return "", fmt.Errorf("%w: %s --version: %w", ErrVersionUndetectable, managed.Executable, err)
 	}
 
 	output, npmErr := s.runner.Run(ctx, "npm", "list", "-g", "node-red", "--json")
 	if npmErr != nil {
-		return "", fmt.Errorf("%w: executable check failed: %v; npm fallback failed: %v", ErrVersionUndetectable, err, npmErr)
+		return "", fmt.Errorf("%w: executable check failed: %w; npm fallback failed: %w", ErrVersionUndetectable, err, npmErr)
 	}
 
 	var result map[string]interface{}
 	if err := json.Unmarshal(output, &result); err != nil {
-		return "", fmt.Errorf("%w: invalid npm response: %v", ErrVersionUndetectable, err)
+		return "", fmt.Errorf("%w: invalid npm response: %w", ErrVersionUndetectable, err)
 	}
 
 	if deps, ok := result["dependencies"].(map[string]interface{}); ok {
