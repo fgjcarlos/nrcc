@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -39,7 +40,7 @@ type backupCreator interface {
 // UpdateService handles Node-RED update detection and caching.
 //
 // Design: Backend-owned polling goroutine runs on a configurable interval (default 4 hours),
-// checking for new Node-RED versions via npm. Results are cached in-memory (for fast reads)
+// querying the managed executable and checking npm for new versions. Results are cached in-memory (for fast reads)
 // and persisted to ./data/update_cache.json (for durability across restarts).
 //
 // The service provides two access patterns:
@@ -70,11 +71,12 @@ type UpdateService struct {
 	getInstalledVersionFn func(ctx context.Context) string
 	getLatestVersionFn    func(ctx context.Context) (string, error)
 	// New fields for update flow state machine
-	applyMu     sync.Mutex
-	flowState   model.UpdateFlowState
-	flowStateMu sync.RWMutex
-	backupStore *store.JSONStore[[]model.BackupEntry]
-	backupSvc   backupCreator
+	applyMu        sync.Mutex
+	flowState      model.UpdateFlowState
+	flowStateMu    sync.RWMutex
+	backupStore    *store.JSONStore[[]model.BackupEntry]
+	backupSvc      backupCreator
+	processManager *ProcessManager
 	// applyCtx / applyCancel form a service-level cancelable root used by
 	// ApplyUpdate so that a server SIGTERM (Shutdown) can abort an in-flight
 	// install. Regression for HIGH-011: the previous implementation used
@@ -89,6 +91,12 @@ type UpdateService struct {
 // update flow refuses to proceed (it will not fabricate a phantom backup).
 func (s *UpdateService) SetBackupCreator(bc backupCreator) {
 	s.backupSvc = bc
+}
+
+// SetProcessManager wires the authority that identifies the Node-RED runtime
+// update detection and application must query.
+func (s *UpdateService) SetProcessManager(pm *ProcessManager) {
+	s.processManager = pm
 }
 
 const (
@@ -122,7 +130,13 @@ func NewUpdateService(dataDir string) *UpdateService {
 	)
 
 	// Set default version checking functions
-	s.getInstalledVersionFn = s.getInstalledVersionInternal
+	s.getInstalledVersionFn = func(ctx context.Context) string {
+		version, err := s.getInstalledVersionInternal(ctx)
+		if err != nil {
+			return "unknown"
+		}
+		return version
+	}
 	s.getLatestVersionFn = s.getLatestVersionInternal
 
 	// Load cache from disk if it exists
@@ -133,13 +147,13 @@ func NewUpdateService(dataDir string) *UpdateService {
 			s.cacheMu.Unlock()
 		}
 	}
-	
+
 	// On startup, if cache is still empty, perform an initial check synchronously.
 	// This ensures the UI doesn't show "unknown" on first page load.
 	s.cacheMu.Lock()
 	cacheEmpty := s.cache.CurrentVersion == "" && s.cache.LatestVersion == ""
 	s.cacheMu.Unlock()
-	
+
 	if cacheEmpty {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		s.performCheck(ctx)
@@ -199,8 +213,8 @@ func (s *UpdateService) performCheck(ctx context.Context) {
 	_ = s.store.Write(entry)
 }
 
-// performCheckInternal does the actual npm check logic.
-// Runs `npm list -g node-red --json` to get installed version.
+// performCheckInternal does the actual version check logic.
+// Queries the managed executable for the installed version.
 // Runs `npm view node-red version` to get latest available version.
 // Compares versions and updates the UpdateAvailable flag.
 // Returns immediately if npm calls fail; error is captured in the result with a sanitized message.
@@ -278,14 +292,14 @@ func (s *UpdateService) ForceCheck(ctx context.Context) (model.UpdateCacheEntry,
 func (s *UpdateService) GetFlowState() model.UpdateFlowState {
 	s.flowStateMu.RLock()
 	defer s.flowStateMu.RUnlock()
-	
+
 	// Include current availableVersion from cache
 	state := s.flowState
 	cached := s.GetCachedStatus()
 	if cached.UpdateAvailable {
 		state.AvailableVersion = cached.LatestVersion
 	}
-	
+
 	return state
 }
 
@@ -402,14 +416,14 @@ func (s *UpdateService) applyContext() context.Context {
 // ApplyUpdateWithBackup orchestrates the full update flow: BackingUp → Applying → Completed/Failed.
 // Only one update can proceed at a time; returns error if state != Idle.
 // Flow:
-//   1. Acquire applyMu lock
-//   2. Check flowState.State == StateIdle; return error if not
-//   3. Set state = BackingUp
-//   4. Call CreateBackup; persist to catalog
-//   5. Set state = Applying
-//   6. Call ApplyUpdate (npm install)
-//   7. Set state = Completed or Failed based on npm result
-//   8. Release applyMu lock
+//  1. Acquire applyMu lock
+//  2. Check flowState.State == StateIdle; return error if not
+//  3. Set state = BackingUp
+//  4. Call CreateBackup; persist to catalog
+//  5. Set state = Applying
+//  6. Call ApplyUpdate (npm install)
+//  7. Set state = Completed or Failed based on npm result
+//  8. Release applyMu lock
 //
 // Backend operation is asynchronous (logs output but does not block caller).
 // Frontend polls /api/updates/state to track progress.
@@ -421,7 +435,7 @@ func (s *UpdateService) ApplyUpdateWithBackup(ctx context.Context) error {
 		return fmt.Errorf("update already in progress")
 	}
 	defer s.applyMu.Unlock()
-	
+
 	// Check if we can start: state must be Idle
 	s.flowStateMu.RLock()
 	if s.flowState.State != model.StateIdle {
@@ -429,20 +443,20 @@ func (s *UpdateService) ApplyUpdateWithBackup(ctx context.Context) error {
 		return fmt.Errorf("update cannot start: state is %s", s.flowState.State)
 	}
 	s.flowStateMu.RUnlock()
-	
+
 	// Get current version for backup record
 	preApplyStatus := s.GetCachedStatus()
 	fromVersion := preApplyStatus.CurrentVersion
 	if fromVersion == "" {
 		fromVersion = "unknown"
 	}
-	
+
 	// Step 1: BackingUp
 	s.setFlowState(model.UpdateFlowState{
 		State: model.StateBackingUp,
 		Phase: "backup",
 	})
-	
+
 	// Create backup
 	backupEntry, err := s.CreateBackup(ctx, fromVersion)
 	if err != nil {
@@ -453,13 +467,13 @@ func (s *UpdateService) ApplyUpdateWithBackup(ctx context.Context) error {
 		})
 		return err
 	}
-	
+
 	// Persist backup to catalog
 	if err := s.AppendBackup(backupEntry); err != nil {
 		// Log error but continue (backup creation succeeded, just persistence failed)
 		fmt.Printf("warning: failed to persist backup catalog: %v\n", err)
 	}
-	
+
 	// Step 2: Applying
 	s.setFlowState(model.UpdateFlowState{
 		State:            model.StateApplying,
@@ -467,7 +481,7 @@ func (s *UpdateService) ApplyUpdateWithBackup(ctx context.Context) error {
 		BackupID:         backupEntry.ID,
 		AvailableVersion: preApplyStatus.LatestVersion,
 	})
-	
+
 	// Execute npm update. ctx is the request-derived context; the runner's
 	// actual context is also derived from s.applyCtx (Shutdown-cancelable),
 	// so a server SIGTERM propagates into the npm install even though the
@@ -482,14 +496,14 @@ func (s *UpdateService) ApplyUpdateWithBackup(ctx context.Context) error {
 		})
 		return err
 	}
-	
+
 	// Step 3: Completed
 	s.setFlowState(model.UpdateFlowState{
 		State:    model.StateCompleted,
 		Phase:    "completed",
 		BackupID: backupEntry.ID,
 	})
-	
+
 	return nil
 }
 
@@ -507,6 +521,13 @@ func (s *UpdateService) ApplyUpdate(ctx context.Context) error {
 		return fmt.Errorf("no resolved target version — run a version check first")
 	}
 	target := "node-red@" + cached.LatestVersion
+	managed := s.managedRuntime()
+	switch managed.Strategy {
+	case StrategyImageLocal:
+		return fmt.Errorf("%w (executable: %s)", ErrUpdateUnsupportedForImage, managed.Executable)
+	case StrategyExternal:
+		return fmt.Errorf("%w (executable: %s)", ErrExternalRuntimeUnmanaged, managed.Executable)
+	}
 
 	runCtx, cancel := context.WithTimeout(s.applyContext(), 120*time.Second)
 	defer cancel()
@@ -520,6 +541,11 @@ func (s *UpdateService) ApplyUpdate(ctx context.Context) error {
 	if err != nil {
 		sanitized := s.sanitizeErrorMessage(err)
 		return fmt.Errorf("%s", sanitized)
+	}
+
+	installed, err := s.versionFromExecutable(runCtx, managed)
+	if err != nil || installed != cached.LatestVersion {
+		return fmt.Errorf("%w (executable: %s, expected: %s, got: %s)", ErrUpdateVerificationFailed, managed.Executable, cached.LatestVersion, installed)
 	}
 
 	if err := s.postInstallAudit(runCtx, cached.LatestVersion); err != nil {
@@ -597,48 +623,81 @@ func (s *UpdateService) sanitizeErrorMessage(err error) string {
 	if err == nil {
 		return ""
 	}
-	
+
 	errStr := err.Error()
-	
+
 	// If it's a context deadline exceeded, the npm command timed out
 	if strings.Contains(errStr, "context deadline exceeded") || strings.Contains(errStr, "i/o timeout") {
 		return "Update check timed out. Please try again."
 	}
-	
+
 	// Exit status errors are npm-specific failures (234, 1, etc.) — hide the exit code
 	if strings.Contains(errStr, "exit status") {
 		return "Update check failed. Please ensure npm is properly installed and Node-RED is accessible."
 	}
-	
+
 	// Connection/network errors
 	if strings.Contains(errStr, "connection refused") || strings.Contains(errStr, "network") {
 		return "Network error while checking for updates. Please check your internet connection."
 	}
-	
+
 	// Default fallback for other errors
 	return "Unable to check for updates at this time."
 }
 
-func (s *UpdateService) getInstalledVersionInternal(ctx context.Context) string {
-	output, err := s.runner.Run(ctx, "npm", "list", "-g", "node-red", "--json")
-	if err != nil {
-		return "unknown"
+var nodeRedVersionPattern = regexp.MustCompile(`^v?([0-9]+\.[0-9]+\.[0-9]+)`)
+
+func (s *UpdateService) getInstalledVersionInternal(ctx context.Context) (string, error) {
+	managed := s.managedRuntime()
+	version, err := s.versionFromExecutable(ctx, managed)
+	if err == nil {
+		return version, nil
+	}
+	if managed.Strategy != StrategyNpmGlobal {
+		return "", fmt.Errorf("%w: %s --version: %w", ErrVersionUndetectable, managed.Executable, err)
+	}
+
+	output, npmErr := s.runner.Run(ctx, "npm", "list", "-g", "node-red", "--json")
+	if npmErr != nil {
+		return "", fmt.Errorf("%w: executable check failed: %w; npm fallback failed: %w", ErrVersionUndetectable, err, npmErr)
 	}
 
 	var result map[string]interface{}
 	if err := json.Unmarshal(output, &result); err != nil {
-		return "unknown"
+		return "", fmt.Errorf("%w: invalid npm response: %w", ErrVersionUndetectable, err)
 	}
 
 	if deps, ok := result["dependencies"].(map[string]interface{}); ok {
 		if nodeRed, ok := deps["node-red"].(map[string]interface{}); ok {
 			if version, ok := nodeRed["version"].(string); ok {
-				return version
+				return version, nil
 			}
 		}
 	}
 
-	return "unknown"
+	return "", ErrVersionUndetectable
+}
+
+func (s *UpdateService) managedRuntime() ManagedRuntime {
+	if s.processManager != nil {
+		return s.processManager.ManagedRuntime()
+	}
+	return ResolveManagedRuntime("node-red", s.dataDir)
+}
+
+func (s *UpdateService) versionFromExecutable(ctx context.Context, managed ManagedRuntime) (string, error) {
+	if managed.Executable == "" {
+		return "", ErrVersionUndetectable
+	}
+	output, err := s.runner.Run(ctx, managed.Executable, "--version")
+	if err != nil {
+		return "", err
+	}
+	match := nodeRedVersionPattern.FindStringSubmatch(strings.TrimSpace(string(output)))
+	if len(match) != 2 {
+		return "", ErrVersionUndetectable
+	}
+	return match[1], nil
 }
 
 func (s *UpdateService) getLatestVersionInternal(ctx context.Context) (string, error) {

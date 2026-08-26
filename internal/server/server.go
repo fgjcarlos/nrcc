@@ -477,6 +477,9 @@ func (s *Server) GetShutdownChannel() chan struct{} {
 // SetProcessManager sets the ProcessManager for runtime routes
 func (s *Server) SetProcessManager(pm *service.ProcessManager) {
 	s.processManager = pm
+	if s.updateSvc != nil {
+		s.updateSvc.SetProcessManager(pm)
+	}
 	// Wire env vars into the process so they're injected on every node-red start
 	pm.SetEnvService(s.envSvc)
 	// Wire process manager into env handler so it restarts node-red on env changes

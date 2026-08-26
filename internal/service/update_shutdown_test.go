@@ -35,6 +35,8 @@ func (b *blockingRunner) Run(ctx context.Context, name string, args ...string) (
 func TestApplyUpdate_RespectsShutdownCancel(t *testing.T) {
 	tmpDir := t.TempDir()
 	svc := NewUpdateService(tmpDir)
+	pm, _ := npmGlobalProcessManager(t)
+	svc.SetProcessManager(pm)
 
 	svc.getInstalledVersionFn = func(ctx context.Context) string { return "4.0.1" }
 	svc.getLatestVersionFn = func(ctx context.Context) (string, error) { return "4.0.2", nil }
