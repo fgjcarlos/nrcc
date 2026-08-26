@@ -586,6 +586,8 @@ func TestApplyUpdateWithBackup_ConcurrencyGuard(t *testing.T) {
 func TestApplyUpdateWithBackup_SuccessfulFlow(t *testing.T) {
 	tmpDir := t.TempDir()
 	svc := NewUpdateService(tmpDir)
+	pm, _ := npmGlobalProcessManager(t)
+	svc.SetProcessManager(pm)
 	svc.SetBackupCreator(NewBackupService(tmpDir))
 
 	// Mock version functions
@@ -635,6 +637,8 @@ func TestApplyUpdateWithBackup_SuccessfulFlow(t *testing.T) {
 func TestApplyUpdateWithBackup_NpmFailure(t *testing.T) {
 	tmpDir := t.TempDir()
 	svc := NewUpdateService(tmpDir)
+	pm, _ := npmGlobalProcessManager(t)
+	svc.SetProcessManager(pm)
 	svc.SetBackupCreator(NewBackupService(tmpDir))
 
 	// Mock version functions
@@ -751,6 +755,8 @@ func (s *sequenceRunner) Run(ctx context.Context, name string, args ...string) (
 func TestApplyUpdate_PinsResolvedVersion(t *testing.T) {
 	tmpDir := t.TempDir()
 	svc := NewUpdateService(tmpDir)
+	pm, _ := npmGlobalProcessManager(t)
+	svc.SetProcessManager(pm)
 
 	svc.getInstalledVersionFn = func(ctx context.Context) string { return "4.0.1" }
 	svc.getLatestVersionFn = func(ctx context.Context) (string, error) { return "4.0.2", nil }
@@ -814,6 +820,8 @@ func TestApplyUpdate_RejectsWithoutResolvedVersion(t *testing.T) {
 func TestApplyUpdate_BlocksOnAuditFailure(t *testing.T) {
 	tmpDir := t.TempDir()
 	svc := NewUpdateService(tmpDir)
+	pm, _ := npmGlobalProcessManager(t)
+	svc.SetProcessManager(pm)
 
 	svc.getInstalledVersionFn = func(ctx context.Context) string { return "4.0.1" }
 	svc.getLatestVersionFn = func(ctx context.Context) (string, error) { return "4.0.2", nil }
@@ -851,6 +859,8 @@ func TestApplyUpdate_BlocksOnAuditFailure(t *testing.T) {
 func TestApplyUpdate_DoesNotUseGlobalAuditFlag(t *testing.T) {
 	tmpDir := t.TempDir()
 	svc := NewUpdateService(tmpDir)
+	pm, _ := npmGlobalProcessManager(t)
+	svc.SetProcessManager(pm)
 
 	svc.getInstalledVersionFn = func(ctx context.Context) string { return "4.0.1" }
 	svc.getLatestVersionFn = func(ctx context.Context) (string, error) { return "4.0.2", nil }
@@ -894,6 +904,8 @@ func TestApplyUpdate_DoesNotUseGlobalAuditFlag(t *testing.T) {
 func TestApplyUpdate_AllowsWhenAuditCannotRun(t *testing.T) {
 	tmpDir := t.TempDir()
 	svc := NewUpdateService(tmpDir)
+	pm, _ := npmGlobalProcessManager(t)
+	svc.SetProcessManager(pm)
 
 	svc.getInstalledVersionFn = func(ctx context.Context) string { return "4.0.1" }
 	svc.getLatestVersionFn = func(ctx context.Context) (string, error) { return "4.0.2", nil }
@@ -926,6 +938,8 @@ func TestApplyUpdate_AllowsWhenAuditCannotRun(t *testing.T) {
 func TestApplyUpdate_AllowsWhenNoCriticals(t *testing.T) {
 	tmpDir := t.TempDir()
 	svc := NewUpdateService(tmpDir)
+	pm, _ := npmGlobalProcessManager(t)
+	svc.SetProcessManager(pm)
 
 	svc.getInstalledVersionFn = func(ctx context.Context) string { return "4.0.1" }
 	svc.getLatestVersionFn = func(ctx context.Context) (string, error) { return "4.0.2", nil }
