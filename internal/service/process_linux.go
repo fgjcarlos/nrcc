@@ -432,13 +432,20 @@ func (pm *ProcessManager) Status() model.RuntimeStatus {
 // Version returns the node-red version string (fetched once and cached).
 func (pm *ProcessManager) Version() string {
 	pm.versionOnce.Do(func() {
-		// #nosec G204 -- pm.nodeRedCmd is operator-supplied via configuration; "--version" is a fixed flag.
-		out, err := exec.Command(pm.nodeRedCmd, "--version").Output()
+		managed := pm.ManagedRuntime()
+		// #nosec G204 -- managed.Executable is derived from the operator-supplied command; "--version" is a fixed flag.
+		out, err := exec.Command(managed.Executable, "--version").Output()
 		if err == nil {
 			pm.version = strings.TrimSpace(string(out))
 		}
 	})
 	return pm.version
+}
+
+// ManagedRuntime returns the installation authority for the Node-RED process
+// this manager launches.
+func (pm *ProcessManager) ManagedRuntime() ManagedRuntime {
+	return ResolveManagedRuntime(pm.nodeRedCmd, pm.dataDir)
 }
 
 // waitForExit is the sole goroutine that calls cmd.Wait(). It handles

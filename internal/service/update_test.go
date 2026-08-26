@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,6 +11,39 @@ import (
 
 	"github.com/fgjcarlos/nrcc/internal/model"
 )
+
+func imageLocalProcessManager(t *testing.T) (*ProcessManager, string) {
+	t.Helper()
+	root := t.TempDir()
+	executable := filepath.Join(root, "usr", "src", "node-red", "node_modules", ".bin", "node-red")
+	if err := os.MkdirAll(filepath.Dir(executable), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(executable, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return NewProcessManager(executable, root), executable
+}
+
+func npmGlobalProcessManager(t *testing.T) (*ProcessManager, string) {
+	t.Helper()
+	root := t.TempDir()
+	target := filepath.Join(root, "usr", "local", "lib", "node_modules", "node-red", "bin", "node-red.js")
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(target, []byte("#!/usr/bin/env node\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	executable := filepath.Join(root, "usr", "local", "bin", "node-red")
+	if err := os.MkdirAll(filepath.Dir(executable), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, executable); err != nil {
+		t.Fatal(err)
+	}
+	return NewProcessManager(executable, root), executable
+}
 
 // mockRunner implements execRunner for testing
 type mockRunner struct {
@@ -48,10 +82,10 @@ func TestNewUpdateService(t *testing.T) {
 // This ensures the UI never shows "unknown" on first page load
 func TestGetCachedStatus_Empty(t *testing.T) {
 	tmpDir := t.TempDir()
-	
+
 	// Create a mock service with controlled version functions
 	svc := NewUpdateService(tmpDir)
-	
+
 	// Override the version functions to return controlled values for this test
 	svc.getInstalledVersionFn = func(ctx context.Context) string {
 		return "4.0.1"
@@ -59,7 +93,7 @@ func TestGetCachedStatus_Empty(t *testing.T) {
 	svc.getLatestVersionFn = func(ctx context.Context) (string, error) {
 		return "4.0.1", nil
 	}
-	
+
 	status := svc.GetCachedStatus()
 
 	// After initialization, cache should be populated (not empty)
@@ -243,7 +277,6 @@ func TestStartStop(t *testing.T) {
 	}
 }
 
-
 // TestConcurrentForceCheck tests that concurrent force checks don't run concurrently
 func TestConcurrentForceCheck(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -269,7 +302,7 @@ func TestConcurrentForceCheck(t *testing.T) {
 	}()
 
 	time.Sleep(50 * time.Millisecond) // Let first one start
-	_, _ = svc.ForceCheck(ctx)             // This should block until first completes
+	_, _ = svc.ForceCheck(ctx)        // This should block until first completes
 
 	<-done
 
@@ -520,19 +553,19 @@ func TestApplyUpdateWithBackup_ConcurrencyGuard(t *testing.T) {
 	// Override ApplyUpdate to block for a bit
 	blockChan := make(chan struct{})
 	svc.runner = &mockRunner{output: []byte(""), err: nil}
-	
+
 	// Manually acquire lock to simulate first call holding it
 	svc.applyMu.Lock()
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	// Try to acquire; should fail immediately
 	err := svc.ApplyUpdateWithBackup(ctx)
-	
+
 	// Release lock
 	svc.applyMu.Unlock()
-	
+
 	if err == nil {
 		t.Error("Expected error when applyMu is held")
 	}
@@ -568,8 +601,8 @@ func TestApplyUpdateWithBackup_SuccessfulFlow(t *testing.T) {
 	_, _ = svc.ForceCheck(ctx)
 	cancel()
 
-	// Override runner to succeed
-	svc.runner = &mockRunner{output: []byte("success"), err: nil}
+	// Every command succeeds; the managed executable reports the target version.
+	svc.runner = &mockRunner{output: []byte("v4.0.2\n"), err: nil}
 
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -732,7 +765,7 @@ func TestApplyUpdate_PinsResolvedVersion(t *testing.T) {
 			err    error
 		}{
 			{[]byte("installed"), nil}, // npm install
-			{[]byte("ok"), nil},        // npm audit
+			{[]byte("v4.0.2\n"), nil},  // managed executable verification
 		},
 	}
 	svc.runner = runner
@@ -798,9 +831,10 @@ func TestApplyUpdate_BlocksOnAuditFailure(t *testing.T) {
 			output []byte
 			err    error
 		}{
-			{[]byte("installed"), nil},                              // npm install -g
-			{[]byte(""), nil},                                       // npm install --package-lock-only
-			{[]byte(criticalReport), fmt.Errorf("exit status 1")},   // npm audit (criticals found)
+			{[]byte("installed"), nil},                            // npm install -g
+			{[]byte("v4.0.2\n"), nil},                             // managed executable verification
+			{[]byte(""), nil},                                     // npm install --package-lock-only
+			{[]byte(criticalReport), fmt.Errorf("exit status 1")}, // npm audit (criticals found)
 		},
 	}
 	svc.runner = runner
@@ -825,7 +859,13 @@ func TestApplyUpdate_DoesNotUseGlobalAuditFlag(t *testing.T) {
 	_, _ = svc.ForceCheck(ctx)
 	cancel()
 
-	runner := &sequenceRunner{}
+	runner := &sequenceRunner{results: []struct {
+		output []byte
+		err    error
+	}{
+		{[]byte("installed"), nil},
+		{[]byte("v4.0.2\n"), nil},
+	}}
 	svc.runner = runner
 
 	_ = svc.ApplyUpdate(context.Background())
@@ -870,7 +910,7 @@ func TestApplyUpdate_AllowsWhenAuditCannotRun(t *testing.T) {
 			err    error
 		}{
 			{[]byte("installed"), nil},
-			{[]byte("npm error code EAUDITGLOBAL"), fmt.Errorf("exit status 1")},
+			{[]byte("v4.0.2\n"), nil},
 			{[]byte("npm error code EAUDITGLOBAL"), fmt.Errorf("exit status 1")},
 		},
 	}
@@ -901,6 +941,7 @@ func TestApplyUpdate_AllowsWhenNoCriticals(t *testing.T) {
 			err    error
 		}{
 			{[]byte("installed"), nil},
+			{[]byte("v4.0.2\n"), nil},
 			{[]byte(""), nil},
 			{[]byte(report), fmt.Errorf("exit status 1")}, // non-zero for highs, but no criticals
 		},
@@ -932,3 +973,131 @@ func TestParseCriticalCount(t *testing.T) {
 	}
 }
 
+func TestGetInstalledVersion_PrefersManagedExecutable(t *testing.T) {
+	svc := NewUpdateService(t.TempDir())
+	pm, executable := imageLocalProcessManager(t)
+	svc.SetProcessManager(pm)
+	runner := &mockRunner{output: []byte("v4.0.9\n")}
+	svc.runner = runner
+
+	version, err := svc.getInstalledVersionInternal(context.Background())
+	if err != nil {
+		t.Fatalf("getInstalledVersionInternal returned an error: %v", err)
+	}
+	if version != "4.0.9" {
+		t.Fatalf("expected version 4.0.9, got %q", version)
+	}
+	if len(runner.lastCalls) != 1 {
+		t.Fatalf("expected one executable call, got %v", runner.lastCalls)
+	}
+	call := runner.lastCalls[0]
+	if call.name != executable || len(call.args) != 1 || call.args[0] != "--version" {
+		t.Fatalf("expected %q --version, got %q %v", executable, call.name, call.args)
+	}
+}
+
+func TestGetInstalledVersion_ImageLocalFailureIsTypedWithoutNpmFallback(t *testing.T) {
+	svc := NewUpdateService(t.TempDir())
+	pm, _ := imageLocalProcessManager(t)
+	svc.SetProcessManager(pm)
+	runner := &mockRunner{err: errors.New("version command failed")}
+	svc.runner = runner
+
+	_, err := svc.getInstalledVersionInternal(context.Background())
+	if !errors.Is(err, ErrVersionUndetectable) {
+		t.Fatalf("expected ErrVersionUndetectable, got %v", err)
+	}
+	if len(runner.lastCalls) != 1 || runner.lastCalls[0].name == "npm" {
+		t.Fatalf("image-local detection must not use npm fallback, got %v", runner.lastCalls)
+	}
+}
+
+func TestGetInstalledVersion_FallsBackToNpmGlobalWhenStrategyPermits(t *testing.T) {
+	svc := NewUpdateService(t.TempDir())
+	pm, executable := npmGlobalProcessManager(t)
+	svc.SetProcessManager(pm)
+	runner := &sequenceRunner{results: []struct {
+		output []byte
+		err    error
+	}{
+		{nil, errors.New("version command failed")},
+		{[]byte(`{"dependencies":{"node-red":{"version":"4.0.8"}}}`), nil},
+	}}
+	svc.runner = runner
+
+	version, err := svc.getInstalledVersionInternal(context.Background())
+	if err != nil {
+		t.Fatalf("getInstalledVersionInternal returned an error: %v", err)
+	}
+	if version != "4.0.8" {
+		t.Fatalf("expected npm fallback version 4.0.8, got %q", version)
+	}
+	if len(runner.calls) != 2 {
+		t.Fatalf("expected executable and npm fallback calls, got %v", runner.calls)
+	}
+	if runner.calls[0].name != executable {
+		t.Fatalf("expected managed executable first, got %q", runner.calls[0].name)
+	}
+	if runner.calls[1].name != "npm" {
+		t.Fatalf("expected npm fallback second, got %q", runner.calls[1].name)
+	}
+}
+
+func TestApplyUpdate_RejectsImageLocal(t *testing.T) {
+	svc := NewUpdateService(t.TempDir())
+	pm, _ := imageLocalProcessManager(t)
+	svc.SetProcessManager(pm)
+	svc.cacheMu.Lock()
+	svc.cache.LatestVersion = "4.0.9"
+	svc.cacheMu.Unlock()
+	runner := &mockRunner{}
+	svc.runner = runner
+
+	err := svc.ApplyUpdate(context.Background())
+	if !errors.Is(err, ErrUpdateUnsupportedForImage) {
+		t.Fatalf("expected ErrUpdateUnsupportedForImage, got %v", err)
+	}
+	if len(runner.lastCalls) != 0 {
+		t.Fatalf("expected no subprocess calls, got %v", runner.lastCalls)
+	}
+}
+
+func TestApplyUpdate_VerifiesVersionDelta(t *testing.T) {
+	svc := NewUpdateService(t.TempDir())
+	pm, _ := npmGlobalProcessManager(t)
+	svc.SetProcessManager(pm)
+	svc.cacheMu.Lock()
+	svc.cache.LatestVersion = "4.0.9"
+	svc.cacheMu.Unlock()
+	runner := &sequenceRunner{results: []struct {
+		output []byte
+		err    error
+	}{
+		{[]byte("installed"), nil},
+		{[]byte("v4.0.8\n"), nil},
+	}}
+	svc.runner = runner
+
+	err := svc.ApplyUpdate(context.Background())
+	if !errors.Is(err, ErrUpdateVerificationFailed) {
+		t.Fatalf("expected ErrUpdateVerificationFailed, got %v", err)
+	}
+}
+
+func TestApplyUpdate_RejectsExternal(t *testing.T) {
+	svc := NewUpdateService(t.TempDir())
+	svc.SetProcessManager(NewProcessManager(filepath.Join(t.TempDir(), "opt", "node-red"), t.TempDir()))
+	svc.cacheMu.Lock()
+	svc.cache.LatestVersion = "4.0.9"
+	svc.cacheMu.Unlock()
+	runner := &mockRunner{}
+	svc.runner = runner
+
+	err := svc.ApplyUpdate(context.Background())
+	if !errors.Is(err, ErrExternalRuntimeUnmanaged) {
+		t.Fatalf("expected ErrExternalRuntimeUnmanaged, got %v", err)
+	}
+	if len(runner.lastCalls) != 0 {
+		t.Fatalf("expected no subprocess calls, got %v", runner.lastCalls)
+	}
+}
