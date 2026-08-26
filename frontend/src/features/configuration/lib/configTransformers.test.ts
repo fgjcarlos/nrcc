@@ -770,6 +770,19 @@ describe('configTransformers', () => {
       });
     });
 
+    it('should strip uploads prefix from editor images sent to the API', () => {
+      const formData = configToFormData({});
+      formData.editorPageFavicon = '/uploads/favicon.png';
+      formData.editorHeaderImage = '/uploads/header.png';
+      formData.editorLoginImage = '/uploads/login.png';
+
+      const result = formDataToConfigPayload(formData);
+
+      expect(result.editorTheme?.page?.favicon).toBe('/favicon.png');
+      expect(result.editorTheme?.header?.image).toBe('/header.png');
+      expect(result.editorTheme?.login?.image).toBe('/login.png');
+    });
+
     it('should handle palette catalogues split by newlines', () => {
       const formData: NodeRedConfigFormData = {
         uiPort: 1880,

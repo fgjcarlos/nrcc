@@ -1203,6 +1203,47 @@ func TestPatchSettingsJS_ReplacesExistingEnvArray(t *testing.T) {
 	}
 }
 
+func TestPatchSettingsJS_AddsHTTPStaticWhenMissing(t *testing.T) {
+	existing := `module.exports = {
+  uiPort: 1880,
+}`
+
+	content := patchSettingsJS(existing, model.DefaultNodeRedConfig())
+
+	if !strings.Contains(content, `httpStatic: "uploads",`) {
+		t.Fatalf("patched settings.js missing default httpStatic:\n%s", content)
+	}
+}
+
+func TestPatchSettingsJS_PreservesOperatorHTTPStatic(t *testing.T) {
+	existing := `module.exports = {
+  uiPort: 1880,
+  httpStatic: '/var/custom/path',
+}`
+
+	content := patchSettingsJS(existing, model.DefaultNodeRedConfig())
+
+	if !strings.Contains(content, `httpStatic: '/var/custom/path',`) {
+		t.Fatalf("patched settings.js changed operator-authored httpStatic:\n%s", content)
+	}
+	if strings.Count(content, "httpStatic:") != 1 {
+		t.Fatalf("patched settings.js should contain exactly one httpStatic entry:\n%s", content)
+	}
+}
+
+func TestEnsureHTTPStatic_Idempotent(t *testing.T) {
+	existing := `module.exports = {
+  uiPort: 1880,
+}`
+
+	once := ensureHTTPStatic(existing, "uploads")
+	twice := ensureHTTPStatic(once, "uploads")
+
+	if twice != once {
+		t.Fatalf("ensureHTTPStatic should be idempotent:\nonce:\n%s\ntwice:\n%s", once, twice)
+	}
+}
+
 func TestRenderEditorThemeBlock_RoundTrip(t *testing.T) {
 	cfg := model.NodeRedConfig{
 		ProjectsEnabled: true,

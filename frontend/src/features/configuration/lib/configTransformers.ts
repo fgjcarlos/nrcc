@@ -95,6 +95,14 @@ export interface ConfigPayload {
  * Convert form data to API payload
  * Pure function with no React dependencies
  */
+function toEditorImageUrl(value: string): string {
+  if (!value) return value;
+  // Strip the "/uploads/" prefix for editorTheme — those URLs must resolve
+  // from Node-RED's origin (1880), which serves them via httpStatic.
+  if (value.startsWith('/uploads/')) return value.slice('/uploads'.length);
+  return value;
+}
+
 export function formDataToConfigPayload(formData: NodeRedConfigFormData): ConfigPayload {
   const config: Record<string, unknown> = {};
 
@@ -167,7 +175,7 @@ export function formDataToConfigPayload(formData: NodeRedConfigFormData): Config
   // instead of silently keeping the previous one.
   const page: Record<string, unknown> = {};
   if (formData.editorPageTitle !== undefined) page.title = formData.editorPageTitle;
-  if (formData.editorPageFavicon !== undefined) page.favicon = formData.editorPageFavicon;
+  if (formData.editorPageFavicon !== undefined) page.favicon = toEditorImageUrl(formData.editorPageFavicon);
   if (formData.editorPageCss !== undefined) page.css = formData.editorPageCss;
   if (Object.keys(page).length > 0) editorTheme.page = page;
 
@@ -175,7 +183,7 @@ export function formDataToConfigPayload(formData: NodeRedConfigFormData): Config
   // emptying the Header Title field actually clears it server-side.
   const header: Record<string, unknown> = {};
   if (formData.editorHeaderTitle !== undefined) header.title = formData.editorHeaderTitle;
-  if (formData.editorHeaderImage !== undefined) header.image = formData.editorHeaderImage;
+  if (formData.editorHeaderImage !== undefined) header.image = toEditorImageUrl(formData.editorHeaderImage);
   if (formData.editorHeaderUrl !== undefined) header.url = formData.editorHeaderUrl;
   if (Object.keys(header).length > 0) editorTheme.header = header;
 
@@ -194,7 +202,7 @@ export function formDataToConfigPayload(formData: NodeRedConfigFormData): Config
 
   // Login/Logout settings
   if (formData.editorLoginImage) {
-    editorTheme.login = { image: formData.editorLoginImage };
+    editorTheme.login = { image: toEditorImageUrl(formData.editorLoginImage) };
   }
   if (formData.editorLogoutRedirect) {
     editorTheme.logout = { redirect: formData.editorLogoutRedirect };
