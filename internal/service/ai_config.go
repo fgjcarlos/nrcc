@@ -89,26 +89,30 @@ func NewAIConfigService(dataDir, encryptionKey string, opts ...AIConfigServiceOp
 	return s
 }
 
-// Save replaces the persisted provider configuration. A supplied API key is
-// always AES-GCM encrypted before JSONStore atomically writes its 0600 file.
+// Save updates the persisted provider configuration. A supplied API key is
+// always AES-GCM encrypted; an omitted key preserves the existing write-only
+// secret. JSONStore atomically writes the resulting 0600 file.
 func (s *AIConfigService) Save(cfg AIConfig) error {
 	cfg = normalizeAIConfig(cfg)
 	if !isSupportedAIProvider(cfg.Provider) {
 		return fmt.Errorf("%w: %s", ErrAIInvalidProvider, cfg.Provider)
 	}
 
-	persisted := persistedAIConfig{Enabled: cfg.Enabled, Provider: cfg.Provider, Endpoint: cfg.Endpoint, Model: cfg.Model}
-	if cfg.APIKey != "" {
-		if s.encryptionKey == "" {
-			return ErrAIEncryptionKeyRequired
+	if err := s.store.Update(func(persisted *persistedAIConfig) error {
+		apiKey := persisted.APIKey
+		if cfg.APIKey != "" {
+			if s.encryptionKey == "" {
+				return ErrAIEncryptionKeyRequired
+			}
+			ciphertext, err := Encrypt(cfg.APIKey, s.encryptionKey)
+			if err != nil {
+				return fmt.Errorf("encrypt AI provider API key: %w", err)
+			}
+			apiKey = ciphertext
 		}
-		ciphertext, err := Encrypt(cfg.APIKey, s.encryptionKey)
-		if err != nil {
-			return fmt.Errorf("encrypt AI provider API key: %w", err)
-		}
-		persisted.APIKey = ciphertext
-	}
-	if err := s.store.Write(persisted); err != nil {
+		*persisted = persistedAIConfig{Enabled: cfg.Enabled, Provider: cfg.Provider, Endpoint: cfg.Endpoint, Model: cfg.Model, APIKey: apiKey}
+		return nil
+	}); err != nil {
 		return fmt.Errorf("persist AI provider configuration: %w", err)
 	}
 	return nil
@@ -178,11 +182,21 @@ func (s *AIConfigService) Probe(ctx context.Context) error {
 	}
 	probeCtx, cancel := context.WithTimeout(ctx, s.timeout)
 	defer cancel()
-	if err := s.probe(probeCtx, cfg); err != nil {
-		if errors.Is(err, context.DeadlineExceeded) || errors.Is(probeCtx.Err(), context.DeadlineExceeded) {
-			return fmt.Errorf("%w: %v", ErrAIProbeTimeout, err)
+	probeErr := s.probe(probeCtx, cfg)
+	if err := probeCtx.Err(); err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return fmt.Errorf("%w: %w", ErrAIProbeTimeout, err)
 		}
-		return fmt.Errorf("%w: %v", ErrAIProbeUnreachable, err)
+		return err
+	}
+	if errors.Is(probeErr, context.DeadlineExceeded) {
+		return fmt.Errorf("%w: %w", ErrAIProbeTimeout, probeErr)
+	}
+	if errors.Is(probeErr, context.Canceled) {
+		return probeErr
+	}
+	if probeErr != nil {
+		return fmt.Errorf("%w: %w", ErrAIProbeUnreachable, probeErr)
 	}
 	return nil
 }
@@ -200,7 +214,7 @@ func isSupportedAIProvider(provider string) bool {
 
 func validAIEndpoint(endpoint string) bool {
 	u, err := url.ParseRequestURI(endpoint)
-	return err == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Host != "" && u.User == nil && u.RawQuery == "" && u.Fragment == ""
+	return err == nil && u.Scheme == "https" && u.Host != "" && u.User == nil && u.RawQuery == "" && u.Fragment == ""
 }
 
 func defaultAIProviderProbe(ctx context.Context, cfg AIConfig) error {

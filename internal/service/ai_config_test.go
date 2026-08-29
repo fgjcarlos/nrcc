@@ -11,14 +11,35 @@ import (
 	"time"
 )
 
+func saveAIConfig(t *testing.T, svc *AIConfigService, cfg AIConfig) {
+	t.Helper()
+	if err := svc.Save(cfg); err != nil {
+		t.Fatalf("Save() error: %v", err)
+	}
+}
+
+func loadAIConfig(t *testing.T, svc *AIConfigService) AIConfig {
+	t.Helper()
+	cfg, err := svc.Load()
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	return cfg
+}
+
+func newConfiguredAIService(t *testing.T, opts ...AIConfigServiceOption) *AIConfigService {
+	t.Helper()
+	svc := NewAIConfigService(t.TempDir(), "encryption-key", opts...)
+	saveAIConfig(t, svc, AIConfig{Enabled: true, Provider: "openai", Endpoint: "https://api.example.test", Model: "model", APIKey: "key"})
+	return svc
+}
+
 func TestAIConfigServicePersistsEncryptedSecretAndReturnsRedactedView(t *testing.T) {
 	dir := t.TempDir()
 	svc := NewAIConfigService(dir, "encryption-key")
 	key := "test-api-key-must-not-be-persisted-raw"
 
-	if err := svc.Save(AIConfig{Enabled: true, Provider: "openai", Endpoint: "https://api.example.test/v1", Model: "test-model", APIKey: key}); err != nil {
-		t.Fatalf("Save() error: %v", err)
-	}
+	saveAIConfig(t, svc, AIConfig{Enabled: true, Provider: "openai", Endpoint: "https://api.example.test/v1", Model: "test-model", APIKey: key})
 
 	view, err := svc.View()
 	if err != nil {
@@ -35,6 +56,7 @@ func TestAIConfigServicePersistsEncryptedSecretAndReturnsRedactedView(t *testing
 		t.Fatalf("public view leaked API key: %#v", view)
 	}
 
+	// #nosec G304 -- the path is derived from t.TempDir() and a literal filename.
 	persisted, err := os.ReadFile(filepath.Join(dir, "ai-config.json"))
 	if err != nil {
 		t.Fatalf("read persisted config: %v", err)
@@ -62,10 +84,7 @@ func TestAIConfigServiceUsesEnvironmentOnlyWithoutPersistedConfig(t *testing.T) 
 	t.Setenv("NRCC_AI_API_KEY", "env-key")
 
 	svc := NewAIConfigService(t.TempDir(), "encryption-key")
-	cfg, err := svc.Load()
-	if err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
+	cfg := loadAIConfig(t, svc)
 	if cfg.Endpoint != "https://env.example.test/v1" || cfg.APIKey != "env-key" {
 		t.Fatalf("Load() did not use environment fallback: %#v", cfg)
 	}
@@ -77,15 +96,15 @@ func TestAIConfigServicePersistedConfigWinsOverEnvironment(t *testing.T) {
 	t.Setenv("NRCC_AI_MODEL", "env-model")
 
 	svc := NewAIConfigService(t.TempDir(), "encryption-key")
-	if err := svc.Save(AIConfig{Enabled: true, Provider: "offline", Model: "persisted-model"}); err != nil {
-		t.Fatalf("Save() error: %v", err)
-	}
-	cfg, err := svc.Load()
-	if err != nil {
-		t.Fatalf("Load() error: %v", err)
-	}
-	if !cfg.Enabled || cfg.Provider != "offline" || cfg.Model != "persisted-model" {
+	saveAIConfig(t, svc, AIConfig{Enabled: true, Provider: "offline", Model: "persisted-model", APIKey: "persisted-key"})
+	cfg := loadAIConfig(t, svc)
+	if !cfg.Enabled || cfg.Provider != "offline" || cfg.Model != "persisted-model" || cfg.APIKey != "persisted-key" {
 		t.Fatalf("persisted config did not win: %#v", cfg)
+	}
+	saveAIConfig(t, svc, AIConfig{Provider: "offline", Model: "updated-model"})
+	cfg = loadAIConfig(t, svc)
+	if cfg.Enabled || cfg.Model != "updated-model" || cfg.APIKey != "persisted-key" {
+		t.Fatalf("update did not preserve the write-only API key: %#v", cfg)
 	}
 }
 
@@ -109,13 +128,12 @@ func TestAIConfigServiceProbeReturnsStableErrors(t *testing.T) {
 		{"incomplete", AIConfig{Enabled: true, Provider: "openai", Model: "model", APIKey: "key"}, ErrAIConfigIncomplete},
 		{"missing key", AIConfig{Enabled: true, Provider: "openai", Endpoint: "https://api.example.test", Model: "model"}, ErrAIKeyRequired},
 		{"invalid endpoint", AIConfig{Enabled: true, Provider: "openai", Endpoint: "not a URL", Model: "model", APIKey: "key"}, ErrAIInvalidEndpoint},
+		{"insecure endpoint", AIConfig{Enabled: true, Provider: "openai", Endpoint: "http://api.example.test", Model: "model", APIKey: "key"}, ErrAIInvalidEndpoint},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			svc := NewAIConfigService(t.TempDir(), "encryption-key")
-			if err := svc.Save(tt.cfg); err != nil {
-				t.Fatalf("Save() error: %v", err)
-			}
+			saveAIConfig(t, svc, tt.cfg)
 			if err := svc.Probe(context.Background()); !errors.Is(err, tt.want) {
 				t.Fatalf("Probe() error = %v, want %v", err, tt.want)
 			}
@@ -124,38 +142,34 @@ func TestAIConfigServiceProbeReturnsStableErrors(t *testing.T) {
 }
 
 func TestAIConfigServiceProbeBoundsInjectedProviderTimeout(t *testing.T) {
-	svc := NewAIConfigService(t.TempDir(), "encryption-key", WithAIProbeTimeout(time.Millisecond), WithAIProviderProbe(func(ctx context.Context, _ AIConfig) error {
+	svc := newConfiguredAIService(t, WithAIProbeTimeout(time.Millisecond), WithAIProviderProbe(func(ctx context.Context, _ AIConfig) error {
 		<-ctx.Done()
 		return ctx.Err()
 	}))
-	if err := svc.Save(AIConfig{Enabled: true, Provider: "openai", Endpoint: "https://api.example.test", Model: "model", APIKey: "key"}); err != nil {
-		t.Fatalf("Save() error: %v", err)
-	}
 	if err := svc.Probe(context.Background()); !errors.Is(err, ErrAIProbeTimeout) {
 		t.Fatalf("Probe() error = %v, want ErrAIProbeTimeout", err)
 	}
 }
 
 func TestAIConfigServiceProbeClassifiesUnreachableProvider(t *testing.T) {
-	svc := NewAIConfigService(t.TempDir(), "encryption-key", WithAIProviderProbe(func(context.Context, AIConfig) error {
+	svc := newConfiguredAIService(t, WithAIProviderProbe(func(context.Context, AIConfig) error {
 		return errors.New("connection refused")
 	}))
-	if err := svc.Save(AIConfig{Enabled: true, Provider: "openai", Endpoint: "https://api.example.test", Model: "model", APIKey: "key"}); err != nil {
-		t.Fatalf("Save() error: %v", err)
-	}
 	if err := svc.Probe(context.Background()); !errors.Is(err, ErrAIProbeUnreachable) {
 		t.Fatalf("Probe() error = %v, want ErrAIProbeUnreachable", err)
 	}
 }
 
 func TestAIConfigServiceProbeSucceedsWithInjectedProvider(t *testing.T) {
-	svc := NewAIConfigService(t.TempDir(), "encryption-key", WithAIProviderProbe(func(context.Context, AIConfig) error {
+	svc := newConfiguredAIService(t, WithAIProviderProbe(func(context.Context, AIConfig) error {
 		return nil
 	}))
-	if err := svc.Save(AIConfig{Enabled: true, Provider: "openai", Endpoint: "https://api.example.test", Model: "model", APIKey: "key"}); err != nil {
-		t.Fatalf("Save() error: %v", err)
-	}
 	if err := svc.Probe(context.Background()); err != nil {
 		t.Fatalf("Probe() error: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := svc.Probe(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Probe() error = %v, want context.Canceled", err)
 	}
 }
