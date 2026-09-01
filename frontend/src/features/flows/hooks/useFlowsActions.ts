@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { flowService, type AnalysisResult } from '@/features/flows';
+import { AICapabilityUnavailableError } from '@/features/flows/services/flowService';
 import { toast } from 'sonner';
 
 export interface UseFlowsActionsResult {
@@ -28,7 +29,14 @@ export function useFlowsActions(): UseFlowsActionsResult {
         }
       });
 
-      if (failed > 0) {
+      const unavailable = results.find(
+        (result): result is PromiseRejectedResult =>
+          result.status === 'rejected' && result.reason instanceof AICapabilityUnavailableError,
+      );
+
+      if (unavailable && failed === ids.length) {
+        toast.error(unavailable.reason.message);
+      } else if (failed > 0) {
         toast.error(
           `${failed} flow${failed > 1 ? 's' : ''} failed to analyze. Check AI configuration.`
         );

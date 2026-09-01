@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 import { useFlowsData } from '@/features/flows/hooks/useFlowsData';
 import { useFlowsActions } from '@/features/flows/hooks/useFlowsActions';
+import { useAICapability } from '@/features/flows/hooks/useAICapability';
+import { useAuth } from '@/features/auth/hooks';
 import { StateContainer } from '@/shared/components/StateContainer';
 import { UI_COPY } from '@/shared/constants/uiCopy';
 import { toast } from 'sonner';
@@ -30,6 +32,9 @@ export function FlowsView() {
 
   const { flows, available, isLoading, error } = useFlowsData();
   const { analyzeFlows } = useFlowsActions();
+  const aiCapability = useAICapability();
+  const { user } = useAuth();
+  const canConfigureAI = user?.role === 'admin';
 
   const toggleSelect = (id: string) => {
     setSelected(prev => {
@@ -58,6 +63,10 @@ export function FlowsView() {
 
   const handleAnalyze = async () => {
     if (selected.size === 0) return;
+    if (!aiCapability.isReady) {
+      toast.error(aiCapability.message);
+      return;
+    }
     setAnalyzing(true);
     const ids = Array.from(selected);
     try {
@@ -193,7 +202,7 @@ export function FlowsView() {
             </span>
             <button
               onClick={handleAnalyze}
-              disabled={analyzing}
+              disabled={!aiCapability.isReady || analyzing}
               className="flex items-center gap-2 rounded-full bg-primary px-4 py-1.5 text-sm font-medium text-primary-content transition-colors hover:bg-primary/90 disabled:opacity-50"
             >
               {analyzing
@@ -201,6 +210,16 @@ export function FlowsView() {
                 : <Sparkles className="w-4 h-4" />}
               {analyzing ? UI_COPY.analyzing : UI_COPY.analyzeWithAI}
             </button>
+            {!aiCapability.isReady && (
+              <span className="max-w-56 text-xs text-base-content/60" aria-live="polite">
+                {aiCapability.message}
+                {canConfigureAI && (
+                  <Link to="/configuration" className="ml-1 text-primary underline underline-offset-2">
+                    Configure AI provider
+                  </Link>
+                )}
+              </span>
+            )}
           </div>
         </div>
       )}
