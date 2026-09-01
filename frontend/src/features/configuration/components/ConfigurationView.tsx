@@ -8,10 +8,11 @@ import {
   AuthSettings,
   LoggingSettings,
   EditorThemeSettings,
+  AIProviderSettings,
 } from '.';
 import {
   Settings, Server, Lock, Activity, Palette,
-  Save, LockOpen, AlertTriangle
+  Save, LockOpen, AlertTriangle, Bot
 } from 'lucide-react';
 import { useConfigurationData, useConfigurationActions } from '../hooks';
 import { UI_COPY } from '@/shared/constants/uiCopy';
@@ -25,7 +26,7 @@ interface Section {
   id: string;
   label: string;
   icon: React.ElementType;
-  component: React.ComponentType<{
+  component?: React.ComponentType<{
     settings: NodeRedConfigFormData;
     onUpdate: (field: keyof NodeRedConfigFormData, value: string | number | boolean) => void;
     disabled?: boolean;
@@ -37,6 +38,7 @@ const SECTIONS: Section[] = [
   { id: 'auth', label: 'Authentication', icon: Lock, component: AuthSettings },
   { id: 'logging', label: 'Logging', icon: Activity, component: LoggingSettings },
   { id: 'editor', label: 'Editor Theme', icon: Palette, component: EditorThemeSettings },
+  { id: 'ai', label: 'AI Provider', icon: Bot },
 ];
 
 // ============================================
@@ -289,11 +291,7 @@ export function ConfigurationView() {
 
       {/* Active Tab Content */}
       <div className="surface-card p-6">
-        <ActiveComponent
-          settings={formData}
-          onUpdate={handleUpdateField}
-          disabled={isSaving}
-        />
+        {activeTab === 'ai' ? <AIProviderSettings /> : <ActiveComponent settings={formData} onUpdate={handleUpdateField} disabled={isSaving} />}
       </div>
 
       {/* Raw Settings Editor — gated by issue #364 */}
