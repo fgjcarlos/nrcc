@@ -173,3 +173,119 @@ func TestAIConfigServiceProbeSucceedsWithInjectedProvider(t *testing.T) {
 		t.Fatalf("Probe() error = %v, want context.Canceled", err)
 	}
 }
+
+func TestAIConfigServiceStatusRequiresPersistedRemoteConnectionResult(t *testing.T) {
+	tests := []struct {
+		name       string
+		cfg        AIConfig
+		connection string
+		want       string
+	}{
+		{"disabled", AIConfig{Provider: "offline"}, "", "disabled"},
+		{"remote incomplete", AIConfig{Enabled: true, Provider: "openai", Model: "model"}, "", "incomplete"},
+		{"remote awaiting test", AIConfig{Enabled: true, Provider: "openai", Endpoint: "https://api.example.test", Model: "model", APIKey: "key"}, "", "incomplete"},
+		{"remote testing", AIConfig{Enabled: true, Provider: "openai", Endpoint: "https://api.example.test", Model: "model", APIKey: "key"}, "testing", "testing"},
+		{"remote unreachable", AIConfig{Enabled: true, Provider: "openai", Endpoint: "https://api.example.test", Model: "model", APIKey: "key"}, "unreachable", "unreachable"},
+		{"offline without key", AIConfig{Enabled: true, Provider: "offline", Model: "local"}, "", "ready"},
+		{"remote ready", AIConfig{Enabled: true, Provider: "openai", Endpoint: "https://api.example.test", Model: "model", APIKey: "key"}, "ready", "ready"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			probed := false
+			svc := NewAIConfigService(t.TempDir(), "encryption-key", WithAIProviderProbe(func(context.Context, AIConfig) error {
+				probed = true
+				return nil
+			}))
+			saveAIConfig(t, svc, tt.cfg)
+			if tt.connection != "" {
+				if err := svc.updateConnection(tt.connection, "test status"); err != nil {
+					t.Fatalf("updateConnection() error: %v", err)
+				}
+			}
+			got, err := svc.Status()
+			if err != nil {
+				t.Fatalf("Status() error: %v", err)
+			}
+			if got.Status != tt.want {
+				t.Errorf("Status().Status = %q, want %q", got.Status, tt.want)
+			}
+			if probed {
+				t.Error("Status() must not probe the provider")
+			}
+		})
+	}
+}
+
+func TestAIConfigServiceSaveInvalidatesChangedRemoteConnectionAndPreservesExistingFailure(t *testing.T) {
+	svc := newConfiguredAIService(t)
+	if err := svc.updateConnection("unreachable", "The provider could not be reached"); err != nil {
+		t.Fatalf("updateConnection() error: %v", err)
+	}
+
+	// Saving unchanged settings must not turn an unavailable provider into ready.
+	saveAIConfig(t, svc, AIConfig{Enabled: true, Provider: "openai", Endpoint: "https://api.example.test", Model: "model"})
+	status, err := svc.Status()
+	if err != nil {
+		t.Fatalf("Status() error: %v", err)
+	}
+	if status.Status != "unreachable" {
+		t.Fatalf("Status().Status = %q, want unreachable", status.Status)
+	}
+
+	// Changing a remote setting invalidates a prior success until it is retested.
+	if err := svc.updateConnection("ready", ""); err != nil {
+		t.Fatalf("updateConnection() error: %v", err)
+	}
+	saveAIConfig(t, svc, AIConfig{Enabled: true, Provider: "openai", Endpoint: "https://other.example.test", Model: "model"})
+	status, err = svc.Status()
+	if err != nil {
+		t.Fatalf("Status() error: %v", err)
+	}
+	if status.Status != "incomplete" {
+		t.Fatalf("Status().Status = %q, want incomplete", status.Status)
+	}
+}
+
+func TestAIConfigServiceTestRecordsSafeConnectionStatus(t *testing.T) {
+	tests := []struct {
+		name       string
+		probeErr   error
+		wantStatus string
+		wantReason string
+	}{
+		{"ready", nil, "ready", ""},
+		{"timeout", context.DeadlineExceeded, "unreachable", "The provider did not respond before the connection test timed out"},
+		{"unreachable", errors.New("request failed with Authorization: Bearer secret"), "unreachable", "The provider could not be reached"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := NewAIConfigService(t.TempDir(), "encryption-key", WithAIProviderProbe(func(context.Context, AIConfig) error {
+				return tt.probeErr
+			}))
+			saveAIConfig(t, svc, AIConfig{Enabled: true, Provider: "openai", Endpoint: "https://api.example.test", Model: "model", APIKey: "secret"})
+
+			got, err := svc.Test(context.Background())
+			if tt.probeErr != nil && err == nil {
+				t.Fatal("Test() error = nil, want probe error")
+			}
+			if tt.probeErr == nil && err != nil {
+				t.Fatalf("Test() error = %v", err)
+			}
+			if got.Status != tt.wantStatus || got.Reason != tt.wantReason {
+				t.Errorf("Test() = %#v, want status %q and reason %q", got, tt.wantStatus, tt.wantReason)
+			}
+			if strings.Contains(got.Reason, "secret") {
+				t.Fatalf("connection reason leaked secret: %q", got.Reason)
+			}
+
+			persisted, err := svc.Status()
+			if err != nil {
+				t.Fatalf("Status() error = %v", err)
+			}
+			if persisted != got {
+				t.Errorf("Status() = %#v, want persisted result %#v", persisted, got)
+			}
+		})
+	}
+}
