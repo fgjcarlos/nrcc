@@ -29,11 +29,13 @@ var (
 const defaultAIProbeTimeout = 5 * time.Second
 
 type persistedAIConfig struct {
-	Enabled  bool   `json:"enabled"`
-	Provider string `json:"provider"`
-	Endpoint string `json:"endpoint,omitempty"`
-	Model    string `json:"model,omitempty"`
-	APIKey   string `json:"apiKey,omitempty"`
+	Enabled        bool   `json:"enabled"`
+	Provider       string `json:"provider"`
+	Endpoint       string `json:"endpoint,omitempty"`
+	Model          string `json:"model,omitempty"`
+	APIKey         string `json:"apiKey,omitempty"`
+	Connection     string `json:"connection,omitempty"`
+	ConnectionNote string `json:"connectionNote,omitempty"`
 }
 
 // AIConfigView is the safe configuration representation for API consumers.
@@ -43,6 +45,16 @@ type AIConfigView struct {
 	Endpoint         string `json:"endpoint,omitempty"`
 	Model            string `json:"model,omitempty"`
 	APIKeyConfigured bool   `json:"apiKeyConfigured"`
+}
+
+// AIProviderStatus is the safe capability contract consumed by UI clients.
+// It intentionally excludes whether a secret value exists or its contents.
+type AIProviderStatus struct {
+	Status   string `json:"status"`
+	Provider string `json:"provider"`
+	Endpoint string `json:"endpoint,omitempty"`
+	Model    string `json:"model,omitempty"`
+	Reason   string `json:"reason,omitempty"`
 }
 
 // AIProviderProbe is the injected remote connectivity boundary.
@@ -100,6 +112,8 @@ func (s *AIConfigService) Save(cfg AIConfig) error {
 
 	if err := s.store.Update(func(persisted *persistedAIConfig) error {
 		apiKey := persisted.APIKey
+		connection := persisted.Connection
+		connectionNote := persisted.ConnectionNote
 		if cfg.APIKey != "" {
 			if s.encryptionKey == "" {
 				return ErrAIEncryptionKeyRequired
@@ -110,10 +124,38 @@ func (s *AIConfigService) Save(cfg AIConfig) error {
 			}
 			apiKey = ciphertext
 		}
-		*persisted = persistedAIConfig{Enabled: cfg.Enabled, Provider: cfg.Provider, Endpoint: cfg.Endpoint, Model: cfg.Model, APIKey: apiKey}
+		// A successful remote probe applies only to the exact saved settings. Keep
+		// an existing result for an unchanged configuration, but require a new
+		// bounded probe after any setting that can affect connectivity changes.
+		if cfg.Enabled != persisted.Enabled || cfg.Provider != persisted.Provider || cfg.Endpoint != persisted.Endpoint || cfg.Model != persisted.Model || cfg.APIKey != "" {
+			connection, connectionNote = "", ""
+		}
+		*persisted = persistedAIConfig{
+			Enabled:        cfg.Enabled,
+			Provider:       cfg.Provider,
+			Endpoint:       cfg.Endpoint,
+			Model:          cfg.Model,
+			APIKey:         apiKey,
+			Connection:     connection,
+			ConnectionNote: connectionNote,
+		}
 		return nil
 	}); err != nil {
 		return fmt.Errorf("persist AI provider configuration: %w", err)
+	}
+	return nil
+}
+
+// Validate verifies configuration fields that are knowable before a provider
+// connection test. It accepts incomplete remote configurations so an operator
+// can save a draft, but rejects malformed endpoints.
+func (s *AIConfigService) Validate(cfg AIConfig) error {
+	cfg = normalizeAIConfig(cfg)
+	if !isSupportedAIProvider(cfg.Provider) {
+		return fmt.Errorf("%w: %s", ErrAIInvalidProvider, cfg.Provider)
+	}
+	if cfg.Endpoint != "" && !validAIEndpoint(cfg.Endpoint) {
+		return ErrAIInvalidEndpoint
 	}
 	return nil
 }
@@ -156,6 +198,97 @@ func (s *AIConfigService) View() (AIConfigView, error) {
 		return AIConfigView{}, err
 	}
 	return AIConfigView{Enabled: cfg.Enabled, Provider: cfg.Provider, Endpoint: cfg.Endpoint, Model: cfg.Model, APIKeyConfigured: cfg.APIKey != ""}, nil
+}
+
+// Status returns the provider capability without contacting the provider.
+// The last connection result is persisted by Test so callers can distinguish a
+// complete configuration from a recently unreachable provider.
+func (s *AIConfigService) Status() (AIProviderStatus, error) {
+	persisted, err := s.store.Read()
+	if errors.Is(err, os.ErrNotExist) {
+		cfg := normalizeAIConfig(LoadAIConfigFromEnv())
+		if !isSupportedAIProvider(cfg.Provider) {
+			return AIProviderStatus{}, fmt.Errorf("%w: %s", ErrAIInvalidProvider, cfg.Provider)
+		}
+		return aiProviderStatus(cfg, "", ""), nil
+	}
+	if err != nil {
+		return AIProviderStatus{}, fmt.Errorf("read AI provider configuration: %w", err)
+	}
+	cfg, err := s.Load()
+	if err != nil {
+		return AIProviderStatus{}, err
+	}
+	return aiProviderStatus(cfg, persisted.Connection, persisted.ConnectionNote), nil
+}
+
+func aiProviderStatus(cfg AIConfig, connection, note string) AIProviderStatus {
+	status := AIProviderStatus{Provider: cfg.Provider, Endpoint: cfg.Endpoint, Model: cfg.Model}
+	if !cfg.Enabled {
+		status.Status, status.Reason = "disabled", "AI provider is disabled"
+		return status
+	}
+	if cfg.Provider == "offline" {
+		status.Status = "ready"
+		return status
+	}
+	if cfg.Endpoint == "" || cfg.Model == "" || cfg.APIKey == "" || !validAIEndpoint(cfg.Endpoint) {
+		status.Status, status.Reason = "incomplete", "Provider endpoint, model, and API key are required"
+		return status
+	}
+	if connection == "testing" || connection == "unreachable" {
+		status.Status, status.Reason = connection, note
+		return status
+	}
+	if connection != "ready" {
+		status.Status, status.Reason = "incomplete", "A successful connection test is required"
+		return status
+	}
+	status.Status = "ready"
+	return status
+}
+
+// Test runs a bounded provider probe and persists only its safe outcome. It
+// never stores or exposes transport errors, which may include credentials.
+func (s *AIConfigService) Test(ctx context.Context) (AIProviderStatus, error) {
+	if err := s.updateConnection("testing", "Connection test is in progress"); err != nil {
+		return AIProviderStatus{}, err
+	}
+	if err := s.Probe(ctx); err != nil {
+		status, updateErr := s.recordProbeFailure(err)
+		if updateErr != nil {
+			return AIProviderStatus{}, updateErr
+		}
+		return status, err
+	}
+	if err := s.updateConnection("ready", ""); err != nil {
+		return AIProviderStatus{}, err
+	}
+	return s.Status()
+}
+
+func (s *AIConfigService) recordProbeFailure(probeErr error) (AIProviderStatus, error) {
+	status, reason := "unreachable", "The provider could not be reached"
+	switch {
+	case errors.Is(probeErr, ErrAIDisabled):
+		status, reason = "disabled", "AI provider is disabled"
+	case errors.Is(probeErr, ErrAIConfigIncomplete), errors.Is(probeErr, ErrAIKeyRequired), errors.Is(probeErr, ErrAIInvalidEndpoint):
+		status, reason = "incomplete", "Provider endpoint, model, and API key are required"
+	case errors.Is(probeErr, ErrAIProbeTimeout):
+		reason = "The provider did not respond before the connection test timed out"
+	}
+	if err := s.updateConnection(status, reason); err != nil {
+		return AIProviderStatus{}, err
+	}
+	return s.Status()
+}
+
+func (s *AIConfigService) updateConnection(status, note string) error {
+	return s.store.Update(func(persisted *persistedAIConfig) error {
+		persisted.Connection = status
+		persisted.ConnectionNote = note
+		return nil
+	})
 }
 
 // Probe validates the active configuration then executes a bounded provider
