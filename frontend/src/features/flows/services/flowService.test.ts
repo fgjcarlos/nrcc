@@ -11,10 +11,23 @@ vi.mock('@/shared/lib', () => ({
 const mockApi = (apiLib as unknown as { api: { get: ReturnType<typeof vi.fn>; post: ReturnType<typeof vi.fn> } }).api;
 
 const ok = <T>(data: T) => ({ data: { data } });
+const readyCapability = { status: 'ready' as const, provider: 'openai' as const, model: 'model' };
 
 beforeEach(() => vi.clearAllMocks());
 
 describe('flowService', () => {
+  describe('getAICapability', () => {
+    it('calls the authoritative AI capability endpoint', async () => {
+      const capability = { status: 'unreachable' as const, provider: 'openai' as const, model: 'model', reason: 'The provider could not be reached' };
+      mockApi.get.mockResolvedValueOnce(ok(capability));
+
+      const result = await flowService.getAICapability();
+
+      expect(mockApi.get).toHaveBeenCalledWith('/ai/status');
+      expect(result).toEqual(capability);
+    });
+  });
+
   describe('getFlows', () => {
     it('calls GET /flows and returns the data envelope', async () => {
       const payload = { available: true, flows: [{ id: 'f1', label: 'Flow 1', nodes: 3, connections: 2, disabled: false }] };
@@ -59,7 +72,9 @@ describe('flowService', () => {
   describe('analyzeFlow', () => {
     it('loads the real flow and sends it to the existing AI audit endpoint', async () => {
       const flow = { id: 'f1', label: 'Flow 1', nodes: [] };
+      mockApi.get.mockResolvedValueOnce(ok(readyCapability));
       mockApi.get.mockResolvedValueOnce(ok(flow));
+      mockApi.get.mockResolvedValueOnce(ok(readyCapability));
       mockApi.post.mockResolvedValueOnce(ok({
         enabled: true,
         provider: 'openai',
@@ -73,7 +88,9 @@ describe('flowService', () => {
 
       const result = await flowService.analyzeFlow('f1');
 
-      expect(mockApi.get).toHaveBeenCalledWith('/flows/f1');
+      expect(mockApi.get).toHaveBeenNthCalledWith(1, '/ai/status');
+      expect(mockApi.get).toHaveBeenNthCalledWith(2, '/flows/f1');
+      expect(mockApi.get).toHaveBeenNthCalledWith(3, '/ai/status');
       expect(mockApi.post).toHaveBeenCalledWith('/ai/analyze/flow', {
         action: 'audit',
         flow,
@@ -85,6 +102,21 @@ describe('flowService', () => {
         cons: ['missing catch'],
         suggestions: ['add retry'],
       });
+    });
+
+    it('fails closed before loading a flow when the provider is not ready', async () => {
+      mockApi.get.mockResolvedValueOnce(ok({
+        status: 'unreachable' as const,
+        provider: 'openai' as const,
+        model: 'model',
+        reason: 'The provider could not be reached',
+      }));
+
+      await expect(flowService.analyzeFlow('f1')).rejects.toThrow('The provider could not be reached');
+
+      expect(mockApi.get).toHaveBeenCalledWith('/ai/status');
+      expect(mockApi.get).not.toHaveBeenCalledWith('/flows/f1');
+      expect(mockApi.post).not.toHaveBeenCalled();
     });
   });
 
@@ -98,6 +130,7 @@ describe('flowService', () => {
         redacted: true,
         summary: 'Explanation here',
       };
+      mockApi.get.mockResolvedValueOnce(ok(readyCapability));
       mockApi.post.mockResolvedValueOnce(ok(aiResponse));
 
       const input = {
@@ -109,6 +142,22 @@ describe('flowService', () => {
 
       expect(mockApi.post).toHaveBeenCalledWith('/ai/analyze/flow', input);
       expect(result).toEqual(aiResponse);
+    });
+
+    it('blocks a direct copilot request when a fresh capability check is not ready', async () => {
+      mockApi.get.mockResolvedValueOnce(ok({
+        status: 'disabled' as const,
+        provider: 'offline' as const,
+        model: '',
+        reason: 'AI assistance is disabled',
+      }));
+
+      await expect(flowService.requestAIAssistance({
+        action: 'explain',
+        flow: { id: 'f1', label: 'Flow 1', nodes: [] },
+      })).rejects.toThrow('AI assistance is disabled');
+
+      expect(mockApi.post).not.toHaveBeenCalled();
     });
   });
 

@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { flowService } from '@/features/flows';
+import { AICapabilityUnavailableError } from '@/features/flows/services/flowService';
 import type { AIFlowAction, FlowDetail } from '@/features/flows/types';
 
 export function useFlowDetailActions() {
@@ -10,8 +11,8 @@ export function useFlowDetailActions() {
     onSuccess: () => {
       toast.success('Flow analyzed successfully');
     },
-    onError: () => {
-      toast.error('Failed to analyze flow');
+    onError: (error: Error) => {
+      toast.error(error instanceof AICapabilityUnavailableError ? error.message : 'Failed to analyze flow');
     },
   });
 
@@ -26,7 +27,7 @@ export function useFlowDetailActions() {
       toast.success(`AI ${data.action} response ready for review`);
     },
     onError: (error: Error) => {
-      toast.error((error as Error).message || 'AI flow assistance is not available');
+      toast.error(error.message || 'AI actions are unavailable until the configured provider is ready.');
     },
   });
 

@@ -3,6 +3,7 @@ import { renderHook, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import { useFlowDetailActions } from './useFlowDetailActions';
+import { AICapabilityUnavailableError } from '@/features/flows/services/flowService';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -66,6 +67,21 @@ describe('useFlowDetailActions', () => {
       });
 
       expect(toast.error).toHaveBeenCalledWith('Failed to analyze flow');
+    });
+
+    it('preserves the unavailable feedback from the action-layer guard', async () => {
+      vi.mocked(flowService.analyzeFlow).mockRejectedValueOnce(
+        new AICapabilityUnavailableError('AI assistance is disabled'),
+      );
+
+      const { result } = renderHook(() => useFlowDetailActions(), { wrapper: createWrapper() });
+
+      await act(async () => {
+        result.current.analyzeFlowMutation.mutate('f1');
+        await vi.waitFor(() => result.current.analyzeFlowMutation.isError);
+      });
+
+      expect(toast.error).toHaveBeenCalledWith('AI assistance is disabled');
     });
   });
 

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useFlowDetailData, useFlowDetailActions } from '@/features/flows/hooks';
+import { useAICapability, useFlowDetailData, useFlowDetailActions } from '@/features/flows/hooks';
+import { useAuth } from '@/features/auth/hooks';
 import type { AIFlowAction } from '@/features/flows/types';
 import { MetricCard } from './MetricCard';
 import { AnalysisResultView } from './AnalysisResultView';
@@ -22,6 +23,9 @@ export function FlowDetailView() {
     flowId: id,
   });
   const { analyzeFlowMutation, aiFlowMutation } = useFlowDetailActions();
+  const aiCapability = useAICapability();
+  const { user } = useAuth();
+  const canConfigureAI = user?.role === 'admin';
 
   // UI State
   const [showRawJson, setShowRawJson] = useState(false);
@@ -29,6 +33,10 @@ export function FlowDetailView() {
 
   // Handlers
   const handleAIAction = (action: AIFlowAction) => {
+    if (!aiCapability.isReady) {
+      toast.error(aiCapability.message);
+      return;
+    }
     const loadedFlow = flow;
     if (!loadedFlow) {
       toast.error('Flow not loaded');
@@ -119,8 +127,14 @@ export function FlowDetailView() {
           <h2 className="text-lg font-semibold text-base-content">AI Analysis</h2>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => analyzeFlowMutation.mutate(id!)}
-              disabled={analyzeFlowMutation.isPending}
+              onClick={() => {
+                if (!aiCapability.isReady) {
+                  toast.error(aiCapability.message);
+                  return;
+                }
+                analyzeFlowMutation.mutate(id!);
+              }}
+              disabled={!aiCapability.isReady || analyzeFlowMutation.isPending}
               className="action-btn-primary"
             >
               {analyzeFlowMutation.isPending && (
@@ -130,6 +144,17 @@ export function FlowDetailView() {
             </button>
           </div>
         </div>
+
+        {!aiCapability.isReady && (
+          <p className="text-sm text-base-content/60" aria-live="polite">
+            {aiCapability.message}
+            {canConfigureAI && (
+              <Link to="/configuration" className="ml-2 text-primary underline underline-offset-2">
+                Configure AI provider
+              </Link>
+            )}
+          </p>
+        )}
 
         {/* Analyze Flow Result */}
         {analyzeFlowMutation.isPending ? (
@@ -165,6 +190,7 @@ export function FlowDetailView() {
         <textarea
           value={aiPrompt}
           onChange={(event) => setAiPrompt(event.target.value)}
+          disabled={!aiCapability.isReady}
           className="w-full rounded-xl border border-border bg-base-100 p-3 text-sm text-base-content"
           rows={3}
           placeholder="Optional instruction, e.g. suggest safer retry handling without changing credentials"
@@ -175,7 +201,7 @@ export function FlowDetailView() {
               key={action}
               type="button"
               onClick={() => handleAIAction(action)}
-              disabled={aiFlowMutation.isPending}
+              disabled={!aiCapability.isReady || aiFlowMutation.isPending}
               className="action-btn-primary capitalize"
             >
               {aiFlowMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
