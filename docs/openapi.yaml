@@ -60,7 +60,7 @@ tags:
   - name: Logs
     description: Node-RED runtime logs
   - name: AI
-    description: AI-assisted flow analysis (stubs — not yet implemented)
+    description: AI provider configuration, capability status, and review-first flow analysis
 
 security: []
 
@@ -2091,25 +2091,127 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
-  # ─── AI (stubs) ───────────────────────────────────────────────────────────────
+  # ─── AI ───────────────────────────────────────────────────────────────────────
 
   /api/ai/analyze/flow:
     post:
       tags: [AI]
       operationId: aiAnalyzeFlow
       summary: Analyze a flow with AI
-      description: AI-powered flow analysis. Not yet implemented.
-      x-status: stub
-      deprecated: false
+      description: Uses the active configured provider to analyze a flow. Generated output is review-only.
       security:
         - bearerAuth: []
       responses:
-        "501":
-          description: Not implemented
+        "200":
+          description: Flow analysis result
+        "503":
+          description: AI provider is disabled or not configured
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/ai/config:
+    get:
+      tags: [AI]
+      operationId: getAIConfig
+      summary: Get AI provider configuration
+      description: Returns non-secret provider settings. API keys are write-only and never returned.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Safe AI provider configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_AIConfig"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    put:
+      tags: [AI]
+      operationId: putAIConfig
+      summary: Save AI provider configuration
+      description: |-
+        **Admin only.** Saves enabled state, provider, endpoint, model, and an optional write-only API key.
+        Existing keys are preserved when `apiKey` is omitted or empty.
+      security:
+        - bearerAuth: []
+          adminOnly: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AIConfigInput"
+      responses:
+        "200":
+          description: Saved safe AI provider configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_AIConfig"
+        "400":
+          description: Invalid provider or endpoint
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/ai/config/test:
+    post:
+      tags: [AI]
+      operationId: testAIConfig
+      summary: Test AI provider connection
+      description: "**Admin only.** Runs a bounded connection test and records a non-secret result for capability consumers."
+      security:
+        - bearerAuth: []
+          adminOnly: []
+      responses:
+        "200":
+          description: Provider is reachable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_AIProviderStatus"
+        "502":
+          description: Provider is unreachable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "504":
+          description: Provider connection test timed out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/ai/status:
+    get:
+      tags: [AI]
+      operationId: getAIStatus
+      summary: Get AI capability status
+      description: Returns the non-secret provider capability contract without initiating a connection test.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Provider capability status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_AIProviderStatus"
         "401":
           $ref: "#/components/responses/Unauthorized"
 
@@ -2329,6 +2431,63 @@ components:
         updatedAt:
           type: string
           format: date-time
+
+    AIConfigInput:
+      type: object
+      required: [enabled, provider]
+      properties:
+        enabled:
+          type: boolean
+        provider:
+          type: string
+          enum: [offline, openai]
+        endpoint:
+          type: string
+          format: uri
+          description: HTTPS provider endpoint. Not required for the offline provider.
+        model:
+          type: string
+        apiKey:
+          type: string
+          writeOnly: true
+          description: Optional write-only provider secret. Never returned by NRCC.
+
+    AIConfig:
+      type: object
+      required: [enabled, provider, apiKeyConfigured]
+      properties:
+        enabled:
+          type: boolean
+        provider:
+          type: string
+          enum: [offline, openai]
+        endpoint:
+          type: string
+          format: uri
+        model:
+          type: string
+        apiKeyConfigured:
+          type: boolean
+          description: Indicates only whether a write-only key is configured.
+
+    AIProviderStatus:
+      type: object
+      required: [status, provider]
+      properties:
+        status:
+          type: string
+          enum: [disabled, incomplete, testing, unreachable, ready]
+        provider:
+          type: string
+          enum: [offline, openai]
+        endpoint:
+          type: string
+          format: uri
+        model:
+          type: string
+        reason:
+          type: string
+          description: User-facing, non-secret explanation when the provider is unavailable.
 
     AuthResponse:
       type: object
@@ -3610,6 +3769,38 @@ components:
           properties:
             data:
               $ref: "#/components/schemas/HealthStatus"
+
+    SuccessEnvelope_AIConfig:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/AIConfig"
+
+    SuccessEnvelope_AIProviderStatus:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/AIProviderStatus"
 
     SuccessEnvelope_StatusResponse:
       allOf:

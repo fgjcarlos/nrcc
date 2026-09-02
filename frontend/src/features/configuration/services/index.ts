@@ -37,3 +37,5 @@ export const settingsService = {
   getRaw: () => api.get<ApiResponse<SettingsDocument>>('/settings/raw'),
   saveRaw: (content: string) => api.post<ApiResponse<{ message: string }>>('/settings/raw', { content }),
 };
+export { aiService } from './aiService';
+export type { AIConfig, AIConfigInput, AIProviderStatus } from './aiService';
