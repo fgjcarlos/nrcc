@@ -580,35 +580,6 @@ func replaceScalarKey(content, key, value string) string {
 	return content
 }
 
-// replaceBlockKey replaces a block (multi-line key: { ... }) or appends it
-func replaceBlockKey(content, key, blockContent string) string {
-	// Find and replace the entire block, using brace-depth tracking
-	rePattern := fmt.Sprintf(`(?ms)^\s*%s\s*:\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\},?\s*$`, regexp.QuoteMeta(key))
-	re := regexp.MustCompile(rePattern)
-
-	if re.MatchString(content) {
-		// Replace existing block
-		return re.ReplaceAllString(content, blockContent)
-	}
-
-	// The key may currently hold a scalar (e.g. `adminAuth: null,`) rather than
-	// a block. Without this, every Save appends a duplicate entry and the file
-	// grows unbounded.
-	scalarRe := regexp.MustCompile(fmt.Sprintf(`(?m)^\s*%s\s*:\s*[^,{\n]*,?\s*$`, regexp.QuoteMeta(key)))
-	if scalarRe.MatchString(content) {
-		return scalarRe.ReplaceAllString(content, blockContent)
-	}
-
-	// Block not found, append before closing brace
-	appendPattern := `\n\s*\}\s*$`
-	appendRe := regexp.MustCompile(appendPattern)
-	if appendRe.MatchString(content) {
-		newEntry := "\n" + blockContent + "\n"
-		return appendRe.ReplaceAllString(content, newEntry+"}\n")
-	}
-
-	return content
-}
 
 // replaceArrayKey replaces or appends a multi-line array key.
 func replaceArrayKey(content, key, arrayContent string) string {
@@ -1007,3 +978,164 @@ func parseBoolFromJS(content, key string, fallback bool) bool {
 	}
 	return fallback
 }
+
+// findTopLevelBlock scans content for `key:` at the start of a line
+// (preceded only by whitespace) and returns the byte range [start, end)
+// of the full entry — block or scalar — including its leading
+// indentation and trailing comma. Returns ok=false if the key is not
+// present. start points to the first byte of the line's leading
+// whitespace so the caller can substitute any replacement verbatim.
+//
+// This is brace-counting, not regex. The previous regex couldn't match
+// blocks deeper than one level of nesting — which broke editorTheme as
+// soon as the user had `codeEditor.options.theme` set, because the
+// existing-block replacement failed and the function fell through to
+// "append a second block", producing duplicates on every Save (#723).
+func findTopLevelBlock(content, key string) (start, end int, ok bool) {
+	prefix := key + ":"
+	scanFrom := 0
+	for {
+		lineStart, keyStart := indexOfKeyAtLineStart(content, prefix, scanFrom)
+		if keyStart < 0 {
+			return 0, 0, false
+		}
+		// Position right after the colon.
+		after := keyStart + len(prefix)
+		// Skip whitespace (space, tab) but not newlines.
+		for after < len(content) && (content[after] == ' ' || content[after] == '\t') {
+			after++
+		}
+		if after >= len(content) {
+			return 0, 0, false
+		}
+		switch content[after] {
+		case '{':
+			_, endIdx := findMatchingBrace(content, after)
+			if endIdx < 0 {
+				return 0, 0, false
+			}
+			// Consume any trailing comma and the rest of the line.
+			endIdx = consumeLineEnd(content, endIdx)
+			return lineStart, endIdx, true
+		default:
+			// Scalar value (null, true, "string", etc.) — cover the rest of the line.
+			lineEnd := strings.IndexByte(content[after:], '\n')
+			if lineEnd < 0 {
+				return lineStart, len(content), true
+			}
+			return lineStart, after + lineEnd, true
+		}
+	}
+}
+
+// indexOfKeyAtLineStart returns the start of the line and the start of
+// the matched needle. The line start is the position just after the
+// previous newline (or 0), so the caller can substitute the entire
+// indented line. The key start is where the needle itself begins. -1, -1
+// is returned if no match is found at or after `from`. This replaces the
+// regex `(?:^|\n)\s*` constraint without pulling in the regexp engine.
+func indexOfKeyAtLineStart(content, needle string, from int) (lineStart, keyStart int) {
+	atLineStart := from == 0
+	if atLineStart && len(content) > 0 && (content[0] == ' ' || content[0] == '\t') {
+		atLineStart = false
+	}
+	for i := from; i+len(needle) <= len(content); i++ {
+		if atLineStart {
+			j := i
+			for j < len(content) && (content[j] == ' ' || content[j] == '\t') {
+				j++
+			}
+			if j+len(needle) <= len(content) && content[j:j+len(needle)] == needle {
+				return i, j
+			}
+			atLineStart = false
+		}
+		if content[i] == '\n' {
+			atLineStart = true
+		}
+	}
+	return -1, -1
+}
+
+// findMatchingBrace returns the index of the '}' that matches the '{' at
+// openIdx, plus the index just past it. Handles nested braces, string
+// literals (', ", `) and line/block comments. Returns -1 if unmatched.
+func findMatchingBrace(content string, openIdx int) (closeIdx, afterClose int) {
+	depth := 0
+	inString := byte(0)
+	for i := openIdx; i < len(content); i++ {
+		c := content[i]
+		if inString != 0 {
+			if c == '\\' && i+1 < len(content) {
+				i++
+				continue
+			}
+			if c == inString {
+				inString = 0
+			}
+			continue
+		}
+		switch c {
+		case '\'', '"', '`':
+			inString = c
+		case '/':
+			// line comment "//"
+			if i+1 < len(content) && content[i+1] == '/' {
+				nl := strings.IndexByte(content[i:], '\n')
+				if nl < 0 {
+					return -1, -1
+				}
+				i += nl
+				continue
+			}
+			// block comment /* */
+			if i+1 < len(content) && content[i+1] == '*' {
+				end := strings.Index(content[i:], "*/")
+				if end < 0 {
+					return -1, -1
+				}
+				i += end + 1
+				continue
+			}
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return i, i + 1
+			}
+		}
+	}
+	return -1, -1
+}
+
+// consumeLineEnd skips a trailing comma and any trailing whitespace on
+// the same line. It deliberately does NOT consume the newline itself —
+// the caller will substitute the replacement block content (which has no
+// trailing newline) and we want the original newline to remain in the
+// document so the next line keeps its leading context.
+func consumeLineEnd(content string, endIdx int) int {
+	for endIdx < len(content) && (content[endIdx] == ' ' || content[endIdx] == '\t' || content[endIdx] == ',') {
+		endIdx++
+	}
+	return endIdx
+}
+
+func replaceBlockKey(content, key, blockContent string) string {
+	start, end, ok := findTopLevelBlock(content, key)
+	if !ok {
+		// Append before closing brace of the module.exports object.
+		appendPattern := `\n\s*\}\s*$`
+		idx := regexp.MustCompile(appendPattern).FindStringIndex(content)
+		if idx == nil {
+			return content
+		}
+		// blockContent already includes its own leading indent and trailing comma.
+		insertion := "\n" + blockContent + "\n"
+		return content[:idx[0]] + insertion + content[idx[0]:]
+	}
+	return content[:start] + blockContent + content[end:]
+}
+
+// (helper for tests)
+
