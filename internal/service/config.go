@@ -1035,8 +1035,6 @@ func findTopLevelBlock(content, key string) (start, end int, ok bool) {
 // is returned if no match is found at or after `from`. This replaces the
 // regex `(?:^|\n)\s*` constraint without pulling in the regexp engine.
 func indexOfKeyAtLineStart(content, needle string, from int) (lineStart, keyStart int) {
-	keyStart = -1
-	lineStart = from
 	atLineStart := from == 0
 	if atLineStart && len(content) > 0 && (content[0] == ' ' || content[0] == '\t') {
 		atLineStart = false
@@ -1054,7 +1052,6 @@ func indexOfKeyAtLineStart(content, needle string, from int) (lineStart, keyStar
 		}
 		if content[i] == '\n' {
 			atLineStart = true
-			lineStart = i + 1
 		}
 	}
 	return -1, -1
