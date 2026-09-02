@@ -174,7 +174,8 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 	// stateless so a single instance is safe to share.
 	dockerSvc := service.NewDockerService()
 	dockerHandler.SetDockerService(dockerSvc)
-	aiHandler := handler.NewAIHandler()
+	aiConfigSvc := service.NewAIConfigService(dataDir, encKey)
+	aiHandler := handler.NewAIHandler(nil, aiConfigSvc)
 
 	// Initialize audit service
 	auditSvc := initAuditService(dataDir, log.Printf)
@@ -186,6 +187,7 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 	updateHandler.SetAuditService(auditSvc)
 	filesHandler.SetAuditService(auditSvc)
 	flowHandler.SetAuditService(auditSvc)
+	aiHandler.SetAuditService(auditSvc)
 	// One RateLimiter for the whole auth surface. Two instances would keep
 	// independent in-memory bucket maps while persisting to the same
 	// ratelimit.json, so each could overwrite the other's buckets from a
@@ -410,6 +412,10 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 
 		// AI routes
 		r.Route("/api/ai", func(r chi.Router) {
+			r.Get("/config", aiHandler.GetConfig)
+			r.With(middleware.RequireAdmin).Put("/config", aiHandler.PutConfig)
+			r.With(middleware.RequireAdmin).Post("/config/test", aiHandler.TestConfig)
+			r.Get("/status", aiHandler.GetStatus)
 			r.With(middleware.RateLimitIP(20, time.Hour)).Post("/analyze/flow", aiHandler.PostAnalyzeFlow)
 		})
 	})
