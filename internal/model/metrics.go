@@ -3,6 +3,8 @@ package model
 // MetricsSnapshot represents a point-in-time snapshot of system metrics.
 type MetricsSnapshot struct {
 	Timestamp     string  `json:"timestamp"`
+	ResourceScope string  `json:"resourceScope,omitempty"`
+	Available     bool    `json:"available"`
 	CPUPercent    float64 `json:"cpuPercent"`
 	MemoryPercent float64 `json:"memoryPercent"`
 	DiskPercent   float64 `json:"diskPercent"`

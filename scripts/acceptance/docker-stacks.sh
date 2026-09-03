@@ -331,6 +331,16 @@ scenario_1_single_stack() {
     || fail "scenario 1: login failed"
   [[ -n "$GLOBAL_TOKEN" ]] || fail "scenario 1: empty token"
 
+  # #726: the dashboard contract must report the Compose cgroup scope and the
+  # configured memory limit instead of mixing host CPU/memory with overlay disk.
+  if [[ "$DRY_RUN" != "1" ]]; then
+    local system_metrics
+    system_metrics="$(api_call_authed GET "http://localhost:${HOST_API_A}/api/system/info" "$GLOBAL_TOKEN")" \
+      || fail "scenario 1: system metrics request failed"
+    assert_contains "$system_metrics" '"resourceScope":"container"' "resource metrics scope"
+    assert_contains "$system_metrics" '"total":536870912' "container memory limit"
+  fi
+
   if [[ "$DRY_RUN" != "1" ]]; then
     local ownership_backup_resp ownership_backup_id
     ownership_backup_resp="$(api_call_authed POST \

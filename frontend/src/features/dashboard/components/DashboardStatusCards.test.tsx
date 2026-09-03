@@ -23,9 +23,10 @@ vi.mock('../hooks/useSystemHistory', () => ({
 import * as useSystemHistoryModule from '../hooks/useSystemHistory';
 
 const mockSystem: SystemInfo = {
-  cpu: { usage: 42.5, cores: 4 },
-  memory: { total: 8000000000, used: 4000000000, free: 4000000000, usagePercent: 50 },
-  disk: { total: 100000000000, used: 60000000000, free: 40000000000, usagePercent: 60 },
+	resourceScope: 'container',
+	cpu: { usage: 42.5, cores: 4, available: true },
+	memory: { total: 8000000000, used: 4000000000, free: 4000000000, usagePercent: 50, available: true },
+	disk: { total: 100000000000, used: 60000000000, free: 40000000000, usagePercent: 60, available: true },
   uptime: 3600,
   platform: 'linux',
   hostname: 'server',
@@ -70,8 +71,16 @@ describe('DashboardStatusCards — Runtime + metric charts', () => {
 
     // formatPercent rounds: 42.5 -> 43%
     expect(screen.getByText('43%')).toBeInTheDocument();
+		expect(screen.getByText('Container scope')).toBeInTheDocument();
     // MetricsChart is lazy-loaded (#301), so the chart appears after the chunk resolves.
     expect((await screen.findAllByTestId('area-chart')).length).toBeGreaterThan(0);
+  });
+
+  it('reports unavailable metrics instead of displaying zero values', () => {
+    vi.mocked(useSystemHistoryModule.useSystemHistory).mockReturnValue({ data: [], isLoading: false, isError: false });
+    renderCards({ system: { ...mockSystem, resourceScope: 'unavailable', cpu: { ...mockSystem.cpu, available: false }, memory: { ...mockSystem.memory, available: false } } });
+    expect(screen.getAllByText('Unavailable')).toHaveLength(2);
+    expect(screen.getAllByText('Resource metrics unavailable')).toHaveLength(3);
   });
 
   it('displays memory percentage value when system data is available', () => {

@@ -548,21 +548,26 @@ export interface HostStatus {
 // ============================================
 
 export interface SystemInfo {
-  cpu: {
-    usage: number;
-    cores: number;
-  };
+	/** Scope shared by all resource values in this response. */
+	resourceScope: 'host' | 'container' | 'unavailable';
+	cpu: {
+	  usage: number;
+	  cores: number;
+	  available: boolean;
+	};
   memory: {
     total: number;
     used: number;
-    free: number;
-    usagePercent: number;
+	  free: number;
+	  usagePercent: number;
+	  available: boolean;
   };
   disk: {
     total: number;
     used: number;
-    free: number;
-    usagePercent: number;
+	  free: number;
+	  usagePercent: number;
+	  available: boolean;
   };
   uptime: number;
   platform: string;
