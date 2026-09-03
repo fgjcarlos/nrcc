@@ -170,7 +170,7 @@ func (s *EnvService) ApplyBulkEnv(parsed BulkEnvResult, restart func(func() erro
 	for i, line := range parsed.Lines {
 		encrypted := line.Type == "secret"
 		set := func() error {
-			if err := s.set(line.Key, line.Value, line.Type, "bulk import", encrypted, false); err != nil {
+			if err := s.set(line.Key, line.Value, line.Type, "bulk import", encrypted, "nrcc", false); err != nil {
 				return err
 			}
 			if restart != nil && i == len(parsed.Lines)-1 {

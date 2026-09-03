@@ -268,6 +268,10 @@ func (h *EnvHandler) ImportFromNodeRedEnv(w http.ResponseWriter, r *http.Request
 	if !DecodeJSONOptional(w, r, &req) {
 		return
 	}
+	if !h.managed || h.pm != nil && h.pm.IsExternalMode() {
+		model.RespondError(w, http.StatusServiceUnavailable, "NODE_RED_SYNC_UNAVAILABLE", "Node-RED environment synchronization is unavailable for externally managed runtimes")
+		return
+	}
 
 	result, err := h.svc.ImportFromNodeRed(req.Commit, func(fn func() error) (bool, error) {
 		restarted, stopErr := h.withManagedNodeRedStopped(fn)

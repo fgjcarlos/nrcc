@@ -1344,6 +1344,40 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /api/env/import-from-node-red:
+    post:
+      tags: [Environment]
+      operationId: importFromNodeRedEnv
+      summary: Synchronize Node-RED global environment entries
+      description: |
+        Imports Node-RED 5 `global-config` environment entries. Existing NRCC-managed
+        entries, including encrypted secrets, take precedence. Entries previously
+        imported from Node-RED are refreshed only when their value or type changes.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NodeRedEnvImportRequest"
+      responses:
+        "200":
+          description: Synchronization result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_NodeRedEnvImportResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
   /api/env/dotenv:
     get:
       tags: [Environment]
@@ -2772,6 +2806,59 @@ components:
           type: string
         encrypted:
           type: boolean
+        source:
+          type: string
+          enum: [nrcc, node-red]
+          description: Origin of the value; NRCC values take precedence during Node-RED imports.
+
+    NodeRedEnvImportRequest:
+      type: object
+      properties:
+        commit:
+          type: boolean
+          default: true
+
+    NodeRedEnvImportIssue:
+      type: object
+      required: [line, reason]
+      properties:
+        line:
+          type: integer
+        key:
+          type: string
+        reason:
+          type: string
+
+    NodeRedEnvImportLine:
+      type: object
+      required: [line, key, value, type]
+      properties:
+        line:
+          type: integer
+        key:
+          type: string
+        value:
+          type: string
+        type:
+          type: string
+          enum: [string, number, boolean]
+
+    NodeRedEnvImportResult:
+      type: object
+      required: [lines, issues, valid, summary]
+      properties:
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/NodeRedEnvImportLine"
+        issues:
+          type: array
+          items:
+            $ref: "#/components/schemas/NodeRedEnvImportIssue"
+        valid:
+          type: boolean
+        summary:
+          type: string
 
     SettingsDocument:
       type: object
@@ -4171,6 +4258,22 @@ components:
           properties:
             data:
               $ref: "#/components/schemas/EnvSetResult"
+
+    SuccessEnvelope_NodeRedEnvImportResult:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/NodeRedEnvImportResult"
 
     SuccessEnvelope_DotenvContent:
       allOf:

@@ -36,6 +36,11 @@ export function EnvVarRow({ envVar, onDelete, onToggleSecret, onEdit, showSecret
           <span className="ml-2 text-xs text-base-content/50">runtime only</span>
         )}
       </td>
+      <td className="px-4 py-3 text-sm text-base-content/60">
+        <span className="rounded-full bg-base-300/70 px-2 py-1 text-xs text-base-content">
+          {envVar.source === 'node-red' ? 'Node-RED' : 'NRCC'}
+        </span>
+      </td>
       <td className="px-4 py-3 text-sm text-base-content/60">{envVar.description || '-'}</td>
       <td className="px-4 py-3 text-right">
         <div className="flex items-center justify-end gap-2">

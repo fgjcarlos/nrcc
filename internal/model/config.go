@@ -71,6 +71,7 @@ type EnvVar struct {
 	Type        string `json:"type"` // Type vocabulary: "string" | "number" | "boolean" | "secret"
 	Description string `json:"description,omitempty"`
 	Encrypted   bool   `json:"encrypted,omitempty"`
+	Source      string `json:"source,omitempty"` // "nrcc" takes precedence over "node-red" during imports.
 }
 
 // UnmarshalJSON handles both uiPort and port field names

@@ -55,22 +55,27 @@ export const envService = {
     }
   },
 
-  importFromNodeRed: async (commit: boolean): Promise<BulkEnvResult> => {
+  importFromNodeRed: async (commit: boolean): Promise<NodeRedEnvImportResult> => {
     try {
-      const response = await api.post<unknown>('/env/import-from-node-red', { commit });
-      const body = response.data;
-      const data = (body as { data?: BulkEnvResult })?.data ?? (body as BulkEnvResult);
+      const response = await api.post<Schemas['SuccessEnvelope_NodeRedEnvImportResult']>('/env/import-from-node-red', { commit });
+      const data = unwrap(response.data);
       return {
         lines: data?.lines ?? [],
         issues: data?.issues ?? [],
         valid: data?.valid ?? false,
         summary: data?.summary ?? '',
+        status: 'synced',
       };
     } catch (err) {
-      const reason =
-        (err as { response?: { data?: { error?: { code?: string; message?: string } } } })?.response?.data
-          ?.error?.message ?? 'Import failed';
-      return { lines: [], issues: [{ line: 0, reason }], valid: false, summary: reason };
+      const response = (err as { response?: { status?: number; data?: { error?: { message?: string } } } })?.response;
+      const reason = response?.data?.error?.message ?? 'Import failed';
+      return {
+        lines: [],
+        issues: [{ line: 0, reason }],
+        valid: false,
+        summary: reason,
+        status: response?.status === 503 ? 'unavailable' : 'error',
+      };
     }
   },
 };
@@ -93,4 +98,12 @@ export interface BulkEnvResult {
   issues: BulkEnvIssue[];
   valid: boolean;
   summary: string;
+}
+
+export interface NodeRedEnvImportResult {
+  lines: Schemas['NodeRedEnvImportLine'][];
+  issues: Schemas['NodeRedEnvImportIssue'][];
+  valid: boolean;
+  summary: string;
+  status: 'synced' | 'unavailable' | 'error';
 }

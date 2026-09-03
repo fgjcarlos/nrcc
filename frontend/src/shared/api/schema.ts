@@ -789,6 +789,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/env/import-from-node-red": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Synchronize Node-RED global environment entries
+         * @description Imports Node-RED 5 `global-config` environment entries. Existing NRCC-managed
+         *     entries, including encrypted secrets, take precedence. Entries previously
+         *     imported from Node-RED are refreshed only when their value or type changes.
+         */
+        post: operations["importFromNodeRedEnv"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/env/dotenv": {
         parameters: {
             query?: never;
@@ -1675,6 +1697,33 @@ export interface components {
             type: "string" | "number" | "boolean" | "secret";
             description?: string;
             encrypted?: boolean;
+            /**
+             * @description Origin of the value; NRCC values take precedence during Node-RED imports.
+             * @enum {string}
+             */
+            source?: "nrcc" | "node-red";
+        };
+        NodeRedEnvImportRequest: {
+            /** @default true */
+            commit: boolean;
+        };
+        NodeRedEnvImportIssue: {
+            line: number;
+            key?: string;
+            reason: string;
+        };
+        NodeRedEnvImportLine: {
+            line: number;
+            key: string;
+            value: string;
+            /** @enum {string} */
+            type: "string" | "number" | "boolean";
+        };
+        NodeRedEnvImportResult: {
+            lines: components["schemas"]["NodeRedEnvImportLine"][];
+            issues: components["schemas"]["NodeRedEnvImportIssue"][];
+            valid: boolean;
+            summary: string;
         };
         SettingsDocument: {
             /** @description Absolute path to settings.js on the host */
@@ -2379,6 +2428,14 @@ export interface components {
             timestamp: string;
         } & {
             data?: components["schemas"]["EnvSetResult"];
+        };
+        SuccessEnvelope_NodeRedEnvImportResult: {
+            /** @enum {boolean} */
+            success: true;
+            /** Format: date-time */
+            timestamp: string;
+        } & {
+            data?: components["schemas"]["NodeRedEnvImportResult"];
         };
         SuccessEnvelope_DotenvContent: {
             /** @enum {boolean} */
@@ -3869,6 +3926,34 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             500: components["responses"]["InternalError"];
+        };
+    };
+    importFromNodeRedEnv: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["NodeRedEnvImportRequest"];
+            };
+        };
+        responses: {
+            /** @description Synchronization result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope_NodeRedEnvImportResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["ServiceUnavailable"];
         };
     };
     getDotenv: {
