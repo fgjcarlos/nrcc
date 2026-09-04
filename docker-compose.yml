@@ -26,6 +26,8 @@ services:
       PORT: "3001"
       DATA_DIR: /data
       NODE_RED_CMD: node-red
+      NODE_RED_USER_DIR: /data
+      NODE_RED_SETTINGS: /data/settings.js
       JWT_SECRET: "${JWT_SECRET:-}"
       # #664: the encryption key is required — without it, "encrypted"
       # env vars are silently written to config.json in plaintext while

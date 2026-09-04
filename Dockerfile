@@ -55,7 +55,15 @@ COPY --chmod=755 --from=go-builder /build/nrcc /usr/local/bin/nrcc
 COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/nrcc-entrypoint.sh
 
 VOLUME ["/data"]
-ENV DATA_DIR=/data NODE_RED_CMD=node-red PORT=3001
+# Keep NRCC's settings writer and its managed Node-RED process on the same
+# Docker-persisted runtime contract. NODE_RED_SETTINGS must remain explicit:
+# the base image also ships node-red under $HOME, which is not the managed
+# user directory.
+ENV DATA_DIR=/data \
+    NODE_RED_CMD=node-red \
+    NODE_RED_USER_DIR=/data \
+    NODE_RED_SETTINGS=/data/settings.js \
+    PORT=3001
 EXPOSE 3001 1880
 
 # ponytail: wget is present in the nodered/node-red:5.0.4-24-minimal

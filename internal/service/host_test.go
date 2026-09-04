@@ -103,11 +103,8 @@ func TestHostService_ResolveSettingsPath_With_NODE_RED_SETTINGS_EnvVar(t *testin
 
 	path := svc.ResolveSettingsPath()
 
-	// The path should be the custom path (assuming Node-RED is not detected locally)
-	// This depends on detection order, but if Node-RED is detected, it uses that path
-	// For this test, we just verify it returns something
-	if path == "" {
-		t.Error("ResolveSettingsPath should return non-empty path")
+	if path != customPath {
+		t.Errorf("ResolveSettingsPath() = %q, want explicit NODE_RED_SETTINGS %q", path, customPath)
 	}
 }
 
@@ -481,4 +478,3 @@ func TestHostService_Detect_Ready_Conditions(t *testing.T) {
 // TestUninstallNodeRedNative_RequiresNpm verifies npm lookup error handling
 // TestUpdateNodeRedNative_SignatureExists verifies the method exists with correct return types
 // TestUpdateNodeRedNative_ReturnTypes verifies return value structure
-
