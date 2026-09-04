@@ -31,4 +31,10 @@ describe('EnvVarRow', () => {
 
     expect(screen.queryByText('runtime only')).not.toBeInTheDocument();
   });
+
+  it('shows whether a variable originated in NRCC or Node-RED', () => {
+    renderRow({ key: 'FROM_NODE_RED', value: 'yes', type: 'string', source: 'node-red' });
+
+    expect(screen.getByText('Node-RED')).toBeInTheDocument();
+  });
 });

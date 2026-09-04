@@ -338,10 +338,12 @@ func hasNodeRedGlobalEnvType(item map[string]json.RawMessage) bool {
 	return typ == "global-config"
 }
 
-// ImportFromNodeRed snapshots the Node-RED 5 global-config env entries and
-// merges every new key into NRCC. Keys already present are skipped to keep
-// the operation idempotent; secrets remain encrypted in NRCC and never
-// leave flows.json. commit=false performs a dry run.
+// ImportFromNodeRed snapshots the Node-RED 5 global-config env entries. NRCC
+// entries (including legacy entries without a source) always take precedence,
+// so an import can never overwrite an NRCC-managed value or encrypted secret.
+// Node-RED-derived entries are refreshed only when their value or type changed;
+// identical entries are skipped to keep the operation idempotent. commit=false
+// performs a dry run.
 func (s *EnvService) ImportFromNodeRed(commit bool, stopAndRestart func(func() error) (bool, error)) (BulkEnvResult, error) {
 	entries, err := s.nodeRedGlobalEnvList()
 	if err != nil {
@@ -355,13 +357,16 @@ func (s *EnvService) ImportFromNodeRed(commit bool, stopAndRestart func(func() e
 			Summary: "no global-config entries in Node-RED",
 		}, nil
 	}
-	existing, err := s.List()
+	if _, err := s.List(); err != nil {
+		return BulkEnvResult{}, err
+	}
+	config, err := s.configSvc.Get()
 	if err != nil {
 		return BulkEnvResult{}, err
 	}
-	managed := make(map[string]struct{}, len(existing))
-	for _, ev := range existing {
-		managed[ev.Key] = struct{}{}
+	managed := make(map[string]model.EnvVar, len(config.EnvVars))
+	for _, ev := range config.EnvVars {
+		managed[ev.Key] = ev
 	}
 
 	var (
@@ -373,10 +378,6 @@ func (s *EnvService) ImportFromNodeRed(commit bool, stopAndRestart func(func() e
 		line := i + 1
 		if e.Name == "" {
 			issues = append(issues, BulkEnvIssue{Line: line, Reason: "entry is missing a name"})
-			continue
-		}
-		if _, ok := managed[e.Name]; ok {
-			issues = append(issues, BulkEnvIssue{Line: line, Key: e.Name, Reason: "already managed by NRCC"})
 			continue
 		}
 		if _, ok := seen[e.Name]; ok {
@@ -392,6 +393,15 @@ func (s *EnvService) ImportFromNodeRed(commit bool, stopAndRestart func(func() e
 			continue
 		}
 		seen[e.Name] = line
+		if existing, ok := managed[e.Name]; ok {
+			if envVarSource(existing) != "node-red" || existing.Encrypted || existing.Type == "secret" {
+				issues = append(issues, BulkEnvIssue{Line: line, Key: e.Name, Reason: "NRCC-managed value takes precedence"})
+				continue
+			}
+			if existing.Value == e.Value && existing.Type == typ {
+				continue
+			}
+		}
 		toImport = append(toImport, BulkEnvLine{Line: line, Key: e.Name, Value: e.Value, Type: typ})
 	}
 
@@ -404,7 +414,7 @@ func (s *EnvService) ImportFromNodeRed(commit bool, stopAndRestart func(func() e
 	case len(toImport) == 0 && len(issues) == 0:
 		result.Summary = "no new entries to import"
 	case len(issues) > 0:
-		result.Summary = fmt.Sprintf("%d skipped, %d ready", len(issues), len(toImport))
+		result.Summary = fmt.Sprintf("%d skipped by NRCC precedence, %d ready", len(issues), len(toImport))
 	default:
 		result.Summary = fmt.Sprintf("%d variable(s) ready", len(toImport))
 	}
@@ -413,7 +423,7 @@ func (s *EnvService) ImportFromNodeRed(commit bool, stopAndRestart func(func() e
 	}
 	apply := func() error {
 		for _, line := range toImport {
-			if err := s.Set(line.Key, line.Value, line.Type, "imported from Node-RED", false); err != nil {
+			if err := s.set(line.Key, line.Value, line.Type, "imported from Node-RED", false, "node-red", false); err != nil {
 				return fmt.Errorf("line %d (%s): %w", line.Line, line.Key, err)
 			}
 		}

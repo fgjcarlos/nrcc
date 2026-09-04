@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
-import { toast } from 'sonner';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { type EnvVar } from '@/features/env-vars/services';
 import { Plus, FileStack, Download } from 'lucide-react';
 import { EnvVarRow } from '@/features/env-vars/components';
@@ -26,6 +25,8 @@ export function EnvVarsView() {
   const [editingVar, setEditingVar] = useState<EnvVar | null>(null);
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = useState<'table' | 'dotenv'>('table');
+  const [nodeRedSyncState, setNodeRedSyncState] = useState<'idle' | 'loading' | 'synced' | 'unavailable' | 'error'>('idle');
+  const [nodeRedSyncMessage, setNodeRedSyncMessage] = useState('');
   const didAutoImport = useRef(false);
   const isMounted = useRef(false);
   const [confirmConfig, setConfirmConfig] = useState<{
@@ -50,18 +51,27 @@ export function EnvVarsView() {
     };
   }, []);
 
+  const syncFromNodeRed = useCallback(async () => {
+    setNodeRedSyncState('loading');
+    setNodeRedSyncMessage('Synchronizing Node-RED environment entries…');
+    const result = await envService.importFromNodeRed(true);
+    if (!isMounted.current) return;
+
+    if (result.status !== 'synced') {
+      setNodeRedSyncState(result.status);
+      setNodeRedSyncMessage(result.summary);
+      return;
+    }
+    if (result.lines.length > 0) refetchEnvVars();
+    setNodeRedSyncState('synced');
+    setNodeRedSyncMessage(result.summary ? `Node-RED synchronized: ${result.summary}` : 'Node-RED environment entries are synchronized.');
+  }, [refetchEnvVars]);
+
   useEffect(() => {
     if (user?.role !== 'admin' || didAutoImport.current) return;
     didAutoImport.current = true;
-
-    void envService.importFromNodeRed(true).then((result) => {
-      if (!isMounted.current) return;
-      if (result.lines.length > 0) refetchEnvVars();
-      if (result.issues.some((issue) => issue.line === 0) && result.summary) {
-        toast.error(result.summary);
-      }
-    });
-  }, [refetchEnvVars, user?.role]);
+    void syncFromNodeRed();
+  }, [syncFromNodeRed, user?.role]);
 
   const openModal = (envVar?: EnvVar) => {
     if (envVar) {
@@ -124,16 +134,14 @@ export function EnvVarsView() {
         {activeTab === 'table' && (
           <div className="flex gap-2">
             <button
-              onClick={async () => {
-                const result = await envService.importFromNodeRed(true);
-                if (result.lines.length > 0) refetchEnvVars();
-              }}
-              className="action-btn-secondary"
+              onClick={() => void syncFromNodeRed()}
+              disabled={nodeRedSyncState === 'loading'}
+              className="action-btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
               data-testid="import-from-node-red-button"
-              title="Pull new env vars from Node-RED 5 global-config"
+              title="Resynchronize environment entries from Node-RED 5 global-config"
             >
               <Download className="w-4 h-4" />
-              From Node-RED
+              {nodeRedSyncState === 'loading' ? 'Resyncing…' : 'Resync Node-RED'}
             </button>
             <button
               onClick={() => setIsBulkOpen(true)}
@@ -150,6 +158,27 @@ export function EnvVarsView() {
           </div>
         )}
       </div>
+
+      {nodeRedSyncState !== 'idle' && (
+        <div
+          role="status"
+          aria-live="polite"
+          data-testid="node-red-sync-status"
+          className={`rounded-lg border px-4 py-3 text-sm ${
+            nodeRedSyncState === 'error'
+              ? 'border-error/30 bg-error/10 text-error-content'
+              : nodeRedSyncState === 'unavailable'
+                ? 'border-warning/30 bg-warning/10 text-warning-content'
+                : 'border-info/30 bg-info/10 text-base-content'
+          }`}
+        >
+          {nodeRedSyncState === 'unavailable'
+            ? `Node-RED synchronization is unavailable: ${nodeRedSyncMessage}`
+            : nodeRedSyncState === 'error'
+              ? `Could not synchronize Node-RED environment entries: ${nodeRedSyncMessage}`
+              : nodeRedSyncMessage}
+        </div>
+      )}
 
       {/* TAREA 3: Tab Navigation */}
       <div className="tabs tabs-bordered">
@@ -176,6 +205,7 @@ export function EnvVarsView() {
                 <th className="px-4 py-3 text-left text-sm font-medium text-base-content">Key</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-base-content">Value</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-base-content">Type</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-base-content">Source</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-base-content">Description</th>
                 <th className="px-4 py-3 text-right text-sm font-medium text-base-content">Actions</th>
               </tr>
@@ -183,13 +213,13 @@ export function EnvVarsView() {
             <tbody className="divide-y divide-border">
               {isLoading ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-base-content/60">
+                  <td colSpan={6} className="px-4 py-8 text-center text-base-content/60">
                     Loading...
                   </td>
                 </tr>
                 ) : envVars.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-base-content/60">
+                  <td colSpan={6} className="px-4 py-8 text-center text-base-content/60">
                       No environment variables configured
                     </td>
                   </tr>

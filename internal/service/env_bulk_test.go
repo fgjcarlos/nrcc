@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"errors"
 	"os"
 	"path/filepath"
@@ -352,7 +353,7 @@ func TestImportFromNodeRed(t *testing.T) {
 	}
 	hasSkip := false
 	for _, iss := range result.Issues {
-		if iss.Key == "ALPHA" && iss.Reason == "already managed by NRCC" {
+		if iss.Key == "ALPHA" && iss.Reason == "NRCC-managed value takes precedence" {
 			hasSkip = true
 		}
 	}
@@ -386,11 +387,83 @@ func TestImportFromNodeRed(t *testing.T) {
 	if beta == nil || gamma == nil {
 		t.Fatalf("imported variables missing after commit: BETA=%+v GAMMA=%+v", beta, gamma)
 	}
-	if beta.Type != "boolean" || beta.Description != "imported from Node-RED" {
+	if beta.Type != "boolean" || beta.Description != "imported from Node-RED" || beta.Source != "node-red" {
 		t.Fatalf("unexpected BETA: %+v", beta)
 	}
 	if gamma.Type != "number" || gamma.Description != "imported from Node-RED" {
 		t.Fatalf("unexpected GAMMA: %+v", gamma)
+	}
+}
+
+func TestImportFromNodeRed_RefreshesDerivedValuesWithoutOverwritingNRCCSecrets(t *testing.T) {
+	dir := t.TempDir()
+	flows := `[{
+        "id":"manual-global","type":"global-config","env":[
+            {"name":"DERIVED","value":"first","type":"str"},
+            {"name":"SECRET","value":"from-node-red","type":"str"}
+        ]
+    }]`
+	if err := os.WriteFile(filepath.Join(dir, "flows.json"), []byte(flows), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	svc := NewEnvService(NewIsolatedConfigService(dir), "test-key")
+	if err := svc.Set("SECRET", "keep-encrypted", "secret", "", true); err != nil {
+		t.Fatal(err)
+	}
+
+	first, err := svc.ImportFromNodeRed(true, nil)
+	if err != nil {
+		t.Fatalf("first import: %v", err)
+	}
+	if len(first.Lines) != 1 || first.Lines[0].Key != "DERIVED" {
+		t.Fatalf("first import lines = %+v, want DERIVED only", first.Lines)
+	}
+	config, err := svc.configSvc.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, envVar := range config.EnvVars {
+		switch envVar.Key {
+		case "DERIVED":
+			if envVar.Source != "node-red" || envVar.Value != "first" {
+				t.Fatalf("derived variable = %+v", envVar)
+			}
+		case "SECRET":
+			if !envVar.Encrypted || !IsEncrypted(envVar.Value) || envVar.Value == "from-node-red" {
+				t.Fatalf("secret was not preserved as encrypted NRCC state: %+v", envVar)
+			}
+		}
+	}
+
+	flows = strings.Replace(flows, `"first"`, `"second"`, 1)
+	if err := os.WriteFile(filepath.Join(dir, "flows.json"), []byte(flows), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	updated, err := svc.ImportFromNodeRed(true, nil)
+	if err != nil {
+		t.Fatalf("refresh import: %v", err)
+	}
+	if len(updated.Lines) != 1 || updated.Lines[0].Value != "second" {
+		t.Fatalf("refresh lines = %+v, want updated DERIVED", updated.Lines)
+	}
+
+	before, err := os.ReadFile(filepath.Join(dir, "config.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	noChange, err := svc.ImportFromNodeRed(true, nil)
+	if err != nil {
+		t.Fatalf("idempotent import: %v", err)
+	}
+	if noChange.Valid || len(noChange.Lines) != 0 {
+		t.Fatalf("idempotent import result = %+v", noChange)
+	}
+	after, err := os.ReadFile(filepath.Join(dir, "config.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Fatal("idempotent import rewrote config.json")
 	}
 }
 

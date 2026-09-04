@@ -244,6 +244,7 @@ func maskEnvVars(envVars []model.EnvVar) []model.EnvVar {
 			Type:        ev.Type,
 			Encrypted:   ev.Encrypted,
 			Description: ev.Description,
+			Source:      envVarSource(ev),
 		}
 		if !ev.Encrypted {
 			masked.Value = ev.Value
@@ -258,10 +259,17 @@ func maskEnvVars(envVars []model.EnvVar) []model.EnvVar {
 // The typ parameter should be one of: "string", "number", "boolean", "secret"
 // Description is optional and used to document the purpose of the variable.
 func (s *EnvService) Set(key, value string, typ string, description string, encrypted bool) error {
-	return s.set(key, value, typ, description, encrypted, true)
+	return s.set(key, value, typ, description, encrypted, "nrcc", true)
 }
 
-func (s *EnvService) set(key, value string, typ string, description string, encrypted, syncGlobal bool) error {
+func envVarSource(envVar model.EnvVar) string {
+	if envVar.Source == "node-red" {
+		return "node-red"
+	}
+	return "nrcc"
+}
+
+func (s *EnvService) set(key, value string, typ string, description string, encrypted bool, source string, syncGlobal bool) error {
 	if err := ValidateEnvKey(key); err != nil {
 		return err
 	}
@@ -301,6 +309,7 @@ func (s *EnvService) set(key, value string, typ string, description string, encr
 				Type:        typ,
 				Description: description,
 				Encrypted:   encrypted,
+				Source:      source,
 			}
 			found = true
 			break
@@ -312,6 +321,7 @@ func (s *EnvService) set(key, value string, typ string, description string, encr
 				Type:        typ,
 				Description: description,
 				Encrypted:   encrypted,
+				Source:      source,
 			})
 		}
 		return nil

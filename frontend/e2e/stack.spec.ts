@@ -48,6 +48,12 @@ async function seedProbeFlow(): Promise<void> {
     data: [
       { id: 'nrcc-e2e-tab', type: 'tab', label: 'NRCC E2E Flow', disabled: false, info: '' },
       {
+        id: 'nrcc-e2e-global-config',
+        type: 'global-config',
+        env: [{ name: 'NODE_RED_E2E_IMPORTED', value: 'available-on-entry', type: 'str' }],
+        modules: {},
+      },
+      {
         id: 'nrcc-e2e-http-in',
         type: 'http in',
         z: 'nrcc-e2e-tab',
@@ -163,4 +169,14 @@ test('environment action reaches a live Node-RED flow after its restart', async 
       return ''
     }
   }, { timeout: 30_000 }).toBe('propagated-through-node-red')
+})
+
+test('environment page imports a Node-RED global entry automatically on route entry', async ({ page }) => {
+  await seedProbeFlow()
+  await login(page)
+  await page.getByRole('link', { name: 'Environment', exact: true }).click()
+
+  await expect(page.getByText('NODE_RED_E2E_IMPORTED')).toBeVisible()
+  await expect(page.getByRole('cell', { name: 'Node-RED', exact: true })).toBeVisible()
+  await expect(page.getByTestId('node-red-sync-status')).toContainText('synchronized')
 })

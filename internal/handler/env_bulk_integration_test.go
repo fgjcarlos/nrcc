@@ -158,6 +158,11 @@ func TestEnvHandler_RemainingEnvironmentEndpoints(t *testing.T) {
 	if w.Code != http.StatusInternalServerError || !strings.Contains(w.Body.String(), "BULK_IMPORT_FAILED") {
 		t.Fatalf("unmanaged bulk status=%d body=%s", w.Code, w.Body.String())
 	}
+	w = httptest.NewRecorder()
+	handler.ImportFromNodeRedEnv(w, httptest.NewRequest(http.MethodPost, "/api/env/import-from-node-red", nil))
+	if w.Code != http.StatusServiceUnavailable || !strings.Contains(w.Body.String(), "NODE_RED_SYNC_UNAVAILABLE") {
+		t.Fatalf("unavailable Node-RED import status=%d body=%s", w.Code, w.Body.String())
+	}
 	handler.SetManagedRuntime(true)
 	t.Setenv("NRCC_BULK_MAX_ENTRIES", "-1")
 	w = postBulkEnv(t, handler, "A=1", false)
