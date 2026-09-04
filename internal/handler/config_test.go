@@ -510,6 +510,7 @@ func TestSaveConfig_WritesExplicitRuntimeSettingsAndRestarts(t *testing.T) {
 
 	commandPath := filepath.Join(t.TempDir(), "node-red-stub.sh")
 	stub := "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$NRCC_TEST_RECORD_FILE\"\ntrap 'exit 0' TERM INT\nwhile :; do sleep 1; done\n"
+	//nolint:gosec // G306 -- the stub script must remain executable for ProcessManager to launch it.
 	if err := os.WriteFile(commandPath, []byte(stub), 0700); err != nil {
 		t.Fatalf("write Node-RED stub: %v", err)
 	}
@@ -556,6 +557,7 @@ func TestSaveConfig_WritesExplicitRuntimeSettingsAndRestarts(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200; body = %s", w.Code, w.Body.String())
 	}
+	//nolint:gosec // G304 -- settingsPath is derived from t.TempDir() and the test-only NODE_RED_SETTINGS env.
 	settings, err := os.ReadFile(settingsPath)
 	if err != nil {
 		t.Fatalf("read active runtime settings: %v", err)
@@ -569,6 +571,7 @@ func TestSaveConfig_WritesExplicitRuntimeSettingsAndRestarts(t *testing.T) {
 	var invocations []byte
 	deadline := time.Now().Add(time.Second)
 	for {
+		//nolint:gosec // G304 -- recordPath is derived from t.TempDir() and the test-only NRCC_TEST_RECORD_FILE env.
 		invocations, err = os.ReadFile(recordPath)
 		if err == nil && strings.Count(string(invocations), settingsArg) == 2 {
 			break
