@@ -89,6 +89,12 @@ interface MetricCardProps {
   system?: SystemInfo;
 }
 
+function scopeLabel(scope?: SystemInfo['resourceScope']) {
+  if (scope === 'container') return 'Container scope';
+  if (scope === 'host') return 'Host scope';
+  return 'Resource metrics unavailable';
+}
+
 function CpuCard({ system }: MetricCardProps) {
   const { data: history, isLoading } = useSystemHistory();
 
@@ -98,8 +104,8 @@ function CpuCard({ system }: MetricCardProps) {
         <Cpu className="w-5 h-5 text-body-secondary" />
         <span className="text-sm font-medium">CPU</span>
       </div>
-      <p className="mt-2 text-2xl font-bold">{system ? formatPercent(system.cpu.usage) : '--'}</p>
-      <p className="mt-1 text-sm text-body-secondary">{system?.cpu.cores || 0} cores</p>
+      <p className="mt-2 text-2xl font-bold">{system?.cpu.available ? formatPercent(system.cpu.usage) : 'Unavailable'}</p>
+      <p className="mt-1 text-sm text-body-secondary">{system?.cpu.available ? `${system.cpu.cores} cores` : scopeLabel(system?.resourceScope)}</p>
       <div className="mt-3">
         <MetricsChart
           data={history}
@@ -122,9 +128,9 @@ function MemoryCard({ system }: MetricCardProps) {
         <MemoryStick className="w-5 h-5 text-body-secondary" />
         <span className="text-sm font-medium">Memory</span>
       </div>
-      <p className="mt-2 text-2xl font-bold">{system ? formatPercent(system.memory.usagePercent) : '--'}</p>
+      <p className="mt-2 text-2xl font-bold">{system?.memory.available ? formatPercent(system.memory.usagePercent) : 'Unavailable'}</p>
       <p className="mt-1 text-sm text-body-secondary">
-        {system ? `${formatBytes(system.memory.used)} / ${formatBytes(system.memory.total)}` : '--'}
+        {system?.memory.available ? `${formatBytes(system.memory.used)} / ${formatBytes(system.memory.total)}` : scopeLabel(system?.resourceScope)}
       </p>
       <div className="mt-3">
         <MetricsChart
@@ -144,7 +150,9 @@ function MemoryCard({ system }: MetricCardProps) {
 
 export function DashboardStatusCards(props: DashboardStatusCardsProps) {
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <section aria-label="Resource metrics" data-testid="resource-metrics" className="space-y-2">
+      <p className="text-xs font-medium uppercase tracking-wide text-body-secondary">{scopeLabel(props.system?.resourceScope)}</p>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
       <RuntimeCard
         container={props.container}
         host={props.host}
@@ -156,6 +164,7 @@ export function DashboardStatusCards(props: DashboardStatusCardsProps) {
       />
       <CpuCard system={props.system} />
       <MemoryCard system={props.system} />
-    </div>
+      </div>
+    </section>
   );
 }

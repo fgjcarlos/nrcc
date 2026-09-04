@@ -46,9 +46,10 @@ export const hostStatus: HostStatus = {
 }
 
 export const systemInfo: SystemInfo = {
-  cpu: { usage: 14, cores: 4 },
-  memory: { total: 8_589_934_592, used: 2_147_483_648, free: 6_442_450_944, usagePercent: 25 },
-  disk: { total: 107_374_182_400, used: 21_474_836_480, free: 85_899_345_920, usagePercent: 20 },
+	resourceScope: 'host',
+  cpu: { usage: 14, cores: 4, available: true },
+  memory: { total: 8_589_934_592, used: 2_147_483_648, free: 6_442_450_944, usagePercent: 25, available: true },
+  disk: { total: 107_374_182_400, used: 21_474_836_480, free: 85_899_345_920, usagePercent: 20, available: true },
   uptime: 3600,
   platform: 'linux',
   hostname: 'nrcc-smoke-host',

@@ -759,7 +759,11 @@ paths:
       tags: [System]
       operationId: getSystemInfo
       summary: Get system resource information
-      description: Returns real-time CPU, memory, and disk statistics for the host.
+      description: |
+        Returns real-time CPU, memory, and disk statistics from one explicit
+        resource scope. In a container, CPU and memory values are derived from
+        the process cgroup; NRCC does not substitute host values when cgroup
+        limits cannot be observed. Each metric has an `available` flag.
       security:
         - bearerAuth: []
       responses:
@@ -2972,7 +2976,7 @@ components:
 
     CpuInfo:
       type: object
-      required: [usage, cores]
+      required: [usage, cores, available]
       properties:
         usage:
           type: number
@@ -2980,10 +2984,13 @@ components:
           description: CPU usage percentage (0–100)
         cores:
           type: integer
+        available:
+          type: boolean
+          description: False when a scoped CPU limit or usage cannot be observed safely.
 
     MemoryInfo:
       type: object
-      required: [total, free, used, usagePercent]
+      required: [total, free, used, usagePercent, available]
       properties:
         total:
           type: integer
@@ -2998,10 +3005,12 @@ components:
         usagePercent:
           type: number
           format: double
+        available:
+          type: boolean
 
     DiskInfo:
       type: object
-      required: [total, free, used, usagePercent]
+      required: [total, free, used, usagePercent, available]
       properties:
         total:
           type: integer
@@ -3016,10 +3025,12 @@ components:
         usagePercent:
           type: number
           format: double
+        available:
+          type: boolean
 
     SystemInfo:
       type: object
-      required: [platform, arch, nodeVersion, hostname, uptime, cpu, memory, disk, nodeRedVersion, edgeMode]
+      required: [platform, arch, nodeVersion, hostname, uptime, resourceScope, cpu, memory, disk, nodeRedVersion, edgeMode]
       properties:
         platform:
           type: string
@@ -3035,7 +3046,11 @@ components:
         uptime:
           type: integer
           format: int64
-          description: Host uptime in seconds
+          description: Kernel uptime in seconds. It is informational and not a resource metric.
+        resourceScope:
+          type: string
+          enum: [host, container, unavailable]
+          description: Scope shared by CPU, memory, and disk values in this response.
         cpu:
           $ref: "#/components/schemas/CpuInfo"
         memory:

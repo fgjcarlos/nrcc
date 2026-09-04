@@ -151,6 +151,21 @@ test('dashboard restart changes the managed Node-RED process PID', async ({ page
   }).not.toBe(before.data?.status?.pid)
 })
 
+test('dashboard labels container-scoped resource metrics returned by the API', async ({ page }) => {
+  const headers = await authHeaders()
+  const response = await nrcc.get('/api/system/info', { headers })
+  await expect(response).toBeOK()
+  const payload = await response.json() as {
+    data?: { resourceScope?: string; memory?: { available?: boolean; total?: number } }
+  }
+  expect(payload.data?.resourceScope).toBe('container')
+  expect(payload.data?.memory?.available).toBe(true)
+  expect(payload.data?.memory?.total).toBe(536_870_912)
+
+  await login(page)
+  await expect(page.getByTestId('resource-metrics')).toContainText('Container scope')
+})
+
 test('environment action reaches a live Node-RED flow after its restart', async ({ page }) => {
   await seedProbeFlow()
   await login(page)

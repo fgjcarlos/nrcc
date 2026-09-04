@@ -91,8 +91,9 @@ func (h *SystemHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
 
 // CpuInfo represents CPU statistics
 type CpuInfo struct {
-	Usage float64 `json:"usage"` // percent 0-100
-	Cores int     `json:"cores"`
+	Usage     float64 `json:"usage"` // percent 0-100
+	Cores     int     `json:"cores"`
+	Available bool    `json:"available"`
 }
 
 // MemoryInfo represents memory statistics
@@ -101,6 +102,7 @@ type MemoryInfo struct {
 	Free         uint64  `json:"free"`
 	Used         uint64  `json:"used"`
 	UsagePercent float64 `json:"usagePercent"`
+	Available    bool    `json:"available"`
 }
 
 // DiskInfo represents disk statistics
@@ -109,6 +111,7 @@ type DiskInfo struct {
 	Free         uint64  `json:"free"`
 	Used         uint64  `json:"used"`
 	UsagePercent float64 `json:"usagePercent"`
+	Available    bool    `json:"available"`
 }
 
 // SystemInfo represents the system information
@@ -118,6 +121,7 @@ type SystemInfo struct {
 	NodeVersion    string     `json:"nodeVersion"`
 	Hostname       string     `json:"hostname"`
 	Uptime         uint64     `json:"uptime"`
+	ResourceScope  string     `json:"resourceScope"`
 	Cpu            CpuInfo    `json:"cpu"`
 	Memory         MemoryInfo `json:"memory"`
 	Disk           DiskInfo   `json:"disk"`
@@ -141,45 +145,46 @@ func (h *SystemHandler) GetSystemInfo(w http.ResponseWriter, r *http.Request) {
 		hostname = ""
 	}
 
-	// Get platform-specific system stats
-	uptime, memTotal, memFree := getSystemStats()
-	memUsed := memTotal - memFree
+	// Resource values always share the advertised scope. In containers this
+	// means cgroup limits and usage; we never substitute host values.
+	resources := service.CollectResourceMetrics()
+	uptime, _, _ := getSystemStats()
+	memUsed := resources.MemoryUsed
 	var memPercent float64
-	if memTotal > 0 {
-		memPercent = float64(memUsed) / float64(memTotal) * 100
+	if resources.MemoryAvailable && resources.MemoryTotal > 0 {
+		memPercent = float64(memUsed) / float64(resources.MemoryTotal) * 100
 	}
 
-	// Get disk info from root filesystem
-	diskTotal, diskFree, diskUsed := getDiskInfo("/")
 	var diskPercent float64
-	if diskTotal > 0 {
-		diskPercent = float64(diskUsed) / float64(diskTotal) * 100
+	if resources.DiskAvailable && resources.DiskTotal > 0 {
+		diskPercent = float64(resources.DiskUsed) / float64(resources.DiskTotal) * 100
 	}
-
-	// CPU usage (sampled over 200ms on Linux, 0 on other platforms)
-	cpuUsage := getCPUUsage()
 
 	info := SystemInfo{
-		Platform:    runtime.GOOS,
-		Arch:        runtime.GOARCH,
-		NodeVersion: h.nodeVersion,
-		Hostname:    hostname,
-		Uptime:      uptime,
+		Platform:      runtime.GOOS,
+		Arch:          runtime.GOARCH,
+		NodeVersion:   h.nodeVersion,
+		Hostname:      hostname,
+		Uptime:        uptime,
+		ResourceScope: resources.Scope,
 		Cpu: CpuInfo{
-			Usage: cpuUsage,
-			Cores: runtime.NumCPU(),
+			Usage:     resources.CPUUsage,
+			Cores:     resources.CPUCores,
+			Available: resources.CPUAvailable,
 		},
 		Memory: MemoryInfo{
-			Total:        memTotal,
-			Free:         memFree,
+			Total:        resources.MemoryTotal,
+			Free:         resources.MemoryFree,
 			Used:         memUsed,
 			UsagePercent: memPercent,
+			Available:    resources.MemoryAvailable,
 		},
 		Disk: DiskInfo{
-			Total:        diskTotal,
-			Free:         diskFree,
-			Used:         diskUsed,
+			Total:        resources.DiskTotal,
+			Free:         resources.DiskFree,
+			Used:         resources.DiskUsed,
 			UsagePercent: diskPercent,
+			Available:    resources.DiskAvailable,
 		},
 		NodeRedVersion: h.nodeRedVersion(),
 		EdgeMode:       h.edgeMode,

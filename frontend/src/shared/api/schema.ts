@@ -497,7 +497,10 @@ export interface paths {
         };
         /**
          * Get system resource information
-         * @description Returns real-time CPU, memory, and disk statistics for the host.
+         * @description Returns real-time CPU, memory, and disk statistics from one explicit
+         *     resource scope. In a container, CPU and memory values are derived from
+         *     the process cgroup; NRCC does not substitute host values when cgroup
+         *     limits cannot be observed. Each metric has an `available` flag.
          */
         get: operations["getSystemInfo"];
         put?: never;
@@ -1785,6 +1788,8 @@ export interface components {
              */
             usage: number;
             cores: number;
+            /** @description False when a scoped CPU limit or usage cannot be observed safely. */
+            available: boolean;
         };
         MemoryInfo: {
             /**
@@ -1798,6 +1803,7 @@ export interface components {
             used: number;
             /** Format: double */
             usagePercent: number;
+            available: boolean;
         };
         DiskInfo: {
             /**
@@ -1811,6 +1817,7 @@ export interface components {
             used: number;
             /** Format: double */
             usagePercent: number;
+            available: boolean;
         };
         SystemInfo: {
             /** @example linux */
@@ -1822,9 +1829,14 @@ export interface components {
             hostname: string;
             /**
              * Format: int64
-             * @description Host uptime in seconds
+             * @description Kernel uptime in seconds. It is informational and not a resource metric.
              */
             uptime: number;
+            /**
+             * @description Scope shared by CPU, memory, and disk values in this response.
+             * @enum {string}
+             */
+            resourceScope: "host" | "container" | "unavailable";
             cpu: components["schemas"]["CpuInfo"];
             memory: components["schemas"]["MemoryInfo"];
             disk: components["schemas"]["DiskInfo"];

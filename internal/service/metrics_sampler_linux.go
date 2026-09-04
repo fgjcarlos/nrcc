@@ -16,7 +16,7 @@ import (
 	"github.com/fgjcarlos/nrcc/internal/model"
 )
 
-// MetricsSampler periodically samples host metrics and stores them in a MetricsBuffer.
+// MetricsSampler periodically samples coherently scoped resource metrics.
 type MetricsSampler struct {
 	buffer   *MetricsBuffer
 	interval time.Duration
@@ -59,7 +59,7 @@ func (ms *MetricsSampler) LastCPU() float64 {
 
 // sample collects one snapshot and pushes it to the buffer.
 func (ms *MetricsSampler) sample() {
-	snap := sampleHost()
+	snap := sampleResources()
 	snap.Timestamp = time.Now().UTC().Format(time.RFC3339)
 	ms.buffer.Push(snap)
 
@@ -68,17 +68,23 @@ func (ms *MetricsSampler) sample() {
 	ms.mu.Unlock()
 }
 
-// sampleHost collects CPU, memory, and disk metrics on Linux.
-// CPU is measured by reading /proc/stat twice with a 200 ms sleep to compute a delta.
-func sampleHost() model.MetricsSnapshot {
-	cpu := cpuPercent()
-	mem := memPercent()
-	disk := diskPercent("/")
+// sampleResources collects CPU, memory, and disk metrics from one scope.
+func sampleResources() model.MetricsSnapshot {
+	metrics := CollectResourceMetrics()
+	var memoryPercent, diskPercent float64
+	if metrics.MemoryAvailable && metrics.MemoryTotal > 0 {
+		memoryPercent = float64(metrics.MemoryUsed) / float64(metrics.MemoryTotal) * 100
+	}
+	if metrics.DiskAvailable && metrics.DiskTotal > 0 {
+		diskPercent = float64(metrics.DiskUsed) / float64(metrics.DiskTotal) * 100
+	}
 
 	return model.MetricsSnapshot{
-		CPUPercent:    cpu,
-		MemoryPercent: mem,
-		DiskPercent:   disk,
+		ResourceScope: metrics.Scope,
+		Available:     metrics.CPUAvailable && metrics.MemoryAvailable && metrics.DiskAvailable,
+		CPUPercent:    metrics.CPUUsage,
+		MemoryPercent: memoryPercent,
+		DiskPercent:   diskPercent,
 	}
 }
 

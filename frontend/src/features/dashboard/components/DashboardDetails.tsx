@@ -35,14 +35,14 @@ function DiskUsageCard({ system }: Pick<DashboardDetailsProps, 'system'>) {
       <div className="space-y-2">
         <div className="flex justify-between text-sm">
           <span className="text-body-secondary">
-            {system ? formatBytes(system.disk.used) : '--'} / {system ? formatBytes(system.disk.total) : '--'}
+            {system?.disk.available ? formatBytes(system.disk.used) : 'Unavailable'} / {system?.disk.available ? formatBytes(system.disk.total) : '--'}
           </span>
-          <span className="font-medium">{system ? formatPercent(system.disk.usagePercent) : '--'}</span>
+          <span className="font-medium">{system?.disk.available ? formatPercent(system.disk.usagePercent) : '--'}</span>
         </div>
         <div className="w-full h-2 rounded-full bg-muted">
           <div
             className="h-2 transition-all duration-500 rounded-full bg-primary"
-            style={{ width: `${system?.disk.usagePercent || 0}%` }}
+            style={{ width: `${system?.disk.available ? system.disk.usagePercent : 0}%` }}
           />
         </div>
       </div>
