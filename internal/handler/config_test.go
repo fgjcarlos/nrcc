@@ -4,9 +4,15 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/fgjcarlos/nrcc/internal/middleware"
 	"github.com/fgjcarlos/nrcc/internal/model"
@@ -484,6 +490,96 @@ func TestSaveConfig_NoProcessManager_DoesNotPanic(t *testing.T) {
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200; body = %s", w.Code, w.Body.String())
+	}
+}
+
+func TestSaveConfig_WritesExplicitRuntimeSettingsAndRestarts(t *testing.T) {
+	dataDir := t.TempDir()
+	runtimeDir := t.TempDir()
+	settingsPath := filepath.Join(runtimeDir, "settings.js")
+	recordPath := filepath.Join(t.TempDir(), "node-red-invocations")
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("reserve test port: %v", err)
+	}
+	port := strconv.Itoa(listener.Addr().(*net.TCPAddr).Port)
+	if err := listener.Close(); err != nil {
+		t.Fatalf("release test port: %v", err)
+	}
+
+	commandPath := filepath.Join(t.TempDir(), "node-red-stub.sh")
+	stub := "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$NRCC_TEST_RECORD_FILE\"\ntrap 'exit 0' TERM INT\nwhile :; do sleep 1; done\n"
+	if err := os.WriteFile(commandPath, []byte(stub), 0700); err != nil {
+		t.Fatalf("write Node-RED stub: %v", err)
+	}
+
+	t.Setenv("NODE_RED_USER_DIR", runtimeDir)
+	t.Setenv("NODE_RED_SETTINGS", settingsPath)
+	t.Setenv("NODE_RED_PORT", port)
+	t.Setenv("NRCC_TEST_RECORD_FILE", recordPath)
+
+	configSvc := service.NewConfigService(dataDir)
+	processManager := service.NewProcessManager(commandPath, dataDir)
+	if err := processManager.Start(); err != nil {
+		t.Fatalf("start managed Node-RED stub: %v", err)
+	}
+	t.Cleanup(func() { _ = processManager.Stop() })
+
+	handler := NewConfigHandler(configSvc)
+	handler.SetProcessManager(processManager)
+	payload := model.NodeRedConfig{
+		Port:          1880,
+		UIPort:        1880,
+		HTTPAdminRoot: "/",
+		HTTPNodeRoot:  "/",
+		FlowFile:      "flows.json",
+		EditorTheme: map[string]any{
+			"page":   map[string]any{"title": "Docker Page Title"},
+			"header": map[string]any{"title": "Docker Header Title"},
+		},
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal configuration payload: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/config", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(context.WithValue(req.Context(), middleware.CtxKeyUser, &model.Claims{
+		Username: "admin",
+		Role:     model.RoleAdmin,
+	}))
+	w := httptest.NewRecorder()
+
+	handler.SaveConfig(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body = %s", w.Code, w.Body.String())
+	}
+	settings, err := os.ReadFile(settingsPath)
+	if err != nil {
+		t.Fatalf("read active runtime settings: %v", err)
+	}
+	for _, title := range []string{"Docker Page Title", "Docker Header Title"} {
+		if !strings.Contains(string(settings), title) {
+			t.Errorf("active runtime settings missing %q:\n%s", title, settings)
+		}
+	}
+	settingsArg := "--settings " + settingsPath
+	var invocations []byte
+	deadline := time.Now().Add(time.Second)
+	for {
+		invocations, err = os.ReadFile(recordPath)
+		if err == nil && strings.Count(string(invocations), settingsArg) == 2 {
+			break
+		}
+		if time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if got := strings.Count(string(invocations), settingsArg); got != 2 {
+		t.Errorf("managed runtime invocations with %q = %d, want 2 (initial start and restart):\n%s", settingsArg, got, invocations)
 	}
 }
 

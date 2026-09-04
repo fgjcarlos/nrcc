@@ -316,6 +316,15 @@ scenario_1_single_stack() {
     docker exec --user 1000:1000 "$container_a" sh -c \
       'touch /data/backups/.uid-1000-write && touch /data/node_modules/.uid-1000-write'
     ok "uid 1000 writes to repaired backup and node_modules volumes"
+
+    local node_red_runtime
+    node_red_runtime="$(docker exec "$container_a" sh -c \
+      'printf "%s:%s" "$NODE_RED_USER_DIR" "$NODE_RED_SETTINGS"')"
+    assert_eq "$node_red_runtime" "/data:/data/settings.js" \
+      "Node-RED Docker settings runtime contract"
+    docker exec "$container_a" test -f /data/settings.js \
+      || fail "scenario 1: active Node-RED settings file is missing"
+    ok "active Node-RED settings file exists in /data"
   fi
 
   # First-boot bootstrap — completes the setup wizard so we have a session.

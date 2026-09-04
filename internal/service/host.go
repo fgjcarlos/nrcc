@@ -214,14 +214,16 @@ func (s *HostService) resolveSettings(status model.HostStatus) model.SettingsDoc
 	source := "nrcc-data"
 
 	if !s.IsolatedSettings {
-		path = status.NodeRed.SettingsPath
-		source = "detected"
-
-		if path == "" {
-			if envPath := strings.TrimSpace(os.Getenv("NODE_RED_SETTINGS")); envPath != "" {
-				path = envPath
-				source = "env"
-			}
+		// NODE_RED_SETTINGS is the explicit runtime contract. It must win over
+		// executable detection because a managed Docker runtime can expose a
+		// bundled node-red binary while loading /data/settings.js instead of the
+		// native $HOME/.node-red/settings.js path.
+		if envPath := strings.TrimSpace(os.Getenv("NODE_RED_SETTINGS")); envPath != "" {
+			path = envPath
+			source = "env"
+		} else {
+			path = status.NodeRed.SettingsPath
+			source = "detected"
 		}
 	}
 	if path == "" {
