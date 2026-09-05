@@ -67,7 +67,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.getConfig.mockResolvedValue({ data: { data: baseConfig, success: true, timestamp: '' } });
   mocks.getRaw.mockResolvedValue({ data: { data: { content: 'module.exports = {};\n', path: '/etc/node-red/settings.js', writable: true }, success: true, timestamp: '' } });
-  mocks.getStatus.mockResolvedValue({ data: { data: { nodeRed: { mode: 'docker', detected: true }, settings: { path: '/etc/node-red/settings.js' } }, success: true, timestamp: '' } });
+  mocks.getStatus.mockResolvedValue({ data: { data: { nodeRed: { mode: 'docker', detected: true, version: '5.0.6' }, settings: { path: '/etc/node-red/settings.js' }, configuration: { runtimeVersion: '5.0.6', adapter: 'node-red-5', catalogVersion: '5.0.6', source: 'detected', mode: 'editable', editable: true } }, success: true, timestamp: '' } });
 });
 
 async function switchToTab(user: ReturnType<typeof userEvent.setup>, label: string) {

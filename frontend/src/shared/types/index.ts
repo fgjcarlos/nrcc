@@ -529,6 +529,16 @@ export interface SettingsDocument {
   content?: string;
 }
 
+export interface ConfigurationCapabilities {
+  runtimeVersion: string;
+  adapter: string;
+  catalogVersion: string;
+  source: string;
+  mode: 'editable' | 'read-only';
+  editable: boolean;
+  reason?: string;
+}
+
 export interface HostStatus {
   platform: string;
   ready: boolean;
@@ -540,6 +550,7 @@ export interface HostStatus {
   dockerCompose: DependencyStatus;
   nodeRed: NodeRedEnvironment;
   settings: SettingsDocument;
+  configuration: ConfigurationCapabilities;
   recommendations?: string[];
 }
 

@@ -42,6 +42,15 @@ export const hostStatus: HostStatus = {
     writable: true,
     backupPath: '/tmp/nrcc-smoke/backups',
   },
+  configuration: {
+    runtimeVersion: '4.0.0',
+    adapter: 'node-red-4-readonly',
+    catalogVersion: '5.0.6',
+    source: 'fixture',
+    mode: 'read-only',
+    editable: false,
+    reason: 'Node-RED 4 is supported for migration only.',
+  },
   recommendations: [],
 }
 
