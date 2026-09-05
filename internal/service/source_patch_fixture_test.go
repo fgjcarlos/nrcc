@@ -91,6 +91,7 @@ func loadRoundTripFixtures(t *testing.T) []struct {
 			continue
 		}
 		path := filepath.Join("testdata", name)
+		//nolint:gosec // G304 -- path is hardcoded under the package's testdata/ directory and filtered to settings-*.js fixtures enumerated via os.ReadDir.
 		data, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatalf("read fixture %q: %v", path, err)
@@ -206,6 +207,7 @@ func TestSettingsRoundTripFixtureSuite_NoOpImportSave(t *testing.T) {
 
 			// The on-disk file must be identical to the fixture; this is
 			// the strictest possible no-op invariant.
+			//nolint:gosec // G304 -- settingsPath is the hermetic isolated HostService settings path inside t.TempDir(), not user input.
 			onDisk, err := os.ReadFile(settingsPath)
 			if err != nil {
 				t.Fatalf("read settings.js: %v", err)
@@ -585,6 +587,7 @@ func TestSettingsRoundTripFixtureSuite_RevisionRoundTrip(t *testing.T) {
 			if !errors.Is(err, ErrSourceRevisionMismatch) {
 				t.Fatalf("SaveRawSettingsWithRevision error = %v, want ErrSourceRevisionMismatch", err)
 			}
+			//nolint:gosec // G304 -- settingsPath is the hermetic isolated HostService settings path inside t.TempDir(), not user input.
 			onDisk, readErr := os.ReadFile(settingsPath)
 			if readErr != nil {
 				t.Fatalf("read settings.js after rejected save: %v", readErr)
