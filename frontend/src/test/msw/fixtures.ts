@@ -54,6 +54,36 @@ export const hostStatus: HostStatus = {
   recommendations: [],
 }
 
+// Editable counterpart for tests needing structured controls.
+// Mirrors the catalog additions from PR #776.
+export const editableHostStatus: HostStatus = {
+  ...hostStatus,
+  nodeRedBinary: { ...hostStatus.nodeRedBinary, version: '5.0.6' },
+  nodeRed: { ...hostStatus.nodeRed, version: '5.0.6' },
+  configuration: {
+    runtimeVersion: '5.0.6',
+    adapter: 'nodered-5',
+    catalogVersion: '5.0.6',
+    source: 'fixture',
+    mode: 'editable',
+    editable: true,
+  },
+}
+
+// Slice-1 catalog fixture: credentialSecret rotation, requireHttps
+// redirect and the TLS `https` block introduced in PR #776.
+export const securityFixture = {
+  credentialSecret: '',
+  requireHttps: false,
+  https: {
+    key: '/etc/node-red/key.pem',
+    cert: '/etc/node-red/cert.pem',
+    ca: '/etc/node-red/ca.pem',
+    port: 1880,
+    passphrase: '',
+  },
+}
+
 export const systemInfo: SystemInfo = {
 	resourceScope: 'host',
   cpu: { usage: 14, cores: 4, available: true },

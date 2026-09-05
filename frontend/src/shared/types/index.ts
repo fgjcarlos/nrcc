@@ -185,6 +185,23 @@ export interface RuntimeStateSettings {
 }
 
 // ============================================
+// SECURITY (issue #762)
+// ============================================
+// On-disk paths only — Node-RED resolves each entry through
+// fs.readFileSync at startup, so the UI never embeds certificate bytes
+// in nrcc's JSON store. credentialSecret is write-only: the form
+// always reads it back empty so the operator's passphrase never reaches
+// the browser.
+
+export interface HttpsConfig {
+  key?: string;
+  cert?: string;
+  ca?: string;
+  port?: number;
+  passphrase?: string;
+}
+
+// ============================================
 // AUTHENTICATION
 // ============================================
 
@@ -233,6 +250,11 @@ export interface NodeRedConfig {
   adminAuth?: AdminAuthSettings;
   nodeHttpAuth?: NodeHttpAuthSettings | boolean;
   staticAuth?: StaticAuthSettings | boolean;
+  // Security slice (issue #762) — credentialSecret is write-only;
+  // requireHttps always round-trips; https mirrors PR #776.
+  credentialSecret?: string;
+  requireHttps?: boolean;
+  https?: HttpsConfig;
   settingsPath?: string;
   settingsSource?: string;
 }
@@ -304,6 +326,15 @@ export interface NodeRedConfigFormData {
   authStaticEnabled: boolean;
   authStaticUser: string;
   authStaticPassword: string;
+  // Security slice (issue #762) — optional; SecuritySettings uses
+  // `?? ''` / `?? false` / `?? 0` fallbacks.
+  credentialSecret?: string;
+  requireHttps?: boolean;
+  httpsKey?: string;
+  httpsCert?: string;
+  httpsCA?: string;
+  httpsPort?: number;
+  httpsPassphrase?: string;
 }
 
 export function configToFormData(config: NodeRedConfig): NodeRedConfigFormData {
@@ -354,6 +385,15 @@ export function configToFormData(config: NodeRedConfig): NodeRedConfigFormData {
     authStaticEnabled: !!config.staticAuth && typeof config.staticAuth === 'object',
     authStaticUser: typeof config.staticAuth === 'object' ? config.staticAuth?.user || '' : '',
     authStaticPassword: '',
+    // Security slice — credentialSecret is read back empty (write-only);
+    // requireHttps round-trips; https falls back to '' / 0.
+    credentialSecret: '',
+    requireHttps: config.requireHttps ?? false,
+    httpsKey: config.https?.key || '',
+    httpsCert: config.https?.cert || '',
+    httpsCA: config.https?.ca || '',
+    httpsPort: config.https?.port ?? 0,
+    httpsPassphrase: config.https?.passphrase || '',
   };
 }
 
@@ -422,6 +462,19 @@ export function formDataToConfig(formData: NodeRedConfigFormData): Partial<NodeR
       file: formData.runtimeStateFile || undefined,
     } : undefined,
     lang: formData.lang || undefined,
+    // Security slice — credentialSecret preserved unless rotation.
+    // requireHttps always round-trips. https emitted only when at
+    // least one field is set (mirrors the backend parser that returns
+    // nil for an empty block).
+    credentialSecret: formData.credentialSecret || undefined,
+    requireHttps: !!formData.requireHttps,
+    https: (formData.httpsKey || formData.httpsCert || formData.httpsCA || (formData.httpsPort ?? 0) > 0 || formData.httpsPassphrase) ? {
+      key: formData.httpsKey || undefined,
+      cert: formData.httpsCert || undefined,
+      ca: formData.httpsCA || undefined,
+      port: formData.httpsPort || undefined,
+      passphrase: formData.httpsPassphrase || undefined,
+    } : undefined,
   };
   
   if (config.editorTheme) {

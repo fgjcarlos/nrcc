@@ -6,12 +6,13 @@ import { settingsRawSchema } from '@/shared/validation/schemas';
 import {
   BasicSettings,
   AuthSettings,
+  SecuritySettings,
   LoggingSettings,
   EditorThemeSettings,
   AIProviderSettings,
 } from '.';
 import {
-  Settings, Server, Lock, Activity, Palette,
+  Settings, Server, Lock, Shield, Activity, Palette,
   Save, LockOpen, AlertTriangle, Bot
 } from 'lucide-react';
 import { useConfigurationData, useConfigurationActions } from '../hooks';
@@ -36,6 +37,9 @@ interface Section {
 const SECTIONS: Section[] = [
   { id: 'basic', label: 'Basic', icon: Server, component: BasicSettings },
   { id: 'auth', label: 'Authentication', icon: Lock, component: AuthSettings },
+  // Issue #762, slice 1 — TLS, credentialSecret and requireHttps tab.
+  // Issue #762 — TLS, credentialSecret and requireHttps tab.
+  { id: 'security', label: 'Security', icon: Shield, component: SecuritySettings },
   { id: 'logging', label: 'Logging', icon: Activity, component: LoggingSettings },
   { id: 'editor', label: 'Editor Theme', icon: Palette, component: EditorThemeSettings },
   { id: 'ai', label: 'AI Provider', icon: Bot },
@@ -141,6 +145,10 @@ export function ConfigurationView() {
   const [rawEditorSnapshot, setRawEditorSnapshot] = useState('');
   const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
 
+  // Issue #762 — credentialSecret rotation confirmation (handleSave
+  // gates when the operator typed a non-empty secret).
+  const [rotationDialogOpen, setRotationDialogOpen] = useState(false);
+
   // Data and actions hooks
   const data = useConfigurationData();
   const actions = useConfigurationActions();
@@ -170,8 +178,25 @@ export function ConfigurationView() {
   };
 
   const handleSave = async () => {
+    // Issue #762 — rotation confirmation gates the save on a new
+    // credentialSecret.
+    if (formData.credentialSecret) {
+      setRotationDialogOpen(true);
+      return;
+    }
     await actions.handleSave(formData);
     setHasChanges(false);
+  };
+
+  const handleConfirmRotation = async () => {
+    setRotationDialogOpen(false);
+    await actions.handleSave(formData);
+    setHasChanges(false);
+  };
+
+  const handleCancelRotation = () => {
+    setRotationDialogOpen(false);
+    setFormData((prev) => ({ ...prev, credentialSecret: undefined }));
   };
 
   const handleReset = () => {
@@ -404,6 +429,17 @@ export function ConfigurationView() {
           setRawEditorUnlocked(true);
           setUnlockDialogOpen(false);
         }}
+      />
+
+      {/* Issue #762 — credentialSecret rotation confirmation. */}
+      <ConfirmationDialog
+        isOpen={rotationDialogOpen}
+        title="Rotate credential secret"
+        description="Saving a new credential secret invalidates the encryption of every stored credential. Existing flows with encrypted credentials will need to be re-entered or restored from a backup taken before this rotation. Continue only if you understand the impact."
+        variant="warning"
+        acknowledgement="I understand that existing encrypted credentials must be re-entered after this rotation."
+        onCancel={handleCancelRotation}
+        onConfirm={handleConfirmRotation}
       />
     </div>
   );

@@ -32,6 +32,14 @@ interface EditorThemeResponse {
   logout?: { redirect?: string };
 }
 
+interface HttpsResponse {
+  key?: string;
+  cert?: string;
+  ca?: string;
+  port?: number;
+  passphrase?: string;
+}
+
 export interface NodeRedConfigResponse {
   uiPort?: number;
   uiHost?: string;
@@ -49,6 +57,11 @@ export interface NodeRedConfigResponse {
   editorTheme?: EditorThemeResponse;
   runtimeState?: RuntimeStateSettings;
   lang?: string;
+  // Security slice (issue #762) — credentialSecret write-only;
+  // requireHttps and https mirror the catalog from PR #776.
+  credentialSecret?: string;
+  requireHttps?: boolean;
+  https?: HttpsResponse;
   [key: string]: unknown;
 }
 
@@ -89,6 +102,18 @@ export interface ConfigPayload {
   adminAuth?: AuthPayload;
   nodeHttpAuth?: AuthPayload;
   staticAuth?: AuthPayload;
+  // Security slice (issue #762) — credentialSecret only on rotation;
+  // requireHttps always round-trips; https only when at least one
+  // field is set.
+  credentialSecret?: string;
+  requireHttps?: boolean;
+  https?: {
+    key?: string;
+    cert?: string;
+    ca?: string;
+    port?: number;
+    passphrase?: string;
+  };
 }
 
 /**
@@ -257,6 +282,29 @@ export function formDataToConfigPayload(formData: NodeRedConfigFormData): Config
     };
   }
 
+  // Security (issue #762). credentialSecret only on rotation;
+  // requireHttps always round-trips; https only when at least one
+  // field is set so an empty form doesn't drop the existing block.
+  if (formData.credentialSecret) {
+    config.credentialSecret = formData.credentialSecret;
+  }
+  config.requireHttps = !!formData.requireHttps;
+  if (
+    formData.httpsKey ||
+    formData.httpsCert ||
+    formData.httpsCA ||
+    (formData.httpsPort ?? 0) > 0 ||
+    formData.httpsPassphrase
+  ) {
+    config.https = {
+      key: formData.httpsKey || undefined,
+      cert: formData.httpsCert || undefined,
+      ca: formData.httpsCA || undefined,
+      port: formData.httpsPort || undefined,
+      passphrase: formData.httpsPassphrase || undefined,
+    };
+  }
+
   // Language
   config.lang = formData.lang || 'en-US';
 
@@ -321,5 +369,17 @@ export function configToFormData(config: NodeRedConfigResponse): NodeRedConfigFo
     runtimeStateEnabled: config.runtimeState?.enabled || false,
     runtimeStateFile: config.runtimeState?.file || '',
     lang: config.lang || 'en-US',
+
+    // Security (issue #762, slice 1) — credentialSecret is always read
+    // back as empty so the operator's passphrase never reaches the
+    // browser. requireHttps round-trips as a boolean. https fields fall
+    // back to '' / 0 when the block is absent.
+    credentialSecret: '',
+    requireHttps: config.requireHttps ?? false,
+    httpsKey: config.https?.key || '',
+    httpsCert: config.https?.cert || '',
+    httpsCA: config.https?.ca || '',
+    httpsPort: config.https?.port ?? 0,
+    httpsPassphrase: config.https?.passphrase || '',
   };
 }

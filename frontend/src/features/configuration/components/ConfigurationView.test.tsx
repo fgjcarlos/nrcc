@@ -282,3 +282,75 @@ describe('ConfigurationView (issue #364 — gated raw settings editor)', () => {
     expect(screen.getByTestId('raw-settings-save-btn')).toBeInTheDocument();
   });
 });
+
+// Issue #762: Security tab surfaces credentialSecret rotation,
+// requireHttps, and the https block from PR #776.
+describe('ConfigurationView (issue #762 — Security tab for credentialSecret / requireHttps / https)', () => {
+  it('renders the Security tab with credentialSecret, requireHttps and https inputs', async () => {
+    const user = userEvent.setup();
+    renderConfiguration();
+
+    await user.click(await screen.findByRole('button', { name: /^Security$/ }));
+
+    // credentialSecret + https use the shared Input (label+id).
+    // requireHttps is a ToggleField with no htmlFor link.
+    expect(screen.getByLabelText('Credential Secret')).toBeInTheDocument();
+    expect(screen.getByText(/^Require HTTPS$/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Private Key Path')).toBeInTheDocument();
+    expect(screen.getByLabelText('Certificate Path')).toBeInTheDocument();
+    expect(screen.getByLabelText('CA Bundle Path')).toBeInTheDocument();
+    expect(screen.getByLabelText('HTTPS Port')).toBeInTheDocument();
+    expect(screen.getByLabelText('Private Key Passphrase')).toBeInTheDocument();
+  });
+
+  it('gates credentialSecret rotation behind a confirmation dialog and clears the field on cancel', async () => {
+    const user = userEvent.setup();
+    renderConfiguration();
+
+    await user.click(await screen.findByRole('button', { name: /^Security$/ }));
+    const secretInput = screen.getByLabelText('Credential Secret') as HTMLInputElement;
+    await user.type(secretInput, 'new-rotation-passphrase');
+
+    // Save click triggers the rotation warning dialog. Confirm is gated
+    // behind an acknowledgement checkbox.
+    await user.click(screen.getByText('Save', { selector: 'button' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByTestId('confirmation-dialog-ack')).not.toBeChecked();
+    expect(within(dialog).getByRole('button', { name: /confirm/i })).toBeDisabled();
+
+    // Cancel clears the field so the operator must re-enter to retry.
+    await user.click(within(dialog).getByRole('button', { name: /^cancel$/i }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(secretInput.value).toBe('');
+
+    // Re-enter and confirm: the value sticks after acknowledgement.
+    await user.type(secretInput, 'final-rotation-passphrase');
+    await user.click(screen.getByText('Save', { selector: 'button' }));
+    const secondDialog = await screen.findByRole('dialog');
+    await user.click(within(secondDialog).getByTestId('confirmation-dialog-ack'));
+    await user.click(within(secondDialog).getByRole('button', { name: /confirm/i }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(secretInput.value).toBe('final-rotation-passphrase');
+  });
+
+  // Rotation is opt-in: blank credentialSecret must NOT be sent.
+  it('omits credentialSecret from the save payload when the rotation field is blank', async () => {
+    const user = userEvent.setup();
+    const updateSpy = vi.fn().mockResolvedValue({ data: { data: {}, success: true, timestamp: '' } });
+    const configModule = await import('@/features/configuration/services');
+    vi.spyOn(configModule.configService, 'updateConfig').mockImplementation(updateSpy);
+
+    renderConfiguration();
+
+    await user.click(await screen.findByRole('button', { name: /^Security$/ }));
+    await user.click(findToggleButton(/^Require HTTPS$/));
+    await user.type(screen.getByLabelText('Private Key Path'), '/etc/node-red/key.pem');
+    await user.click(screen.getByText('Save', { selector: 'button' }));
+
+    await waitFor(() => expect(updateSpy).toHaveBeenCalled());
+    const payload = updateSpy.mock.calls[0][0] as Record<string, unknown>;
+    expect(payload.requireHttps).toBe(true);
+    expect(payload.https).toMatchObject({ key: '/etc/node-red/key.pem' });
+    expect(payload.credentialSecret).toBeUndefined();
+  });
+});
