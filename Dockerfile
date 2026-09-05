@@ -42,7 +42,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 # ref: nodered/node-red:5.0.4-24-minimal — community image, pinned to
 # digest. Dependabot (docker ecosystem, weekly) bumps the digest when
 # upstream changes. See issue #593 and auditoria/devops-security.md §2.1.
-FROM nodered/node-red:5.0.4-24-minimal@sha256:7d57985fde220f7d223e008a2e8f97a46dcd432009fcdfaaaf00ed3e37a540ab
+FROM nodered/node-red:5.0.6-24-minimal@sha256:20b94d04e0f4a7e4c50a047297219e651689fa7d86c06982f7bee9f27dcd2d5f
 LABEL org.opencontainers.image.title="nrcc" \
       org.opencontainers.image.description="Node-RED Control Center — all-in-one" \
       org.opencontainers.image.source="https://github.com/fgjcarlos/nrcc"
