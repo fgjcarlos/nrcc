@@ -2882,6 +2882,30 @@ components:
           type: string
           description: Raw text content of settings.js
 
+    ConfigurationCapabilities:
+      type: object
+      required: [runtimeVersion, adapter, catalogVersion, source, mode, editable]
+      properties:
+        runtimeVersion:
+          type: string
+          description: Detected Node-RED runtime version, or "unknown"
+        adapter:
+          type: string
+          description: Selected NRCC configuration adapter
+        catalogVersion:
+          type: string
+          description: Node-RED settings catalog version used by the adapter
+        source:
+          type: string
+          description: Source used to resolve settings.js
+        mode:
+          type: string
+          enum: [editable, read-only]
+        editable:
+          type: boolean
+        reason:
+          type: string
+
     RawSettingsRequest:
       type: object
       required: [content]
@@ -2944,7 +2968,7 @@ components:
 
     HostStatus:
       type: object
-      required: [platform, ready, interactive, nodejs, npm, nodeRedBinary, portless, docker, dockerCompose, nodeRed, settings]
+      required: [platform, ready, interactive, nodejs, npm, nodeRedBinary, portless, docker, dockerCompose, nodeRed, settings, configuration]
       properties:
         platform:
           type: string
@@ -2969,6 +2993,8 @@ components:
           $ref: "#/components/schemas/NodeRedEnvironment"
         settings:
           $ref: "#/components/schemas/SettingsDocument"
+        configuration:
+          $ref: "#/components/schemas/ConfigurationCapabilities"
         recommendations:
           type: array
           items:

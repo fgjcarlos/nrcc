@@ -42,18 +42,31 @@ type SettingsDocument struct {
 	Content    string `json:"content,omitempty"`
 }
 
+// ConfigurationCapabilities describes whether NRCC can safely edit the
+// detected Node-RED settings.js contract.
+type ConfigurationCapabilities struct {
+	RuntimeVersion string `json:"runtimeVersion"`
+	Adapter        string `json:"adapter"`
+	CatalogVersion string `json:"catalogVersion"`
+	Source         string `json:"source"`
+	Mode           string `json:"mode"`
+	Editable       bool   `json:"editable"`
+	Reason         string `json:"reason,omitempty"`
+}
+
 // HostStatus summarizes the detected host and runtime environment.
 type HostStatus struct {
-	Platform        string             `json:"platform"`
-	Ready           bool               `json:"ready"`
-	Interactive     bool               `json:"interactive"`
-	NodeJS          DependencyStatus   `json:"nodejs"`
-	NPM             DependencyStatus   `json:"npm"`
-	NodeRedBinary   DependencyStatus   `json:"nodeRedBinary"`
-	Portless        DependencyStatus   `json:"portless"`
-	Docker          DependencyStatus   `json:"docker"`
-	DockerCompose   DependencyStatus   `json:"dockerCompose"`
-	NodeRed         NodeRedEnvironment `json:"nodeRed"`
-	Settings        SettingsDocument   `json:"settings"`
-	Recommendations []string           `json:"recommendations,omitempty"`
+	Platform        string                   `json:"platform"`
+	Ready           bool                     `json:"ready"`
+	Interactive     bool                     `json:"interactive"`
+	NodeJS          DependencyStatus         `json:"nodejs"`
+	NPM             DependencyStatus         `json:"npm"`
+	NodeRedBinary   DependencyStatus         `json:"nodeRedBinary"`
+	Portless        DependencyStatus         `json:"portless"`
+	Docker          DependencyStatus         `json:"docker"`
+	DockerCompose   DependencyStatus         `json:"dockerCompose"`
+	NodeRed         NodeRedEnvironment       `json:"nodeRed"`
+	Settings        SettingsDocument         `json:"settings"`
+	Configuration   ConfigurationCapabilities `json:"configuration"`
+	Recommendations []string                 `json:"recommendations,omitempty"`
 }

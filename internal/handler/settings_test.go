@@ -13,6 +13,29 @@ import (
 	"github.com/fgjcarlos/nrcc/internal/service"
 )
 
+func TestSettingsHandler_SaveRaw_RejectsUnsupportedNodeREDVersion(t *testing.T) {
+	t.Setenv("PATH", "")
+	configSvc := service.NewConfigService(t.TempDir())
+	handler := NewSettingsHandler(configSvc)
+
+	body, err := json.Marshal(RawSettingsRequest{Content: "module.exports = { uiPort: 1880 };"})
+	if err != nil {
+		t.Fatalf("marshal settings request: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/settings/raw", bytes.NewReader(body))
+	req = req.WithContext(context.WithValue(req.Context(), middleware.CtxKeyUser, &model.Claims{
+		Username: "admin",
+		Role:     model.RoleAdmin,
+	}))
+	w := httptest.NewRecorder()
+
+	handler.SaveRaw(w, req)
+
+	if w.Code != http.StatusConflict {
+		t.Fatalf("SaveRaw status = %d, want %d: %s", w.Code, http.StatusConflict, w.Body.String())
+	}
+}
+
 func TestBootstrapHandler_GetStatus_Returns200(t *testing.T) {
 	hostSvc := service.NewHostService(t.TempDir())
 	handler := NewBootstrapHandler(hostSvc)

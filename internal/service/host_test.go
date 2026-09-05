@@ -81,6 +81,15 @@ func TestHostService_Detect_ReturnsHostStatus(t *testing.T) {
 	}
 }
 
+func TestHostService_Detect_ReportsNodeRED5ConfigurationCapabilities(t *testing.T) {
+	svc := NewIsolatedHostService(t.TempDir())
+
+	capabilities := svc.Detect().Configuration
+	if capabilities.RuntimeVersion != "5.0.6" || capabilities.Adapter != "nodered-5" || !capabilities.Editable {
+		t.Fatalf("configuration capabilities = %+v, want editable Node-RED 5 adapter", capabilities)
+	}
+}
+
 func TestHostService_ResolveSettingsPath_WithDataDir(t *testing.T) {
 	tempDir := t.TempDir()
 	svc := NewHostService(tempDir)
