@@ -27,6 +27,14 @@ type NodeRedConfig struct {
 	ProjectsEnabled bool        `json:"projectsEnabled,omitempty"`
 	Logging         interface{} `json:"logging,omitempty"`
 
+	// TLS (issue #762 slice 1). HTTPS enables a TLS listener; RequireHttps
+	// redirects plain-http traffic to https when set. Both require a Node-RED
+	// restart. Https carries the on-disk paths to the PEM key, cert and
+	// optional CA; the backend renders them as fs.readFileSync() so the
+	// operator never has to inline certificate content.
+	RequireHttps bool      `json:"requireHttps,omitempty"`
+	Https        *HttpsConfig `json:"https,omitempty"`
+
 	// Editor Theme
 	EditorTheme interface{} `json:"editorTheme,omitempty"`
 
@@ -55,6 +63,18 @@ type AdminAuthUser struct {
 	Username    string `json:"username"`
 	Password    string `json:"password"`
 	Permissions string `json:"permissions"`
+}
+
+// HttpsConfig describes the Node-RED `https` block. Node-RED reads each
+// entry through fs.readFileSync at startup, so storing on-disk paths is the
+// safest representation: we never embed certificate bytes in nrcc's own JSON
+// store, and operator rotation is "replace the file, restart Node-RED".
+type HttpsConfig struct {
+	Key        string `json:"key,omitempty"`
+	Cert       string `json:"cert,omitempty"`
+	CA         string `json:"ca,omitempty"`
+	Port       int    `json:"port,omitempty"`
+	Passphrase string `json:"passphrase,omitempty"`
 }
 
 // FunctionLibrary represents a Node-RED function library

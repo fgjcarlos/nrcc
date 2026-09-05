@@ -35,6 +35,8 @@ var nodeRED5Catalog = []SettingCatalogEntry{
 	{Key: "uiHost", Shape: "string", Default: "0.0.0.0", Validation: "host-or-ip", RestartRequired: true, UIEditable: true},
 	{Key: "httpAdminRoot", Shape: "string-or-false", Default: "/", Validation: "path-or-false", RestartRequired: true, UIEditable: true},
 	{Key: "httpNodeRoot", Shape: "string-or-false", Default: "/", Validation: "path-or-false", RestartRequired: true, UIEditable: true},
+	{Key: "https", Shape: "https-options", Default: "undefined", Validation: "https-options", Secret: true, RestartRequired: true, UIEditable: true},
+	{Key: "requireHttps", Shape: "boolean", Default: "false", Validation: "boolean", RestartRequired: true, UIEditable: true},
 	{Key: "httpStatic", Shape: "string-or-array", Validation: "path-or-static-sources", RestartRequired: true, UIEditable: false},
 	{Key: "lang", Shape: "string", Default: "en-US", Validation: "locale", RestartRequired: true, UIEditable: true},
 	{Key: "runtimeState", Shape: "object", Default: "{enabled:false,ui:false}", Validation: "runtime-state-options", RestartRequired: true, UIEditable: true},
@@ -47,6 +49,23 @@ var nodeRED5Catalog = []SettingCatalogEntry{
 // NodeRED5Catalog returns a copy of the Node-RED 5.0.6 canonical setting
 // catalog. The catalog is deliberately separate from the UI so future adapters
 // must opt in to every supported setting shape.
+//
+// Per-entry documentation (issue #762 acceptance: every control states its
+// Node-RED 5 meaning, default, restart impact, secret behavior and
+// verification method):
+//
+//   - credentialSecret: encrypts credentials.json at rest. "false" disables
+//     encryption (not recommended). Restart required. Secret because changing
+//     it invalidates stored credentials. Verification: editor login still
+//     works after restart and credentials.json cannot be read without the
+//     secret.
+//   - https: TLS listener block (key/cert/ca/port/passphrase options). When
+//     set Node-RED serves HTTPS instead of HTTP. Restart required. Secret
+//     because cert/key paths leak server identity. Verification: openssl
+//     s_client -connect host:port returns the configured certificate.
+//   - requireHttps: when true Node-RED redirects http:// requests to https://.
+//     Restart required. Verification: editor URL without https redirects to
+//     https://<same path>.
 func NodeRED5Catalog() []SettingCatalogEntry {
 	return append([]SettingCatalogEntry(nil), nodeRED5Catalog...)
 }

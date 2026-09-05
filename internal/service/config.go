@@ -530,6 +530,26 @@ func patchSettingsJS(existingContent string, cfg model.NodeRedConfig) string {
 		content = replaceScalarKey(content, "lang", fmt.Sprintf("%q", cfg.Lang))
 	}
 
+	// TLS / secrets (issue #762 slice 1). credentialSecret is treated as a
+	// "rotate by saving a new value" operation: empty cfg leaves the
+	// existing settings.js line untouched, "false" disables encryption,
+	// any other value becomes the literal passphrase. The operator MUST
+	// re-enter credentials after a rotation, so the UI is expected to
+	// surface a confirmation warning before this key is written.
+	if cfg.CredentialSecret != "" {
+		if cfg.CredentialSecret == "false" {
+			content = replaceScalarKey(content, "credentialSecret", "false")
+		} else {
+			content = replaceScalarKey(content, "credentialSecret", fmt.Sprintf("%q", cfg.CredentialSecret))
+		}
+	}
+	content = replaceScalarKey(content, "requireHttps", fmt.Sprintf("%t", cfg.RequireHttps))
+	if block := renderHttpsBlock(cfg); block != "" {
+		content = replaceBlockKey(content, "https", block)
+	} else {
+		content = removeObjectKey(content, "https")
+	}
+
 	// Block keys: use brace-aware replacement
 	if block := renderEnvBlock(cfg); block != "" {
 		content = replaceArrayKey(content, "env", block)
@@ -609,6 +629,51 @@ func replaceArrayKey(content, key, arrayContent string) string {
 func removeArrayKey(content, key string) string {
 	rePattern := fmt.Sprintf(`(?ms)^\s*%s\s*:\s*\[[^\]]*\],?\s*\n?`, regexp.QuoteMeta(key))
 	return regexp.MustCompile(rePattern).ReplaceAllString(content, "")
+}
+
+// removeObjectKey deletes a top-level object key from a settings.js
+// document. The matching brace-counting helper (findTopLevelBlock) was
+// introduced for editorTheme in #748; we reuse the same approach here so
+// a `https: { ... }` block is removed verbatim — including any inner
+// nested braces — without leaving a dangling `https: null` behind.
+func removeObjectKey(content, key string) string {
+	start, end, ok := findTopLevelBlock(content, key)
+	if !ok {
+		return content
+	}
+	return content[:start] + content[end:]
+}
+
+// renderHttpsBlock produces a settings.js-compatible `https: { ... }` entry
+// from the structured HttpsConfig. Each non-empty field becomes an
+// fs.readFileSync(<path>) call so Node-RED can consume on-disk PEM
+// material without us embedding certificate bytes in nrcc's own JSON
+// store. Returns the empty string when no fields are set, so callers
+// route to removeObjectKey instead of emitting an empty block.
+func renderHttpsBlock(cfg model.NodeRedConfig) string {
+	if cfg.Https == nil {
+		return ""
+	}
+	parts := make([]string, 0, 5)
+	if cfg.Https.Key != "" {
+		parts = append(parts, fmt.Sprintf("    key: require('fs').readFileSync(%q),", cfg.Https.Key))
+	}
+	if cfg.Https.Cert != "" {
+		parts = append(parts, fmt.Sprintf("    cert: require('fs').readFileSync(%q),", cfg.Https.Cert))
+	}
+	if cfg.Https.CA != "" {
+		parts = append(parts, fmt.Sprintf("    ca: require('fs').readFileSync(%q),", cfg.Https.CA))
+	}
+	if cfg.Https.Port > 0 {
+		parts = append(parts, fmt.Sprintf("    port: %d,", cfg.Https.Port))
+	}
+	if cfg.Https.Passphrase != "" {
+		parts = append(parts, fmt.Sprintf("    passphrase: %q,", cfg.Https.Passphrase))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "  https: {\n" + strings.Join(parts, "\n") + "\n  },"
 }
 
 func nodeRedEnvType(typ string) string {
@@ -896,6 +961,9 @@ func (s *ConfigService) parseConfigFromContent(content string) (model.NodeRedCon
 	cfg.Lang = parseStringFromJS(content, "lang", cfg.Lang)
 	cfg.DisableEditor = parseBoolFromJS(content, "disableEditor", cfg.DisableEditor)
 	cfg.ProjectsEnabled = parseProjectsEnabledFromJS(content, cfg.ProjectsEnabled)
+	cfg.CredentialSecret = parseCredentialSecretFromJS(content)
+	cfg.RequireHttps = parseBoolFromJS(content, "requireHttps", false)
+	cfg.Https = parseHttpsBlockFromJS(content)
 	adminAuth, err := parseAdminAuthFromJS(content)
 	if err != nil {
 		// ErrSandboxTimeout is propagated so the HTTP handler can return
@@ -908,6 +976,68 @@ func (s *ConfigService) parseConfigFromContent(content string) (model.NodeRedCon
 	}
 	cfg.AdminAuth = adminAuth
 	return cfg, nil
+}
+
+// parseCredentialSecretFromJS reads the credentialSecret scalar back out of
+// settings.js. The value can be a quoted string (operator-supplied
+// passphrase) or the literal `false` (encryption disabled). Anything else
+// — including an empty string — is treated as "unset" so the UI doesn't
+// display a stale value.
+func parseCredentialSecretFromJS(content string) string {
+	re := regexp.MustCompile(`credentialSecret\s*:\s*(?:'([^']*)'|"([^"]*)")`)
+	if m := re.FindStringSubmatch(content); len(m) > 0 {
+		if m[1] != "" {
+			return m[1]
+		}
+		return m[2]
+	}
+	if regexp.MustCompile(`credentialSecret\s*:\s*false`).MatchString(content) {
+		return "false"
+	}
+	return ""
+}
+
+// parseHttpsBlockFromJS locates the top-level `https: { ... }` block using
+// the same brace-counting helper as the renderer, then extracts the
+// fs.readFileSync(<path>) calls and quoted scalars into a HttpsConfig.
+// Returns nil when no https block is present so the structured model
+// reflects "TLS not configured" rather than an empty placeholder.
+func parseHttpsBlockFromJS(content string) *model.HttpsConfig {
+	start, end, ok := findTopLevelBlock(content, "https")
+	if !ok {
+		return nil
+	}
+	body := content[start:end]
+
+	readRe := regexp.MustCompile(`(\w+)\s*:\s*require\(['"]fs['"]\)\.readFileSync\(['"]([^'"]+)['"]\)`)
+	quoteRe := regexp.MustCompile(`(\w+)\s*:\s*['"]([^'"]+)['"]`)
+	intRe := regexp.MustCompile(`port\s*:\s*(\d+)`)
+
+	https := &model.HttpsConfig{}
+	for _, m := range readRe.FindAllStringSubmatch(body, -1) {
+		switch m[1] {
+		case "key":
+			https.Key = m[2]
+		case "cert":
+			https.Cert = m[2]
+		case "ca":
+			https.CA = m[2]
+		}
+	}
+	for _, m := range quoteRe.FindAllStringSubmatch(body, -1) {
+		if m[1] == "passphrase" {
+			https.Passphrase = m[2]
+		}
+	}
+	if m := intRe.FindStringSubmatch(body); len(m) == 2 {
+		if n, err := strconv.Atoi(m[1]); err == nil {
+			https.Port = n
+		}
+	}
+	if https.Key == "" && https.Cert == "" && https.CA == "" && https.Port == 0 && https.Passphrase == "" {
+		return nil
+	}
+	return https
 }
 
 func parseStringFromJS(content, key, fallback string) string {

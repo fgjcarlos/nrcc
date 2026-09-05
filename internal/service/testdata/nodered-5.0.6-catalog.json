@@ -11,6 +11,8 @@
   {"key":"uiHost","shape":"string"},
   {"key":"httpAdminRoot","shape":"string-or-false"},
   {"key":"httpNodeRoot","shape":"string-or-false"},
+  {"key":"https","shape":"https-options"},
+  {"key":"requireHttps","shape":"boolean"},
   {"key":"httpStatic","shape":"string-or-array"},
   {"key":"lang","shape":"string"},
   {"key":"runtimeState","shape":"object"},
