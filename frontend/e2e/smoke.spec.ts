@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { installApiMocks, login } from './helpers'
+import { hostStatus } from '../src/test/msw/fixtures'
 
 test.describe('NRCC smoke E2E flows with fixture API', () => {
   test('setup flow creates the first administrator without host side effects', async ({ page }) => {
@@ -80,5 +81,47 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
     await page.getByRole('button', { name: /open user menu/ }).click()
     await page.getByRole('menuitem', { name: 'Profile' }).click()
     await expect(page.getByRole('heading', { name: 'Profile' })).toBeVisible()
+  })
+
+  // Issue #762: editable runtime surfaces credentialSecret rotation,
+  // requireHttps and the TLS https block (PR #776).
+  test('configuration surfaces the Security tab with credentialSecret, requireHttps and https inputs', async ({ page }) => {
+    await login(page)
+    // installApiMocks ignores its `status` parameter, so we layer a
+    // direct route handler. The catalog additions from PR #776 require
+    // an editable adapter before the Security tab renders.
+    const editableStatus = {
+      ...hostStatus,
+      nodeRed: { ...hostStatus.nodeRed, version: '5.0.6' },
+      nodeRedBinary: { ...hostStatus.nodeRedBinary, version: '5.0.6' },
+      configuration: {
+        ...hostStatus.configuration,
+        runtimeVersion: '5.0.6',
+        adapter: 'nodered-5',
+        catalogVersion: '5.0.6',
+        mode: 'editable',
+        editable: true,
+      },
+    }
+    await page.route(/\/api\/bootstrap\/status/, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data: editableStatus, timestamp: new Date(0).toISOString() }) }),
+    )
+    await page.goto('/configuration')
+    // Reload so react-query refetches bootstrap/status with the override
+    // (the dashboard-time cache otherwise wins).
+    await page.reload()
+
+    await page.getByRole('button', { name: 'Security' }).click()
+    await expect(page.getByText('Credential Encryption')).toBeVisible()
+    await expect(page.getByLabel('Credential Secret')).toBeVisible()
+    await expect(page.getByText('HTTPS Redirect')).toBeVisible()
+    // ToggleField's label is not htmlFor-linked — match by visible text.
+    await expect(page.getByText('Require HTTPS')).toBeVisible()
+    await expect(page.getByText('TLS (HTTPS Listener)')).toBeVisible()
+    await expect(page.getByLabel('Private Key Path')).toBeVisible()
+    await expect(page.getByLabel('Certificate Path')).toBeVisible()
+    await expect(page.getByLabel('CA Bundle Path')).toBeVisible()
+    await expect(page.getByLabel('HTTPS Port')).toBeVisible()
+    await expect(page.getByLabel('Private Key Passphrase')).toBeVisible()
   })
 })
