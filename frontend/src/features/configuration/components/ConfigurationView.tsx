@@ -238,7 +238,7 @@ export function ConfigurationView() {
           <button
             type="button"
             onClick={handleSave}
-            disabled={!hasChanges || isSaving}
+            disabled={!hasChanges || isSaving || data.hostStatus?.configuration?.editable === false}
             className="action-btn-primary"
           >
             <Save className="w-4 h-4" />
@@ -255,9 +255,19 @@ export function ConfigurationView() {
               {UI_COPY.installationDetected}: <strong className="text-base-content">{data.hostStatus.nodeRed.mode}</strong>
               {data.hostStatus.nodeRed.detected ? '' : ` ${UI_COPY.nodeRedNotDetected}`}
             </span>
-            <span>
-              settings.js: <strong className="text-base-content">{data.hostStatus.settings.path || UI_COPY.pathNotDetected}</strong>
-            </span>
+              <span>
+                Runtime version: <strong className="text-base-content">{data.hostStatus.configuration?.runtimeVersion || data.hostStatus.nodeRed.version || 'unknown'}</strong>
+              </span>
+              <span>
+                Configuration source: <strong className="text-base-content">{data.hostStatus.configuration?.source || data.hostStatus.settings.source}</strong>
+              </span>
+              <span>
+                Editing: <strong className={data.hostStatus.configuration?.editable === false ? 'text-warning' : 'text-success'}>
+                  {data.hostStatus.configuration?.editable === false ? 'read-only' : 'editable'}
+                </strong>
+                {data.hostStatus.configuration?.reason && ` — ${data.hostStatus.configuration.reason}`}
+              </span>
+
             {data.hostStatus.recommendations && data.hostStatus.recommendations.length > 0 && (
               <span>{data.hostStatus.recommendations[0]}</span>
             )}
@@ -289,10 +299,15 @@ export function ConfigurationView() {
         </nav>
       </div>
 
-      {/* Active Tab Content */}
-      <div className="surface-card p-6">
-        {activeTab === 'ai' ? <AIProviderSettings /> : <ActiveComponent settings={formData} onUpdate={handleUpdateField} disabled={isSaving} />}
-      </div>
+       {/* Active Tab Content */}
+       <div className="surface-card p-6">
+         {data.hostStatus?.configuration?.editable === false ? (
+           <div className="rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm text-warning" role="status">
+             Configuration controls are unavailable for this runtime. Review the detected settings below.
+           </div>
+         ) : activeTab === 'ai' ? <AIProviderSettings /> : <ActiveComponent settings={formData} onUpdate={handleUpdateField} disabled={isSaving} />}
+       </div>
+
 
       {/* Raw Settings Editor — gated by issue #364 */}
       <div className="surface-card p-6 space-y-4">

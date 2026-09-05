@@ -62,6 +62,7 @@ describe('DashboardView', () => {
         dockerCompose: { name: 'docker compose', installed: true },
         nodeRed: { detected: false, mode: 'unknown', managedByNrcc: false, running: false },
         settings: { path: '/tmp/settings.js', source: 'disk', writable: false },
+        configuration: { runtimeVersion: 'unknown', adapter: 'none', catalogVersion: '5.0.6', source: 'disk', mode: 'read-only', editable: false, reason: 'Node-RED not detected' },
         recommendations: [],
       },
       runtime: { status: 'stopped', uptime: 0 },
