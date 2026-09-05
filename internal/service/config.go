@@ -239,6 +239,15 @@ func (s *ConfigService) GetDefault() model.NodeRedConfig {
 	return model.DefaultNodeRedConfig()
 }
 
+// ConfigurationCapabilities returns the active Node-RED adapter contract.
+// Callers must use it before attempting a settings.js mutation.
+func (s *ConfigService) ConfigurationCapabilities() model.ConfigurationCapabilities {
+	if s.hostSvc == nil {
+		return ResolveConfigurationCapabilities("", model.SettingsDocument{})
+	}
+	return s.hostSvc.Detect().Configuration
+}
+
 // GetRawSettings loads the active settings.js document.
 func (s *ConfigService) GetRawSettings() (model.SettingsDocument, error) {
 	status := s.hostSvc.Detect()

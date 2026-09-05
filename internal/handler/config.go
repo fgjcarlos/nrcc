@@ -82,6 +82,11 @@ func (h *ConfigHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 // route. Claims are read from the context solely for audit logging.
 func (h *ConfigHandler) SaveConfig(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.ClaimsFromContext(r)
+	capabilities := h.configSvc.ConfigurationCapabilities()
+	if !capabilities.Editable {
+		model.RespondError(w, http.StatusConflict, "CONFIGURATION_READ_ONLY", capabilities.Reason)
+		return
+	}
 
 	var cfg model.NodeRedConfig
 	if !DecodeJSON(w, r, &cfg) {
@@ -106,8 +111,16 @@ func (h *ConfigHandler) SaveConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	h.audit.Log(r, claims.Username, "CONFIG_SAVE", "", "ok", nil)
+	h.audit.Log(r, claims.Username, "CONFIG_SAVE", "", "ok", compatibilityAuditMeta(capabilities))
 	model.RespondJSON(w, http.StatusOK, cfg)
+}
+
+func compatibilityAuditMeta(capabilities model.ConfigurationCapabilities) map[string]string {
+	return map[string]string{
+		"runtime_version": capabilities.RuntimeVersion,
+		"adapter":         capabilities.Adapter,
+		"settings_source": capabilities.Source,
+	}
 }
 
 // GetDefaultConfig handles GET /api/config/default - protected

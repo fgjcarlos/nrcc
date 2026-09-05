@@ -508,8 +508,9 @@ func TestSaveConfig_WritesExplicitRuntimeSettingsAndRestarts(t *testing.T) {
 		t.Fatalf("release test port: %v", err)
 	}
 
-	commandPath := filepath.Join(t.TempDir(), "node-red-stub.sh")
-	stub := "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$NRCC_TEST_RECORD_FILE\"\ntrap 'exit 0' TERM INT\nwhile :; do sleep 1; done\n"
+	commandDir := t.TempDir()
+	commandPath := filepath.Join(commandDir, "node-red")
+	stub := "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then\n  printf '%s\\n' 'v5.0.6'\n  exit 0\nfi\nprintf '%s\\n' \"$*\" >> \"$NRCC_TEST_RECORD_FILE\"\ntrap 'exit 0' TERM INT\nwhile :; do sleep 1; done\n"
 	//nolint:gosec // G306 -- the stub script must remain executable for ProcessManager to launch it.
 	if err := os.WriteFile(commandPath, []byte(stub), 0700); err != nil {
 		t.Fatalf("write Node-RED stub: %v", err)
@@ -519,8 +520,13 @@ func TestSaveConfig_WritesExplicitRuntimeSettingsAndRestarts(t *testing.T) {
 	t.Setenv("NODE_RED_SETTINGS", settingsPath)
 	t.Setenv("NODE_RED_PORT", port)
 	t.Setenv("NRCC_TEST_RECORD_FILE", recordPath)
+	t.Setenv("PATH", commandDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	configSvc := service.NewConfigService(dataDir)
+	capabilities := configSvc.ConfigurationCapabilities()
+	if capabilities.RuntimeVersion != "v5.0.6" || !capabilities.Editable {
+		t.Fatalf("configuration capabilities = %+v, want editable Node-RED 5 runtime", capabilities)
+	}
 	processManager := service.NewProcessManager(commandPath, dataDir)
 	if err := processManager.Start(); err != nil {
 		t.Fatalf("start managed Node-RED stub: %v", err)

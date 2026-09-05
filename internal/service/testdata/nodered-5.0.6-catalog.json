@@ -1,0 +1,21 @@
+[
+  {"key":"flowFile","shape":"string"},
+  {"key":"credentialSecret","shape":"string-or-false"},
+  {"key":"flowFilePretty","shape":"boolean"},
+  {"key":"userDir","shape":"string"},
+  {"key":"nodesDir","shape":"string"},
+  {"key":"adminAuth","shape":"object"},
+  {"key":"httpNodeAuth","shape":"object"},
+  {"key":"httpStaticAuth","shape":"object"},
+  {"key":"uiPort","shape":"number-or-expression"},
+  {"key":"uiHost","shape":"string"},
+  {"key":"httpAdminRoot","shape":"string-or-false"},
+  {"key":"httpNodeRoot","shape":"string-or-false"},
+  {"key":"httpStatic","shape":"string-or-array"},
+  {"key":"lang","shape":"string"},
+  {"key":"runtimeState","shape":"object"},
+  {"key":"logging","shape":"object"},
+  {"key":"disableEditor","shape":"boolean"},
+  {"key":"editorTheme","shape":"object"},
+  {"key":"functionGlobalContext","shape":"object"}
+]

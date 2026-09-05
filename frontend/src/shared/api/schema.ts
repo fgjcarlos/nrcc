@@ -1738,6 +1738,20 @@ export interface components {
             /** @description Raw text content of settings.js */
             content?: string;
         };
+        ConfigurationCapabilities: {
+            /** @description Detected Node-RED runtime version, or "unknown" */
+            runtimeVersion: string;
+            /** @description Selected NRCC configuration adapter */
+            adapter: string;
+            /** @description Node-RED settings catalog version used by the adapter */
+            catalogVersion: string;
+            /** @description Source used to resolve settings.js */
+            source: string;
+            /** @enum {string} */
+            mode: "editable" | "read-only";
+            editable: boolean;
+            reason?: string;
+        };
         RawSettingsRequest: {
             /** @description Full text content to write to settings.js */
             content: string;
@@ -1779,6 +1793,7 @@ export interface components {
             dockerCompose: components["schemas"]["DependencyStatus"];
             nodeRed: components["schemas"]["NodeRedEnvironment"];
             settings: components["schemas"]["SettingsDocument"];
+            configuration: components["schemas"]["ConfigurationCapabilities"];
             recommendations?: string[];
         };
         CpuInfo: {

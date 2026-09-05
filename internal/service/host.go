@@ -60,10 +60,21 @@ func (s *HostService) Detect() model.HostStatus {
 		},
 	}
 
-	if !s.IsolatedSettings {
+	if s.IsolatedSettings {
+		// Hermetic services model the supported Node-RED 5 fixture so handler
+		// tests exercise the same editability boundary as production.
+		status.NodeRed = model.NodeRedEnvironment{
+			Detected:     true,
+			Mode:         model.InstallationModeNative,
+			Version:      nodeRED5CatalogVersion,
+			UserDir:      s.dataDir,
+			SettingsPath: filepath.Join(s.dataDir, "settings.js"),
+		}
+	} else {
 		status.NodeRed = s.inspectNodeRed(status)
 	}
 	status.Settings = s.resolveSettings(status)
+	status.Configuration = ResolveConfigurationCapabilities(status.NodeRed.Version, status.Settings)
 	status.Recommendations = s.buildRecommendations(status)
 	status.Ready = status.NodeRed.Detected && status.Settings.Path != ""
 

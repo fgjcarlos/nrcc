@@ -53,6 +53,11 @@ func (h *SettingsHandler) GetRaw(w http.ResponseWriter, r *http.Request) {
 // route. Claims are read from the context solely for audit logging.
 func (h *SettingsHandler) SaveRaw(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.ClaimsFromContext(r)
+	capabilities := h.configSvc.ConfigurationCapabilities()
+	if !capabilities.Editable {
+		model.RespondError(w, http.StatusConflict, "CONFIGURATION_READ_ONLY", capabilities.Reason)
+		return
+	}
 
 	var req RawSettingsRequest
 	if !DecodeJSON(w, r, &req) {
@@ -84,6 +89,6 @@ func (h *SettingsHandler) SaveRaw(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	h.audit.Log(r, claims.Username, "SETTINGS_UPDATE", "", "ok", nil)
+	h.audit.Log(r, claims.Username, "SETTINGS_UPDATE", "", "ok", compatibilityAuditMeta(capabilities))
 	model.RespondJSON(w, http.StatusOK, doc)
 }
