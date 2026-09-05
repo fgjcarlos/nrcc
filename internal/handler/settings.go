@@ -19,7 +19,8 @@ type SettingsHandler struct {
 
 // RawSettingsRequest is the payload for raw settings updates.
 type RawSettingsRequest struct {
-	Content string `json:"content"`
+	Content         string `json:"content"`
+	ExpectedRevision string `json:"expectedRevision,omitempty"`
 }
 
 // NewSettingsHandler creates a settings handler.
@@ -68,8 +69,20 @@ func (h *SettingsHandler) SaveRaw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	doc, err := h.configSvc.SaveRawSettings(req.Content)
+	expected := model.SourceRevision{Algorithm: service.SourceRevisionAlgorithm}
+	if req.ExpectedRevision != "" {
+		expected.Fingerprint = req.ExpectedRevision
+	}
+
+	doc, err := h.configSvc.SaveRawSettingsWithRevision(req.Content, expected)
 	if err != nil {
+		// Source revision mismatch — the operator read a different copy of
+		// settings.js than the one currently on disk. Refuse the write so
+		// the external change is not overwritten silently (slice B of #757).
+		if errors.Is(err, service.ErrSourceRevisionMismatch) {
+			model.RespondError(w, http.StatusConflict, "SOURCE_REVISION_MISMATCH", err.Error())
+			return
+		}
 		// settings.js sandbox timeouts must surface as a 4xx so the
 		// operator gets a clear "settings.js did not terminate" instead
 		// of a hung request, and so the bad content is rejected before

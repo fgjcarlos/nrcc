@@ -256,16 +256,48 @@ func (s *ConfigService) GetRawSettings() (model.SettingsDocument, error) {
 	if err != nil {
 		if os.IsNotExist(err) {
 			doc.Content = renderSettingsJS(s.GetDefault())
-			return doc, nil
+		} else {
+			return doc, err
 		}
-		return doc, err
+	} else {
+		doc.Content = string(content)
 	}
-	doc.Content = string(content)
+	doc.Revision = FingerprintSource(doc.Content)
 	return doc, nil
 }
 
 // SaveRawSettings writes the active settings.js document after backing up the previous version.
 func (s *ConfigService) SaveRawSettings(content string) (model.SettingsDocument, error) {
+	return s.SaveRawSettingsWithRevision(content, model.SourceRevision{})
+}
+
+// SaveRawSettingsWithRevision writes the active settings.js document only
+// when the on-disk fingerprint matches expected. An empty
+// expected.Fingerprint is treated as "no expectation" and the call falls
+// through to the legacy SaveRawSettings behaviour, preserving backward
+// compatibility for callers that have not yet been wired to capture the
+// revision.
+//
+// When the on-disk fingerprint does not match a non-empty expected
+// revision, the call returns ErrSourceRevisionMismatch without touching
+// disk or creating a backup. The handler maps this to HTTP 409 Conflict
+// so the operator is forced to re-read, re-render and retry instead of
+// silently overwriting an external change to settings.js.
+//
+// Slice deferral: the renderSettings routing change that would have this
+// path receive an already-patched SourcePatch result instead of a raw
+// content blob is deferred to a follow-up PR. The slice-B contract is
+// "bytes in, bytes out, refuse on revision mismatch" — the structured
+// edit path wires in afterwards.
+func (s *ConfigService) SaveRawSettingsWithRevision(content string, expected model.SourceRevision) (model.SettingsDocument, error) {
+	current, err := s.currentOnDiskRevision()
+	if err != nil {
+		return model.SettingsDocument{}, err
+	}
+	if !RevisionMatches(expected, current) {
+		return model.SettingsDocument{}, ErrSourceRevisionMismatch
+	}
+
 	parsed, err := s.parseConfigFromContent(content)
 	if err != nil {
 		// Propagate sandbox timeouts so the operator gets SETTINGS_TIMEOUT
@@ -275,7 +307,29 @@ func (s *ConfigService) SaveRawSettings(content string) (model.SettingsDocument,
 	if err := validateAdminAuthPasswords(parsed); err != nil {
 		return model.SettingsDocument{}, err
 	}
-	return s.writeSettingsFile(content, true)
+	doc, err := s.writeSettingsFile(content, true)
+	if err != nil {
+		return doc, err
+	}
+	// Re-stamp the revision against the bytes that were just persisted so
+	// the caller can use the returned document as the next expected
+	// revision without re-reading the file. Any subsequent external edit
+	// will then trigger the conflict response on the next save.
+	doc.Revision = FingerprintSource(doc.Content)
+	return doc, nil
+}
+
+// currentOnDiskRevision returns the SourceRevision of the bytes currently
+// on disk for the active settings.js path. When the file does not exist
+// (first-write state) the revision is computed against the would-be
+// default content so the caller can still compare revisions on a virgin
+// install where the first save is also the first read.
+func (s *ConfigService) currentOnDiskRevision() (model.SourceRevision, error) {
+	doc, err := s.GetRawSettings()
+	if err != nil {
+		return model.SourceRevision{}, err
+	}
+	return doc.Revision, nil
 }
 
 func (s *ConfigService) writeSettingsFile(content string, syncStore bool) (model.SettingsDocument, error) {
