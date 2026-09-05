@@ -390,15 +390,14 @@ func (s *ConfigService) decorateConfig(cfg *model.NodeRedConfig) {
 // deployment, not a failure.
 func (s *ConfigService) readFromSettingsFile() (model.NodeRedConfig, bool, error) {
 	doc, err := s.GetRawSettings()
-	if err != nil || doc.Content == "" {
-		//nolint:nilerr // see function doc: missing/unreadable settings.js falls back to defaults, not an error.
-		return model.NodeRedConfig{}, false, nil
+	if err == nil && doc.Content != "" {
+		cfg, err := s.parseConfigFromContent(doc.Content)
+		if err != nil {
+			return model.NodeRedConfig{}, false, err
+		}
+		return cfg, true, nil
 	}
-	cfg, err := s.parseConfigFromContent(doc.Content)
-	if err != nil {
-		return model.NodeRedConfig{}, false, err
-	}
-	return cfg, true, nil
+	return model.NodeRedConfig{}, false, nil
 }
 
 func (s *ConfigService) backupSettingsFile(path string) (string, error) {
@@ -1138,4 +1137,3 @@ func replaceBlockKey(content, key, blockContent string) string {
 }
 
 // (helper for tests)
-

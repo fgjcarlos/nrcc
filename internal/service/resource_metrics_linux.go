@@ -163,6 +163,7 @@ func cgroupV1ControllerRoot(root string, controllers ...string) string {
 }
 
 func cgroupV2Path(file string) (string, error) {
+	// #nosec G304 -- file is the fixed /proc/self/cgroup path from CollectResourceMetrics or a test fixture.
 	data, err := os.ReadFile(file)
 	if err != nil {
 		return "", fmt.Errorf("read cgroup v2 membership: %w", err)
@@ -177,6 +178,7 @@ func cgroupV2Path(file string) (string, error) {
 }
 
 func cgroupV1Paths(file string) (map[string]string, error) {
+	// #nosec G304 -- file is the fixed /proc/self/cgroup path from CollectResourceMetrics or a test fixture.
 	data, err := os.ReadFile(file)
 	if err != nil {
 		return nil, fmt.Errorf("read cgroup v1 membership: %w", err)
@@ -198,6 +200,7 @@ func cgroupV1Paths(file string) (map[string]string, error) {
 }
 
 func readCPUMax(path string) (quota, period uint64, err error) {
+	// #nosec G304 -- path is derived from the cgroup root and controller membership, or supplied by a test fixture.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return 0, 0, err
@@ -215,6 +218,7 @@ func readCPUMax(path string) (quota, period uint64, err error) {
 }
 
 func readLimit(path string) (uint64, error) {
+	// #nosec G304 -- path is derived from the cgroup root and controller membership, or supplied by a test fixture.
 	data, err := os.ReadFile(path)
 	if err != nil || strings.TrimSpace(string(data)) == "max" {
 		return 0, fmt.Errorf("limit unavailable")
@@ -223,6 +227,7 @@ func readLimit(path string) (uint64, error) {
 }
 
 func readUint(path string) (uint64, error) {
+	// #nosec G304 -- path is derived from the cgroup root and controller membership, or supplied by a test fixture.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return 0, err
@@ -231,6 +236,7 @@ func readUint(path string) (uint64, error) {
 }
 
 func readInt(path string) (int64, error) {
+	// #nosec G304 -- path is derived from the cgroup root and controller membership, or supplied by a test fixture.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return 0, err
@@ -260,6 +266,7 @@ func cgroupV2CPUPercent(path string, cores float64) (float64, bool) {
 }
 
 func cgroupV2Usage(path string) (uint64, error) {
+	// #nosec G304 -- path is derived from the cgroup root and controller membership, or supplied by a test fixture.
 	file, err := os.Open(path)
 	if err != nil {
 		return 0, err
@@ -300,11 +307,12 @@ func boundedPercent(value float64) float64 {
 
 func diskUsage(path string) (total, free, used uint64, ok bool) {
 	var stat syscall.Statfs_t
-	if err := syscall.Statfs(path, &stat); err != nil || stat.Blocks == 0 {
+	if err := syscall.Statfs(path, &stat); err != nil || stat.Blocks == 0 || stat.Bsize <= 0 {
 		return 0, 0, 0, false
 	}
-	total = stat.Blocks * uint64(stat.Bsize)
-	free = stat.Bavail * uint64(stat.Bsize)
-	used = (stat.Blocks - stat.Bfree) * uint64(stat.Bsize)
+	blockSize := uint64(stat.Bsize)
+	total = stat.Blocks * blockSize
+	free = stat.Bavail * blockSize
+	used = (stat.Blocks - stat.Bfree) * blockSize
 	return total, free, used, true
 }
