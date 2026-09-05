@@ -312,7 +312,7 @@ func isWritableDir(dir string) bool {
 
 	// Test write permission by creating a temporary file
 	testFile := filepath.Join(dir, ".nrcc-write-test-"+strconv.Itoa(os.Getpid()))
-	//nolint:gosec // G304,G703 -- testFile is built from validated dir + a constant prefix + pid; not request-derived.
+	// #nosec G304,G703 -- testFile is built from validated dir + a constant prefix + pid; not request-derived.
 	file, err := os.OpenFile(testFile, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
 		return false

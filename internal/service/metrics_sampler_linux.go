@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/fgjcarlos/nrcc/internal/model"
@@ -160,36 +159,4 @@ func readCPUStat() (cpuStat, error) {
 	}
 
 	return cpuStat{}, fmt.Errorf("/proc/stat: cpu line not found")
-}
-
-// memPercent returns used memory as a percentage of total RAM.
-func memPercent() float64 {
-	var info syscall.Sysinfo_t
-	if err := syscall.Sysinfo(&info); err != nil {
-		return 0
-	}
-	if info.Totalram == 0 {
-		return 0
-	}
-	used := info.Totalram - info.Freeram - info.Bufferram - info.Sharedram
-	return float64(used) / float64(info.Totalram) * 100.0
-}
-
-// diskPercent returns used disk space as a percentage of total space for the given path.
-func diskPercent(path string) float64 {
-	var stat syscall.Statfs_t
-	if err := syscall.Statfs(path, &stat); err != nil {
-		return 0
-	}
-	if stat.Blocks == 0 {
-		return 0
-	}
-	// #nosec G115 -- 64-bit platforms only; stat.Blocks and stat.Bfree are uint64 on every supported target.
-	total := stat.Blocks * uint64(stat.Bsize)
-	// #nosec G115 -- 64-bit platforms only; stat.Blocks and stat.Bfree are uint64 on every supported target.
-	free := stat.Bfree * uint64(stat.Bsize)
-	if total == 0 {
-		return 0
-	}
-	return float64(total-free) / float64(total) * 100.0
 }

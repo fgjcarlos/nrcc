@@ -2,8 +2,6 @@
 
 package handler
 
-import "syscall"
-
 // computeDiskUsage derives the (total, free, used) byte counts from a Statfs
 // snapshot. Pure so the formula is unit-testable without an actual filesystem.
 //
@@ -17,14 +15,4 @@ func computeDiskUsage(blocks, bfree, bavail, bsize uint64) (total, free, used ui
 	free = bavail * bsize
 	used = (blocks - bfree) * bsize
 	return total, free, used
-}
-
-// getDiskInfo retrieves disk statistics for a path (Unix version)
-func getDiskInfo(path string) (total, free, used uint64) {
-	var stat syscall.Statfs_t
-	if err := syscall.Statfs(path, &stat); err != nil {
-		return 0, 0, 0
-	}
-	// #nosec G115 -- 64-bit platforms only; stat fields are uint64 on every supported target.
-	return computeDiskUsage(stat.Blocks, stat.Bfree, stat.Bavail, uint64(stat.Bsize))
 }

@@ -447,6 +447,7 @@ func TestImportFromNodeRed_RefreshesDerivedValuesWithoutOverwritingNRCCSecrets(t
 		t.Fatalf("refresh lines = %+v, want updated DERIVED", updated.Lines)
 	}
 
+	// #nosec G304 -- dir is a test fixture directory created by t.TempDir.
 	before, err := os.ReadFile(filepath.Join(dir, "config.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -458,6 +459,7 @@ func TestImportFromNodeRed_RefreshesDerivedValuesWithoutOverwritingNRCCSecrets(t
 	if noChange.Valid || len(noChange.Lines) != 0 {
 		t.Fatalf("idempotent import result = %+v", noChange)
 	}
+	// #nosec G304 -- dir is a test fixture directory created by t.TempDir.
 	after, err := os.ReadFile(filepath.Join(dir, "config.json"))
 	if err != nil {
 		t.Fatal(err)
