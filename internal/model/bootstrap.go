@@ -35,11 +35,24 @@ type NodeRedEnvironment struct {
 
 // SettingsDocument describes the active settings.js file and backup metadata.
 type SettingsDocument struct {
-	Path       string `json:"path"`
-	Source     string `json:"source"`
-	Writable   bool   `json:"writable"`
-	BackupPath string `json:"backupPath,omitempty"`
-	Content    string `json:"content,omitempty"`
+	Path       string        `json:"path"`
+	Source     string        `json:"source"`
+	Writable   bool          `json:"writable"`
+	BackupPath string        `json:"backupPath,omitempty"`
+	Content    string        `json:"content,omitempty"`
+	Revision   SourceRevision `json:"revision"`
+}
+
+// SourceRevision identifies a specific byte-state of the active settings.js
+// file. The backend computes a fingerprint whenever the source is read so a
+// subsequent save can refuse stale edits instead of silently overwriting an
+// external change. CapturedAt is informational; equality is determined by
+// (Algorithm, Fingerprint) only so callers do not have to keep timestamps in
+// sync.
+type SourceRevision struct {
+	Fingerprint string `json:"fingerprint"`
+	Algorithm   string `json:"algorithm"`
+	CapturedAt  string `json:"capturedAt,omitempty"`
 }
 
 // ConfigurationCapabilities describes whether NRCC can safely edit the
