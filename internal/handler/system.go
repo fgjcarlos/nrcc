@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"os/exec"
@@ -69,6 +71,103 @@ func NewSystemHandler() *SystemHandler {
 		nodeVersion: getNodeVersion(),
 		startedAt:   time.Now(),
 	}
+}
+
+// RestartService aggregates the docker + systemd restart primitives the
+// runtime-control handlers (RestartNodeRed / StopNodeRed / StartNodeRed)
+// will dispatch through in slice C. Slice B only ships the helper; no
+// HTTP handler in this file calls into it yet, and the existing
+// /api/runtime/* routes continue to use ProcessManager for the
+// native-binary path. Wiring the docker + systemd paths is a slice C
+// concern.
+//
+// The methods are intentionally narrow (one exec per method) so a slice
+// C test can stub each independently. They are safe to call from a
+// request handler because they delegate to the same package-level exec
+// shim that DockerService / SystemdManager use elsewhere — the helper
+// does not introduce a new dependency surface.
+type RestartService struct {
+	// execCommand is the exec shim used to invoke the docker / systemctl
+	// binaries. Defaults to exec.Command so tests can stub it via
+	// WithExecCommand. nil falls back to exec.Command.
+	execCommand func(name string, arg ...string) *exec.Cmd
+}
+
+// NewRestartService constructs a RestartService with the package
+// defaults. Tests use the With* helpers to inject shims.
+func NewRestartService() *RestartService {
+	return &RestartService{execCommand: exec.Command}
+}
+
+// WithExecCommand overrides the exec shim. nil is a no-op so callers
+// can chain without nil-checking.
+func (r *RestartService) WithExecCommand(fn func(name string, arg ...string) *exec.Cmd) *RestartService {
+	if r == nil || fn == nil {
+		return r
+	}
+	r.execCommand = fn
+	return r
+}
+
+// RestartDockerCompose runs `docker compose -p <project> restart`. The
+// project name is operator-supplied via the slice C handler body —
+// slice B only delivers the primitive.
+//
+// Returns nil on a zero exit code; any non-zero exit is wrapped with
+// the captured stderr (when available) so the slice C handler can map
+// the failure onto a 5xx with a useful message.
+func (r *RestartService) RestartDockerCompose(project string) error {
+	if r == nil {
+		return errors.New("restart: RestartService is nil")
+	}
+	args := []string{"compose", "restart"}
+	if strings.TrimSpace(project) != "" {
+		args = append(args, "-p", strings.TrimSpace(project))
+	}
+	// #nosec G204 -- args are composed from a constant subcommand list plus the operator-supplied project name.
+	cmd := r.execCommand("docker", args...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("docker compose restart (project=%q): %w: %s", project, err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+// RestartDockerCustom runs `docker restart <container>`. The container
+// name comes from the discovery layer (slice C wires it).
+func (r *RestartService) RestartDockerCustom(container string) error {
+	if r == nil {
+		return errors.New("restart: RestartService is nil")
+	}
+	if strings.TrimSpace(container) == "" {
+		return errors.New("restart: container name is empty")
+	}
+	// #nosec G204 -- container is the operator-supplied discovered container name.
+	cmd := r.execCommand("docker", "restart", container)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("docker restart %s: %w: %s", container, err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+// RestartSystemd runs `systemctl restart <unit>`. The unit name is the
+// systemd service unit that fronts Node-RED (slice C resolves it from
+// the operator's environment).
+func (r *RestartService) RestartSystemd(unit string) error {
+	if r == nil {
+		return errors.New("restart: RestartService is nil")
+	}
+	if strings.TrimSpace(unit) == "" {
+		return errors.New("restart: systemd unit is empty")
+	}
+	// #nosec G204 -- unit is the operator-supplied systemd unit name.
+	cmd := r.execCommand("systemctl", "restart", unit)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("systemctl restart %s: %w: %s", unit, err, strings.TrimSpace(string(out)))
+	}
+	return nil
 }
 
 // GetHealth handles GET /api/health — public (no auth required).
