@@ -1,4 +1,5 @@
 import { api, registerTokenAccessors } from '@/shared/lib/api';
+import type { Schemas } from '@/shared/api';
 
 export interface User {
   id: string;
@@ -80,8 +81,8 @@ export const authService = {
   },
 
   getUsers: async (): Promise<User[]> => {
-    const response = await api.get<{ data: User[] }>('/auth/users');
-    return response.data.data;
+    const response = await api.get<Schemas['SuccessEnvelope_UserListResponse']>('/auth/users');
+    return response.data.data?.users ?? [];
   },
 
   createUser: async (username: string, password: string, role: 'admin' | 'viewer'): Promise<User> => {

@@ -9,6 +9,8 @@ export const mockUser: User = {
   createdAt: '2026-01-01T00:00:00.000Z',
 }
 
+export const authUsersResponse = { users: [mockUser] }
+
 export const authStatusInitialized: AuthStatus = { initialized: true }
 export const authStatusSetupRequired: AuthStatus = { initialized: false }
 

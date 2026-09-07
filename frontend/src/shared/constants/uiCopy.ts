@@ -63,6 +63,8 @@ export const UI_COPY = {
     newPasswordLabel: 'New Password',
     keepCurrentPasswordPlaceholder: 'Leave empty to keep current password',
     cannotDemoteLastAdmin: 'Cannot demote the last admin user',
+    cannotChangeOwnRole: 'Another administrator must change your role.',
+    userManagementSafetyNotice: 'Your own account cannot be deleted or demoted from this page.',
     noUsersYet: 'No users yet',
     addFirstUser: 'Add the first user to get started',
     // Backup Actions

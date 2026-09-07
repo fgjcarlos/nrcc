@@ -10,6 +10,7 @@ interface UserModalProps {
   editingUser: User | null;
   isPending: boolean;
   adminCount: number;
+  currentUserId: string;
   onSubmit: (data: {
     username?: string;
     password?: string;
@@ -23,6 +24,7 @@ export function UserModal({
   editingUser,
   isPending,
   adminCount,
+  currentUserId,
   onSubmit,
   onClose,
 }: UserModalProps) {
@@ -47,6 +49,7 @@ export function UserModal({
   }, [mode, editingUser]);
 
   const isLastAdmin = editingUser?.role === 'admin' && adminCount === 1;
+  const isCurrentUser = editingUser?.id === currentUserId;
   const canSubmit = !isPending && (
     mode === 'create'
       ? formData.username.trim() && formData.password.trim()
@@ -144,9 +147,9 @@ export function UserModal({
               <select
                 value={formData.role}
                 onChange={(e) => setFormData({ ...formData, role: e.target.value as 'admin' | 'viewer' })}
-                disabled={isLastAdmin}
+                disabled={isLastAdmin || isCurrentUser}
                 className={`glass-panel w-full rounded-xl border border-border px-3 py-2 text-base-content focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-                  isLastAdmin ? 'opacity-60 cursor-not-allowed' : ''
+                  isLastAdmin || isCurrentUser ? 'opacity-60 cursor-not-allowed' : ''
                 }`}
                 required={mode === 'create'}
               >
@@ -155,6 +158,9 @@ export function UserModal({
               </select>
               {isLastAdmin && (
                 <p className="mt-2 text-sm text-error">{UI_COPY.cannotDemoteLastAdmin}</p>
+              )}
+              {isCurrentUser && (
+                <p className="mt-2 text-sm text-base-content/60">{UI_COPY.cannotChangeOwnRole}</p>
               )}
             </div>
           )}

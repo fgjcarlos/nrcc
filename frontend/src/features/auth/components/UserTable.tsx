@@ -4,6 +4,7 @@ import { UI_COPY } from '@/shared/constants/uiCopy';
 interface UserTableProps {
   users: User[];
   adminCount: number;
+  currentUserId: string;
   onEdit: (user: User) => void;
   onDelete: (user: User) => void;
   onChangePassword: (user: User) => void;
@@ -12,6 +13,7 @@ interface UserTableProps {
 export function UserTable({
   users,
   adminCount,
+  currentUserId,
   onEdit,
   onDelete,
   onChangePassword,
@@ -70,7 +72,7 @@ export function UserTable({
                   </button>
                   <button
                     onClick={() => onDelete(user)}
-                    disabled={user.role === 'admin' && adminCount === 1}
+                    disabled={user.id === currentUserId || (user.role === 'admin' && adminCount === 1)}
                     className="text-sm text-error transition-colors hover:text-error/80 disabled:text-base-content/40 disabled:cursor-not-allowed"
                   >
                     {UI_COPY.delete}
@@ -132,7 +134,7 @@ export function UserTable({
                 </button>
                 <button
                   onClick={() => onDelete(user)}
-                  disabled={user.role === 'admin' && adminCount === 1}
+                  disabled={user.id === currentUserId || (user.role === 'admin' && adminCount === 1)}
                   className="flex-1 text-sm text-error transition-colors hover:text-error/80 disabled:text-base-content/40 disabled:cursor-not-allowed"
                 >
                   {UI_COPY.delete}

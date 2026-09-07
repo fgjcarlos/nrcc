@@ -648,6 +648,13 @@ func (h *AuthHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// An administrator changing their own role would revoke the access needed to
+	// administer NRCC. Require another administrator to perform that operation.
+	if userID == claims.UserID && *req.Role != model.RoleAdmin {
+		model.RespondError(w, http.StatusBadRequest, "CANNOT_CHANGE_OWN_ROLE", "Cannot change your own role")
+		return
+	}
+
 	user, err := h.authSvc.UpdateUserRole(userID, *req.Role, model.NowISO8601())
 	if err != nil {
 		switch {
