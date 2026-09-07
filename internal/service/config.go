@@ -156,6 +156,86 @@ func (s *ConfigService) Save(cfg model.NodeRedConfig) error {
 	return nil
 }
 
+// StructuredApplyInput is the bundle the handler hands to the
+// slice C apply coordinator for the structured save path. The
+// fields mirror what ApplyRequest needs plus the committed cfg
+// the handler should echo back to the operator.
+//
+// All four fields are required to be populated by the helper
+// that produces them (CommitStructured); partial bundles are
+// never passed to the coordinator because the coordinator has
+// no concept of "no path" or "no backup directory".
+type StructuredApplyInput struct {
+	// Committed is the post-store NodeRedConfig the operator
+	// should see in the response (passwords are bcrypt hashes
+	// at this point).
+	Committed model.NodeRedConfig
+	// Content is the rendered settings.js bytes the
+	// coordinator's apply stage will atomically write.
+	Content string
+	// Live is the live SettingsDocument at the moment of the
+	// commit. Path is the on-disk settings.js location;
+	// Revision is the fingerprint the coordinator's revision
+	// precondition compares against req.Expected.
+	Live model.SettingsDocument
+	// BackupDir is the directory the apply stage writes the
+	// pre-write snapshot to. Matches the directory the legacy
+	// Save() flow used so existing backup tooling keeps finding
+	// the new files.
+	BackupDir string
+}
+
+// CommitStructured commits cfg to the JSON store and renders the
+// corresponding settings.js content. The slice C handler uses the
+// returned bundle to drive ApplyCoordinator.Apply so the settings.js
+// write participates in the validate → backup → atomic write → audit
+// transaction instead of going through the legacy writeSettingsFile
+// helper.
+//
+// Failure modes:
+//
+//   - Validation failure (adminAuth / sandbox / Validate): returned
+//     verbatim, JSON store is NOT modified.
+//   - Store commit failure: returned verbatim, JSON store may be in
+//     an indeterminate state (the JSONStore.Update atomicity contract
+//     is the source of truth for that).
+//   - renderSettings or GetRawSettings failure after a successful
+//     commit: returned verbatim, JSON store IS committed. This is the
+//     same "JSON committed but settings.js update failed" risk the
+//     legacy Save() surfaced; the slice C coordinator adds the
+//     revision check on top of it.
+func (s *ConfigService) CommitStructured(cfg model.NodeRedConfig) (StructuredApplyInput, error) {
+	committed, err := s.Update(func(current *model.NodeRedConfig) error {
+		candidate := cfg
+		preserveAdminAuthPasswords(current, &candidate)
+		if err := upgradePlaintextAdminAuthPasswords(candidate); err != nil {
+			return err
+		}
+		if err := validateAdminAuthPasswords(candidate); err != nil {
+			return err
+		}
+		if err := s.Validate(candidate); err != nil {
+			return err
+		}
+		s.decorateConfig(&candidate)
+		*current = candidate
+		return nil
+	})
+	if err != nil {
+		return StructuredApplyInput{}, err
+	}
+	live, err := s.GetRawSettings()
+	if err != nil {
+		return StructuredApplyInput{}, fmt.Errorf("read live settings after commit: %w", err)
+	}
+	return StructuredApplyInput{
+		Committed: committed,
+		Content:   s.renderSettings(committed),
+		Live:      live,
+		BackupDir: filepath.Join(s.dataDir, "backups", "settings"),
+	}, nil
+}
+
 func preserveAdminAuthPasswords(existing, candidate *model.NodeRedConfig) {
 	if candidate.AdminAuth == nil || len(candidate.AdminAuth.Users) == 0 ||
 		existing.AdminAuth == nil || len(existing.AdminAuth.Users) == 0 {

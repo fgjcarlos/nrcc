@@ -38,6 +38,7 @@ type Server struct {
 	dockerHandler    *handler.DockerHandler
 	configHandler    *handler.ConfigHandler
 	settingsHandler  *handler.SettingsHandler
+	configApplyHandler *handler.ConfigApplyHandler
 	flowHandler      *handler.FlowHandler
 	systemHandler    *handler.SystemHandler
 	metricsCollector *metrics.MetricsCollector
@@ -177,11 +178,40 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 	aiConfigSvc := service.NewAIConfigService(dataDir, encKey)
 	aiHandler := handler.NewAIHandler(nil, aiConfigSvc)
 
-	// Initialize audit service
+	// Initialize audit service first so the apply pipeline (slice C
+	// of #758) can be wired to a real audit hook instead of a
+	// nil-tolerant placeholder. AuditService tolerates a degraded
+	// init — when NewService returns nil the apply service still
+	// runs, audit events just disappear into the void.
 	auditSvc := initAuditService(dataDir, log.Printf)
+
+	// Apply pipeline (slice C of #758). The apply service runs
+	// the validate → backup → atomic write → audit transaction;
+	// the coordinator wraps it with single-flight concurrency
+	// keyed on the live settings.js path so overlapping
+	// structured + raw saves cannot race the backup stage.
+	//
+	// The audit.Service.Log signature returns an Outcome value;
+	// the apply service's AuditHookFunc is void-returning so we
+	// adapt here. Outcome is intentionally discarded — the apply
+	// transaction never gates on audit success (audit is
+	// observability, not a critical-path dependency).
+	var applyAuditHook service.AuditHookFunc
+	if auditSvc != nil {
+		applyAuditHook = func(r *http.Request, actor, action, target, result string, meta map[string]string) {
+			auditSvc.Log(r, actor, action, target, result, meta)
+		}
+	}
+	applySvc := service.NewApplyService(configSvc, applyAuditHook)
+	applyCoordinator := service.NewApplyCoordinator(applySvc)
+	configHandler.SetApplyCoordinator(applyCoordinator)
+	settingsHandler.SetApplyCoordinator(applyCoordinator)
+	configApplyHandler := handler.NewConfigApplyHandler(configSvc, applyCoordinator)
+
 	authHandler.SetAuditService(auditSvc)
 	configHandler.SetAuditService(auditSvc)
 	settingsHandler.SetAuditService(auditSvc)
+	configApplyHandler.SetAuditService(auditSvc)
 	backupHandler.SetAuditService(auditSvc)
 	envHandler.SetAuditService(auditSvc)
 	updateHandler.SetAuditService(auditSvc)
@@ -280,6 +310,13 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 			r.With(middleware.RequireAdmin).Post("/", configHandler.SaveConfig)
 			r.Get("/default", configHandler.GetDefaultConfig)
 			r.Post("/validate", configHandler.ValidateConfig)
+			// Slice C of #758: structured + raw apply
+			// endpoints share the single-flight apply
+			// coordinator with the existing SaveConfig +
+			// SaveRaw routes so a settings.js mutation can
+			// only be in flight from one place at a time.
+			r.With(middleware.RequireAdmin).Post("/apply", configApplyHandler.ApplyStructured)
+			r.With(middleware.RequireAdmin).Post("/apply/raw", configApplyHandler.ApplyRaw)
 		})
 
 		r.Route("/api/settings", func(r chi.Router) {
@@ -421,24 +458,25 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 	})
 
 	server := &Server{
-		router:           r,
-		authSvc:          authSvc,
-		hostSvc:          hostSvc,
-		envSvc:           envSvc,
-		updateSvc:        updateSvc,
-		backupSvc:        backupSvc,
-		librarySvc:       librarySvc,
-		envHandler:       envHandler,
-		dockerHandler:    dockerHandler,
-		configHandler:    configHandler,
-		settingsHandler:  settingsHandler,
-		flowHandler:      flowHandler,
-		systemHandler:    systemHandler,
-		metricsCollector: metricsCollector,
-		metricsBuffer:    metricsBuffer,
-		metricsSampler:   metricsSampler,
-		flowVersionSvc:   flowVersionSvc,
-		httpLogger:       cfg.HTTPLogger,
+		router:             r,
+		authSvc:            authSvc,
+		hostSvc:            hostSvc,
+		envSvc:             envSvc,
+		updateSvc:          updateSvc,
+		backupSvc:          backupSvc,
+		librarySvc:         librarySvc,
+		envHandler:         envHandler,
+		dockerHandler:      dockerHandler,
+		configHandler:      configHandler,
+		settingsHandler:    settingsHandler,
+		configApplyHandler: configApplyHandler,
+		flowHandler:        flowHandler,
+		systemHandler:      systemHandler,
+		metricsCollector:   metricsCollector,
+		metricsBuffer:      metricsBuffer,
+		metricsSampler:     metricsSampler,
+		flowVersionSvc:     flowVersionSvc,
+		httpLogger:         cfg.HTTPLogger,
 	}
 
 	// Create a cancellable context for the server lifecycle
@@ -498,6 +536,9 @@ func (s *Server) SetProcessManager(pm *service.ProcessManager) {
 	}
 	if s.settingsHandler != nil {
 		s.settingsHandler.SetProcessManager(pm)
+	}
+	if s.configApplyHandler != nil {
+		s.configApplyHandler.SetProcessManager(pm)
 	}
 	if s.flowHandler != nil {
 		s.flowHandler.SetProcessManager(pm)
