@@ -379,6 +379,7 @@ func TestConfigHandler_SaveConfig_DelegatesToApplyCoordinator(t *testing.T) {
 
 	// On-disk file reflects the new uiPort (via the apply
 	// transaction's atomic write).
+	// #nosec G304 -- settingsPath is derived from t.TempDir(), not user input.
 	got, err := os.ReadFile(settingsPath)
 	if err != nil {
 		t.Fatalf("read settings.js: %v", err)
@@ -428,6 +429,7 @@ func TestSettingsHandler_SaveRaw_DelegatesToApplyCoordinator(t *testing.T) {
 	if !sawSuccess {
 		t.Errorf("expected apply.success in audit events; got: %+v", rec.events)
 	}
+	// #nosec G304 -- settingsPath is derived from t.TempDir(), not user input.
 	got, err := os.ReadFile(settingsPath)
 	if err != nil {
 		t.Fatalf("read settings.js: %v", err)

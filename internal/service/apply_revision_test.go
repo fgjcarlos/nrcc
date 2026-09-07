@@ -3,25 +3,13 @@ package service
 import (
 	"context"
 	"errors"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/fgjcarlos/nrcc/internal/model"
 )
-
-// recorder captures audit events emitted via AuditHookFunc so
-// the slice C tests can assert the failure_stage envelope
-// without depending on a real audit.Service. The recorder
-// follows the same discipline as the slice A
-// recordingAuditHook in apply_test.go.
-type recorder struct {
-	mu     sync.Mutex
-	events []recordedAudit
-}
 
 type recordedAudit struct {
 	Action       string
@@ -29,32 +17,6 @@ type recordedAudit struct {
 	FailureStage string
 	HasMeta      bool
 	MetaCopy     map[string]string
-}
-
-func (r *recorder) Log(req *http.Request, actor, action, target, result string, meta map[string]string) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	rec := recordedAudit{
-		Action:       action,
-		Result:       result,
-		FailureStage: meta["failure_stage"],
-		HasMeta:      meta != nil,
-	}
-	if meta != nil {
-		rec.MetaCopy = make(map[string]string, len(meta))
-		for k, v := range meta {
-			rec.MetaCopy[k] = v
-		}
-	}
-	r.events = append(r.events, rec)
-}
-
-func (r *recorder) snapshot() []recordedAudit {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	out := make([]recordedAudit, len(r.events))
-	copy(out, r.events)
-	return out
 }
 
 // TestCheckRevisionPrecondition_MatchHappyPath covers the
