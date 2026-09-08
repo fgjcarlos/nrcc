@@ -326,7 +326,7 @@ export function ConfigurationView() {
 
        {/* Active Tab Content */}
        <div className="surface-card p-6">
-          {activeTab === 'auth' ? <SecurityCenter config={data.config} rawSettingsContent={rawSettingsContent} editable={data.hostStatus?.configuration?.editable === true} /> : data.hostStatus?.configuration?.editable === false ? (
+          {activeTab === 'auth' ? <SecurityCenter config={data.config} rawSettingsContent={rawSettingsContent} expectedRevision={data.settingsDoc?.revision?.fingerprint} editable={data.hostStatus?.configuration?.editable === true} onApplied={() => { void data.refetchConfig(); void data.refetchSettings(); }} /> : data.hostStatus?.configuration?.editable === false ? (
            <div className="rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm text-warning" role="status">
              Configuration controls are unavailable for this runtime. Review the detected settings below.
            </div>

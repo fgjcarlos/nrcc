@@ -117,12 +117,19 @@ func RedactSettingsContent(content string) string {
 	}
 	secretSet := secretSettingKeySet()
 	lines := strings.Split(content, "\n")
+	redactingDepth := 0
 	for i, line := range lines {
+		if redactingDepth > 0 {
+			redactingDepth += braceDelta(line)
+			lines[i] = "  [redacted]"
+			continue
+		}
 		key, ok := keyInLine(line)
 		if !ok {
 			continue
 		}
 		if _, isSecret := secretSet[key]; isSecret {
+			redactingDepth = braceDelta(line)
 			lines[i] = redactTopLevelLine(line, key)
 			continue
 		}
@@ -131,6 +138,13 @@ func RedactSettingsContent(content string) string {
 		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+// braceDelta tracks multi-line secret blocks after their first redacted line.
+// Redaction is display-only, so collapsing every nested line is safer than
+// retaining a syntactically valid object that might contain credentials.
+func braceDelta(line string) int {
+	return strings.Count(line, "{") - strings.Count(line, "}")
 }
 
 // RedactDiff returns a unified diff between before and after with

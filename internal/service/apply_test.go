@@ -17,9 +17,9 @@ import (
 // audit discipline required by issue #758 (apply.start, apply.backup,
 // apply.write, apply.success | apply.failure in the right order).
 type recordingAuditHook struct {
-	mu      sync.Mutex
-	events  []recordedEvent
-	failOn  string // if non-empty, return an error from Log to simulate audit degradation
+	mu     sync.Mutex
+	events []recordedEvent
+	failOn string // if non-empty, return an error from Log to simulate audit degradation
 }
 
 type recordedEvent struct {
@@ -492,10 +492,10 @@ func TestApplyTransactionFaultMatrix(t *testing.T) {
 			// Bind-back: the failed transaction must NOT have modified
 			// settings.js (no atomic write committed). We assert two
 			// cheap post-conditions:
-//
-//   - No backup file was created when the failure is at validate or
-//     earlier (no backup stage reached).
-//   - No .apply-* sibling leaked from the atomic-write primitive.
+			//
+			//   - No backup file was created when the failure is at validate or
+			//     earlier (no backup stage reached).
+			//   - No .apply-* sibling leaked from the atomic-write primitive.
 			if req.Path != "" && req.BackupDir != "" {
 				matches, _ := filepath.Glob(filepath.Join(req.BackupDir, "settings-*.js.bak"))
 				if tc.wantStage == ApplyStageValidate && len(matches) > 0 {
@@ -553,10 +553,14 @@ func TestApplyTransaction_RedactsCredentialsInDiff(t *testing.T) {
 };
 `
 	after := `module.exports = {
-  uiPort: 1890,
-  credentialSecret: 'new-secret',
-  adminAuth: { type: 'credentials', users: [{ username: 'admin', password: 'hash', permissions: '*' }] },
-  https: { key: '/etc/ssl/key.pem', passphrase: 'new-pass' },
+	  uiPort: 1890,
+	  credentialSecret: 'new-secret',
+	  adminAuth: {
+	    type: 'credentials',
+	    users: [{ username: 'admin', password: 'new-hash-value', permissions: '*' }],
+	  },
+	  httpNodeAuth: { user: 'node-user', pass: 'node-hash-value' },
+	  https: { key: '/etc/ssl/key.pem', passphrase: 'new-pass' },
 };
 `
 
@@ -564,9 +568,9 @@ func TestApplyTransaction_RedactsCredentialsInDiff(t *testing.T) {
 
 	// Top-level redaction must scrub credentialSecret and adminAuth
 	// values on both sides of the diff.
-	for _, secret := range []string{"old-secret", "new-secret"} {
+	for _, secret := range []string{"old-secret", "new-secret", "new-hash-value", "node-hash-value"} {
 		if strings.Contains(diff, secret) {
-			t.Errorf("diff leaks %q: %s", secret, diff)
+			t.Error("diff leaked a credential value")
 		}
 	}
 	// https block is collapsed wholesale — the nested passphrase is
@@ -574,11 +578,11 @@ func TestApplyTransaction_RedactsCredentialsInDiff(t *testing.T) {
 	// interface will own multi-line https redaction when the field
 	// shape grows beyond a single line.
 	if got := strings.Count(diff, "[redacted]"); got < 3 {
-		t.Errorf("diff [redacted] count = %d, want >= 3 (diff: %s)", got, diff)
+		t.Errorf("diff [redacted] count = %d, want >= 3", got)
 	}
 	// Non-secret keys survive the diff intact.
 	if !strings.Contains(diff, "uiPort: 1880") || !strings.Contains(diff, "uiPort: 1890") {
-		t.Errorf("diff should preserve uiPort lines, got: %s", diff)
+		t.Error("diff should preserve uiPort lines")
 	}
 }
 

@@ -580,6 +580,10 @@ export interface SettingsDocument {
   writable: boolean;
   backupPath?: string;
   content?: string;
+  revision?: {
+    fingerprint: string;
+    algorithm: string;
+  };
 }
 
 export interface ConfigurationCapabilities {

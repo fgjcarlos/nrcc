@@ -6,6 +6,12 @@ export const configService = {
   
   updateConfig: (config: Record<string, unknown>) =>
     api.post<ApiResponse<NodeRedConfig>>('/config', config),
+
+  applyConfig: (config: Record<string, unknown>, expectedRevision: string) =>
+    api.post<ApiResponse<{ configuration: NodeRedConfig; document: SettingsDocument }>>('/config/apply', {
+      ...config,
+      expectedRevision,
+    }),
   
   validateConfig: (config: Partial<NodeRedConfig>) => 
     api.post<ApiResponse<{ valid: boolean; errors: string[] }>>('/config/validate', config),
