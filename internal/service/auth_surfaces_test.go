@@ -83,15 +83,15 @@ func TestAuthSurfaceRoundTripPreservesUnmanagedSource(t *testing.T) {
 }
 
 func TestHTTPAuthValidationRedactsPasswords(t *testing.T) {
-	secret := "not-a-bcrypt-password"
+	invalidHash := "not-a-bcrypt-password"
 	err := (&ConfigService{}).Validate(model.NodeRedConfig{
 		Port: 1880, HTTPAdminRoot: "/", HTTPNodeRoot: "/",
-		HTTPNodeAuth: &model.HTTPBasicAuth{User: "nodes", Pass: secret},
+		HTTPNodeAuth: &model.HTTPBasicAuth{User: "nodes", Pass: invalidHash},
 	})
 	if err == nil {
 		t.Fatal("expected invalid bcrypt password to be rejected")
 	}
-	if strings.Contains(err.Error(), secret) {
+	if strings.Contains(err.Error(), invalidHash) {
 		t.Fatalf("validation error leaked password: %v", err)
 	}
 }
