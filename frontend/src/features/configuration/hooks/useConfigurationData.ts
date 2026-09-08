@@ -60,6 +60,7 @@ export function useConfigurationData() {
     configLoading: configQuery.isLoading,
     configError: configQuery.isError,
     initialFormData,
+    config: loadedConfig as NodeRedConfigResponse | null,
 
     // Bootstrap query state
     bootstrapLoading: bootstrapQuery.isLoading,

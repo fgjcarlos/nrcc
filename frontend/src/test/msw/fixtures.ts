@@ -86,6 +86,13 @@ export const securityFixture = {
   },
 }
 
+export const securityCenterConfig = {
+  uiPort: 1880,
+  adminAuth: { type: 'credentials', users: [{ username: 'operator', permissions: '*' }], sessionExpiryTime: 3600 },
+  httpNodeAuth: { user: 'nodes' },
+  httpStaticAuth: { user: 'static' },
+}
+
 export const systemInfo: SystemInfo = {
 	resourceScope: 'host',
   cpu: { usage: 14, cores: 4, available: true },

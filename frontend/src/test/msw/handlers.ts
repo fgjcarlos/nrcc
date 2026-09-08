@@ -14,6 +14,7 @@ import {
   libraries,
   mockUser,
   systemInfo,
+  securityCenterConfig,
 } from './fixtures'
 
 const ok = <T>(data: T) =>
@@ -45,7 +46,9 @@ export function createNrccApiHandlers(scenario: NrccMswScenario = 'initialized')
       state: { running: true, paused: false, restartCount: 0 },
       inDocker: false,
     })),
-    http.get('/api/config', () => ok({ uiPort: 1880, uiHost: '127.0.0.1', projectsEnabled: true })),
+    http.get('/api/config', () => ok(securityCenterConfig)),
+    http.post('/api/config', async ({ request }) => ok(await request.json())),
+    http.get('/api/settings/raw', () => ok({ content: 'module.exports = { nodeHttpAuth: { user: "nodes", pass: "[redacted]" } };', writable: true })),
     http.get('/api/runtime/history', () => ok({ events: [], status: { status: 'running', uptime: 0, restartCount: 0, consecutiveFailures: 0 } })),
     http.post('/api/runtime/start', () => ok({ message: 'Node-RED start requested in test mode' })),
     http.post('/api/runtime/stop', () => ok({ message: 'Node-RED stop requested in test mode' })),
