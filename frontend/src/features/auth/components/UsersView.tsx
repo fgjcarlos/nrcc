@@ -166,6 +166,7 @@ export function UsersView() {
           {UI_COPY.add} {UI_COPY.createUser}
         </button>
       </div>
+      <p className="text-sm text-base-content/60">{UI_COPY.userManagementSafetyNotice}</p>
 
       {/* State container: loading, error, empty, or content */}
       <StateContainer
@@ -182,6 +183,7 @@ export function UsersView() {
         <UserTable
           users={users}
           adminCount={adminCount}
+          currentUserId={currentUser.id}
           onEdit={openEditModal}
           onDelete={handleDelete}
           onChangePassword={openPasswordModal}
@@ -216,6 +218,7 @@ export function UsersView() {
               : changePasswordMutation.isPending
           }
           adminCount={adminCount}
+          currentUserId={currentUser.id}
           onSubmit={handleModalSubmit}
           onClose={closeModal}
         />

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { server } from '@/test/msw/server';
-import { mockUser } from '@/test/msw/fixtures';
+import { authUsersResponse, mockUser } from '@/test/msw/fixtures';
 
 const ok = <T>(data: T) =>
   HttpResponse.json({ success: true, data, timestamp: new Date(0).toISOString() });
@@ -98,5 +98,17 @@ describe('authService in-memory token lifecycle', () => {
     expect(setToken).toHaveBeenCalledWith('refreshed-token');
     expect(authService.getToken()).toBe('refreshed-token');
     expect(user).toEqual(mockUser);
+  });
+});
+
+describe('authService users contract', () => {
+  it('decodes the backend users envelope', async () => {
+    server.use(
+      http.get('/api/auth/users', () => ok(authUsersResponse)),
+    );
+
+    const { authService } = await import('./authService');
+
+    await expect(authService.getUsers()).resolves.toEqual([mockUser]);
   });
 });

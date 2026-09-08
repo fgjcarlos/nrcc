@@ -1,6 +1,7 @@
 import { http, HttpResponse, type HttpHandler } from 'msw'
 import {
   authResponse,
+  authUsersResponse,
   authStatusInitialized,
   authStatusSetupRequired,
   backupConfig,
@@ -30,7 +31,7 @@ export function createNrccApiHandlers(scenario: NrccMswScenario = 'initialized')
     http.post('/api/auth/refresh', () => ok({ token: authResponse.token })),
     http.post('/api/auth/logout', () => ok({ message: 'Logged out' })),
     http.get('/api/auth/me', () => ok(mockUser)),
-    http.get('/api/auth/users', () => ok([mockUser])),
+    http.get('/api/auth/users', () => ok(authUsersResponse)),
 
     http.get('/api/bootstrap/status', () => ok(hostStatus)),
     http.get('/api/system/info', () => ok(systemInfo)),
