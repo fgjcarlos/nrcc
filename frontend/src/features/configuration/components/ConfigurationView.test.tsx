@@ -98,31 +98,6 @@ function findToggleButton(labelText: RegExp): HTMLButtonElement {
 }
 
 describe('ConfigurationView (issue #366 — toggles were reset on every render)', () => {
-  it('keeps the Enable Admin Auth toggle flipped on after a re-render', async () => {
-    const user = userEvent.setup();
-    renderConfiguration();
-
-    // The "Basic" tab is the default; switch to "Authentication" first.
-    await switchToTab(user, 'Authentication');
-
-    const toggle = findToggleButton(/^Enable Admin Auth$/);
-    // Initial state: fixture has no adminAuth, so the toggle starts off.
-    expect(toggle.className).toContain('bg-muted');
-
-    await user.click(toggle);
-    await waitFor(() => expect(toggle.className).toContain('bg-primary'));
-
-    // Trigger a re-render by clicking the top-level Save button. This
-    // re-runs the useEffect in ConfigurationView that used to clobber
-    // form state on every render before the fix landed.
-    const saveButton = screen.getByText('Save', { selector: 'button' });
-    await user.click(saveButton).catch(() => undefined);
-
-    // After the re-render, the toggle should still be on. Before the
-    // fix, this would have been reset to its loaded value.
-    expect(toggle.className).toContain('bg-primary');
-  });
-
   it('keeps the Editor Theme palette toggle flipped off after a re-render', async () => {
     const user = userEvent.setup();
     renderConfiguration();

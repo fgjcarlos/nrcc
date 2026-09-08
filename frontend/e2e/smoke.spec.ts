@@ -124,4 +124,13 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
     await expect(page.getByLabel('HTTPS Port')).toBeVisible()
     await expect(page.getByLabel('Private Key Passphrase')).toBeVisible()
   })
+
+  test('Security Center exposes the canonical authentication surface in read-only mode', async ({ page }) => {
+    await login(page)
+    await page.goto('/configuration')
+    await page.getByRole('button', { name: 'Authentication' }).click()
+    await expect(page.getByRole('heading', { name: 'Security Center' })).toBeVisible()
+    await expect(page.getByRole('status')).toContainText('read-only')
+    await expect(page.getByRole('button', { name: 'Save Security Center' })).not.toBeVisible()
+  })
 })

@@ -5,12 +5,12 @@ import type { NodeRedConfigFormData } from '@/shared/types';
 import { settingsRawSchema } from '@/shared/validation/schemas';
 import {
   BasicSettings,
-  AuthSettings,
   SecuritySettings,
   LoggingSettings,
   EditorThemeSettings,
   AIProviderSettings,
 } from '.';
+import { SecurityCenter } from './SecurityCenter';
 import {
   Settings, Server, Lock, Shield, Activity, Palette,
   Save, LockOpen, AlertTriangle, Bot
@@ -36,7 +36,7 @@ interface Section {
 
 const SECTIONS: Section[] = [
   { id: 'basic', label: 'Basic', icon: Server, component: BasicSettings },
-  { id: 'auth', label: 'Authentication', icon: Lock, component: AuthSettings },
+  { id: 'auth', label: 'Authentication', icon: Lock },
   // Issue #762, slice 1 — TLS, credentialSecret and requireHttps tab.
   // Issue #762 — TLS, credentialSecret and requireHttps tab.
   { id: 'security', label: 'Security', icon: Shield, component: SecuritySettings },
@@ -326,11 +326,11 @@ export function ConfigurationView() {
 
        {/* Active Tab Content */}
        <div className="surface-card p-6">
-         {data.hostStatus?.configuration?.editable === false ? (
+          {activeTab === 'auth' ? <SecurityCenter config={data.config} rawSettingsContent={rawSettingsContent} editable={data.hostStatus?.configuration?.editable === true} /> : data.hostStatus?.configuration?.editable === false ? (
            <div className="rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm text-warning" role="status">
              Configuration controls are unavailable for this runtime. Review the detected settings below.
            </div>
-         ) : activeTab === 'ai' ? <AIProviderSettings /> : <ActiveComponent settings={formData} onUpdate={handleUpdateField} disabled={isSaving} />}
+          ) : activeTab === 'ai' ? <AIProviderSettings /> : <ActiveComponent settings={formData} onUpdate={handleUpdateField} disabled={isSaving} />}
        </div>
 
 
