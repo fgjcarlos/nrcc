@@ -42,6 +42,20 @@ var sandboxTimeout = 2 * time.Second
 // On missing adminAuth (e.g. the file does not export one) the function
 // returns ErrAdminAuthMissing. The caller decides whether that is fatal.
 func ParseAdminAuthViaSandbox(content string) (*model.AdminAuth, error) {
+	surfaces, err := ParseAuthenticationSurfacesViaSandbox(content)
+	if err != nil {
+		return nil, err
+	}
+	if surfaces.AdminAuth == nil {
+		return nil, ErrAdminAuthMissing
+	}
+	return surfaces.AdminAuth, nil
+}
+
+// ParseAuthenticationSurfacesViaSandbox extracts the canonical Node-RED
+// authentication surfaces. It recognizes only adminAuth, httpNodeAuth, and
+// httpStaticAuth; legacy aliases are never migrated implicitly.
+func ParseAuthenticationSurfacesViaSandbox(content string) (*model.AuthenticationSurfaces, error) {
 	if content == "" {
 		return nil, ErrAdminAuthMissing
 	}
@@ -96,7 +110,41 @@ func ParseAdminAuthViaSandbox(content string) (*model.AdminAuth, error) {
 		return nil, fmt.Errorf("%w: %w", ErrSandboxRuntime, err)
 	}
 
-	return extractAdminAuth(rt)
+	return extractAuthenticationSurfaces(rt)
+}
+
+func extractAuthenticationSurfaces(rt *goja.Runtime) (*model.AuthenticationSurfaces, error) {
+	surfaces := &model.AuthenticationSurfaces{}
+	adminAuth, err := extractAdminAuth(rt)
+	if err != nil && !errors.Is(err, ErrAdminAuthMissing) {
+		return nil, err
+	}
+	surfaces.AdminAuth = adminAuth
+
+	exports := rt.Get("module").ToObject(rt).Get("exports")
+	if exports == nil || goja.IsUndefined(exports) || goja.IsNull(exports) {
+		return nil, ErrAdminAuthMissing
+	}
+	exportsObject := exports.ToObject(rt)
+	surfaces.HTTPNodeAuth = extractHTTPBasicAuth(rt, exportsObject.Get("httpNodeAuth"))
+	surfaces.HTTPStaticAuth = extractHTTPBasicAuth(rt, exportsObject.Get("httpStaticAuth"))
+	if surfaces.AdminAuth == nil && surfaces.HTTPNodeAuth == nil && surfaces.HTTPStaticAuth == nil {
+		return nil, ErrAdminAuthMissing
+	}
+	return surfaces, nil
+}
+
+func extractHTTPBasicAuth(rt *goja.Runtime, value goja.Value) *model.HTTPBasicAuth {
+	if value == nil || goja.IsUndefined(value) || goja.IsNull(value) {
+		return nil
+	}
+	object := value.ToObject(rt)
+	user := readStringProp(object, "user")
+	pass := readStringProp(object, "pass")
+	if user == "" || pass == "" {
+		return nil
+	}
+	return &model.HTTPBasicAuth{User: user, Pass: pass}
 }
 
 // extractAdminAuth reads `module.exports.adminAuth` from the sandbox runtime
@@ -126,6 +174,9 @@ func extractAdminAuth(rt *goja.Runtime) (*model.AdminAuth, error) {
 	}
 	if auth.Type == "" {
 		return nil, fmt.Errorf("%w: missing type", ErrAdminAuthMissing)
+	}
+	if expiry := adminAuthObj.Get("sessionExpiryTime"); expiry != nil && !goja.IsUndefined(expiry) && !goja.IsNull(expiry) {
+		auth.SessionExpiryTime = int(expiry.ToInteger())
 	}
 
 	usersVal := adminAuthObj.Get("users")

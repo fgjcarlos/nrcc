@@ -325,6 +325,8 @@ func seedRedactionConfig(t *testing.T, configSvc *service.ConfigService, hash st
 				},
 			},
 		},
+		HTTPNodeAuth:   &model.HTTPBasicAuth{User: "nodes", Pass: hash},
+		HTTPStaticAuth: &model.HTTPBasicAuth{User: "static", Pass: hash},
 		EnvVars: []model.EnvVar{
 			{Key: "PLAINTEXT_SECRET", Value: "supersecret-cleartext", Type: "string"},
 			{Key: "ENCRYPTED_SECRET", Value: "v1:already-encrypted-blob", Type: "secret", Encrypted: true},
@@ -373,6 +375,12 @@ func TestConfigHandler_GetConfig_Viewer_RedactsSecrets(t *testing.T) {
 		if u.Password != "" {
 			t.Errorf("AdminAuth.Users[%d].Password must be redacted for viewer; got non-empty value (len=%d)", i, len(u.Password))
 		}
+	}
+	if cfg.HTTPNodeAuth == nil || cfg.HTTPNodeAuth.Pass != "" {
+		t.Error("HTTP node authentication password must be redacted for viewer")
+	}
+	if cfg.HTTPStaticAuth == nil || cfg.HTTPStaticAuth.Pass != "" {
+		t.Error("HTTP static authentication password must be redacted for viewer")
 	}
 
 	if len(cfg.EnvVars) != 2 {
