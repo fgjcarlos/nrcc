@@ -88,6 +88,12 @@ func (h *ConfigHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 				cfg.AdminAuth.Users[i].Password = ""
 			}
 		}
+		if cfg.HTTPNodeAuth != nil {
+			cfg.HTTPNodeAuth.Pass = ""
+		}
+		if cfg.HTTPStaticAuth != nil {
+			cfg.HTTPStaticAuth.Pass = ""
+		}
 		for i := range cfg.EnvVars {
 			if !cfg.EnvVars[i].Encrypted {
 				cfg.EnvVars[i].Value = "********"

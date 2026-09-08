@@ -19,9 +19,9 @@ type NodeRedConfig struct {
 	DisableEditor    bool   `json:"disableEditor,omitempty"`
 
 	// Authentication
-	AdminAuth    *AdminAuth  `json:"adminAuth,omitempty"`
-	NodeHttpAuth interface{} `json:"nodeHttpAuth,omitempty"`
-	StaticAuth   interface{} `json:"staticAuth,omitempty"`
+	AdminAuth      *AdminAuth     `json:"adminAuth,omitempty"`
+	HTTPNodeAuth   *HTTPBasicAuth `json:"httpNodeAuth,omitempty"`
+	HTTPStaticAuth *HTTPBasicAuth `json:"httpStaticAuth,omitempty"`
 
 	// Projects & Logging
 	ProjectsEnabled bool        `json:"projectsEnabled,omitempty"`
@@ -32,7 +32,7 @@ type NodeRedConfig struct {
 	// restart. Https carries the on-disk paths to the PEM key, cert and
 	// optional CA; the backend renders them as fs.readFileSync() so the
 	// operator never has to inline certificate content.
-	RequireHttps bool      `json:"requireHttps,omitempty"`
+	RequireHttps bool         `json:"requireHttps,omitempty"`
 	Https        *HttpsConfig `json:"https,omitempty"`
 
 	// Editor Theme
@@ -54,8 +54,9 @@ type NodeRedConfig struct {
 
 // AdminAuth represents Node-RED admin authentication config
 type AdminAuth struct {
-	Type  string          `json:"type"`
-	Users []AdminAuthUser `json:"users,omitempty"`
+	Type              string          `json:"type"`
+	Users             []AdminAuthUser `json:"users,omitempty"`
+	SessionExpiryTime int             `json:"sessionExpiryTime,omitempty"`
 }
 
 // AdminAuthUser represents a user in adminAuth config
@@ -63,6 +64,22 @@ type AdminAuthUser struct {
 	Username    string `json:"username"`
 	Password    string `json:"password"`
 	Permissions string `json:"permissions"`
+}
+
+// HTTPBasicAuth is the canonical Node-RED basic-auth shape used by both
+// httpNodeAuth and httpStaticAuth. Node-RED expects `user` and `pass`; `pass`
+// must be a bcrypt hash. Legacy aliases are intentionally unsupported.
+type HTTPBasicAuth struct {
+	User string `json:"user"`
+	Pass string `json:"pass"`
+}
+
+// AuthenticationSurfaces is the parsed set of independently configured
+// Node-RED authentication boundaries. It is separate from NRCC accounts.
+type AuthenticationSurfaces struct {
+	AdminAuth      *AdminAuth
+	HTTPNodeAuth   *HTTPBasicAuth
+	HTTPStaticAuth *HTTPBasicAuth
 }
 
 // HttpsConfig describes the Node-RED `https` block. Node-RED reads each

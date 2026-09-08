@@ -473,6 +473,12 @@ func (s *ConfigService) Validate(cfg model.NodeRedConfig) error {
 			return err
 		}
 	}
+	if err := validateHTTPBasicAuth("httpNodeAuth", cfg.HTTPNodeAuth); err != nil {
+		return err
+	}
+	if err := validateHTTPBasicAuth("httpStaticAuth", cfg.HTTPStaticAuth); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -503,8 +509,27 @@ func validateAdminAuth(auth *model.AdminAuth) error {
 		if len(user.Password) < 6 {
 			return fmt.Errorf("adminAuth user %d: password must be at least 6 characters", i)
 		}
+		if user.Permissions != "*" && user.Permissions != "read" {
+			return fmt.Errorf("adminAuth user %d: permissions must be \"*\" or \"read\"", i)
+		}
+	}
+	if auth.SessionExpiryTime < 0 {
+		return fmt.Errorf("adminAuth sessionExpiryTime must not be negative")
 	}
 
+	return nil
+}
+
+func validateHTTPBasicAuth(name string, auth *model.HTTPBasicAuth) error {
+	if auth == nil {
+		return nil
+	}
+	if auth.User == "" {
+		return fmt.Errorf("%s user must not be empty", name)
+	}
+	if !isBcryptHash(auth.Pass) {
+		return fmt.Errorf("%s pass must be a bcrypt hash", name)
+	}
 	return nil
 }
 
@@ -616,17 +641,18 @@ func generateSettingsJS(cfg model.NodeRedConfig) string {
 		builder.WriteString("\n")
 	}
 	if cfg.AdminAuth != nil && len(cfg.AdminAuth.Users) > 0 {
-		user := cfg.AdminAuth.Users[0]
-		builder.WriteString("  adminAuth: {\n")
-		fmt.Fprintf(&builder, "    type: %q,\n", cfg.AdminAuth.Type)
-		builder.WriteString("    users: [{\n")
-		fmt.Fprintf(&builder, "      username: %q,\n", user.Username)
-		fmt.Fprintf(&builder, "      password: %q,\n", user.Password)
-		fmt.Fprintf(&builder, "      permissions: %q,\n", user.Permissions)
-		builder.WriteString("    }],\n")
-		builder.WriteString("  },\n")
+		builder.WriteString(renderAdminAuthBlock(cfg))
+		builder.WriteString("\n")
 	} else {
 		builder.WriteString("  adminAuth: null,\n")
+	}
+	if cfg.HTTPNodeAuth != nil {
+		builder.WriteString(renderHTTPBasicAuthBlock("httpNodeAuth", cfg.HTTPNodeAuth))
+		builder.WriteString("\n")
+	}
+	if cfg.HTTPStaticAuth != nil {
+		builder.WriteString(renderHTTPBasicAuthBlock("httpStaticAuth", cfg.HTTPStaticAuth))
+		builder.WriteString("\n")
 	}
 	builder.WriteString("  editorTheme: {\n")
 	fmt.Fprintf(&builder, "    projects: { enabled: %t },\n", cfg.ProjectsEnabled)
@@ -690,7 +716,15 @@ func patchSettingsJS(existingContent string, cfg model.NodeRedConfig) string {
 	} else {
 		content = removeArrayKey(content, "env")
 	}
-	content = replaceBlockKey(content, "adminAuth", renderAdminAuthBlock(cfg))
+	if cfg.AdminAuth != nil {
+		content = replaceBlockKey(content, "adminAuth", renderAdminAuthBlock(cfg))
+	}
+	if cfg.HTTPNodeAuth != nil {
+		content = replaceBlockKey(content, "httpNodeAuth", renderHTTPBasicAuthBlock("httpNodeAuth", cfg.HTTPNodeAuth))
+	}
+	if cfg.HTTPStaticAuth != nil {
+		content = replaceBlockKey(content, "httpStaticAuth", renderHTTPBasicAuthBlock("httpStaticAuth", cfg.HTTPStaticAuth))
+	}
 	content = replaceBlockKey(content, "editorTheme", renderEditorThemeBlock(cfg))
 	content = replaceBlockKey(content, "logging", renderLoggingBlock())
 	content = ensureHTTPStatic(content, "uploads")
@@ -741,7 +775,6 @@ func replaceScalarKey(content, key, value string) string {
 
 	return content
 }
-
 
 // replaceArrayKey replaces or appends a multi-line array key.
 func replaceArrayKey(content, key, arrayContent string) string {
@@ -862,15 +895,32 @@ func renderAdminAuthBlock(cfg model.NodeRedConfig) string {
 
 	var builder strings.Builder
 	builder.WriteString("  adminAuth: {\n")
-	user := cfg.AdminAuth.Users[0]
 	fmt.Fprintf(&builder, "    type: %q,\n", cfg.AdminAuth.Type)
-	builder.WriteString("    users: [{\n")
-	fmt.Fprintf(&builder, "      username: %q,\n", user.Username)
-	fmt.Fprintf(&builder, "      password: %q,\n", user.Password)
-	fmt.Fprintf(&builder, "      permissions: %q,\n", user.Permissions)
-	builder.WriteString("    }],\n")
+	builder.WriteString("    users: [\n")
+	for i, user := range cfg.AdminAuth.Users {
+		builder.WriteString("      {\n")
+		fmt.Fprintf(&builder, "        username: %q,\n", user.Username)
+		fmt.Fprintf(&builder, "        password: %q,\n", user.Password)
+		fmt.Fprintf(&builder, "        permissions: %q\n", user.Permissions)
+		if i == len(cfg.AdminAuth.Users)-1 {
+			builder.WriteString("      }\n")
+		} else {
+			builder.WriteString("      },\n")
+		}
+	}
+	builder.WriteString("    ],\n")
+	if cfg.AdminAuth.SessionExpiryTime > 0 {
+		fmt.Fprintf(&builder, "    sessionExpiryTime: %d,\n", cfg.AdminAuth.SessionExpiryTime)
+	}
 	builder.WriteString("  },")
 	return builder.String()
+}
+
+func renderHTTPBasicAuthBlock(name string, auth *model.HTTPBasicAuth) string {
+	if auth == nil {
+		return ""
+	}
+	return fmt.Sprintf("  %s: { user: %q, pass: %q },", name, auth.User, auth.Pass)
 }
 
 // renderEditorThemeBlock renders editorTheme as a block string. The block is
@@ -1098,7 +1148,7 @@ func (s *ConfigService) parseConfigFromContent(content string) (model.NodeRedCon
 	cfg.CredentialSecret = parseCredentialSecretFromJS(content)
 	cfg.RequireHttps = parseBoolFromJS(content, "requireHttps", false)
 	cfg.Https = parseHttpsBlockFromJS(content)
-	adminAuth, err := parseAdminAuthFromJS(content)
+	surfaces, err := parseAuthenticationSurfacesFromJS(content)
 	if err != nil {
 		// ErrSandboxTimeout is propagated so the HTTP handler can return
 		// SETTINGS_TIMEOUT; other sandbox errors fall back to the legacy
@@ -1108,7 +1158,11 @@ func (s *ConfigService) parseConfigFromContent(content string) (model.NodeRedCon
 		}
 		return cfg, nil
 	}
-	cfg.AdminAuth = adminAuth
+	if surfaces != nil {
+		cfg.AdminAuth = surfaces.AdminAuth
+		cfg.HTTPNodeAuth = surfaces.HTTPNodeAuth
+		cfg.HTTPStaticAuth = surfaces.HTTPStaticAuth
+	}
 	return cfg, nil
 }
 
@@ -1228,6 +1282,22 @@ func parseAdminAuthFromJS(content string) (*model.AdminAuth, error) {
 		return nil, nil
 	}
 	return auth, nil
+}
+
+func parseAuthenticationSurfacesFromJS(content string) (*model.AuthenticationSurfaces, error) {
+	surfaces, err := ParseAuthenticationSurfacesViaSandbox(content)
+	if err != nil {
+		if errors.Is(err, ErrSandboxTimeout) {
+			return nil, err
+		}
+		return nil, nil
+	}
+	if surfaces.AdminAuth != nil && surfaces.AdminAuth.Type != "credentials" {
+		// Non-credential strategies can contain executable callbacks. They are
+		// intentionally source-managed until a dedicated strategy editor exists.
+		surfaces.AdminAuth = nil
+	}
+	return surfaces, nil
 }
 
 func parseIntFromJS(content, key string, fallback int) int {
