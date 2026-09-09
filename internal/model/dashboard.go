@@ -32,3 +32,13 @@ type DashboardDiscovery struct {
 	FlowFuse []DashboardPackage `json:"flowFuse"`
 	UIBases  []DashboardPath    `json:"uiBases"`
 }
+
+// DashboardAccessPolicy selects a reviewed dashboard access recipe.
+// Secrets are write-only and are never returned in API responses.
+type DashboardAccessPolicy struct {
+	Target           string `json:"target"`
+	Recipe           string `json:"recipe"`
+	Username         string `json:"username,omitempty"`
+	Secret           string `json:"secret,omitempty"`
+	ExpectedRevision string `json:"expectedRevision,omitempty"`
+}
