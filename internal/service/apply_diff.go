@@ -63,12 +63,19 @@ var secretSettingKeys = []string{
 	"https",
 }
 
+// dashboardSecretSettingKeys are reviewed dashboard extension settings. They
+// are intentionally outside the Node-RED core catalog above.
+var dashboardSecretSettingKeys = []string{"dashboard"}
+
 // secretSettingKeySet returns the secretSettingKeys list as a lookup
 // table. Tests use it to assert the membership is in lock-step with the
 // catalog; runtime callers iterate via IsSecretSettingKey.
 func secretSettingKeySet() map[string]struct{} {
 	set := make(map[string]struct{}, len(secretSettingKeys))
 	for _, k := range secretSettingKeys {
+		set[k] = struct{}{}
+	}
+	for _, k := range dashboardSecretSettingKeys {
 		set[k] = struct{}{}
 	}
 	return set

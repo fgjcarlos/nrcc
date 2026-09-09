@@ -205,6 +205,7 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 	}
 	applySvc := service.NewApplyService(configSvc, applyAuditHook)
 	applyCoordinator := service.NewApplyCoordinator(applySvc)
+	dashboardHandler.SetAccessService(service.NewDashboardAccessService(service.NewDashboardService(dataDir), configSvc, applyCoordinator))
 	configHandler.SetApplyCoordinator(applyCoordinator)
 	settingsHandler.SetApplyCoordinator(applyCoordinator)
 	configApplyHandler := handler.NewConfigApplyHandler(configSvc, applyCoordinator)
@@ -414,6 +415,7 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 
 		// Dashboard discovery route
 		r.Get("/api/dashboards/discovery", dashboardHandler.GetDiscovery)
+		r.With(middleware.RequireAdmin).Post("/api/dashboards/access", dashboardHandler.ApplyAccess)
 
 		r.Route("/api/libraries", func(r chi.Router) {
 			r.Get("/", libraryHandler.GetLibraries)
