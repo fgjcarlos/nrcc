@@ -161,6 +161,7 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 	flowVersionSvc.StartPolling()
 	flowHandler := handler.NewFlowHandler(flowSvc)
 	flowHandler.SetVersionService(flowVersionSvc)
+	dashboardHandler := handler.NewDashboardHandler(service.NewDashboardService(dataDir))
 	librarySvc := service.NewLibraryService(dataDir)
 	libraryHandler := handler.NewLibraryHandler(librarySvc)
 	updateSvc := service.NewUpdateService(dataDir)
@@ -411,7 +412,9 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 			r.Get("/{id}", flowHandler.GetFlow)
 		})
 
-		// Library routes
+		// Dashboard discovery route
+		r.Get("/api/dashboards/discovery", dashboardHandler.GetDiscovery)
+
 		r.Route("/api/libraries", func(r chi.Router) {
 			r.Get("/", libraryHandler.GetLibraries)
 			// npm install shells out and is slow — tightest cap on the router.
