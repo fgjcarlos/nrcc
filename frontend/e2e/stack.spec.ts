@@ -236,6 +236,7 @@ test('FlowFuse policy protects deployed HTTP and Socket.IO endpoints', async () 
   await expect(rawSettings).toBeOK()
   const raw = await rawSettings.json() as { data?: { revision?: { fingerprint?: string } } }
   const policy = { target: 'flowfuse', recipe: 'basic-auth', username: 'operator', secret: 'e2e-flowfuse-access-secret', expectedRevision: raw.data?.revision?.fingerprint }
+  const dashboardAuthorization = `Basic ${Buffer.from(`${policy.username}:${policy.secret}`).toString('base64')}`
   const applied = await nrcc.post('/api/dashboards/access', { headers, data: policy })
   await expect(applied).toBeOK()
   expect(JSON.stringify(await applied.json())).not.toContain(policy.secret)
@@ -243,9 +244,9 @@ test('FlowFuse policy protects deployed HTTP and Socket.IO endpoints', async () 
 
   const dashboard = await nodeRed.get('/nrcc-flowfuse')
   expect(dashboard.status()).toBe(401)
-  const authenticatedDashboard = await nodeRed.get('/nrcc-flowfuse', { headers: { Authorization: 'Basic b3BlcmF0b3I6ZTJlLWZsb3dmdXNlLWFjY2Vzcy1zZWNyZXQ=' } })
+  const authenticatedDashboard = await nodeRed.get('/nrcc-flowfuse', { headers: { Authorization: dashboardAuthorization } })
   await expect(authenticatedDashboard).toBeOK()
 
   expect(await socketHandshake()).toContain('44{"message":"unauthorized"}')
-  expect(await socketHandshake({ Authorization: 'Basic b3BlcmF0b3I6ZTJlLWZsb3dmdXNlLWFjY2Vzcy1zZWNyZXQ=' })).toMatch(/^40\{.*"sid"/)
+  expect(await socketHandshake({ Authorization: dashboardAuthorization })).toMatch(/^40\{.*"sid"/)
 })
