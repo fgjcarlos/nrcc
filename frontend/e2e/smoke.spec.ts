@@ -130,7 +130,7 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
     await page.goto('/configuration')
     await page.getByRole('button', { name: 'Authentication' }).click()
     await expect(page.getByRole('heading', { name: 'Security Center' })).toBeVisible()
-    await expect(page.getByRole('status')).toContainText('read-only')
+    await expect(page.getByText('Security Center is read-only because this runtime configuration is not editable.', { exact: true })).toContainText('read-only')
     await expect(page.getByRole('button', { name: 'Save Security Center' })).not.toBeVisible()
   })
 })

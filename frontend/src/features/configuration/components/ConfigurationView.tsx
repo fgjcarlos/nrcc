@@ -11,6 +11,7 @@ import {
   AIProviderSettings,
 } from '.';
 import { SecurityCenter } from './SecurityCenter';
+import { DashboardAccess } from './DashboardAccess';
 import {
   Settings, Server, Lock, Shield, Activity, Palette,
   Save, LockOpen, AlertTriangle, Bot
@@ -326,7 +327,7 @@ export function ConfigurationView() {
 
        {/* Active Tab Content */}
        <div className="surface-card p-6">
-          {activeTab === 'auth' ? <SecurityCenter config={data.config} rawSettingsContent={rawSettingsContent} expectedRevision={data.settingsDoc?.revision?.fingerprint} editable={data.hostStatus?.configuration?.editable === true} onApplied={() => { void data.refetchConfig(); void data.refetchSettings(); }} /> : data.hostStatus?.configuration?.editable === false ? (
+          {activeTab === 'auth' ? <><SecurityCenter config={data.config} rawSettingsContent={rawSettingsContent} expectedRevision={data.settingsDoc?.revision?.fingerprint} editable={data.hostStatus?.configuration?.editable === true} onApplied={() => { void data.refetchConfig(); void data.refetchSettings(); }} /><div className="my-6 border-t border-border" /><DashboardAccess editable={data.hostStatus?.configuration?.editable === true} expectedRevision={data.settingsDoc?.revision?.fingerprint} onApplied={() => { void data.refetchConfig(); void data.refetchSettings(); }} /></> : data.hostStatus?.configuration?.editable === false ? (
            <div className="rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm text-warning" role="status">
              Configuration controls are unavailable for this runtime. Review the detected settings below.
            </div>
