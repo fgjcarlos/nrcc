@@ -66,7 +66,7 @@ describe('Security Center', () => {
     const user = userEvent.setup();
     renderView();
     await user.click(await screen.findByRole('button', { name: 'Authentication' }));
-    expect(await screen.findByRole('status')).toHaveTextContent(/read-only/i);
+    expect(await screen.findByText(/Security Center is read-only because this runtime configuration is not editable/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Save Security Center' })).not.toBeInTheDocument();
   });
 
