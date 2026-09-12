@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/http"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -34,7 +35,7 @@ func NewDashboardAccessService(discovery *DashboardService, config *ConfigServic
 	return &DashboardAccessService{discovery: discovery, config: config, apply: apply}
 }
 
-func (s *DashboardAccessService) Apply(ctx context.Context, policy model.DashboardAccessPolicy, actor string) (model.SettingsDocument, error) {
+func (s *DashboardAccessService) Apply(ctx context.Context, policy model.DashboardAccessPolicy, actor string, request *http.Request) (model.SettingsDocument, error) {
 	if s.discovery == nil || s.config == nil || s.apply == nil || !dashboardPolicySupported(s.discovery.Discover(), policy) {
 		return model.SettingsDocument{}, ErrDashboardPolicyUnavailable
 	}
@@ -55,7 +56,7 @@ func (s *DashboardAccessService) Apply(ctx context.Context, policy model.Dashboa
 	}
 	_, err = s.apply.Apply(ctx, ApplyRequest{
 		Path: live.Path, Content: content, Expected: expected,
-		BackupDir: filepath.Join(s.config.dataDir, "backups", "settings"), Actor: actor,
+		BackupDir: filepath.Join(s.config.dataDir, "backups", "settings"), Actor: actor, Request: request,
 		Capabilities: s.config.ConfigurationCapabilities(),
 	})
 	if err != nil {

@@ -26,6 +26,33 @@ async function authHeaders(): Promise<Record<string, string>> {
   return { Authorization: `Bearer ${payload.data?.token}` }
 }
 
+async function restartNodeRed(headers: Record<string, string>): Promise<void> {
+  const response = await nrcc.post('/api/runtime/restart', { headers })
+  await expect(response).toBeOK()
+  await expect.poll(async () => {
+    try {
+      return (await nodeRed.get('/flows')).ok()
+    } catch {
+      return false
+    }
+  }, { timeout: 30_000 }).toBe(true)
+}
+
+async function socketHandshake(headers: Record<string, string> = {}): Promise<string> {
+  const path = '/nrcc-flowfuse/socket.io/?EIO=4&transport=polling'
+  const engine = await nodeRed.get(path, { headers })
+  await expect(engine).toBeOK()
+  const sid = (JSON.parse((await engine.text()).slice(1)) as { sid: string }).sid
+  const connect = await nodeRed.post(`${path}&sid=${sid}`, {
+    headers: { ...headers, 'Content-Type': 'text/plain;charset=UTF-8' },
+    data: '40',
+  })
+  await expect(connect).toBeOK()
+  const socket = await nodeRed.get(`${path}&sid=${sid}`, { headers })
+  await expect(socket).toBeOK()
+  return socket.text()
+}
+
 async function login(page: Page): Promise<void> {
   await page.goto('/login')
   await page.getByLabel('Username').fill(username)
@@ -194,4 +221,32 @@ test('environment page imports a Node-RED global entry automatically on route en
   await expect(page.getByText('NODE_RED_E2E_IMPORTED')).toBeVisible()
   await expect(page.getByRole('cell', { name: 'Node-RED', exact: true })).toBeVisible()
   await expect(page.getByTestId('node-red-sync-status')).toContainText('synchronized')
+})
+
+test('FlowFuse policy protects deployed HTTP and Socket.IO endpoints', async () => {
+  const headers = await authHeaders()
+  const discoveryResponse = await nrcc.get('/api/dashboards/discovery', { headers })
+  await expect(discoveryResponse).toBeOK()
+  const discovery = await discoveryResponse.json() as { data?: { legacy?: unknown; flowFuse?: unknown[]; uiBases?: { path?: string }[] } }
+  expect(discovery.data?.legacy).toBeFalsy()
+  expect(discovery.data?.flowFuse).toHaveLength(1)
+  expect(discovery.data?.uiBases).toContainEqual(expect.objectContaining({ path: '/nrcc-flowfuse' }))
+
+  const rawSettings = await nrcc.get('/api/settings/raw', { headers })
+  await expect(rawSettings).toBeOK()
+  const raw = await rawSettings.json() as { data?: { revision?: { fingerprint?: string } } }
+  const policy = { target: 'flowfuse', recipe: 'basic-auth', username: 'operator', secret: 'e2e-flowfuse-access-secret', expectedRevision: raw.data?.revision?.fingerprint }
+  const dashboardAuthorization = `Basic ${Buffer.from(`${policy.username}:${policy.secret}`).toString('base64')}`
+  const applied = await nrcc.post('/api/dashboards/access', { headers, data: policy })
+  await expect(applied).toBeOK()
+  expect(JSON.stringify(await applied.json())).not.toContain(policy.secret)
+  await restartNodeRed(headers)
+
+  const dashboard = await nodeRed.get('/nrcc-flowfuse')
+  expect(dashboard.status()).toBe(401)
+  const authenticatedDashboard = await nodeRed.get('/nrcc-flowfuse', { headers: { Authorization: dashboardAuthorization } })
+  await expect(authenticatedDashboard).toBeOK()
+
+  expect(await socketHandshake()).toContain('44{"message":"unauthorized"}')
+  expect(await socketHandshake({ Authorization: dashboardAuthorization })).toMatch(/^40\{.*"sid"/)
 })
