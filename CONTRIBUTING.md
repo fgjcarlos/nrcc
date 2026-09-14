@@ -15,7 +15,7 @@ If `go build ./...` fails on your machine with `undefined: syscall.Flock` or `un
 
 Requirements:
 
-- Go 1.25+
+- Go 1.26+
 - Node.js 22+ and pnpm 11+ (npm is intentionally not supported — see [`pnpm-workspace.yaml`](pnpm-workspace.yaml))
 - Node-RED in `$PATH` (`npm install -g node-red`)
 
