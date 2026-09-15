@@ -1,0 +1,12 @@
+version: 2
+# Test fixtures live under frontend/e2e and docker-compose.e2e.yml. They
+# contain deliberately-fake credentials (e.g.
+# `e2e-flowfuse-access-secret`, `acceptance-fixture-pw-not-a-secret`)
+# that get Base64-encoded for loopback-only acceptance runs. The
+# pattern detectors in GitGuardian flag those Base64 segments as if
+# they were real hardcoded credentials. These paths are test-only —
+# the secrets never reach production — so ignoring them here keeps the
+# security gate focused on real surfaces.
+paths-ignore:
+  - frontend/e2e/**
+  - docker-compose.e2e.yml

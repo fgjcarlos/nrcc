@@ -28,7 +28,7 @@ RUN pnpm build
 # ref: golang:1.26-alpine — pinned to digest for supply-chain integrity.
 # Dependabot (docker ecosystem, weekly) bumps the digest when upstream
 # changes. See issue #593 and auditoria/devops-security.md §2.1.
-FROM golang:1.26-alpine@sha256:ce864e7223ac17b1775e6fd0b4c0db580c2eb50e7953a427916379e4b92a1628 AS go-builder
+FROM golang:1.27-alpine@sha256:4c9fe60190a2a3350ddc51de80d0224b8a6698d12bdfc999fee45ea9d6c46dbc AS go-builder
 WORKDIR /build
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod \
@@ -42,7 +42,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 # ref: nodered/node-red:5.0.4-24-minimal — community image, pinned to
 # digest. Dependabot (docker ecosystem, weekly) bumps the digest when
 # upstream changes. See issue #593 and auditoria/devops-security.md §2.1.
-FROM nodered/node-red:5.0.7-24-minimal@sha256:828be222da3c61b10eebb85d5192d1da98e3e5d59c2fc1d7e9cd7958e0a69314
+FROM nodered/node-red:5.0.7-24-minimal@sha256:828be222da3c61b10eebb85d5192d1da98e3e5d59c2fc1d7e9cd7958e0a69314 AS runtime
 LABEL org.opencontainers.image.title="nrcc" \
       org.opencontainers.image.description="Node-RED Control Center — all-in-one" \
       org.opencontainers.image.source="https://github.com/fgjcarlos/nrcc"
@@ -73,4 +73,16 @@ EXPOSE 3001 1880
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD wget -qO- http://localhost:3001/healthz || exit 1
 
+# Test-only FlowFuse image. It is selected exclusively by docker-compose.e2e.yml
+# and seeds an isolated user directory before the standard NRCC entrypoint runs.
+FROM runtime AS flowfuse-e2e
+ARG FLOWFUSE_DASHBOARD_VERSION=1.31.0
+RUN npm install --prefix /opt/nrcc-flowfuse-e2e --omit=dev --ignore-scripts --no-audit --no-fund \
+    "@flowfuse/node-red-dashboard@${FLOWFUSE_DASHBOARD_VERSION}"
+COPY frontend/e2e/fixtures/flowfuse/flows.json /opt/nrcc-flowfuse-e2e/flows.json
+COPY frontend/e2e/fixtures/flowfuse/settings.js /opt/nrcc-flowfuse-e2e/settings.js
+COPY --chmod=755 frontend/e2e/fixtures/flowfuse/entrypoint.sh /usr/local/bin/nrcc-flowfuse-e2e-entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/nrcc-flowfuse-e2e-entrypoint.sh"]
+
+FROM runtime
 ENTRYPOINT ["/usr/local/bin/nrcc-entrypoint.sh"]

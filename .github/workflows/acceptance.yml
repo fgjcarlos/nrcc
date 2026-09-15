@@ -81,18 +81,38 @@ jobs:
           NRCC_ENCRYPTION_KEY: acceptance-fixture-encryption-key-not-a-secret
         run: docker compose up -d --wait --wait-timeout 180
 
-      - name: Playwright against NRCC and Node-RED
+      - name: Playwright against default NRCC and Node-RED stack
         working-directory: frontend
         env:
           E2E_BASE_URL: http://127.0.0.1:3001
           E2E_NODE_RED_URL: http://127.0.0.1:1880
-        run: pnpm test:e2e:stack
+        run: pnpm exec playwright test --config playwright.stack.config.ts --grep-invert "FlowFuse policy protects deployed HTTP and Socket.IO endpoints"
 
       - name: Stop real browser-acceptance stack
         if: always()
         env:
           NRCC_ENCRYPTION_KEY: acceptance-fixture-encryption-key-not-a-secret
         run: docker compose down -v --remove-orphans
+
+      # The FlowFuse fixture is intentionally isolated from the production-like
+      # default stack so the default acceptance coverage remains unchanged.
+      - name: Start isolated FlowFuse E2E stack
+        run: docker compose -p nrcc-flowfuse-e2e -f docker-compose.e2e.yml up -d --build --wait --wait-timeout 180
+
+      - name: Playwright FlowFuse stack acceptance
+        working-directory: frontend
+        env:
+          E2E_BASE_URL: http://127.0.0.1:3301
+          E2E_NODE_RED_URL: http://127.0.0.1:31880
+        run: pnpm exec playwright test --config playwright.stack.config.ts --grep "FlowFuse policy protects deployed HTTP and Socket.IO endpoints"
+
+      - name: Upload FlowFuse compose logs on failure
+        if: failure()
+        run: docker compose -p nrcc-flowfuse-e2e -f docker-compose.e2e.yml logs --no-color --tail=200 || true
+
+      - name: Stop isolated FlowFuse E2E stack
+        if: always()
+        run: docker compose -p nrcc-flowfuse-e2e -f docker-compose.e2e.yml down -v --remove-orphans
 
       - name: Install jq for JSON parsing
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends jq

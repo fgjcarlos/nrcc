@@ -1,0 +1,31 @@
+services:
+  nrcc:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: flowfuse-e2e
+    restart: "no"
+    ports:
+      - "127.0.0.1:${E2E_NRCC_HOST_PORT:-3301}:3001"
+      - "127.0.0.1:${E2E_NODE_RED_HOST_PORT:-31880}:1880"
+    environment:
+      PORT: "3001"
+      DATA_DIR: /data
+      NODE_RED_CMD: node-red
+      NODE_RED_USER_DIR: /data
+      NODE_RED_SETTINGS: /data/settings.js
+      JWT_SECRET: e2e-flowfuse-jwt-not-a-secret
+      NRCC_ENCRYPTION_KEY: e2e-flowfuse-encryption-key-not-a-secret
+    volumes:
+      - flowfuse_e2e_data:/data
+      - flowfuse_e2e_backups:/data/backups
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+    init: true
+
+volumes:
+  flowfuse_e2e_data:
+  flowfuse_e2e_backups:
