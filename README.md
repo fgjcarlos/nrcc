@@ -3,7 +3,7 @@
 [![PR Validation](https://github.com/fgjcarlos/nrcc/actions/workflows/pr.yml/badge.svg)](https://github.com/fgjcarlos/nrcc/actions/workflows/pr.yml)
 [![Release](https://github.com/fgjcarlos/nrcc/actions/workflows/release.yml/badge.svg)](https://github.com/fgjcarlos/nrcc/actions/workflows/release.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Go 1.25+](https://img.shields.io/badge/Go-1.25%2B-00ADD8?logo=go)](go.mod)
+[![Go 1.26+](https://img.shields.io/badge/Go-1.26%2B-00ADD8?logo=go)](go.mod)
 
 A single-binary management UI for one Node-RED instance. The canonical deployment model is **one Docker Compose service containing one NRCC and one Node-RED runtime**, backed by persistent per-instance volumes. Spin up multiple stacks to run multiple Node-RED instances; each stack has its own credentials, settings, backups, and host ports.
 
@@ -26,7 +26,7 @@ A single-binary management UI for one Node-RED instance. The canonical deploymen
 ## Requirements
 
 - Docker 24+ and Docker Compose (canonical stack deployment)
-- Go 1.25+ (to build from source)
+- Go 1.26+ (to build from source)
 - For source/frontend builds: Node.js 22+ and pnpm 11+
 
 > **Build target: Linux only.** The Go backend uses POSIX-only syscalls (see [ADR 0004](docs/adr/0004-linux-only-build.md)). Building natively on macOS or Windows is not supported — use Docker or a Linux VM.
