@@ -44,7 +44,7 @@ func (h *DashboardHandler) ApplyAccess(w http.ResponseWriter, r *http.Request) {
 		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid dashboard policy")
 		return
 	}
-	doc, err := h.access.Apply(r.Context(), policy, claims.Username)
+	doc, err := h.access.Apply(r.Context(), policy, claims.Username, r)
 	if err != nil {
 		if errors.Is(err, service.ErrDashboardPolicyUnavailable) || errors.Is(err, service.ErrUnsafeDashboardPolicy) {
 			model.RespondError(w, http.StatusBadRequest, "DASHBOARD_POLICY_REJECTED", "Dashboard policy was rejected")
@@ -58,6 +58,7 @@ func (h *DashboardHandler) ApplyAccess(w http.ResponseWriter, r *http.Request) {
 		model.RespondError(w, http.StatusInternalServerError, "DASHBOARD_POLICY_APPLY_FAILED", "Failed to apply dashboard policy")
 		return
 	}
+	doc.Content = service.RedactSettingsContent(doc.Content)
 	model.RespondJSON(w, http.StatusOK, struct {
 		Document model.SettingsDocument `json:"document"`
 	}{Document: doc})
