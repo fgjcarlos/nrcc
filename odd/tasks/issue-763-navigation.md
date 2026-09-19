@@ -54,4 +54,4 @@ Frontend routing, sidebar and command-palette navigation, and associated focused
 - No runtime harness is applicable: this is covered by frontend route/component tests.
 
 ## Next step
-Commit this ODD bookkeeping update as `chore(odd): record issue 763 completion`; do not push, open a PR, or mutate GitHub.
+Parent RDD assessment/native review; prepare a PR only if separately authorized.
