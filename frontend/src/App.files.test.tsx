@@ -3,8 +3,10 @@ import { render, screen, waitFor } from '@testing-library/react';
 import App from './App';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { buildAuthMock } from '@/features/auth/__test-utils__/authMock';
+import { authService } from '@/features/auth/services/authService';
 
 vi.mock('@/features/auth/hooks/useAuth', () => ({ useAuth: vi.fn() }));
+vi.mock('@/features/auth/services/authService', () => ({ authService: { getStatus: vi.fn() } }));
 vi.mock('@/features/auth/components/LoginView', () => ({ LoginView: () => <div>Login page</div> }));
 vi.mock('@/features/auth/components/SetupView', () => ({ SetupView: () => <div>Setup page</div> }));
 vi.mock('@/features/dashboard/components/DashboardView', () => ({ DashboardView: () => <div>Overview page</div> }));
@@ -26,16 +28,28 @@ describe('navigation redirects', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it.each([
-    ['uninitialized', false, false, 'Setup page'],
-    ['unauthenticated', true, false, 'Login page'],
-    ['authenticated', true, true, 'Overview page'],
-  ])('routes / deterministically for %s users', async (_state, isInitialized, isAuthenticated, expectedPage) => {
+    ['fresh server', false, false, 'Setup page'],
+    ['initialized unauthenticated server', true, false, 'Login page'],
+    ['initialized authenticated server', true, true, 'Overview page'],
+  ])('routes / using the server initialization signal for %s', async (_state, initialized, isAuthenticated, expectedPage) => {
     window.history.pushState({}, '', '/');
-    mockAuth({ isInitialized, isAuthenticated, isLoading: false, user: isAuthenticated ? undefined : null });
+    vi.mocked(authService.getStatus).mockResolvedValue({ initialized });
+    mockAuth({ isInitialized: true, isAuthenticated, isLoading: false, user: isAuthenticated ? undefined : null });
 
     render(<App />);
 
     expect(await screen.findByText(expectedPage)).toBeInTheDocument();
+    expect(authService.getStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it('routes to login when the server initialization status cannot be read', async () => {
+    window.history.pushState({}, '', '/');
+    vi.mocked(authService.getStatus).mockRejectedValue(new Error('status unavailable'));
+    mockAuth({ isInitialized: true, isAuthenticated: false, isLoading: false, user: null });
+
+    render(<App />);
+
+    expect(await screen.findByText('Login page')).toBeInTheDocument();
   });
 
   it.each([
