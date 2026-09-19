@@ -63,6 +63,7 @@ Frontend routing, sidebar and command-palette navigation, and associated focused
 - T2 `cd frontend && npm run typecheck` — passed.
 - T2 `cd frontend && npm run lint` — passed with the same 2 pre-existing `react-refresh/only-export-components` warnings in `src/features/backups/components/CronBuilder.tsx`.
 - T2 `cd frontend && npm test -- --run` — 59 files, 398 tests passed.
+- Parent re-review of the bounded T2 diff found no remaining setup-routing, authorization, redirect, async-cleanup, or test-validity defect; delegated Sol re-review was unavailable because that agent exhausted its usage allowance.
 
 ## Progress / evidence
 - Implementation commit: `12212e951382d4890a882742560ab712e88a5811` (`feat(navigation): focus NRCC on configuration operations`).
@@ -73,4 +74,4 @@ Frontend routing, sidebar and command-palette navigation, and associated focused
 - RDD remains unavailable because `gentle-ai` could not be resolved in this worktree; no lifecycle command was run.
 
 ## Next step
-Sol re-review; RDD remains unavailable because `gentle-ai` cannot currently be resolved. Prepare a PR only if separately authorized.
+RDD remains unavailable because `gentle-ai` cannot currently be resolved. Prepare the feature-branch chain only if separately authorized.
