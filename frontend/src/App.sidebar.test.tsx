@@ -16,7 +16,7 @@ vi.mock('@/features/auth/components/LoginView', () => ({
 }));
 
 vi.mock('@/features/dashboard/components/DashboardView', () => ({
-  DashboardView: () => <div>Dashboard page</div>,
+  DashboardView: () => <div>Overview page</div>,
 }));
 
 vi.mock('@/features/configuration/components/ConfigurationView', () => ({
@@ -124,7 +124,7 @@ describe('sidebar navigation (#365)', () => {
         length: 0,
       },
     });
-    window.history.pushState({}, '', '/dashboard');
+    window.history.pushState({}, '', '/overview');
     window.matchMedia = vi.fn().mockImplementation((query) => ({
       matches: false,
       media: query,
@@ -141,38 +141,42 @@ describe('sidebar navigation (#365)', () => {
     mockAuthenticated();
     render(<App />);
 
-    // Sanity: dashboard renders on first load.
-    expect(await screen.findByText('Dashboard page')).toBeInTheDocument();
+
+    expect(await screen.findByText('Overview page')).toBeInTheDocument();
 
     // Click Configuration in the sidebar. The main content area should
-    // render the Configuration view, NOT keep the dashboard view.
+    // render the Configuration view, NOT keep the overview view.
     await userEvent.click(screen.getByRole('link', { name: /Configuration/ }));
 
     await waitFor(() => {
       expect(screen.getByText('Configuration page')).toBeInTheDocument();
     });
-    expect(screen.queryByText('Dashboard page')).not.toBeInTheDocument();
+    expect(screen.queryByText('Overview page')).not.toBeInTheDocument();
   });
 
-  it('does not show links to removed Logs or Docker pages', async () => {
+  it('does not show links to legacy public pages', async () => {
     mockAuthenticated();
     render(<App />);
 
-    expect(await screen.findByText('Dashboard page')).toBeInTheDocument();
+    expect(await screen.findByText('Overview page')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /^Logs$/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /^Docker$/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /^Flows$/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /^Files$/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /^Updates$/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /^Libraries$/ })).not.toBeInTheDocument();
   });
 
-  it('navigates Configuration -> Dashboard -> Configuration without showing a stale view', async () => {
+  it('navigates Configuration -> Overview -> Configuration without showing a stale view', async () => {
     mockAuthenticated();
     window.history.pushState({}, '', '/configuration');
     render(<App />);
 
     expect(await screen.findByText('Configuration page')).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('link', { name: /Dashboard/ }));
+    await userEvent.click(screen.getByRole('link', { name: /Overview/ }));
     await waitFor(() => {
-      expect(screen.getByText('Dashboard page')).toBeInTheDocument();
+      expect(screen.getByText('Overview page')).toBeInTheDocument();
     });
     expect(screen.queryByText('Configuration page')).not.toBeInTheDocument();
 
@@ -180,20 +184,26 @@ describe('sidebar navigation (#365)', () => {
     await waitFor(() => {
       expect(screen.getByText('Configuration page')).toBeInTheDocument();
     });
-    expect(screen.queryByText('Dashboard page')).not.toBeInTheDocument();
+    expect(screen.queryByText('Overview page')).not.toBeInTheDocument();
   });
 
   it('also routes through the admin Users link', async () => {
     mockAuthenticated({ role: 'admin' });
-    window.history.pushState({}, '', '/dashboard');
+    window.history.pushState({}, '', '/overview');
     render(<App />);
 
-    expect(await screen.findByText('Dashboard page')).toBeInTheDocument();
+    expect(await screen.findByText('Overview page')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('link', { name: /Users/ }));
     await waitFor(() => {
       expect(screen.getByText('Users page')).toBeInTheDocument();
     });
-    expect(screen.queryByText('Dashboard page')).not.toBeInTheDocument();
+    expect(screen.queryByText('Overview page')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('link', { name: /Update Maintenance/ }));
+    await waitFor(() => expect(screen.getByText('Updates page')).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole('link', { name: /Library Maintenance/ }));
+    await waitFor(() => expect(screen.getByText('Libraries page')).toBeInTheDocument());
   });
 });

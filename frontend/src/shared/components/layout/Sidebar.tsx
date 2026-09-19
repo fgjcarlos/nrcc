@@ -6,7 +6,6 @@ import {
   ChevronLeft,
   ChevronRight,
   DatabaseBackup,
-  File,
   Gauge,
   HardDrive,
   Library,
@@ -14,26 +13,23 @@ import {
   Settings,
   SlidersHorizontal,
   UsersRound,
-  Workflow
 } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { UserMenu } from './UserMenu';
 
 const navItems = [
-  { to: '/dashboard', label: 'Dashboard', icon: Gauge },
+  { to: '/overview', label: 'Overview', icon: Gauge },
   { to: '/bootstrap', label: 'Bootstrap', icon: HardDrive },
   { to: '/configuration', label: 'Configuration', icon: Settings },
-  { to: '/flows', label: 'Flows', icon: Workflow },
-  { to: '/backups', label: 'Backups', icon: DatabaseBackup },
-  { to: '/files', label: 'Files', icon: File },
-  { to: '/updates', label: 'Updates', icon: RotateCw },
-  { to: '/libraries', label: 'Libraries', icon: Library },
+  { to: '/backups', label: 'Recovery', icon: DatabaseBackup },
   { to: '/environment', label: 'Environment', icon: SlidersHorizontal },
 ];
 
 const adminItems = [
   { to: '/settings/users', label: 'Users', icon: UsersRound },
+  { to: '/maintenance/updates', label: 'Update Maintenance', icon: RotateCw },
+  { to: '/maintenance/libraries', label: 'Library Maintenance', icon: Library },
 ];
 
 const STORAGE_KEY = 'sidebar-collapsed';

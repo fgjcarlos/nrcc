@@ -74,7 +74,7 @@ describe('DashboardView', () => {
 
     renderDashboard()
 
-    expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument()
     expect(screen.getByText('Docker container is not running correctly. Some features may not work.')).toBeInTheDocument()
     expect(screen.getByText('Node.js no está instalado. Node-RED aún no fue detectado. nrcc no puede escribir sobre settings.js.')).toBeInTheDocument()
     expect(screen.getByText('Check environment for issues')).toBeInTheDocument()
@@ -95,7 +95,7 @@ describe('DashboardView', () => {
 
     renderDashboard()
 
-    expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument()
     expect(screen.getByText('Disk Usage')).toBeInTheDocument()
     // Runtime card promoted to the top row (issue #676 item 1) carries the
     // Restart + Open actions; QuickActionsCard was removed from this row.
