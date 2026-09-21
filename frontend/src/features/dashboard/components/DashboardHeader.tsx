@@ -9,7 +9,7 @@ export function DashboardHeader({ edgeMode }: DashboardHeaderProps) {
     <div className="flex items-end justify-between gap-4">
       <div>
         <p className="text-xs uppercase tracking-[0.28em] text-base-content/50">System overview</p>
-        <h1 className="text-3xl font-bold tracking-tight text-base-content">Dashboard</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-base-content">Overview</h1>
       </div>
       <div className="flex items-center gap-2">
         <EdgeModeBadge enabled={edgeMode} />

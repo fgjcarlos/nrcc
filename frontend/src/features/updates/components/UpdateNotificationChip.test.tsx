@@ -8,13 +8,14 @@ import * as useUpdateFlowStateHook from '@/features/updates/hooks'
 import React from 'react'
 
 // Mock dependencies
+const navigateSpy = vi.hoisted(() => vi.fn())
 vi.mock('@/hooks/useUpdateStatus')
 vi.mock('@/features/updates/hooks')
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom')
   return {
     ...actual,
-    useNavigate: () => vi.fn(),
+    useNavigate: () => navigateSpy,
   }
 })
 
@@ -157,6 +158,27 @@ describe('UpdateNotificationChip component', () => {
     await waitFor(() => {
       expect(screen.getByText('Update available')).toBeInTheDocument()
     })
+  })
+
+  it('routes update notifications to maintenance', async () => {
+    vi.spyOn(useUpdateStatusHook, 'useUpdateStatus').mockReturnValue({
+      data: {
+        currentVersion: '3.0.0',
+        latestVersion: '3.1.0',
+        updateAvailable: true,
+        checkedAt: new Date().toISOString(),
+      },
+      isLoading: false,
+      isError: false,
+      isSuccess: true,
+      status: 'success',
+    } as any)
+
+    render(<UpdateNotificationChip />, { wrapper: createWrapper() })
+
+    screen.getByLabelText('Update available, click to go to updates page').click()
+
+    expect(navigateSpy).toHaveBeenCalledWith('/maintenance/updates')
   })
 
   it('should have proper accessibility attributes', () => {

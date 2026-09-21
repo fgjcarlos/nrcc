@@ -33,7 +33,7 @@ export function UpdateNotificationChip() {
     };
 
     const handleClick = () => {
-      navigate('/updates');
+      navigate('/maintenance/updates');
     };
 
     return (
