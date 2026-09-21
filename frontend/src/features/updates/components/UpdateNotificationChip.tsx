@@ -2,6 +2,7 @@ import { ArrowUpCircle, X, Loader2, CheckCircle2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useUpdateStatus } from '@/features/updates/hooks';
 import { useUpdateFlowState } from '@/features/updates/hooks';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useState, useEffect } from 'react';
 
 const DISMISS_KEY = 'cc-update-dismissed-version';
@@ -10,6 +11,7 @@ export function UpdateNotificationChip() {
   const navigate = useNavigate();
   const { data: status } = useUpdateStatus();
   const { data: flowState } = useUpdateFlowState();
+  const { user } = useAuth();
   const [dismissed, setDismissed] = useState<string | null>(null);
 
   // Load dismissed version from localStorage on mount
@@ -22,10 +24,11 @@ export function UpdateNotificationChip() {
   const isUpdateActive = flowState?.state && ['BackingUp', 'Applying'].includes(flowState.state);
   const isUpdateCompleted = flowState?.state === 'Completed';
   const hasAvailableUpdate = status?.updateAvailable && !status?.error;
+  const isAdmin = user?.role === 'admin';
   
   // Show update available badge if there's an update and it hasn't been dismissed
   // (dismissed version is different from latest version)
-  if (hasAvailableUpdate && dismissed !== status?.latestVersion && !isUpdateActive) {
+  if (isAdmin && hasAvailableUpdate && dismissed !== status?.latestVersion && !isUpdateActive) {
     const handleDismiss = (e: React.MouseEvent) => {
       e.stopPropagation();
       localStorage.setItem(DISMISS_KEY, status.latestVersion);
@@ -33,7 +36,7 @@ export function UpdateNotificationChip() {
     };
 
     const handleClick = () => {
-      navigate('/updates');
+      navigate('/maintenance/updates');
     };
 
     return (

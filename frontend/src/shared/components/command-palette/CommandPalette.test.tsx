@@ -48,7 +48,7 @@ function LocationProbe() {
   return <div data-testid="location">{location.pathname}</div>;
 }
 
-function renderPalette(initialPath = '/dashboard') {
+function renderPalette(initialPath = '/overview') {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
   return render(
@@ -97,10 +97,10 @@ describe('CommandPalette', () => {
     await user.type(search, 'configuration');
 
     expect(screen.getByRole('option', { name: /go to configuration/i })).toBeInTheDocument();
-    expect(screen.queryByRole('option', { name: /go to dashboard/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /go to overview/i })).not.toBeInTheDocument();
   });
 
-  it('does not offer navigation to removed Logs or Docker pages', async () => {
+  it('does not offer navigation to removed legacy pages', async () => {
     renderPalette();
     const user = userEvent.setup();
 
@@ -108,18 +108,40 @@ describe('CommandPalette', () => {
 
     expect(screen.queryByRole('option', { name: 'Open Logs' })).not.toBeInTheDocument();
     expect(screen.queryByRole('option', { name: 'Go to Docker' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Go to Flows' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Go to Files' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Go to Updates' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Go to Libraries' })).not.toBeInTheDocument();
   });
 
   it('executes route navigation from the keyboard', async () => {
-    renderPalette('/dashboard');
+    renderPalette('/overview');
     const user = userEvent.setup();
 
     await user.keyboard('{Control>}k{/Control}');
-    await user.type(screen.getByRole('combobox', { name: /search commands/i }), 'backups');
+    await user.type(screen.getByRole('combobox', { name: /search commands/i }), 'recovery');
     await user.keyboard('{Enter}');
 
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/backups'));
     expect(screen.queryByRole('dialog', { name: /command palette/i })).not.toBeInTheDocument();
+  });
+
+
+  it('offers separate update and library maintenance routes to admins', async () => {
+    renderPalette();
+    const user = userEvent.setup();
+
+    await user.keyboard('{Control>}k{/Control}');
+    await user.type(screen.getByRole('combobox', { name: /search commands/i }), 'update maintenance');
+    await user.keyboard('{Enter}');
+
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/maintenance/updates'));
+
+    await user.keyboard('{Control>}k{/Control}');
+    await user.type(screen.getByRole('combobox', { name: /search commands/i }), 'library maintenance');
+    await user.keyboard('{Enter}');
+
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/maintenance/libraries'));
   });
 
   it('confirms and runs protected service commands for admins', async () => {
@@ -135,7 +157,7 @@ describe('CommandPalette', () => {
     expect(toastSpy).toHaveBeenCalledWith('Command executed', expect.objectContaining({ description: 'Backup Now' }));
   });
 
-  it('hides admin-only service commands from viewers', async () => {
+  it('hides admin-only service and maintenance commands from viewers', async () => {
     authState.user = { id: 'u2', username: 'viewer', role: 'viewer', createdAt: '2024-01-01T00:00:00Z' };
     renderPalette();
     const user = userEvent.setup();
@@ -144,6 +166,12 @@ describe('CommandPalette', () => {
     await user.type(screen.getByRole('combobox', { name: /search commands/i }), 'restart');
 
     expect(screen.queryByRole('option', { name: /restart node-red/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/no matching commands/i)).toBeInTheDocument();
+
+    await user.clear(screen.getByRole('combobox', { name: /search commands/i }));
+    await user.type(screen.getByRole('combobox', { name: /search commands/i }), 'library maintenance');
+
+    expect(screen.queryByRole('option', { name: /go to library maintenance/i })).not.toBeInTheDocument();
     expect(screen.getByText(/no matching commands/i)).toBeInTheDocument();
   });
 });

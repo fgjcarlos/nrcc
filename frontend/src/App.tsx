@@ -1,9 +1,11 @@
 import { lazy, Suspense, useEffect, useState, type ComponentType, type ReactNode } from 'react';
-import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Navigate, Routes, Route, useNavigate } from 'react-router-dom';
 import { setNavigator } from '@/shared/lib/navigation';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { Layout } from '@/shared/components/layout/Layout';
 import { ProtectedRoute } from '@/shared/components/ProtectedRoute';
+import { useAuth } from '@/features/auth/hooks/useAuth';
+import { authService } from '@/features/auth/services/authService';
 import { ErrorBoundary } from '@/shared/components/layout/ErrorBoundary';
 import { Button } from '@/shared/components/ui/Button';
 
@@ -15,10 +17,6 @@ function lazyNamed<T extends ComponentType<object>>(
 }
 
 // Public pages (no layout)
-const LandingView = lazyNamed(
-  () => import('@/features/auth/components/LandingView'),
-  'LandingView',
-);
 const SetupView = lazyNamed(
   () => import('@/features/auth/components/SetupView'),
   'SetupView',
@@ -53,18 +51,6 @@ const LibrariesView = lazyNamed(
   () => import('@/features/libraries/components/LibrariesView'),
   'LibrariesView',
 );
-const FlowsView = lazyNamed(
-  () => import('@/features/flows/components/FlowsView'),
-  'FlowsView',
-);
-const FlowVersionsView = lazyNamed(
-  () => import('@/features/flows/components/FlowVersionsView'),
-  'FlowVersionsView',
-);
-const FlowDetailView = lazyNamed(
-  () => import('@/features/flows/components/FlowDetailView'),
-  'FlowDetailView',
-);
 const BootstrapView = lazyNamed(
   () => import('@/features/bootstrap/components/BootstrapView'),
   'BootstrapView',
@@ -76,10 +62,6 @@ const EnvVarsView = lazyNamed(
 const BackupsView = lazyNamed(
   () => import('@/features/backups/components/BackupsView'),
   'BackupsView',
-);
-const FilesView = lazyNamed(
-  () => import('@/features/files/components/FilesView'),
-  'FilesView',
 );
 
 function RouteLoadingFallback({ label }: { label: string }) {
@@ -134,6 +116,42 @@ function routeElement(label: string, view: ReactNode, requiredRole?: 'admin') {
   );
 }
 
+function RootRedirect() {
+  const { isAuthenticated, isLoading } = useAuth();
+  const [serverInitialized, setServerInitialized] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void authService
+      .getStatus()
+      .then(({ initialized }) => {
+        if (!cancelled) {
+          setServerInitialized(initialized);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setServerInitialized(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (isLoading || serverInitialized === null) {
+    return <RouteLoadingFallback label="home" />;
+  }
+
+  if (!serverInitialized) {
+    return <Navigate to="/setup" replace />;
+  }
+
+  return <Navigate to={isAuthenticated ? '/overview' : '/login'} replace />;
+}
+
 function publicRouteElement(label: string, view: ReactNode) {
   return <RouteBoundary label={label}>{view}</RouteBoundary>;
 }
@@ -142,25 +160,28 @@ function AppRoutes() {
   return (
     <Routes>
       {/* Public routes without layout */}
-      <Route path="/" element={publicRouteElement('home', <LandingView />)} />
+      <Route path="/" element={<RootRedirect />} />
       <Route path="/setup" element={publicRouteElement('setup', <SetupView />)} />
       <Route path="/login" element={publicRouteElement('login', <LoginView />)} />
 
       {/* Protected routes with layout */}
       <Route path="/" element={<Layout />}>
-        <Route path="dashboard" element={routeElement('dashboard', <DashboardView />)} />
+        <Route path="overview" element={routeElement('overview', <DashboardView />)} />
+        <Route path="dashboard" element={<Navigate to="/overview" replace />} />
         <Route path="configuration" element={routeElement('configuration', <ConfigurationView />)} />
         <Route path="profile" element={routeElement('profile', <ProfileView />)} />
         <Route path="settings/users" element={routeElement('users', <UsersView />, 'admin')} />
-        <Route path="updates" element={routeElement('updates', <UpdatesView />)} />
-        <Route path="libraries" element={routeElement('libraries', <LibrariesView />)} />
-        <Route path="flows" element={routeElement('flows', <FlowsView />)} />
-        <Route path="flows/versions" element={routeElement('flow versions', <FlowVersionsView />)} />
-        <Route path="flows/:id" element={routeElement('flow details', <FlowDetailView />)} />
+        <Route path="maintenance/updates" element={routeElement('maintenance updates', <UpdatesView />, 'admin')} />
+        <Route path="maintenance/libraries" element={routeElement('maintenance libraries', <LibrariesView />, 'admin')} />
+        <Route path="updates" element={<Navigate to="/maintenance/updates" replace />} />
+        <Route path="libraries" element={<Navigate to="/maintenance/libraries" replace />} />
+        <Route path="flows" element={<Navigate to="/overview" replace />} />
+        <Route path="flows/versions" element={<Navigate to="/backups" replace />} />
+        <Route path="flows/:id" element={<Navigate to="/overview" replace />} />
         <Route path="bootstrap" element={routeElement('bootstrap', <BootstrapView />)} />
         <Route path="environment" element={routeElement('environment variables', <EnvVarsView />)} />
-        <Route path="backups" element={routeElement('backups', <BackupsView />)} />
-        <Route path="files" element={routeElement('files', <FilesView />)} />
+        <Route path="backups" element={routeElement('recovery', <BackupsView />)} />
+        <Route path="files" element={<Navigate to="/overview" replace />} />
       </Route>
     </Routes>
   );

@@ -8,13 +8,20 @@ import * as useUpdateFlowStateHook from '@/features/updates/hooks'
 import React from 'react'
 
 // Mock dependencies
+const navigateSpy = vi.hoisted(() => vi.fn())
+const authState = vi.hoisted(() => ({
+  user: { id: 'admin', username: 'admin', role: 'admin' as 'admin' | 'viewer', createdAt: '2024-01-01T00:00:00Z' },
+}))
 vi.mock('@/hooks/useUpdateStatus')
 vi.mock('@/features/updates/hooks')
+vi.mock('@/features/auth/hooks/useAuth', () => ({
+  useAuth: () => ({ user: authState.user }),
+}))
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom')
   return {
     ...actual,
-    useNavigate: () => vi.fn(),
+    useNavigate: () => navigateSpy,
   }
 })
 
@@ -38,6 +45,7 @@ describe('UpdateNotificationChip component', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     localStorage.clear()
+    authState.user = { id: 'admin', username: 'admin', role: 'admin', createdAt: '2024-01-01T00:00:00Z' }
     // Default mock for flow state: Idle (no active update)
     vi.spyOn(useUpdateFlowStateHook, 'useUpdateFlowState').mockReturnValue({
       data: { state: 'Idle' },
@@ -157,6 +165,48 @@ describe('UpdateNotificationChip component', () => {
     await waitFor(() => {
       expect(screen.getByText('Update available')).toBeInTheDocument()
     })
+  })
+
+  it('hides actionable update notifications from viewers', () => {
+    authState.user = { id: 'viewer', username: 'viewer', role: 'viewer', createdAt: '2024-01-01T00:00:00Z' }
+    vi.spyOn(useUpdateStatusHook, 'useUpdateStatus').mockReturnValue({
+      data: {
+        currentVersion: '3.0.0',
+        latestVersion: '3.1.0',
+        updateAvailable: true,
+        checkedAt: new Date().toISOString(),
+      },
+      isLoading: false,
+      isError: false,
+      isSuccess: true,
+      status: 'success',
+    } as any)
+
+    const { container } = render(<UpdateNotificationChip />, { wrapper: createWrapper() })
+
+    expect(container.firstChild).toBeNull()
+    expect(navigateSpy).not.toHaveBeenCalled()
+  })
+
+  it('routes update notifications to maintenance', async () => {
+    vi.spyOn(useUpdateStatusHook, 'useUpdateStatus').mockReturnValue({
+      data: {
+        currentVersion: '3.0.0',
+        latestVersion: '3.1.0',
+        updateAvailable: true,
+        checkedAt: new Date().toISOString(),
+      },
+      isLoading: false,
+      isError: false,
+      isSuccess: true,
+      status: 'success',
+    } as any)
+
+    render(<UpdateNotificationChip />, { wrapper: createWrapper() })
+
+    screen.getByLabelText('Update available, click to go to updates page').click()
+
+    expect(navigateSpy).toHaveBeenCalledWith('/maintenance/updates')
   })
 
   it('should have proper accessibility attributes', () => {

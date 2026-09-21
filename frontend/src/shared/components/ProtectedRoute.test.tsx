@@ -22,7 +22,7 @@ const renderProtectedRoute = (requiredRole?: 'admin' | 'viewer') =>
           }
         />
         <Route path="/login" element={<div>Login route</div>} />
-        <Route path="/dashboard" element={<div>Dashboard route</div>} />
+        <Route path="/overview" element={<div>Overview route</div>} />
       </Routes>
     </MemoryRouter>
   )
@@ -53,7 +53,7 @@ describe('ProtectedRoute', () => {
     expect(await screen.findByText('Login route')).toBeInTheDocument()
   })
 
-  it('redirects users without the required role to the dashboard', async () => {
+  it('redirects users without the required role to Overview', async () => {
     vi.mocked(useAuthModule.useAuth).mockReturnValue(
       buildAuthMock({
         isAuthenticated: true,
@@ -64,7 +64,7 @@ describe('ProtectedRoute', () => {
 
     renderProtectedRoute('admin')
 
-    expect(await screen.findByText('Dashboard route')).toBeInTheDocument()
+    expect(await screen.findByText('Overview route')).toBeInTheDocument()
   })
 
   it('renders the child content for authorized users', () => {
