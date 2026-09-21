@@ -58,7 +58,9 @@ async function login(page: Page): Promise<void> {
   await page.getByLabel('Username').fill(username)
   await page.getByLabel('Password').fill(password)
   await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
+  // Issue #763 renamed the landing surface /dashboard -> /overview with an
+  // "Overview" heading (/dashboard is now only a redirect).
+  await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible()
 }
 
 async function seedProbeFlow(): Promise<void> {

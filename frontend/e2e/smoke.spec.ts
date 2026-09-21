@@ -10,7 +10,8 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
     await page.getByLabel('Password', { exact: true }).fill('password123')
     await page.getByLabel('Confirm Password').fill('password123')
     await page.getByRole('button', { name: 'Create account and continue' }).click()
-    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
+    // Issue #763: setup lands on the canonical /overview surface.
+    await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible()
   })
 
   test('login flow opens the dashboard with representative status responses', async ({ page }) => {
@@ -24,7 +25,7 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
 
   test('restart flow drives the real Reiniciar button and shows the success toast', async ({ page }) => {
     await login(page)
-    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible()
     await page.getByRole('button', { name: 'Reiniciar' }).click()
     await expect(page.getByRole('heading', { name: '¿Reiniciar Node-RED?' })).toBeVisible()
     await page.getByRole('button', { name: 'Sí, reiniciar' }).click()
@@ -33,7 +34,9 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
 
   test('backup creation uses fixture responses', async ({ page }) => {
     await login(page)
-    await page.getByRole('link', { name: /Backups/ }).click()
+    // Issue #763 renamed the sidebar label to "Recovery" (/backups keeps
+    // the "Backups" page heading).
+    await page.getByRole('link', { name: /Recovery/ }).click()
     await expect(page.getByRole('heading', { name: 'Backups', exact: true })).toBeVisible()
     await page.getByRole('button', { name: /Crear backup ahora/ }).first().click()
     await expect(page.getByRole('button', { name: 'Manual smoke backup' })).toBeVisible()
@@ -60,15 +63,17 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
     // Reach each route directly. Doing page.goto / url avoids race conditions
     // where the previous view is still tearing down when the next link click
     // fires (Backups in particular was catching the next nav mid-render).
+    // Issue #763 focused navigation on configuration operations: /flows and
+    // /files were removed (they redirect to /overview) and /updates and
+    // /libraries moved under /maintenance/*. Exercise the canonical routes.
     const pages: Array<{ url: string; heading: string }> = [
-      { url: '/flows', heading: 'Flows' },
-      { url: '/libraries', heading: 'npm Libraries' },
-      { url: '/backups', heading: 'Backups' },
-      { url: '/configuration', heading: 'Node-RED Configuration' },
-      { url: '/environment', heading: 'Environment Variables' },
-      { url: '/files', heading: 'Files' },
-      { url: '/updates', heading: 'Node-RED Updates' },
+      { url: '/overview', heading: 'Overview' },
       { url: '/bootstrap', heading: 'Bootstrap & Environment' },
+      { url: '/configuration', heading: 'Node-RED Configuration' },
+      { url: '/backups', heading: 'Backups' },
+      { url: '/environment', heading: 'Environment Variables' },
+      { url: '/maintenance/updates', heading: 'Node-RED Updates' },
+      { url: '/maintenance/libraries', heading: 'npm Libraries' },
     ]
 
     for (const { url, heading } of pages) {
@@ -77,7 +82,7 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
     }
 
     // /profile is reached from the UserMenu, not the sidebar.
-    await page.goto('/dashboard')
+    await page.goto('/overview')
     await page.getByRole('button', { name: /open user menu/ }).click()
     await page.getByRole('menuitem', { name: 'Profile' }).click()
     await expect(page.getByRole('heading', { name: 'Profile' })).toBeVisible()
