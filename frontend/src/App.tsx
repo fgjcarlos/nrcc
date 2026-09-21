@@ -5,6 +5,7 @@ import { AlertCircle, Loader2 } from 'lucide-react';
 import { Layout } from '@/shared/components/layout/Layout';
 import { ProtectedRoute } from '@/shared/components/ProtectedRoute';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import { authService } from '@/features/auth/services/authService';
 import { ErrorBoundary } from '@/shared/components/layout/ErrorBoundary';
 import { Button } from '@/shared/components/ui/Button';
 
@@ -116,13 +117,35 @@ function routeElement(label: string, view: ReactNode, requiredRole?: 'admin') {
 }
 
 function RootRedirect() {
-  const { isAuthenticated, isInitialized, isLoading } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
+  const [serverInitialized, setServerInitialized] = useState<boolean | null>(null);
 
-  if (isLoading) {
+  useEffect(() => {
+    let cancelled = false;
+
+    void authService
+      .getStatus()
+      .then(({ initialized }) => {
+        if (!cancelled) {
+          setServerInitialized(initialized);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setServerInitialized(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (isLoading || serverInitialized === null) {
     return <RouteLoadingFallback label="home" />;
   }
 
-  if (!isInitialized) {
+  if (!serverInitialized) {
     return <Navigate to="/setup" replace />;
   }
 
