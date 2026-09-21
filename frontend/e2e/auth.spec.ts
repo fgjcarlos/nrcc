@@ -13,8 +13,8 @@ test.describe('NRCC auth boundaries', () => {
     await login(page)
     await page.reload()
 
-    await expect(page).toHaveURL(/\/dashboard$/)
-    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
+    await expect(page).toHaveURL(/\/overview$/)
+    await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible()
     expect(loginRequests).toBe(1)
   })
 
@@ -62,8 +62,9 @@ test.describe('NRCC auth boundaries', () => {
       })
     })
     // ProtectedRoute redirects non-admin users from /settings/users to
-    // /dashboard (see ProtectedRoute.tsx:35). The observable signal is the
-    // URL: a viewer should never see the Users page render.
+    // /overview (see ProtectedRoute.tsx; issue #763 renamed the landing
+    // route). The observable signal is the URL: a viewer should never see
+    // the Users page render.
     await page.goto('/settings/users')
     await expect(page).not.toHaveURL(/\/settings\/users$/)
   })

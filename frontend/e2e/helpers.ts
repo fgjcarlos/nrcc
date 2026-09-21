@@ -113,5 +113,9 @@ export async function login(page: Page) {
   await page.getByLabel('Username').fill('admin')
   await page.getByLabel('Password').fill('password123')
   await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
+  // Issue #763 renamed the landing route /dashboard -> /overview and the
+  // page heading "Dashboard" -> "Overview". /dashboard only remains as a
+  // redirect, so the canonical post-login surface is asserted here.
+  await expect(page).toHaveURL(/\/overview$/)
+  await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible()
 }
