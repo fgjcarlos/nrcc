@@ -122,6 +122,7 @@ func TestParseBulkEnv_RejectsEntryTooLarge(t *testing.T) {
 }
 
 func TestParseBulkEnv_AcceptsAtLimits(t *testing.T) {
+	// l10n: technical-unicode-fixture — the é is intentional payload
 	value := strings.Repeat("é", 4095) + "v"
 	result := mustParseBulkWithLimits(t, "# ignored\n\nK="+value+"#string\nB=2", BulkLimits{MaxEntries: 2, MaxEntryBytes: 8192})
 	if !result.Valid || len(result.Lines) != 2 {

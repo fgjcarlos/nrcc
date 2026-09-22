@@ -20,6 +20,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io/fs"
 	"os"
@@ -67,6 +68,8 @@ var excludedPathPrefixes = []string{
 	"frontend/e2e",   // e2e specs mirror UI strings; migrated with the catalog in #767
 	"auditoria",      // historical audit docs are immutable; only NEW docs are English
 	"tools/langscan", // self-reference: the scanner's own docs/tests use Spanish fixtures
+	"odd/tasks",      // ODD workspace docs may quote non-English artefacts verbatim as evidence
+	".agents/skills", // third-party agent skills (installed by the agent-skills framework)
 }
 
 // scannedExtensions limits the walk to known technical files. Locale
@@ -153,11 +156,29 @@ func hasExcludedDir(path string) bool {
 	return false
 }
 
+// exemptionMarker exempts the line (or the line that follows it)
+// from the language-policy scan. Contributors attach it inline
+// (`... // l10n: <reason>`) or on its own line above the snippet
+// they want to exempt. The scanner keeps both forms so a contributor
+// can choose whichever fits the artefact.
+const exemptionMarker = "// l10n:"
+
+// hasExemptionMarker reports whether line carries an exemption marker.
+func hasExemptionMarker(line string) bool {
+	return strings.Contains(line, exemptionMarker)
+}
+
 // lineShouldFlag returns the reason string if line should be reported,
-// empty string otherwise.
+// empty string otherwise. A line that carries or follows an exemption
+// marker is always skipped so contributors can opt out for
+// intentional non-English snippets (Unicode fixtures, illustrative
+// i18n examples, etc.).
 func lineShouldFlag(line string) string {
 	trimmed := strings.TrimSpace(line)
 	if trimmed == "" {
+		return ""
+	}
+	if hasExemptionMarker(trimmed) {
 		return ""
 	}
 	if !hasSpanishChar(trimmed) {
@@ -225,7 +246,9 @@ func Scan(root string) ([]Finding, error) {
 }
 
 // scanFile reads path under root and returns findings for each
-// Spanish-sentence line.
+// Spanish-sentence line. A line is skipped when it carries an
+// exemption marker (// l10n: <reason>) inline OR when the previous
+// line is exactly a marker line.
 func scanFile(root, rel string) ([]Finding, error) {
 	full := filepath.Join(root, rel)
 	f, err := os.Open(full)
@@ -237,15 +260,23 @@ func scanFile(root, rel string) ([]Finding, error) {
 	var findings []Finding
 	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, 1024*1024), 4*1024*1024) // long lines
+	prevWasMarker := false
 	lineNo := 0
 	for scanner.Scan() {
 		lineNo++
 		text := scanner.Text()
+		if prevWasMarker {
+			prevWasMarker = false
+			continue
+		}
+		if hasExemptionMarker(strings.TrimSpace(text)) {
+			prevWasMarker = true
+			continue
+		}
 		reason := lineShouldFlag(text)
 		if reason == "" {
 			continue
 		}
-		// Column is the byte index of the first Spanish char in the line.
 		col := strings.IndexAny(text, spanishChars)
 		if col < 0 {
 			col = 0
@@ -304,8 +335,12 @@ func main() {
 		fmt.Fprintln(os.Stderr, "scan error:", err)
 		os.Exit(2)
 	}
-	if os.Getenv("LANGSCAN_FORMAT") == "markdown" {
+	if format := flag.String("format", "json", "output format: json or markdown"); *format == "markdown" {
 		fmt.Print(RenderMarkdown(findings))
+		return
+	}
+	if len(findings) == 0 {
+		fmt.Println("[]")
 		return
 	}
 	enc := json.NewEncoder(os.Stdout)

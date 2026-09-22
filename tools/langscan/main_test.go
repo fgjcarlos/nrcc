@@ -221,3 +221,52 @@ func TestRenderMarkdown(t *testing.T) {
 		t.Errorf("markdown missing Hola: %s", md)
 	}
 }
+
+// TestScan_InlineExemptionMarker — a line carrying an inline
+// `// l10n: <reason>` marker is exempt from reporting. The marker
+// lets a file declare an intentional non-English snippet
+// (Unicode test fixture, illustrative i18n example, etc.) without
+// rewriting the snippet.
+func TestScan_InlineExemptionMarker(t *testing.T) {
+	withTempRepo(t, func(root string) {
+		writeFile(t, root, "internal/foo/exempt.go", `package foo
+
+// Esta función se ignora porque lleva el marker. // l10n: illustrative
+func Bar() {}
+`)
+		findings, err := Scan(root)
+		if err != nil {
+			t.Fatalf("Scan: %v", err)
+		}
+		for _, f := range findings {
+			if strings.Contains(f.Path, "exempt.go") {
+				t.Errorf("line with // l10n: marker must be exempt, got %+v", f)
+			}
+		}
+	})
+}
+
+// TestScan_PrecedingLineExemptionMarker — a line carrying a Spanish
+// sentence preceded by a `// l10n: <reason>` marker on its own
+// line is also exempt. This is the form slice 2 uses for multi-line
+// Spanish snippets.
+func TestScan_PrecedingLineExemptionMarker(t *testing.T) {
+	withTempRepo(t, func(root string) {
+		writeFile(t, root, "internal/foo/multi.go", `package foo
+
+// l10n: technical-unicode-fixture
+// Esta función valida el usuario antes de continuar.
+func Foo() {}
+`)
+		findings, err := Scan(root)
+		if err != nil {
+			t.Fatalf("Scan: %v", err)
+		}
+		for _, f := range findings {
+			if strings.Contains(f.Path, "multi.go") && strings.Contains(f.Text, "Esta función") {
+				t.Errorf("line after // l10n: marker must be exempt, got %+v", f)
+			}
+		}
+	})
+}
+
