@@ -132,4 +132,8 @@ export const UI_COPY = {
   saveRawSettings: 'Save raw settings.js',
   savingRawSettings: 'Saving settings.js...',
   lockedBadge: 'Locked — click "Unlock to edit" to make changes',
+  // Curated presets (slice 3 of #764)
+  confirmApply: 'Confirm apply',
+  presetAck:
+    'I understand that confirming a preset will rewrite the managed key in settings.js and the original managed value cannot be recovered unless a backup exists.',
 } as const;

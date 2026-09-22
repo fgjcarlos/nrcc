@@ -9,6 +9,12 @@ interface ConfirmationDialogProps {
   isOpen: boolean;
   title: string;
   description: string;
+  // Optional body slot rendered between the description and the
+  // confirm/cancel footer. Slice 3 of #764 (AdvancedSettings) uses
+  // this to render a redacted diff preview alongside the standard
+  // description text. Callers that do not pass children get the
+  // previous behaviour verbatim.
+  children?: React.ReactNode;
   confirmText?: string;
   acknowledgement?: string;
   variant?: ConfirmationVariant;
@@ -21,6 +27,7 @@ export function ConfirmationDialog({
   isOpen,
   title,
   description,
+  children,
   confirmText = '',
   acknowledgement,
   variant = 'default',
@@ -219,6 +226,8 @@ export function ConfirmationDialog({
                />
              </div>
            )}
+
+           {children}
 
            {acknowledgement && (
              <label className="mt-4 flex items-start gap-3 cursor-pointer select-none">

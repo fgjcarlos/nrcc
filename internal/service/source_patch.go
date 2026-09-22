@@ -76,6 +76,12 @@ var managedSettingKeys = []string{
 	"credentialSecret",
 	"functionGlobalContext",
 	"env",
+	// https — issue #764 slice 1 contract expansion. The catalog
+	// already lists https as a Node-RED 5 setting (shape=https-options)
+	// and apply_diff.go already redacts it as a secret; promoting it
+	// to managed lets the https-tls-preset route through SourcePatch
+	// while keeping the existing preservation guarantees.
+	"https",
 }
 
 // IsManagedSettingKey reports whether key is one NRCC edits through its
@@ -234,6 +240,28 @@ func SourcePatch(content string, edits []SourceEdit) (SourcePatchResult, error) 
 
 	result.Content = current
 	return result, nil
+}
+
+// extractTopLevelBlockContent returns the textual content of a top-level
+// `key: { ... }` block in content (the substring between the opening brace
+// and the matching closing brace, trimmed). Returns "" when the key is
+// absent or the source is not a recognisable module.exports literal.
+//
+// This helper is used by the functionGlobalContext-relaxed preset to
+// round-trip operator-authored entries (e.g. require() expressions)
+// through the apply pipeline so the issue's
+// FunctionGlobalContextAndNodeDefaultsFixtureSuite acceptance test
+// passes the "executable/unknown cases remain preserved" half.
+func extractTopLevelBlockContent(content, key string) string {
+	start, end, ok := findTopLevelBlock(content, key)
+	if !ok {
+		return ""
+	}
+	inner := content[start:end]
+	// Trim a trailing comma so the result round-trips through
+	// ApplyBlockEdit, which re-adds the comma.
+	inner = strings.TrimRight(strings.TrimSpace(inner), ",")
+	return inner
 }
 
 // findModuleExportsClosingBrace returns the byte index of the closing '}'

@@ -12,6 +12,7 @@ import {
 } from '.';
 import { SecurityCenter } from './SecurityCenter';
 import { DashboardAccess } from './DashboardAccess';
+import { AdvancedSettings } from './AdvancedSettings';
 import {
   Settings, Server, Lock, Shield, Activity, Palette,
   Save, LockOpen, AlertTriangle, Bot
@@ -334,6 +335,12 @@ export function ConfigurationView() {
           ) : activeTab === 'ai' ? <AIProviderSettings /> : <ActiveComponent settings={formData} onUpdate={handleUpdateField} disabled={isSaving} />}
        </div>
 
+
+      {/* Curated preset catalogue — slice 3 of #764 */}
+      <AdvancedSettings
+        rawContent={rawSettingsContent}
+        onApplied={() => { void data.refetchConfig(); void data.refetchSettings(); }}
+      />
 
       {/* Raw Settings Editor — gated by issue #364 */}
       <div className="surface-card p-6 space-y-4">
