@@ -87,11 +87,11 @@ func TestPresetRegistry_BuildsSourceEdits_Deterministic(t *testing.T) {
 		t.Skip("https-tls-preset not registered")
 	}
 	current := map[string]string{"https": "{ key: 'old', cert: 'old' }"}
-	first, err := p.BuildEdits(current)
+	first, err := p.BuildEdits("module.exports = {}", current)
 	if err != nil {
 		t.Fatalf("BuildEdits: %v", err)
 	}
-	second, err := p.BuildEdits(current)
+	second, err := p.BuildEdits("module.exports = {}", current)
 	if err != nil {
 		t.Fatalf("BuildEdits (second): %v", err)
 	}

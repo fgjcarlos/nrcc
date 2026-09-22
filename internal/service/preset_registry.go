@@ -81,7 +81,7 @@ type Preset struct {
 	Trust           TrustTier
 	ChannelBoundary string
 	ManagedKeys     []string
-	BuildEdits      func(currentValues map[string]string) ([]SourceEdit, error)
+	BuildEdits      func(content string, currentValues map[string]string) ([]SourceEdit, error)
 }
 
 // PresetRegistry is a defensive lookup for curated presets.
@@ -172,11 +172,12 @@ func httpsTLSPreset() Preset {
 		Trust:           TrustManaged,
 		ChannelBoundary: "http-only",
 		ManagedKeys:     []string{"https"},
-		BuildEdits: func(currentValues map[string]string) ([]SourceEdit, error) {
+		BuildEdits: func(content string, currentValues map[string]string) ([]SourceEdit, error) {
 			// Slice 1: emit a fixed placeholder block. Slice 2 will
 			// derive the block content from currentValues plus the
 			// operator's inputs (key path, cert path, etc.) and the
 			// readiness probe for the live document.
+			_ = content
 			_ = currentValues
 			return []SourceEdit{{
 				Key:     "https",
@@ -203,7 +204,13 @@ func functionGlobalContextStrictPreset() Preset {
 		Trust:           TrustManaged,
 		ChannelBoundary: "editor-only",
 		ManagedKeys:     []string{"functionGlobalContext"},
-		BuildEdits: func(currentValues map[string]string) ([]SourceEdit, error) {
+		BuildEdits: func(content string, currentValues map[string]string) ([]SourceEdit, error) {
+			// The strict preset intentionally REPLACES the FGC block
+			// with a curated allow-list. Unknown / executable keys
+			// (e.g. require() expressions) are not preserved — that
+			// is the whole point of "strict". The relaxed sibling
+			// preserves them.
+			_ = content
 			_ = currentValues
 			return []SourceEdit{{
 				Key:     "functionGlobalContext",
@@ -229,14 +236,30 @@ func functionGlobalContextRelaxedPreset() Preset {
 		Trust:           TrustManaged,
 		ChannelBoundary: "editor-only",
 		ManagedKeys:     []string{"functionGlobalContext"},
-		BuildEdits: func(currentValues map[string]string) ([]SourceEdit, error) {
+		BuildEdits: func(content string, currentValues map[string]string) ([]SourceEdit, error) {
+			// Slice 2: when the existing FGC block is a recognised
+			// module.exports top-level object literal, round-trip the
+			// operator-authored entries (e.g. require() expressions)
+			// through the apply so the issue acceptance test
+			// (FunctionGlobalContextAndNodeDefaultsFixtureSuite)
+			// passes the "executable/unknown cases remain preserved"
+			// half. When the block is absent or unparseable, fall
+			// back to a minimal skeleton.
+			existing := extractTopLevelBlockContent(content, "functionGlobalContext")
+			if existing == "" {
+				return []SourceEdit{{
+					Key:     "functionGlobalContext",
+					IsBlock: true,
+					Block: "functionGlobalContext: {\n" +
+						"  // operator-managed keys\n" +
+						"}",
+				}}, nil
+			}
 			_ = currentValues
 			return []SourceEdit{{
 				Key:     "functionGlobalContext",
 				IsBlock: true,
-				Block: "functionGlobalContext: {\n" +
-					"  // operator-managed keys\n" +
-					"}",
+				Block:   existing,
 			}}, nil
 		},
 	}
@@ -254,7 +277,8 @@ func loggingCallbackMiddlewarePreset() Preset {
 		Trust:           TrustManaged,
 		ChannelBoundary: "editor-only",
 		ManagedKeys:     []string{"logging"},
-		BuildEdits: func(currentValues map[string]string) ([]SourceEdit, error) {
+		BuildEdits: func(content string, currentValues map[string]string) ([]SourceEdit, error) {
+			_ = content
 			_ = currentValues
 			return []SourceEdit{{
 				Key:     "logging",

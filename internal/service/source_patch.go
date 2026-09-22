@@ -242,6 +242,28 @@ func SourcePatch(content string, edits []SourceEdit) (SourcePatchResult, error) 
 	return result, nil
 }
 
+// extractTopLevelBlockContent returns the textual content of a top-level
+// `key: { ... }` block in content (the substring between the opening brace
+// and the matching closing brace, trimmed). Returns "" when the key is
+// absent or the source is not a recognisable module.exports literal.
+//
+// This helper is used by the functionGlobalContext-relaxed preset to
+// round-trip operator-authored entries (e.g. require() expressions)
+// through the apply pipeline so the issue's
+// FunctionGlobalContextAndNodeDefaultsFixtureSuite acceptance test
+// passes the "executable/unknown cases remain preserved" half.
+func extractTopLevelBlockContent(content, key string) string {
+	start, end, ok := findTopLevelBlock(content, key)
+	if !ok {
+		return ""
+	}
+	inner := content[start:end]
+	// Trim a trailing comma so the result round-trips through
+	// ApplyBlockEdit, which re-adds the comma.
+	inner = strings.TrimRight(strings.TrimSpace(inner), ",")
+	return inner
+}
+
 // findModuleExportsClosingBrace returns the byte index of the closing '}'
 // of the outermost module.exports object literal on its own line, plus ok.
 // The match must be the closing brace of the root object — deeper '}' are
