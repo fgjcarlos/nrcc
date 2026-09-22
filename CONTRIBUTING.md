@@ -89,6 +89,45 @@ If the bug involves backups, configuration, or anything that touches stored stat
 
 If you find a security issue, please **don't open a public issue**. Email the maintainer (contact in the [GitHub profile](https://github.com/fgjcarlos)) or open a private security advisory in this repo.
 
+## Language policy
+
+All repository-maintained technical artifacts are written in English:
+source code comments, log messages, developer-facing errors, scripts,
+configuration examples, API descriptions, CI workflow comments,
+documentation, issue and PR templates, and contributor-facing files.
+
+User-visible product copy is the only exception: it lives in i18n
+catalogs introduced by issue #767 and may carry localized content
+(English default, Spanish translation).
+
+The language-policy scanner enforces this rule. It runs
+advisory-only in CI (see `.github/workflows/language-policy.yml`, added in slice 3):
+
+```
+go run ./tools/langscan
+```
+
+Files and paths that the scanner does not report by design:
+
+- `frontend/src/**` and `frontend/e2e/**` — UI strings and specs that
+  mirror them. Migrated with the i18n catalog in #767.
+- `auditoria/**` — historical audit documents are immutable.
+- `tools/langscan/**` — the scanner code and its test fixtures.
+- `node_modules/`, `vendor/`, generated files, build artefacts.
+
+When the scanner reports a new finding, prefer one of:
+
+1. **Translate** the artefact to English.
+2. **Add an exemption marker** (`// l10n: <reason>` or equivalent) when
+   the artefact is intentional, e.g. an i18n example or a Unicode
+   test fixture.
+3. **Move** the artefact to an excluded path category (with a
+   rationale in the PR description).
+
+For policies enforced before slice 3 lands, see
+ and
+.
+
 ## License
 
 By contributing, you agree your contributions will be licensed under the [Apache License 2.0](LICENSE).
