@@ -76,6 +76,12 @@ var managedSettingKeys = []string{
 	"credentialSecret",
 	"functionGlobalContext",
 	"env",
+	// https — issue #764 slice 1 contract expansion. The catalog
+	// already lists https as a Node-RED 5 setting (shape=https-options)
+	// and apply_diff.go already redacts it as a secret; promoting it
+	// to managed lets the https-tls-preset route through SourcePatch
+	// while keeping the existing preservation guarantees.
+	"https",
 }
 
 // IsManagedSettingKey reports whether key is one NRCC edits through its

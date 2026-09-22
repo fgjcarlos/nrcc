@@ -19,6 +19,8 @@ func TestManagedSettingKeys_CatalogExposed(t *testing.T) {
 		"editorTheme", "logging", "runtimeState",
 		"credentialSecret", "functionGlobalContext",
 		"env",
+		// #764 slice 1: https became managed (was operator-owned under #758).
+		"https",
 	}
 	got := ManagedSettingKeys()
 	if len(got) != len(want) {
@@ -46,7 +48,8 @@ func TestIsManagedSettingKey(t *testing.T) {
 		// Operator-owned / extension-owned / Node-RED advanced keys:
 		{"httpMiddleware", false},
 		{"externalModules", false},
-		{"https", false},
+		// https became managed in #764 slice 1 (was operator-owned under #758).
+		{"https", true},
 		{"exportGlobalContextKeys", false},
 		{"nodesDirArray", false},
 		{"fooBar", false},
