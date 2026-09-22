@@ -142,22 +142,13 @@ test('unknown API routes fail as JSON instead of returning the SPA', async () =>
   expect(payload.error?.code).toBe('API_ROUTE_NOT_FOUND')
 })
 
-test('flow list and detail are derived from the live Node-RED flows document', async ({ page }) => {
-  await seedProbeFlow()
-  await login(page)
-  await page.getByRole('link', { name: 'Flows', exact: true }).click()
-
-  await expect(page.getByRole('heading', { name: 'Flows' })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'NRCC E2E Flow' })).toBeVisible()
-  await expect(page.getByText('3 nodes')).toBeVisible()
-  await expect(page.getByText('2 connections')).toBeVisible()
-
-  await page.getByRole('link', { name: 'NRCC E2E Flow' }).click()
-  await expect(page.getByRole('heading', { name: 'NRCC E2E Flow' })).toBeVisible()
-  await expect(page.getByText('http in (1)')).toBeVisible()
-  await expect(page.getByText('function (1)')).toBeVisible()
-  await expect(page.getByText('http response (1)')).toBeVisible()
-})
+// Removed obsolete Flows-UI e2e test (issue #829). The public Flows UI
+// was retired by issue #763 (`/flows` and `/flows/:id` now redirect to
+// `/overview`). The functionality it covered (flows derived from the
+// live Node-RED flows document) is exercised at the API layer by
+// `frontend/src/features/flows/services/flowService.test.ts` and at the
+// component layer by `DashboardView.test.tsx`. If a future change
+// re-introduces a public Flows surface, port this test back.
 
 test('dashboard restart changes the managed Node-RED process PID', async ({ page }) => {
   const headers = await authHeaders()
