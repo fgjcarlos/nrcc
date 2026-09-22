@@ -22,6 +22,7 @@ import (
 func readFixture(t *testing.T, name string) string {
 	t.Helper()
 	path := "testdata/preset-fixtures/" + name
+	// #nosec G304 -- test fixture path is built from a package-local constant
 	b, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read fixture %s: %v", name, err)
