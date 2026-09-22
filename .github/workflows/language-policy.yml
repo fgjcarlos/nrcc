@@ -1,0 +1,72 @@
+name: Language policy (advisory)
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Advisory only: the scanner never blocks. contents read is sufficient
+# to scan the working tree; pull-requests write lets us post a comment
+# when findings exist so reviewers can see the report inline.
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  scan:
+    name: Language policy scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # pin to commit (v7.0.0)
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # pin to commit (v7.0.0)
+        with:
+          go-version: "1.26.8"
+
+      - name: Run language-policy scanner
+        id: scan
+        # || true keeps the step advisory: existing violations never
+        # block the PR. New violations still appear in the run log so
+        # reviewers see them.
+        run: |
+          set +e
+          go run ./tools/langscan > /tmp/audit.json
+          set -e
+          cat /tmp/audit.json
+          findings_count=$(jq 'length' /tmp/audit.json 2>/dev/null || echo 0)
+          echo "findings=$findings_count" >> "$GITHUB_OUTPUT"
+
+      - name: Post advisory comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@f8cd92d0b4b2191ce902d3a83f7dd2d5e91f38ec  # pin to commit (v7.0.4)
+        env:
+          FINDINGS: ${{ steps.scan.outputs.findings }}
+        with:
+          script: |
+            const fs = require('fs');
+            const findings = JSON.parse(fs.readFileSync('/tmp/audit.json', 'utf8'));
+            const count = findings.length;
+            const header = count === 0
+              ? 'Language policy: no findings.'
+              : 'Language policy: ' + count + ' finding(s). The scanner is advisory - this PR is not blocked.';
+            const body = [header, ''];
+            if (count > 0) {
+              body.push('| File | Line | Reason | Excerpt |');
+              body.push('| --- | --- | --- | --- |');
+              for (const f of findings.slice(0, 50)) {
+                const excerpt = f.text.replace(/\|/g, '\\|').slice(0, 120);
+                body.push('| `' + f.path + '` | ' + f.line + ' | ' + f.reason + ' | `' + excerpt + '` |');
+              }
+              if (count > 50) {
+                body.push('| _...and ' + (count - 50) + ' more_ | | | |');
+              }
+              body.push('');
+              body.push('See CONTRIBUTING.md Language policy section for remediation options.');
+            }
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body.join('\n'),
+            });
