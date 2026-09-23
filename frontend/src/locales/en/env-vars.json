@@ -1,0 +1,6 @@
+{
+  "dotenvSaved": "Variables saved",
+  "dotenvSaving": "Saving variables",
+  "dotenvEditorHint": "Variables defined here override the table values. Node-RED restarts automatically on save.",
+  "dotenvCommentSample": "# Lines starting with # are comments"
+}

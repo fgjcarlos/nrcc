@@ -1,0 +1,23 @@
+{
+  "loading": "Cargando flujos",
+  "failedToLoad": "No se pudieron cargar los flujos",
+  "noFlowsFound": "No se encontraron flujos",
+  "nodeRedUnavailable": "Node-RED no está disponible",
+  "checkNodeRedContainer": "Verifica que el contenedor Node-RED esté en ejecución.",
+  "selectAll": "Seleccionar todo",
+  "deselectAll": "Quitar selección",
+  "selected_one": "{{count}} flujo seleccionado",
+  "selected_other": "{{count}} flujos seleccionados",
+  "analyzing": "Analizando...",
+  "analyzeWithAI": "Analizar con IA",
+  "nodes": "nodos",
+  "connections": "conexiones",
+  "disabled": "Deshabilitado",
+  "aiAnalysis": "Análisis con IA",
+  "strengths": "Fortalezas",
+  "improvements": "Mejoras",
+  "suggestions": "Sugerencias",
+  "analyzedAt": "Analizado {{date}}",
+  "select": "Seleccionar",
+  "deselect": "Quitar selección"
+}

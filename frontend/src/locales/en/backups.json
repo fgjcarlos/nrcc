@@ -1,0 +1,39 @@
+{
+  "loading": "Loading backups",
+  "reading": "Reading local snapshots and associated metadata.",
+  "failedToLoad": "Could not load backup list",
+  "retryLoad": "Retry loading or check backend status.",
+  "noBackupsYet": "No backups yet",
+  "createFirst": "Create first backup",
+  "createFirstDesc": "Create one manually or enable automatic scheduler",
+  "table": {
+    "type": "Type",
+    "name": "Name",
+    "date": "Date",
+    "files": "Files",
+    "size": "Size",
+    "actions": "Actions"
+  },
+  "actions": {
+    "download": "Download",
+    "restore": "Restore",
+    "delete": "Delete"
+  },
+  "configurationSaved": "Backup configuration saved",
+  "backupCreated": "Backup created successfully",
+  "backupRestored": "Backup restored successfully",
+  "backupDeleted": "Backup deleted",
+  "retentionPolicySaved": "Retention policy saved",
+  "preRestoreBackupNotice": "A safety backup was created: {{id}}",
+  "backupIdentifierInvalid": "The backup has no valid identifier",
+  "backupCronRequired": "Enter a cron expression for the custom scheduler",
+  "backupDownloadStarted": "Download started",
+  "backupDownloadFailed": "Could not download the backup",
+  "couldNotCreateBackup": "Could not create the backup",
+  "couldNotRestoreBackup": "Could not restore the backup",
+  "couldNotDeleteBackup": "Could not delete the backup",
+  "couldNotSaveRetentionPolicy": "Could not save the retention policy",
+  "couldNotSaveBackupConfiguration": "Could not save the backup configuration",
+  "schedulerTitle": "Scheduler configuration",
+  "schedulerDesc": "Choose a preset frequency or schedule a single backup at a specific date and time."
+}

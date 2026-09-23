@@ -1,0 +1,6 @@
+{
+  "dotenvSaved": "Variables guardadas",
+  "dotenvSaving": "Guardando variables",
+  "dotenvEditorHint": "Las variables aquí tienen prioridad sobre las configuradas en la tabla. Node-RED se reiniciará automáticamente al guardar.",
+  "dotenvCommentSample": "# Las líneas con # son comentarios"
+}

@@ -1,0 +1,25 @@
+{
+  "host": {
+    "installationDetected": "Instalación detectada",
+    "nodeRedNotDetected": "(sin Node-RED detectado)",
+    "pathNotDetected": "sin ruta detectada"
+  },
+  "advanced": {
+    "title": "Ajustes avanzados de settings.js",
+    "description": "Edita el archivo settings.js detectado por nrcc. Se crea un respaldo automáticamente antes de guardar.",
+    "lastBackup": "Último respaldo: {{path}}",
+    "unlockToEdit": "Desbloquear para editar settings.js",
+    "unlockDialogTitle": "Editar Node-RED settings.js directamente",
+    "unlockDialogDescription": "Este cambio se escribe directamente en el archivo settings.js del host ({{backupPath}}). Se toma un respaldo automáticamente antes de guardar. Un error de sintaxis en settings.js puede impedir que Node-RED se inicie, lo que dejaría el orquestador fuera de línea.",
+    "unlockAcknowledgement": "Entiendo que un guardado incorrecto puede bloquear el inicio de Node-RED.",
+    "saveRaw": "Guardar settings.js sin procesar",
+    "savingRaw": "Guardando settings.js...",
+    "lockedBadge": "Bloqueado - haz clic en \"Desbloquear para editar\" para realizar cambios",
+    "cancelEdit": "Cancelar"
+  },
+  "preset": {
+    "confirmApply": "Confirmar aplicación",
+    "acknowledgement": "Entiendo que al confirmar un preset se reescribirá la clave gestionada en settings.js y el valor original no se podrá recuperar a menos que exista un respaldo."
+  },
+  "saveErrorRaw": "La respuesta del guardado no es JSON"
+}

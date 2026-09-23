@@ -1,0 +1,39 @@
+{
+  "loading": "Cargando respaldos",
+  "reading": "Leyendo instantáneas locales y metadatos asociados.",
+  "failedToLoad": "No se pudo cargar la lista de respaldos",
+  "retryLoad": "Reintenta la carga o revisa el estado del backend.",
+  "noBackupsYet": "Aún no hay respaldos",
+  "createFirst": "Crear primer respaldo",
+  "createFirstDesc": "Crea uno manualmente o activa la programación automática",
+  "table": {
+    "type": "Tipo",
+    "name": "Nombre",
+    "date": "Fecha",
+    "files": "Archivos",
+    "size": "Tamaño",
+    "actions": "Acciones"
+  },
+  "actions": {
+    "download": "Descargar",
+    "restore": "Restaurar",
+    "delete": "Eliminar"
+  },
+  "configurationSaved": "Configuración de respaldos guardada",
+  "backupCreated": "Respaldo creado con éxito",
+  "backupRestored": "Respaldo restaurado con éxito",
+  "backupDeleted": "Respaldo eliminado",
+  "retentionPolicySaved": "Política de retención guardada",
+  "preRestoreBackupNotice": "Se creó un respaldo de seguridad: {{id}}",
+  "backupIdentifierInvalid": "El respaldo no tiene un identificador válido",
+  "backupCronRequired": "Ingresa una expresión cron para el programador personalizado",
+  "backupDownloadStarted": "Descarga iniciada",
+  "backupDownloadFailed": "No se pudo descargar el respaldo",
+  "couldNotCreateBackup": "No se pudo crear el respaldo",
+  "couldNotRestoreBackup": "No se pudo restaurar el respaldo",
+  "couldNotDeleteBackup": "No se pudo eliminar el respaldo",
+  "couldNotSaveRetentionPolicy": "No se pudo guardar la política de retención",
+  "couldNotSaveBackupConfiguration": "No se pudo guardar la configuración de respaldos",
+  "schedulerTitle": "Configuración del programador",
+  "schedulerDesc": "Elige una frecuencia predeterminada o programa un respaldo único en una fecha y hora concretas."
+}

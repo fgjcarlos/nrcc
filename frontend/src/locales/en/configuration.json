@@ -1,0 +1,25 @@
+{
+  "host": {
+    "installationDetected": "Installation detected",
+    "nodeRedNotDetected": "(no Node-RED detected)",
+    "pathNotDetected": "no path detected"
+  },
+  "advanced": {
+    "title": "Advanced settings.js",
+    "description": "Edit the live settings.js file detected by nrcc. A backup is created automatically before saving.",
+    "lastBackup": "Last backup: {{path}}",
+    "unlockToEdit": "Unlock to edit settings.js",
+    "unlockDialogTitle": "Edit Node-RED settings.js directly",
+    "unlockDialogDescription": "This change is written directly to the host settings.js file ({{backupPath}}). A backup is taken automatically before saving. A syntax error in settings.js can prevent Node-RED from starting, which would take the orchestrator offline.",
+    "unlockAcknowledgement": "I understand that a bad save can break Node-RED startup.",
+    "saveRaw": "Save raw settings.js",
+    "savingRaw": "Saving settings.js...",
+    "lockedBadge": "Locked - click \"Unlock to edit\" to make changes",
+    "cancelEdit": "Cancel"
+  },
+  "preset": {
+    "confirmApply": "Confirm apply",
+    "acknowledgement": "I understand that confirming a preset will rewrite the managed key in settings.js and the original managed value cannot be recovered unless a backup exists."
+  },
+  "saveErrorRaw": "Save returned a non-JSON response"
+}

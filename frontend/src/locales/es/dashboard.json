@@ -1,0 +1,14 @@
+{
+  "restart": {
+    "title": "¿Reiniciar Node-RED?",
+    "description": "Node-RED se detendrá y volverá a arrancar. Los flujos activos se interrumpirán brevemente.",
+    "confirm": "Sí, reiniciar",
+    "cancel": "Cancelar"
+  },
+  "container": {
+    "restartTitle": "Reiniciar contenedor",
+    "restartDescription": "¿Seguro que quieres reiniciar el contenedor Node-RED? El servicio no estará disponible durante unos instantes.",
+    "stopTitle": "Detener contenedor",
+    "stopDescription": "¿Seguro que quieres detener el contenedor Node-RED? El servicio no estará disponible hasta que lo reinicies."
+  }
+}

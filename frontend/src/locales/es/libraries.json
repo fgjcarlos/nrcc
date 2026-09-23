@@ -1,0 +1,10 @@
+{
+  "installing": "Instalando...",
+  "installed": "Instalado",
+  "installFailed": "La instalación falló",
+  "uninstalling": "Desinstalando...",
+  "uninstalled": "Desinstalado",
+  "uninstallFailed": "La desinstalación falló",
+  "searchPlaceholder": "Buscar bibliotecas npm",
+  "noLibrariesFound": "No se encontraron bibliotecas"
+}

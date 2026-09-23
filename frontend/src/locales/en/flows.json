@@ -1,0 +1,23 @@
+{
+  "loading": "Loading flows",
+  "failedToLoad": "Failed to load flows",
+  "noFlowsFound": "No flows found",
+  "nodeRedUnavailable": "Node-RED is not available",
+  "checkNodeRedContainer": "Verify that the Node-RED container is running.",
+  "selectAll": "Select all",
+  "deselectAll": "Deselect all",
+  "selected_one": "{{count}} flow selected",
+  "selected_other": "{{count}} flows selected",
+  "analyzing": "Analyzing...",
+  "analyzeWithAI": "Analyze with AI",
+  "nodes": "nodes",
+  "connections": "connections",
+  "disabled": "Disabled",
+  "aiAnalysis": "AI Analysis",
+  "strengths": "Strengths",
+  "improvements": "Improvements",
+  "suggestions": "Suggestions",
+  "analyzedAt": "Analyzed {{date}}",
+  "select": "Select",
+  "deselect": "Deselect"
+}
