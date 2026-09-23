@@ -33,5 +33,22 @@
   "languageSelector": "Selector de idioma",
   "themeLight": "Claro",
   "themeDark": "Oscuro",
-  "themeSystem": "Sistema"
+  "themeSystem": "Sistema",
+  "loadingWithLabel": "Cargando {{label}}",
+  "unableToLoad": "No se pudo cargar {{label}}",
+  "routeLoadFailed": "Esta ruta no se pudo cargar. Puedes reintentar sin salir de la página actual.",
+  "preparingSection": "Preparando esta sección...",
+  "somethingWentWrong": "Algo salió mal",
+  "reloadPage": "Recargar página",
+  "defaultErrorFallback": "Ocurrió un error. Por favor recarga la página.",
+  "productShortName": "Centro de Control",
+  "productFullName": "Centro de Control Node-RED",
+  "signedInAs": "Conectado como",
+  "profile": "Perfil",
+  "signingOut": "Cerrando sesión…",
+  "signOut": "Cerrar sesión",
+  "commandPalette": "Paleta de comandos",
+  "commandPaletteShortcut": "⌘/Ctrl K",
+  "searchCommands": "Buscar comandos",
+  "noMatchingCommands": "No hay comandos que coincidan"
 }

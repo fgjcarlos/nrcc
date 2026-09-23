@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from 'react';
+import { i18n } from '@/i18n';
 
 interface Props {
   children: ReactNode;
@@ -35,16 +36,16 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="flex flex-col items-center justify-center min-h-screen p-8 text-center">
           <h1 className="text-2xl font-bold text-base-content mb-4">
-            Something went wrong
+            {i18n.t('common:somethingWentWrong')}
           </h1>
           <p className="text-base-content/70 mb-4">
-            {this.state.error?.message || 'An error occurred. Please reload the page.'}
+            {this.state.error?.message || i18n.t('common:defaultErrorFallback')}
           </p>
           <button
             onClick={() => window.location.reload()}
             className="btn btn-primary"
           >
-            Reload Page
+            {i18n.t('common:reloadPage')}
           </button>
         </div>
       );

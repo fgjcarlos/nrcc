@@ -7,6 +7,7 @@ import { dashboardService } from '@/features/dashboard/services';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { queryKeys } from '@/shared/lib/queryKeys';
 import { cn } from '@/shared/lib/utils';
+import { useT } from '@/i18n';
 
 type CommandKind = 'navigation' | 'service' | 'external';
 
@@ -35,6 +36,7 @@ export function CommandPalette() {
   const [isExecuting, setIsExecuting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const { t } = useT();
   const queryClient = useQueryClient();
   const { data: configResponse } = useQuery({
     queryKey: queryKeys.config.root,
@@ -190,7 +192,12 @@ export function CommandPalette() {
         keywords: ['editor', 'external', 'localhost'],
         kind: 'external',
         run: () => {
-          window.open(`http://localhost:${uiPort}`, '_blank', 'noopener,noreferrer');
+          // Validate uiPort is an integer in the valid TCP port range
+          // before constructing the loopback URL. Defends against
+          // misconfigured backend responses or env injection.
+          const parsed = Number.parseInt(String(uiPort), 10);
+          const safePort = Number.isInteger(parsed) && parsed >= 1 && parsed <= 65535 ? parsed : 1880;
+          window.open(`http://localhost:${safePort}`, '_blank', 'noopener,noreferrer');
         },
       },
     ],
@@ -295,8 +302,8 @@ export function CommandPalette() {
         aria-haspopup="dialog"
         aria-expanded={isOpen}
       >
-        <span>Command palette</span>
-        <kbd className="rounded-md border border-border/70 bg-base-100 px-1.5 py-0.5 text-[0.65rem] text-base-content/60">⌘/Ctrl K</kbd>
+        <span>{t('common:commandPalette')}</span>
+        <kbd className="rounded-md border border-border/70 bg-base-100 px-1.5 py-0.5 text-[0.65rem] text-base-content/60">{t('common:commandPaletteShortcut')}</kbd>
       </button>
 
       {isOpen && (
@@ -309,7 +316,7 @@ export function CommandPalette() {
             onMouseDown={(event) => event.stopPropagation()}
           >
             <form onSubmit={onSubmit}>
-              <label className="sr-only" htmlFor="command-palette-search">Search commands</label>
+              <label className="sr-only" htmlFor="command-palette-search">{t('common:searchCommands')}</label>
               <input
                 ref={inputRef}
                 id="command-palette-search"
@@ -326,7 +333,7 @@ export function CommandPalette() {
 
               <div id="command-palette-results" role="listbox" className="max-h-[28rem] overflow-y-auto p-2">
                 {filteredCommands.length === 0 ? (
-                  <div className="px-4 py-8 text-center text-sm text-base-content/60">No matching commands</div>
+                  <div className="px-4 py-8 text-center text-sm text-base-content/60">{t('common:noMatchingCommands')}</div>
                 ) : (
                   filteredCommands.map((command, index) => (
                     <button
