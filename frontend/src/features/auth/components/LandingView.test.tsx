@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { LandingView } from './LandingView'
 import { authService } from '../services/authService'
+import { i18n } from '@/i18n'
 
 vi.mock('../services/authService', () => ({
   authService: {
@@ -28,9 +29,14 @@ const renderLanding = () =>
   )
 
 describe('LandingView branded home', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks()
     localStorage.clear()
+    // Force Spanish locale so the assertions (which expect Spanish copy
+    // from the es catalog) match the rendered output. The component
+    // resolves strings through t(), which defaults to en in jsdom.
+    localStorage.setItem('nrcc.locale', 'es');
+    await i18n.changeLanguage('es');
     window.matchMedia = vi.fn().mockImplementation((query) => ({
       matches: false,
       media: query,

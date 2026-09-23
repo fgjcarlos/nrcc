@@ -243,7 +243,7 @@ export function LandingView() {
               </p>
 
               <h1 className="max-w-4xl text-4xl font-black tracking-tight text-base-content sm:text-5xl lg:text-7xl">
-                Node-RED <span className="text-primary">{t('common:productShortName')}</span>
+                Node-RED <span className="text-primary">Control Center</span>
               </h1>
 
               <p className="mt-6 max-w-2xl text-lg leading-8 text-base-content/75 sm:text-xl">

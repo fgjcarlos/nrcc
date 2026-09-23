@@ -40,8 +40,8 @@ describe('RestartConfirmationModal (#704 portal)', () => {
     render(
       <RestartConfirmationModal isOpen={true} onCancel={vi.fn()} onConfirm={vi.fn()} />
     )
-    const cancelBtn = screen.getByRole('button', { name: /cancelar/i })
-    const confirmBtn = screen.getByRole('button', { name: /yes, restart/i })
+    const cancelBtn = screen.getByRole('button', { name: /cancel/i })
+    const confirmBtn = screen.getByRole('button', { name: /^yes, restart$/i })
     expect(cancelBtn.parentElement?.className).toMatch(/gap-2/)
     expect(confirmBtn.parentElement?.className).toMatch(/gap-2/)
   })
@@ -73,7 +73,7 @@ describe('RestartConfirmationModal (#704 portal)', () => {
     render(
       <RestartConfirmationModal isOpen={true} onCancel={onCancel} onConfirm={onConfirm} />
     )
-    await actor.click(screen.getByRole('button', { name: /yes, restart/i }))
+    await actor.click(screen.getByRole('button', { name: /^yes, restart$/i }))
     expect(onConfirm).toHaveBeenCalledTimes(1)
     expect(onCancel).not.toHaveBeenCalled()
   })

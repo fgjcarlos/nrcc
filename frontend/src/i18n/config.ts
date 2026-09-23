@@ -9,6 +9,7 @@ import { initReactI18next } from 'react-i18next';
 import enCommon from '@/locales/en/common.json';
 import enAuth from '@/locales/en/auth.json';
 import enBackups from '@/locales/en/backups.json';
+import enBootstrap from '@/locales/en/bootstrap.json';
 import enConfig from '@/locales/en/configuration.json';
 import enDashboard from '@/locales/en/dashboard.json';
 import enEnvVars from '@/locales/en/env-vars.json';
@@ -20,6 +21,7 @@ import enUpdates from '@/locales/en/updates.json';
 import esCommon from '@/locales/es/common.json';
 import esAuth from '@/locales/es/auth.json';
 import esBackups from '@/locales/es/backups.json';
+import esBootstrap from '@/locales/es/bootstrap.json';
 import esConfig from '@/locales/es/configuration.json';
 import esDashboard from '@/locales/es/dashboard.json';
 import esEnvVars from '@/locales/es/env-vars.json';
@@ -33,6 +35,7 @@ const resources = {
     common: enCommon,
     auth: enAuth,
     backups: enBackups,
+    bootstrap: enBootstrap,
     configuration: enConfig,
     dashboard: enDashboard,
     'env-vars': enEnvVars,
@@ -45,6 +48,7 @@ const resources = {
     common: esCommon,
     auth: esAuth,
     backups: esBackups,
+    bootstrap: esBootstrap,
     configuration: esConfig,
     dashboard: esDashboard,
     'env-vars': esEnvVars,
@@ -56,6 +60,9 @@ const resources = {
 };
 
 // Use a global flag so HMR re-loads don't double-register middleware.
+// SAFETY: globalThis is augmented with this flag only inside this module;
+//             the `as unknown as { ... }` narrows the Global type to the
+//             intentionally injected shape without polluting other modules.
 const w = globalThis as unknown as { __nrccI18nInitOnce?: boolean };
 if (!w.__nrccI18nInitOnce) {
   void i18n
@@ -65,8 +72,8 @@ if (!w.__nrccI18nInitOnce) {
       fallbackLng: 'en',
       defaultNS: 'common',
       ns: [
-        'common', 'auth', 'backups', 'configuration', 'dashboard',
-        'env-vars', 'files', 'flows', 'libraries', 'updates',
+        'common', 'auth', 'backups', 'bootstrap', 'configuration',
+        'dashboard', 'env-vars', 'files', 'flows', 'libraries', 'updates',
       ],
       resources,
       detection: {
