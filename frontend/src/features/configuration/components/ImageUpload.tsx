@@ -3,6 +3,7 @@ import { Upload, X, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { fileService } from '@/features/configuration/services';
 import { cn } from '@/shared/lib';
+import { useT } from '@/i18n';
 
 interface ImageUploadProps {
   label: string;
@@ -13,6 +14,7 @@ interface ImageUploadProps {
 }
 
 export function ImageUpload({ label, value, onChange, type, help }: ImageUploadProps) {
+  const { t } = useT();
   const [isUploading, setIsUploading] = useState(false);
   const [preview, setPreview] = useState<string | null>(value || null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -129,12 +131,12 @@ export function ImageUpload({ label, value, onChange, type, help }: ImageUploadP
           {isUploading ? (
             <>
               <Loader2 className="w-6 h-6 animate-spin" />
-              <span className="text-sm">Uploading...</span>
+              <span className="text-sm">{t('configuration:imageUploading')}</span>
             </>
           ) : (
             <>
               <ImageIcon className="w-6 h-6" />
-              <span className="text-sm">Click to upload image</span>
+              <span className="text-sm">{t('configuration:imageUploadPrompt')}</span>
             </>
           )}
         </button>

@@ -109,7 +109,7 @@ export function AdvancedSettings({ rawContent, onApplied }: AdvancedSettingsProp
   if (presetsQuery.isLoading) {
     return (
       <div className="flex items-center gap-2 text-sm text-base-content/65">
-        <Loader2 className="h-4 w-4 animate-spin" /> Loading curated presets…
+        <Loader2 className="h-4 w-4 animate-spin" /> {t('configuration:preset.loadingCurated')}
       </div>
     );
   }
@@ -120,7 +120,7 @@ export function AdvancedSettings({ rawContent, onApplied }: AdvancedSettingsProp
         role="status"
         className="flex items-center gap-2 rounded-xl border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning"
       >
-        <AlertTriangle className="h-4 w-4" /> Presets could not be loaded.
+        <AlertTriangle className="h-4 w-4" /> {t('configuration:preset.loadError')}
       </div>
     );
   }
@@ -128,15 +128,13 @@ export function AdvancedSettings({ rawContent, onApplied }: AdvancedSettingsProp
   const presets = presetsQuery.data;
 
   return (
-    <section aria-label="Curated presets" className="surface-card space-y-4 p-6">
+    <section aria-label={t('configuration:preset.sectionLabel')} className="surface-card space-y-4 p-6">
       <header className="flex items-center gap-2">
         <ShieldCheck className="h-5 w-5 text-primary" />
-        <h2 className="text-lg font-semibold">Curated presets</h2>
+        <h2 className="text-lg font-semibold">{t('configuration:preset.title')}</h2>
       </header>
       <p className="text-sm text-base-content/65">
-        Vetted high-value recipes for advanced Node-RED 5 settings. Each preset
-        declares the editor / HTTP / Socket.IO surfaces it touches and never
-        rewrites operator-owned code outside its declared scope.
+        {t('configuration:preset.description')}
       </p>
 
       <ul className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -176,9 +174,9 @@ export function AdvancedSettings({ rawContent, onApplied }: AdvancedSettingsProp
                 type="button"
                 onClick={() => openPreview(preset)}
                 className="action-btn-secondary"
-                aria-label={`preview ${preset.name}`}
+                aria-label={t('configuration:preset.previewAria', { name: preset.name })}
               >
-                Preview
+                {t('configuration:preset.preview')}
               </button>
             </div>
           </li>
@@ -187,13 +185,13 @@ export function AdvancedSettings({ rawContent, onApplied }: AdvancedSettingsProp
 
       <ConfirmationDialog
         isOpen={activePreset !== null}
-        title={activePreset ? `Preview: ${activePreset.name}` : ''}
+        title={activePreset ? t('configuration:preset.previewTitle', { name: activePreset.name }) : ''}
         description={
           previewError
             ? previewError
             : preview
-              ? 'Review the redacted diff. Confirm to write the patched source through /api/settings/raw (or cancel to discard).'
-              : 'Generating redacted preview…'
+              ? t('configuration:preset.reviewDiff')
+              : t('configuration:preset.generatingPreview')
         }
         onConfirm={preview ? confirmPreview : () => undefined}
         onCancel={cancelPreview}
