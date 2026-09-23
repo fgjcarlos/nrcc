@@ -31,6 +31,9 @@ var inlineLinkRe = regexp.MustCompile(`!?\[[^\]\n]*\]\(([^)\n]+)\)`)
 // broken ones. External links (http(s)://, mailto:, #anchor-only)
 // are considered well-formed and not returned.
 func Check(path string) []Finding {
+	// #nosec G304 — path is the CLI argument; the tool is invoked on
+	// user-trusted docs in the local working tree, not on remote
+	// attacker-controlled input.
 	f, err := os.Open(path)
 	if err != nil {
 		return []Finding{{Path: path, Line: 0, Target: "", Text: err.Error()}}
@@ -54,6 +57,9 @@ func Check(path string) []Finding {
 			}
 			target = stripFragment(target)
 			resolved := filepath.Join(dir, target)
+			// #nosec G703 — dir is the directory of the CLI-supplied
+			// markdown file; target is parsed out of that file's body,
+			// which is exactly the surface the tool is designed to scan.
 			if _, err := os.Stat(resolved); err != nil {
 				findings = append(findings, Finding{
 					Path:   path,
