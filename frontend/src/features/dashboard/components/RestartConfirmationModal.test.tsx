@@ -33,7 +33,7 @@ describe('RestartConfirmationModal (#704 portal)', () => {
     expect(overlay?.parentElement).toBe(document.body)
 
     // Dialog exposes the right role/labelling for a11y.
-    expect(screen.getByRole('dialog', { name: '¿Reiniciar Node-RED?' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Restart Node-RED?' })).toBeInTheDocument()
   })
 
   it('action buttons have visible horizontal separation (gap-2)', () => {
@@ -41,7 +41,7 @@ describe('RestartConfirmationModal (#704 portal)', () => {
       <RestartConfirmationModal isOpen={true} onCancel={vi.fn()} onConfirm={vi.fn()} />
     )
     const cancelBtn = screen.getByRole('button', { name: /cancelar/i })
-    const confirmBtn = screen.getByRole('button', { name: /sí, reiniciar/i })
+    const confirmBtn = screen.getByRole('button', { name: /yes, restart/i })
     expect(cancelBtn.parentElement?.className).toMatch(/gap-2/)
     expect(confirmBtn.parentElement?.className).toMatch(/gap-2/)
   })
@@ -62,7 +62,7 @@ describe('RestartConfirmationModal (#704 portal)', () => {
     onCancel.mockReset()
 
     // Click inside the dialog (the title is inside it) — must NOT cancel.
-    await actor.click(screen.getByText('¿Reiniciar Node-RED?'))
+    await actor.click(screen.getByText('Restart Node-RED?'))
     expect(onCancel).not.toHaveBeenCalled()
   })
 
@@ -73,7 +73,7 @@ describe('RestartConfirmationModal (#704 portal)', () => {
     render(
       <RestartConfirmationModal isOpen={true} onCancel={onCancel} onConfirm={onConfirm} />
     )
-    await actor.click(screen.getByRole('button', { name: /sí, reiniciar/i }))
+    await actor.click(screen.getByRole('button', { name: /yes, restart/i }))
     expect(onConfirm).toHaveBeenCalledTimes(1)
     expect(onCancel).not.toHaveBeenCalled()
   })

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, X } from 'lucide-react';
-import { UI_COPY } from '@/shared/constants/uiCopy';
+import { useT } from '@/i18n';
 
 export type ConfirmationVariant = 'danger' | 'warning' | 'default';
 
@@ -37,6 +37,7 @@ export function ConfirmationDialog({
 }: ConfirmationDialogProps) {
   const [inputValue, setInputValue] = useState('');
   const [acknowledged, setAcknowledged] = useState(false);
+  const { t } = useT();
   const inputRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
@@ -213,7 +214,7 @@ export function ConfirmationDialog({
            {confirmText && (
              <div className="mt-4">
                <label className="block text-sm font-medium text-base-content mb-2">
-                 {UI_COPY.typeToConfirmDelete(confirmText)}
+                 {t('typeToConfirmDelete', { identifier: confirmText })}
                </label>
                <input
                  ref={inputRef}
@@ -252,7 +253,7 @@ export function ConfirmationDialog({
              disabled={isPending}
              className="action-btn-secondary"
            >
-             {UI_COPY.cancel}
+             {t('cancel')}
            </button>
            <button
              onClick={onConfirm}
@@ -262,7 +263,7 @@ export function ConfirmationDialog({
              {isPending && (
                <div className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent" />
              )}
-             {isPending ? UI_COPY.processing : UI_COPY.confirm}
+             {isPending ? t('processing') : t('confirm')}
            </button>
          </div>
       </div>

@@ -1,5 +1,6 @@
 import type { BackupConfig } from '@/features/backups/services';
 import { CronBuilder, type SaveState, type PresetType } from './CronBuilder';
+import { useT } from '@/i18n';
 
 interface SchedulerConfigSectionProps {
   configDraft: BackupConfig;
@@ -11,15 +12,16 @@ interface SchedulerConfigSectionProps {
 }
 
 export function SchedulerConfigSection(props: SchedulerConfigSectionProps) {
+  const { t } = useT();
   const { configDraft, saveState, saveError, onChange, onPresetChange, onSave } = props;
   const schedule = (configDraft.schedule ?? 'disabled') as PresetType;
 
   return (
     <div className="surface-card p-6">
       <div className="mb-4">
-        <h2 className="text-lg font-semibold text-base-content">Configuración de horario</h2>
+        <h2 className="text-lg font-semibold text-base-content">{t('backups:scheduler.schedulerTitle')}</h2>
         <p className="text-sm text-base-content/65">
-          Elige una frecuencia predeterminada o programa un backup único en una fecha y hora concretas.
+          {t('backups:scheduler.schedulerDesc')}
         </p>
       </div>
 

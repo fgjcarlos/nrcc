@@ -28,5 +28,8 @@
   "none": "Ninguno",
   "refresh": "Actualizar",
   "retry": "Reintentar",
-  "languageSelector": "Selector de idioma"
+  "languageSelector": "Selector de idioma",
+  "themeLight": "Claro",
+  "themeDark": "Oscuro",
+  "themeSystem": "Sistema"
 }

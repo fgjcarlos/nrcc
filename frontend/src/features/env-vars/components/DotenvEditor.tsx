@@ -6,9 +6,11 @@ import { Save, RefreshCw } from 'lucide-react';
 
 import { queryKeys } from '@/shared/lib/queryKeys';
 import { dotenvSchema } from '@/shared/validation/schemas';
+import { useT } from '@/i18n';
 
 // TAREA 3: Component for editing .env file
 export function DotenvEditor() {
+  const { t } = useT();
   const queryClient = useQueryClient();
   const [content, setContent] = useState('');
   const [isEditing, setIsEditing] = useState(false);
@@ -28,7 +30,7 @@ export function DotenvEditor() {
       toast.success(data.message);
       setIsEditing(false);
       if (data.restarted) {
-        toast.info('Node-RED se está reiniciando...');
+        toast.info(t('env-vars:savingToast'));
       }
     },
     onError: (error: unknown) => {
@@ -65,7 +67,7 @@ export function DotenvEditor() {
         <div>
           <h2 className="text-lg font-semibold text-base-content">Archivo .env</h2>
           <p className="text-sm text-base-content/60 mt-1">
-            Las variables aquí tienen prioridad sobre las configuradas en la tabla. Node-RED se reiniciará automáticamente al guardar.
+            {t('env-vars:editorHelpText')}
           </p>
         </div>
       </div>

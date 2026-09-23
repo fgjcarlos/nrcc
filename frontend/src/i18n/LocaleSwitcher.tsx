@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { SUPPORTED_LOCALES } from './provider';
+import { SUPPORTED_LOCALES } from './constants';
 
 // LocaleSwitcher — slice 1 of issue #767.
 // Two-button group (EN | ES) rendered into the authenticated top bar.

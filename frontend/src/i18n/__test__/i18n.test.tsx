@@ -70,20 +70,14 @@ describe('i18n foundation (slice 1)', () => {
   });
 
   it('provider writes the chosen locale to localStorage', async () => {
-    let changeLang: ((l: string) => Promise<void>) | null = null;
-    const Setup: React.FC = () => {
-      const { i18n } = useT();
-      changeLang = (l: string) => i18n.changeLanguage(l).then(() => undefined);
-      return null;
-    };
     render(
       <I18nProvider>
-        <Setup />
+        <LocaleSwitcher />
       </I18nProvider>,
     );
+    const esButton = await screen.findByRole('button', { name: /es/i });
     await act(async () => {
-      await new Promise((r) => setTimeout(r, 5));
-      await changeLang!('es');
+      fireEvent.click(esButton);
       await new Promise((r) => setTimeout(r, 5));
     });
     expect(localStorage.getItem(I18N_STORAGE_KEY)).toBe('es');

@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { AlertCircle } from 'lucide-react';
 
 import { queryKeys } from '@/shared/lib/queryKeys';
+import { useT } from '@/i18n';
 const loginSchema = z.object({
   username: z.string().min(1, 'Username is required'),
   password: z.string().min(1, 'Password is required'),
@@ -17,6 +18,7 @@ const loginSchema = z.object({
 type LoginFormData = z.infer<typeof loginSchema>;
 
 export function LoginView() {
+  const { t } = useT();
   const navigate = useNavigate();
   const location = useLocation();
   const { login } = useAuth();
@@ -72,7 +74,7 @@ export function LoginView() {
             </div>
             <h1 className="text-2xl font-bold text-base-content">Sistema No Inicializado</h1>
             <p className="mt-2 text-base-content/70">
-              Aún no se ha configurado el usuario administrador.
+              {t('auth:login.adminNotConfigured')}
             </p>
           </div>
 

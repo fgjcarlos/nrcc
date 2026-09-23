@@ -1,3 +1,4 @@
+import { i18n } from '@/i18n';
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -8,8 +9,6 @@ import { authService, type User } from '../services/authService'
 import * as useAuthModule from '../hooks/useAuth'
 import * as useUsersDataModule from '../hooks/useUsersData'
 import { buildAuthMock, buildUserMock } from '../__test-utils__/authMock'
-import { UI_COPY } from '@/shared/constants/uiCopy'
-
 // Mock the auth service
 vi.mock('../services/authService', () => ({
   authService: {
@@ -106,8 +105,8 @@ describe('UsersView', () => {
 
       renderWithProviders(<UsersView />)
 
-      expect(screen.getByText(UI_COPY.accessDenied)).toBeInTheDocument()
-      expect(screen.getByText(UI_COPY.accessDeniedDescription)).toBeInTheDocument()
+      expect(screen.getByText(i18n.t('auth:accessDenied'))).toBeInTheDocument()
+      expect(screen.getByText(i18n.t('auth:accessDeniedDescription'))).toBeInTheDocument()
     })
 
     it('shows user management header for admin user', () => {
@@ -121,7 +120,7 @@ describe('UsersView', () => {
 
       renderWithProviders(<UsersView />)
 
-      expect(screen.getByText(UI_COPY.userManagement)).toBeInTheDocument()
+      expect(screen.getByText(i18n.t('auth:userManagement'))).toBeInTheDocument()
     })
   })
 
@@ -140,18 +139,18 @@ describe('UsersView', () => {
       const user = userEvent.setup()
       renderWithProviders(<UsersView />)
 
-      const addButton = screen.getByRole('button', { name: new RegExp(`${UI_COPY.add}.*${UI_COPY.createUser}`) })
+      const addButton = screen.getByRole('button', { name: new RegExp(`${i18n.t('common:add')}.*${i18n.t('auth:createUser')}`) })
       await user.click(addButton)
 
       // Look for the modal heading, not the submit button
-      expect(screen.getByRole('heading', { name: UI_COPY.createUser })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: i18n.t('auth:createUser') })).toBeInTheDocument()
     })
 
     it('has editable username, password, and role fields in create mode', async () => {
       const user = userEvent.setup()
       renderWithProviders(<UsersView />)
 
-      const addButton = screen.getByRole('button', { name: new RegExp(`${UI_COPY.add}.*${UI_COPY.createUser}`) })
+      const addButton = screen.getByRole('button', { name: new RegExp(`${i18n.t('common:add')}.*${i18n.t('auth:createUser')}`) })
       await user.click(addButton)
 
       // Username input exists and is enabled
@@ -171,10 +170,10 @@ describe('UsersView', () => {
       const user = userEvent.setup()
       renderWithProviders(<UsersView />)
 
-      const addButton = screen.getByRole('button', { name: new RegExp(`${UI_COPY.add}.*${UI_COPY.createUser}`) })
+      const addButton = screen.getByRole('button', { name: new RegExp(`${i18n.t('common:add')}.*${i18n.t('auth:createUser')}`) })
       await user.click(addButton)
 
-      const submitButton = screen.getByRole('button', { name: UI_COPY.createUser }) as HTMLButtonElement
+      const submitButton = screen.getByRole('button', { name: i18n.t('auth:createUser') }) as HTMLButtonElement
       // Submit should be disabled when form is empty
       expect(submitButton).toBeDisabled()
     })
@@ -183,7 +182,7 @@ describe('UsersView', () => {
       const user = userEvent.setup()
       renderWithProviders(<UsersView />)
 
-      const addButton = screen.getByRole('button', { name: new RegExp(`${UI_COPY.add}.*${UI_COPY.createUser}`) })
+      const addButton = screen.getByRole('button', { name: new RegExp(`${i18n.t('common:add')}.*${i18n.t('auth:createUser')}`) })
       await user.click(addButton)
 
       const usernameInputs = screen.getAllByDisplayValue('')
@@ -204,7 +203,7 @@ describe('UsersView', () => {
         await user.type(passwordInput, 'securepass123')
       }
 
-      const submitButton = screen.getByRole('button', { name: UI_COPY.createUser }) as HTMLButtonElement
+      const submitButton = screen.getByRole('button', { name: i18n.t('auth:createUser') }) as HTMLButtonElement
       expect(submitButton).toBeEnabled()
     })
   })
@@ -225,10 +224,10 @@ describe('UsersView', () => {
       renderWithProviders(<UsersView />)
 
       // Find the edit button for the viewer user (second row)
-      const editButtons = screen.getAllByRole('button', { name: UI_COPY.editUser })
+      const editButtons = screen.getAllByRole('button', { name: i18n.t('auth:editUser') })
       await user.click(editButtons[1])
 
-      expect(screen.getByRole('heading', { name: UI_COPY.editUser })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: i18n.t('auth:editUser') })).toBeInTheDocument()
       expect(screen.getByDisplayValue(mockViewerUser.username)).toBeInTheDocument()
     })
 
@@ -236,7 +235,7 @@ describe('UsersView', () => {
       const user = userEvent.setup()
       renderWithProviders(<UsersView />)
 
-      const editButtons = screen.getAllByRole('button', { name: UI_COPY.editUser })
+      const editButtons = screen.getAllByRole('button', { name: i18n.t('auth:editUser') })
       await user.click(editButtons[1])
 
       const usernameInput = screen.getByDisplayValue(mockViewerUser.username) as HTMLInputElement
@@ -256,7 +255,7 @@ describe('UsersView', () => {
       renderWithProviders(<UsersView />)
 
       // With only 1 user, getAllByRole will return at least 2 (desktop + mobile)
-      const editButtons = screen.getAllByRole('button', { name: UI_COPY.editUser })
+      const editButtons = screen.getAllByRole('button', { name: i18n.t('auth:editUser') })
       await user.click(editButtons[0])
 
       const roleSelect = screen.getByDisplayValue('Admin') as HTMLSelectElement
@@ -275,10 +274,10 @@ describe('UsersView', () => {
       const user = userEvent.setup()
       renderWithProviders(<UsersView />)
 
-      const editButtons = screen.getAllByRole('button', { name: UI_COPY.editUser })
+      const editButtons = screen.getAllByRole('button', { name: i18n.t('auth:editUser') })
       await user.click(editButtons[0])
 
-      expect(screen.getByText(UI_COPY.cannotDemoteLastAdmin)).toBeInTheDocument()
+      expect(screen.getByText(i18n.t('auth:cannotDemoteLastAdmin'))).toBeInTheDocument()
     })
 
     it('disables submit button when trying to demote sole admin', async () => {
@@ -293,10 +292,10 @@ describe('UsersView', () => {
       const user = userEvent.setup()
       renderWithProviders(<UsersView />)
 
-      const editButtons = screen.getAllByRole('button', { name: UI_COPY.editUser })
+      const editButtons = screen.getAllByRole('button', { name: i18n.t('auth:editUser') })
       await user.click(editButtons[0])
 
-      const confirmButton = screen.getByRole('button', { name: UI_COPY.confirm }) as HTMLButtonElement
+      const confirmButton = screen.getByRole('button', { name: i18n.t('common:confirm') }) as HTMLButtonElement
       expect(confirmButton).toBeDisabled()
     })
   })
@@ -316,21 +315,21 @@ describe('UsersView', () => {
       const user = userEvent.setup()
       renderWithProviders(<UsersView />)
 
-      const changePasswordButtons = screen.getAllByRole('button', { name: UI_COPY.changePassword })
+      const changePasswordButtons = screen.getAllByRole('button', { name: i18n.t('auth:changePassword') })
       await user.click(changePasswordButtons[1])
 
-      expect(screen.getByRole('heading', { name: UI_COPY.changePassword })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: i18n.t('auth:changePassword') })).toBeInTheDocument()
     })
 
     it('shows only password field in edit_password mode', async () => {
       const user = userEvent.setup()
       renderWithProviders(<UsersView />)
 
-      const changePasswordButtons = screen.getAllByRole('button', { name: UI_COPY.changePassword })
+      const changePasswordButtons = screen.getAllByRole('button', { name: i18n.t('auth:changePassword') })
       await user.click(changePasswordButtons[1])
 
       // Password label should be visible
-      const passwordLabels = screen.queryAllByText(UI_COPY.newPasswordLabel)
+      const passwordLabels = screen.queryAllByText(i18n.t('auth:newPasswordLabel'))
       expect(passwordLabels.length).toBeGreaterThan(0)
     })
 
@@ -338,10 +337,10 @@ describe('UsersView', () => {
       const user = userEvent.setup()
       renderWithProviders(<UsersView />)
 
-      const changePasswordButtons = screen.getAllByRole('button', { name: UI_COPY.changePassword })
+      const changePasswordButtons = screen.getAllByRole('button', { name: i18n.t('auth:changePassword') })
       await user.click(changePasswordButtons[1])
 
-      const confirmButton = screen.getByRole('button', { name: UI_COPY.confirm }) as HTMLButtonElement
+      const confirmButton = screen.getByRole('button', { name: i18n.t('common:confirm') }) as HTMLButtonElement
       expect(confirmButton).toBeDisabled()
     })
 
@@ -349,7 +348,7 @@ describe('UsersView', () => {
       const user = userEvent.setup()
       renderWithProviders(<UsersView />)
 
-      const changePasswordButtons = screen.getAllByRole('button', { name: UI_COPY.changePassword })
+      const changePasswordButtons = screen.getAllByRole('button', { name: i18n.t('auth:changePassword') })
       await user.click(changePasswordButtons[1])
 
       const passwordInputs = screen.getAllByDisplayValue('')
@@ -361,7 +360,7 @@ describe('UsersView', () => {
         await user.type(passwordInput, 'newpassword123')
       }
 
-      const confirmButton = screen.getByRole('button', { name: UI_COPY.confirm }) as HTMLButtonElement
+      const confirmButton = screen.getByRole('button', { name: i18n.t('common:confirm') }) as HTMLButtonElement
       expect(confirmButton).toBeEnabled()
     })
   })
@@ -381,10 +380,10 @@ describe('UsersView', () => {
       const user = userEvent.setup()
       renderWithProviders(<UsersView />)
 
-      const deleteButtons = screen.getAllByRole('button', { name: UI_COPY.delete })
+      const deleteButtons = screen.getAllByRole('button', { name: i18n.t('common:delete') })
       await user.click(deleteButtons[1])
 
-      expect(screen.getByRole('heading', { name: UI_COPY.deleteUser })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: i18n.t('common:deleteUser') })).toBeInTheDocument()
     })
 
     it('disables delete button for sole admin user', () => {
@@ -398,7 +397,7 @@ describe('UsersView', () => {
 
       renderWithProviders(<UsersView />)
 
-      const deleteButtons = screen.getAllByRole('button', { name: UI_COPY.delete })
+      const deleteButtons = screen.getAllByRole('button', { name: i18n.t('common:delete') })
       // First delete button (desktop) should be disabled
       expect(deleteButtons[0]).toBeDisabled()
     })
@@ -407,7 +406,7 @@ describe('UsersView', () => {
       renderWithProviders(<UsersView />)
 
       // Admin user (not sole admin) should have delete button enabled
-      const deleteButtons = screen.getAllByRole('button', { name: UI_COPY.delete })
+      const deleteButtons = screen.getAllByRole('button', { name: i18n.t('common:delete') })
       expect(deleteButtons[1]).toBeEnabled()
     })
   })
@@ -430,11 +429,11 @@ describe('UsersView', () => {
       renderWithProviders(<UsersView />)
 
       // Open edit modal for the second admin (not the last admin — adminCount = 2)
-      const editButtons = screen.getAllByRole('button', { name: UI_COPY.editUser })
+      const editButtons = screen.getAllByRole('button', { name: i18n.t('auth:editUser') })
       await user.click(editButtons[1])
 
       // Confirm modal opened and role select is ENABLED (not last admin)
-      expect(screen.getByRole('heading', { name: UI_COPY.editUser })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: i18n.t('auth:editUser') })).toBeInTheDocument()
       const roleSelect = screen.getByDisplayValue('Admin') as HTMLSelectElement
       expect(roleSelect).toBeEnabled()
 
@@ -443,7 +442,7 @@ describe('UsersView', () => {
       expect(roleSelect).toHaveValue('viewer')
 
       // Submit button MUST be enabled after a role change
-      const confirmButton = screen.getByRole('button', { name: UI_COPY.confirm }) as HTMLButtonElement
+      const confirmButton = screen.getByRole('button', { name: i18n.t('common:confirm') }) as HTMLButtonElement
       expect(confirmButton).toBeEnabled()
 
       // Click submit and assert the mutation is called with the new role
@@ -468,7 +467,7 @@ describe('UsersView', () => {
       const user = userEvent.setup()
       renderWithProviders(<UsersView />)
 
-      const editButtons = screen.getAllByRole('button', { name: UI_COPY.editUser })
+      const editButtons = screen.getAllByRole('button', { name: i18n.t('auth:editUser') })
       await user.click(editButtons[0])
 
       // Verify role selector is disabled
@@ -476,7 +475,7 @@ describe('UsersView', () => {
       expect(roleSelect).toBeDisabled()
 
       // Verify warning is shown
-      expect(screen.getByText(UI_COPY.cannotDemoteLastAdmin)).toBeInTheDocument()
+      expect(screen.getByText(i18n.t('auth:cannotDemoteLastAdmin'))).toBeInTheDocument()
     })
   })
 
@@ -493,7 +492,7 @@ describe('UsersView', () => {
       renderWithProviders(<UsersView />)
 
       // Header should be visible even in loading state
-      expect(screen.getByText(UI_COPY.userManagement)).toBeInTheDocument()
+      expect(screen.getByText(i18n.t('auth:userManagement'))).toBeInTheDocument()
     })
 
     it('shows empty state when user list is empty', () => {
@@ -507,8 +506,8 @@ describe('UsersView', () => {
 
       renderWithProviders(<UsersView />)
 
-      expect(screen.getByText(UI_COPY.noUsersYet)).toBeInTheDocument()
-      expect(screen.getByText(UI_COPY.addFirstUser)).toBeInTheDocument()
+      expect(screen.getByText(i18n.t('auth:noUsersYet'))).toBeInTheDocument()
+      expect(screen.getByText(i18n.t('auth:addFirstUser'))).toBeInTheDocument()
     })
 
     it('shows error state when query fails', () => {
@@ -522,7 +521,7 @@ describe('UsersView', () => {
 
       renderWithProviders(<UsersView />)
 
-      expect(screen.getByText(UI_COPY.userManagement)).toBeInTheDocument()
+      expect(screen.getByText(i18n.t('auth:userManagement'))).toBeInTheDocument()
     })
 
     it('hides table when loading', () => {
@@ -610,13 +609,13 @@ describe('UsersView', () => {
       // With 2 users, we expect 2 Edit buttons (one per user)
       // Note: screen.getAllByRole finds buttons across both desktop and mobile views
       // So for 2 users we get 2 desktop + 2 mobile = 4 total
-      const editButtons = screen.getAllByRole('button', { name: UI_COPY.editUser })
+      const editButtons = screen.getAllByRole('button', { name: i18n.t('auth:editUser') })
       expect(editButtons.length).toBeGreaterThanOrEqual(2)
 
-      const changePasswordButtons = screen.getAllByRole('button', { name: UI_COPY.changePassword })
+      const changePasswordButtons = screen.getAllByRole('button', { name: i18n.t('auth:changePassword') })
       expect(changePasswordButtons.length).toBeGreaterThanOrEqual(2)
 
-      const deleteButtons = screen.getAllByRole('button', { name: UI_COPY.delete })
+      const deleteButtons = screen.getAllByRole('button', { name: i18n.t('common:delete') })
       expect(deleteButtons.length).toBeGreaterThanOrEqual(2)
     })
   })
@@ -633,7 +632,7 @@ describe('UsersView', () => {
 
       renderWithProviders(<UsersView />)
 
-      const addButton = screen.getByRole('button', { name: new RegExp(`${UI_COPY.add}.*${UI_COPY.createUser}`) })
+      const addButton = screen.getByRole('button', { name: new RegExp(`${i18n.t('common:add')}.*${i18n.t('auth:createUser')}`) })
       expect(addButton).toBeInTheDocument()
     })
   })
@@ -657,7 +656,7 @@ describe('UsersView', () => {
       const user = userEvent.setup()
       renderWithProviders(<UsersView />)
 
-      await user.click(screen.getByRole('button', { name: new RegExp(`${UI_COPY.add}.*${UI_COPY.createUser}`) }))
+      await user.click(screen.getByRole('button', { name: new RegExp(`${i18n.t('common:add')}.*${i18n.t('auth:createUser')}`) }))
       await user.type(screen.getByRole('textbox'), 'newuser')
 
       const passwordInputs = screen.getAllByDisplayValue('')
@@ -670,7 +669,7 @@ describe('UsersView', () => {
         await user.type(passwordInput, 'securepass123')
       }
 
-      await user.click(screen.getByRole('button', { name: UI_COPY.createUser }))
+      await user.click(screen.getByRole('button', { name: i18n.t('auth:createUser') }))
 
       await waitFor(() => {
         expect(authService.createUser).toHaveBeenCalledWith('newuser', 'securepass123', 'viewer')
@@ -692,7 +691,7 @@ describe('UsersView', () => {
       const user = userEvent.setup()
       renderWithProviders(<UsersView />)
 
-      await user.click(screen.getByRole('button', { name: new RegExp(`${UI_COPY.add}.*${UI_COPY.createUser}`) }))
+      await user.click(screen.getByRole('button', { name: new RegExp(`${i18n.t('common:add')}.*${i18n.t('auth:createUser')}`) }))
       await user.type(screen.getByRole('textbox'), 'existinguser')
 
       const passwordInputs = screen.getAllByDisplayValue('')
@@ -705,13 +704,13 @@ describe('UsersView', () => {
         await user.type(passwordInput, 'securepass123')
       }
 
-      await user.click(screen.getByRole('button', { name: UI_COPY.createUser }))
+      await user.click(screen.getByRole('button', { name: i18n.t('auth:createUser') }))
 
       await waitFor(() => {
         expect(authService.createUser).toHaveBeenCalledWith('existinguser', 'securepass123', 'viewer')
       })
       expect(await screen.findByText('Username already exists')).toBeInTheDocument()
-      expect(screen.getByRole('heading', { name: UI_COPY.createUser })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: i18n.t('auth:createUser') })).toBeInTheDocument()
     })
 
     it('changes a user password from the password modal', async () => {
@@ -727,7 +726,7 @@ describe('UsersView', () => {
       const user = userEvent.setup()
       renderWithProviders(<UsersView />)
 
-      const changePasswordButtons = screen.getAllByRole('button', { name: UI_COPY.changePassword })
+      const changePasswordButtons = screen.getAllByRole('button', { name: i18n.t('auth:changePassword') })
       await user.click(changePasswordButtons[1])
 
       const passwordInputs = screen.getAllByDisplayValue('')
@@ -740,7 +739,7 @@ describe('UsersView', () => {
         await user.type(passwordInput, 'newpassword123')
       }
 
-      await user.click(screen.getByRole('button', { name: UI_COPY.confirm }))
+      await user.click(screen.getByRole('button', { name: i18n.t('common:confirm') }))
 
       await waitFor(() => {
         expect(authService.changePassword).toHaveBeenCalledWith(mockViewerUser.id, 'newpassword123')
@@ -762,7 +761,7 @@ describe('UsersView', () => {
       const user = userEvent.setup()
       renderWithProviders(<UsersView />)
 
-      const changePasswordButtons = screen.getAllByRole('button', { name: UI_COPY.changePassword })
+      const changePasswordButtons = screen.getAllByRole('button', { name: i18n.t('auth:changePassword') })
       await user.click(changePasswordButtons[1])
 
       const passwordInputs = screen.getAllByDisplayValue('')
@@ -775,13 +774,13 @@ describe('UsersView', () => {
         await user.type(passwordInput, 'newpassword123')
       }
 
-      await user.click(screen.getByRole('button', { name: UI_COPY.confirm }))
+      await user.click(screen.getByRole('button', { name: i18n.t('common:confirm') }))
 
       await waitFor(() => {
         expect(authService.changePassword).toHaveBeenCalledWith(mockViewerUser.id, 'newpassword123')
       })
       expect(await screen.findByText('Password reset failed')).toBeInTheDocument()
-      expect(screen.getByRole('heading', { name: UI_COPY.changePassword })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: i18n.t('auth:changePassword') })).toBeInTheDocument()
     })
 
     it('deletes a user after confirmation', async () => {
@@ -797,9 +796,9 @@ describe('UsersView', () => {
       const user = userEvent.setup()
       renderWithProviders(<UsersView />)
 
-      const deleteButtons = screen.getAllByRole('button', { name: UI_COPY.delete })
+      const deleteButtons = screen.getAllByRole('button', { name: i18n.t('common:delete') })
       await user.click(deleteButtons[1])
-      await user.click(screen.getByRole('button', { name: UI_COPY.confirm }))
+      await user.click(screen.getByRole('button', { name: i18n.t('common:confirm') }))
 
       await waitFor(() => {
         expect(authService.deleteUser).toHaveBeenCalled()
@@ -822,15 +821,15 @@ describe('UsersView', () => {
       const user = userEvent.setup()
       renderWithProviders(<UsersView />)
 
-      const addButton = screen.getByRole('button', { name: new RegExp(`${UI_COPY.add}.*${UI_COPY.createUser}`) })
+      const addButton = screen.getByRole('button', { name: new RegExp(`${i18n.t('common:add')}.*${i18n.t('auth:createUser')}`) })
       await user.click(addButton)
 
-      expect(screen.getByRole('heading', { name: UI_COPY.createUser })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: i18n.t('auth:createUser') })).toBeInTheDocument()
 
-      const cancelButton = screen.getByRole('button', { name: UI_COPY.cancel })
+      const cancelButton = screen.getByRole('button', { name: i18n.t('common:cancel') })
       await user.click(cancelButton)
 
-      expect(screen.queryByRole('heading', { name: UI_COPY.createUser })).not.toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: i18n.t('auth:createUser') })).not.toBeInTheDocument()
     })
   })
 })

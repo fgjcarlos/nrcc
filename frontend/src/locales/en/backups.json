@@ -35,5 +35,7 @@
   "couldNotSaveRetentionPolicy": "Could not save the retention policy",
   "couldNotSaveBackupConfiguration": "Could not save the backup configuration",
   "schedulerTitle": "Scheduler configuration",
-  "schedulerDesc": "Choose a preset frequency or schedule a single backup at a specific date and time."
+  "schedulerDesc": "Choose a preset frequency or schedule a single backup at a specific date and time.",
+  "scheduler.schedulerTitle": "Scheduler configuration",
+  "scheduler.schedulerDesc": "Choose a preset frequency or schedule a single backup at a specific date and time."
 }

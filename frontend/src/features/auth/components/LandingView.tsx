@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../../shared/hooks/useTheme';
 import { authService } from '../services/authService';
+import { useT } from '@/i18n';
 import {
   Activity,
   Archive,
@@ -66,10 +67,12 @@ const capabilities: Capability[] = [
   },
 ];
 
-const trustSignals = [
-  'Pensado para operadores, integradores y desarrolladores de automatización',
-  'Unifica flows, Docker, librerías, backups y configuración',
-  'Diseño responsive y accesible para escritorio, tablet y móvil',
+// Trust signals list — translated at render time so the array
+// stays static and matches the typed catalog structure.
+const trustSignals = (t: (k: string) => string) => [
+  t('auth:landing.audienceTitle'),
+  t('auth:landing.audienceItem1'),
+  t('auth:landing.audienceItem2'),
 ];
 
 // ============================================================================
@@ -107,6 +110,8 @@ function SignalMetric({ label, value }: { label: string; value: string }) {
 // ============================================================================
 
 export function LandingView() {
+  const { t } = useT();
+
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const [authState, setAuthState] = useState<LandingAuthState>('checking');
@@ -188,7 +193,7 @@ export function LandingView() {
       <header className="relative z-20 border-b border-border/70 bg-base-100/55 backdrop-blur-xl">
         <nav
           className="container mx-auto flex items-center justify-between px-4 py-4 sm:px-6 lg:px-8"
-          aria-label="Navegación principal"
+          aria-label={t('auth:landing.primaryNavigationLabel')}
         >
           <div className="flex items-center gap-3">
             <div className="sidebar-brand-mark flex h-11 w-11 items-center justify-center rounded-2xl border">
@@ -263,7 +268,7 @@ export function LandingView() {
               </p>
 
               <ul className="mt-8 grid gap-3 text-sm text-base-content/75">
-                {trustSignals.map((signal) => (
+                {trustSignals(t).map((signal) => (
                   <li key={signal} className="flex items-start gap-3">
                     <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success" aria-hidden="true" />
                     <span>{signal}</span>

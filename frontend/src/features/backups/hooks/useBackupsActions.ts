@@ -2,10 +2,12 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { backupService } from '@/features/backups/services';
 import { getErrorMessage } from '@/features/backups/lib/formatters';
-import { UI_COPY } from '@/shared/constants/uiCopy';
+import { useT } from '@/i18n';
 
 import { queryKeys } from '@/shared/lib/queryKeys';
 export function useBackupsActions() {
+  const { t } = useT();
+
   const queryClient = useQueryClient();
 
   // Save config mutation
@@ -15,11 +17,11 @@ export function useBackupsActions() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.backups.config });
       await queryClient.invalidateQueries({ queryKey: queryKeys.backups.status });
       await queryClient.invalidateQueries({ queryKey: queryKeys.backups.observability });
-      toast.success(UI_COPY.backupConfigurationSaved);
+      toast.success(t('common:backupConfigurationSaved'));
       return savedConfig;
     },
     onError: (error) => {
-      toast.error(getErrorMessage(error, UI_COPY.couldNotSaveBackupConfiguration));
+      toast.error(getErrorMessage(error, t('backups:couldNotSaveBackupConfiguration')));
     },
   });
 
@@ -34,10 +36,10 @@ export function useBackupsActions() {
       // #483: the detail panel for any backup that may have shifted
       // (pre-restore snapshots, deleted rows) needs to refetch.
       await queryClient.invalidateQueries({ queryKey: ['backup-detail'] });
-      toast.success(UI_COPY.backupCreated);
+      toast.success(t('backups:backupCreated'));
     },
      onError: (error) => {
-       toast.error(getErrorMessage(error, UI_COPY.couldNotCreateBackup));
+       toast.error(getErrorMessage(error, t('backups:couldNotCreateBackup')));
      },
   });
 
@@ -52,13 +54,13 @@ export function useBackupsActions() {
       // #483: restore may create or modify related rows (pre-restore
       // snapshot); refetch any open detail panel.
       await queryClient.invalidateQueries({ queryKey: ['backup-detail'] });
-      toast.success(result.message || UI_COPY.backupRestored);
+      toast.success(result.message || t('backups:backupRestored'));
       if (result.preRestoreId) {
-        toast.info(UI_COPY.preRestoreBackupNotice(result.preRestoreId));
+        toast.info(t('backups:preRestoreBackupNotice', { id: result.preRestoreId }));
       }
     },
      onError: (error) => {
-       toast.error(getErrorMessage(error, UI_COPY.couldNotRestoreBackup));
+       toast.error(getErrorMessage(error, t('backups:couldNotRestoreBackup')));
      },
   });
 
@@ -73,10 +75,10 @@ export function useBackupsActions() {
       // #483: the deleted row's detail panel needs to refetch so it
       // surfaces the missing entry instead of a stale manifest.
       await queryClient.invalidateQueries({ queryKey: ['backup-detail'] });
-      toast.success(UI_COPY.backupDeleted);
+      toast.success(t('backups:backupDeleted'));
     },
      onError: (error) => {
-       toast.error(getErrorMessage(error, UI_COPY.couldNotDeleteBackup));
+       toast.error(getErrorMessage(error, t('backups:couldNotDeleteBackup')));
      },
   });
 
@@ -86,10 +88,10 @@ export function useBackupsActions() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.backups.config });
       await queryClient.invalidateQueries({ queryKey: queryKeys.backups.storage });
-      toast.success(UI_COPY.retentionPolicySaved);
+      toast.success(t('backups:retentionPolicySaved'));
     },
      onError: (error) => {
-       toast.error(getErrorMessage(error, UI_COPY.couldNotSaveRetentionPolicy));
+       toast.error(getErrorMessage(error, t('backups:couldNotSaveRetentionPolicy')));
      },
   });
 

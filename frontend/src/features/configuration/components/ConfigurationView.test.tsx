@@ -31,17 +31,20 @@ vi.mock('@/features/bootstrap/services', () => ({
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 import { ConfigurationView } from './ConfigurationView';
+import { I18nProvider } from '@/i18n';
 
 function renderConfiguration() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   return render(
-    <MemoryRouter>
-      <QueryClientProvider client={queryClient}>
-        <ConfigurationView />
-      </QueryClientProvider>
-    </MemoryRouter>,
+    <I18nProvider>
+      <MemoryRouter>
+        <QueryClientProvider client={queryClient}>
+          <ConfigurationView />
+        </QueryClientProvider>
+      </MemoryRouter>
+    </I18nProvider>,
   );
 }
 
@@ -130,7 +133,7 @@ describe('ConfigurationView (issue #363 — Advanced settings panel i18n)', () =
     expect(heading.textContent).not.toMatch(/Avanced/);
   });
 
-  it('renders the advanced settings description in English and routes through UI_COPY', async () => {
+  it('renders the advanced settings description in English', async () => {
     renderConfiguration();
 
     expect(

@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { Loader2, AlertTriangle, Lock, ShieldCheck } from 'lucide-react';
 import api from '@/shared/lib';
 import { ConfirmationDialog } from '@/shared/components/ConfirmationDialog';
-import { UI_COPY } from '@/shared/constants/uiCopy';
+import { useT } from '@/i18n';
 
 // Slice 3 of issue #764 — the curated-preset UI surface.
 //
@@ -48,6 +48,9 @@ export function AdvancedSettings({ rawContent, onApplied }: AdvancedSettingsProp
   const [activePreset, setActivePreset] = useState<PresetView | null>(null);
   const [preview, setPreview] = useState<PresetPreview | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
+
+  const { t } = useT();
+
 
   const presetsQuery = useQuery({
     queryKey: ['presets'],
@@ -194,8 +197,8 @@ export function AdvancedSettings({ rawContent, onApplied }: AdvancedSettingsProp
         }
         onConfirm={preview ? confirmPreview : () => undefined}
         onCancel={cancelPreview}
-        confirmText={UI_COPY.confirmApply}
-        acknowledgement={UI_COPY.presetAck}
+        confirmText={t('configuration:preset.confirmApply')}
+        acknowledgement={t('configuration:preset.acknowledgement')}
       >
         {preview && (
           <pre

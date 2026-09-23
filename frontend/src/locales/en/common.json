@@ -28,5 +28,8 @@
   "none": "None",
   "refresh": "Refresh",
   "retry": "Retry",
-  "languageSelector": "Language selector"
+  "languageSelector": "Language selector",
+  "themeLight": "Light",
+  "themeDark": "Dark",
+  "themeSystem": "System"
 }

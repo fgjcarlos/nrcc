@@ -18,7 +18,7 @@ import {
   Save, LockOpen, AlertTriangle, Bot
 } from 'lucide-react';
 import { useConfigurationData, useConfigurationActions } from '../hooks';
-import { UI_COPY } from '@/shared/constants/uiCopy';
+import { useT } from '@/i18n';
 import { ConfirmationDialog } from '@/shared/components/ConfirmationDialog';
 
 // ============================================
@@ -152,6 +152,8 @@ export function ConfigurationView() {
   const [rotationDialogOpen, setRotationDialogOpen] = useState(false);
 
   // Data and actions hooks
+  const { t } = useT();
+
   const data = useConfigurationData();
   const actions = useConfigurationActions();
 
@@ -279,8 +281,8 @@ export function ConfigurationView() {
         <div className="rounded-2xl border border-border bg-base-200/35 p-4">
           <div className="flex flex-col gap-2 text-sm text-base-content/75">
             <span>
-              {UI_COPY.installationDetected}: <strong className="text-base-content">{data.hostStatus.nodeRed.mode}</strong>
-              {data.hostStatus.nodeRed.detected ? '' : ` ${UI_COPY.nodeRedNotDetected}`}
+              {t('configuration:host.installationDetected')}: <strong className="text-base-content">{data.hostStatus.nodeRed.mode}</strong>
+              {data.hostStatus.nodeRed.detected ? '' : ` ${t('configuration:host.nodeRedNotDetected')}`}
             </span>
               <span>
                 Runtime version: <strong className="text-base-content">{data.hostStatus.configuration?.runtimeVersion || data.hostStatus.nodeRed.version || 'unknown'}</strong>
@@ -347,15 +349,15 @@ export function ConfigurationView() {
         <div className="flex items-center justify-between gap-4">
           <div>
             <h2 className="text-lg font-semibold text-base-content">
-              {UI_COPY.advancedSettingsTitle}
+              {t('configuration:advanced.title')}
             </h2>
             <p className="text-sm text-base-content/65">
-              {UI_COPY.advancedSettingsDescription}
+              {t('configuration:advanced.description')}
             </p>
           </div>
           {data.settingsDoc?.backupPath && (
             <span className="text-xs text-base-content/55">
-              {UI_COPY.lastBackup(data.settingsDoc.backupPath)}
+              {t('configuration:advanced.lastBackup', { path: data.settingsDoc.backupPath })}
             </span>
           )}
         </div>
@@ -366,7 +368,7 @@ export function ConfigurationView() {
             className="flex items-center gap-2 rounded-xl border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning"
           >
             <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-            <span>{UI_COPY.lockedBadge}</span>
+            <span>{t('configuration:advanced.lockedBadge')}</span>
           </div>
         )}
 
@@ -395,7 +397,7 @@ export function ConfigurationView() {
               className="action-btn-secondary"
             >
               <LockOpen className="w-4 h-4" />
-              {UI_COPY.unlockToEdit}
+              {t('configuration:advanced.unlockToEdit')}
             </button>
           ) : (
             <>
@@ -406,7 +408,7 @@ export function ConfigurationView() {
                 data-testid="raw-settings-cancel-btn"
                 className="action-btn-secondary"
               >
-                {UI_COPY.cancelEdit}
+                {t('configuration:advanced.cancelEdit')}
               </button>
               <button
                 type="button"
@@ -416,7 +418,7 @@ export function ConfigurationView() {
                 className="action-btn-primary"
               >
                 <Save className="w-4 h-4" />
-                {actions.saveRawSettingsMutation.isPending ? UI_COPY.savingRawSettings : UI_COPY.saveChanges}
+                {actions.saveRawSettingsMutation.isPending ? t('configuration:advanced.savingRaw') : t('common:saveChanges')}
               </button>
             </>
           )}
@@ -425,9 +427,9 @@ export function ConfigurationView() {
 
       <ConfirmationDialog
         isOpen={unlockDialogOpen}
-        title={UI_COPY.unlockDialogTitle}
-        description={UI_COPY.unlockDialogDescription(data.settingsDoc?.backupPath || '/var/backups/nrcc/settings.js')}
-        acknowledgement={UI_COPY.unlockDialogAcknowledgement}
+        title={t('configuration:advanced.unlockDialogTitle')}
+        description={t('configuration:advanced.unlockDialogDescription', { backupPath: data.settingsDoc?.backupPath || '/var/backups/nrcc/settings.js' })}
+        acknowledgement={t('configuration:advanced.unlockAcknowledgement')}
         variant="warning"
         onCancel={() => setUnlockDialogOpen(false)}
         onConfirm={() => {

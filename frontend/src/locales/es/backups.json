@@ -35,5 +35,7 @@
   "couldNotSaveRetentionPolicy": "No se pudo guardar la política de retención",
   "couldNotSaveBackupConfiguration": "No se pudo guardar la configuración de respaldos",
   "schedulerTitle": "Configuración del programador",
-  "schedulerDesc": "Elige una frecuencia predeterminada o programa un respaldo único en una fecha y hora concretas."
+  "schedulerDesc": "Elige una frecuencia predeterminada o programa un respaldo único en una fecha y hora concretas.",
+  "scheduler.schedulerTitle": "Configuración de horario",
+  "scheduler.schedulerDesc": "Elige una frecuencia predeterminada o programa un backup único en una fecha y hora concretas."
 }

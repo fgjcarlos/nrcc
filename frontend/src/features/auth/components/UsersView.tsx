@@ -8,7 +8,7 @@ import { UserModal } from '@/features/auth/components/UserModal';
 import { StateContainer } from '@/shared/components/StateContainer';
 import { ConfirmationDialog } from '@/shared/components/ConfirmationDialog';
 import { useConfirmationDialog } from '@/shared/hooks/useConfirmationDialog';
-import { UI_COPY } from '@/shared/constants/uiCopy';
+import { useT } from '@/i18n';
 
 type ModalMode = 'create' | 'edit_full' | 'edit_password';
 
@@ -26,6 +26,8 @@ export function UsersView() {
   });
 
   const { createMutation, deleteMutation, changePasswordMutation, updateRoleMutation } = useUsersActions();
+  const { t } = useT();
+
   const deleteDialog = useConfirmationDialog<User>();
 
   // Count admins in current user list
@@ -141,8 +143,8 @@ export function UsersView() {
   if (currentUser?.role !== 'admin') {
     return (
       <div className="p-6">
-        <h1 className="text-2xl font-bold text-base-content">{UI_COPY.accessDenied}</h1>
-        <p className="mt-2 text-base-content/60">{UI_COPY.accessDeniedDescription}</p>
+        <h1 className="text-2xl font-bold text-base-content">{t('auth:accessDenied')}</h1>
+        <p className="mt-2 text-base-content/60">{t('auth:accessDeniedDescription')}</p>
       </div>
     );
   }
@@ -157,16 +159,16 @@ export function UsersView() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-base-content">{UI_COPY.userManagement}</h1>
+        <h1 className="text-2xl font-bold text-base-content">{t('auth:userManagement')}</h1>
         <button
           onClick={openCreateModal}
           disabled={isAnyMutationPending}
           className="action-btn-primary disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          {UI_COPY.add} {UI_COPY.createUser}
+          {t('common:add')} {t('auth:createUser')}
         </button>
       </div>
-      <p className="text-sm text-base-content/60">{UI_COPY.userManagementSafetyNotice}</p>
+      <p className="text-sm text-base-content/60">{t('auth:userManagementSafetyNotice')}</p>
 
       {/* State container: loading, error, empty, or content */}
       <StateContainer
@@ -175,8 +177,8 @@ export function UsersView() {
         isEmpty={users.length === 0}
         emptySlot={
           <div className="flex flex-col items-center justify-center gap-3 py-12">
-            <p className="text-lg text-base-content">{UI_COPY.noUsersYet}</p>
-            <p className="text-base-content/60">{UI_COPY.addFirstUser}</p>
+            <p className="text-lg text-base-content">{t('auth:noUsersYet')}</p>
+            <p className="text-base-content/60">{t('auth:addFirstUser')}</p>
           </div>
         }
       >
@@ -193,10 +195,10 @@ export function UsersView() {
       {/* Delete Confirmation Dialog */}
       <ConfirmationDialog
         isOpen={deleteDialog.isOpen}
-        title={UI_COPY.deleteUser}
+        title={t('common:deleteUser')}
         description={
           deleteDialog.pendingItem
-            ? UI_COPY.deleteUserDescription(deleteDialog.pendingItem.username)
+            ? t('common:deleteUserDescription', { username: deleteDialog.pendingItem.username })
             : ''
         }
         variant="danger"

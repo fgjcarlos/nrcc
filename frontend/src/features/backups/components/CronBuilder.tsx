@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { validateCron } from '@/features/backups/lib/cronUtils';
-import { UI_COPY } from '@/shared/constants/uiCopy';
+import { useT } from '@/i18n';
 
 const PRESET_CRON: Record<string, string> = {
   hourly: '0 * * * *',
@@ -88,6 +88,8 @@ export function CronBuilder({
   // picker (when schedule === 'custom') or the preset map. The
   // picker's cron is computed; the parent's customSchedule is the
   // source of truth while editing.
+  const { t } = useT();
+
   const activeCron = useMemo(() => {
     if (schedule !== 'custom') return PRESET_CRON[schedule] ?? '';
     return cronFromDateTime(customDate, customTime) ?? '';
@@ -275,13 +277,13 @@ export function CronBuilder({
             {saveState === 'saving' && (
               <div className="flex items-center gap-2 text-sm text-base-content/60">
                 <div className="h-3 w-3 rounded-full bg-primary/60 animate-pulse" />
-                {UI_COPY.saving}
+                {t('common:saving')}
               </div>
             )}
             {saveState === 'saved' && (
               <div className="flex items-center gap-2 text-sm text-success">
                 <span className="inline-block h-3 w-3 rounded-full bg-success" />
-                {UI_COPY.saved}
+                {t('common:saved')}
               </div>
             )}
             {saveState === 'error' && saveError && (
@@ -297,7 +299,7 @@ export function CronBuilder({
             className="action-btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="cron-save-button"
           >
-            {saveState === 'saving' ? UI_COPY.saving : 'Save Schedule'}
+            {saveState === 'saving' ? t('common:saving') : 'Save Schedule'}
           </button>
         </div>
       )}

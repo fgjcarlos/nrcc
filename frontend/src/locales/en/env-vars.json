@@ -2,5 +2,8 @@
   "dotenvSaved": "Variables saved",
   "dotenvSaving": "Saving variables",
   "dotenvEditorHint": "Variables defined here override the table values. Node-RED restarts automatically on save.",
-  "dotenvCommentSample": "# Lines starting with # are comments"
+  "dotenvCommentSample": "# Lines starting with # are comments",
+  "savingToast": "Node-RED is restarting...",
+  "editorHelpText": "Variables defined here override the table values. Node-RED restarts automatically on save.",
+  "commentLineHint": "# Lines starting with # are comments"
 }

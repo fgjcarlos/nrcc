@@ -12,7 +12,7 @@ import {
 import { useBackupsData } from '@/features/backups/hooks/useBackupsData';
 import { useBackupsActions } from '@/features/backups/hooks/useBackupsActions';
 import { backupService, defaultBackupConfig, type BackupConfig, type BackupSummary } from '@/features/backups/services';
-import { UI_COPY } from '@/shared/constants/uiCopy';
+import { useT } from '@/i18n';
 import {
   getErrorMessage,
   getBackupFileLabel,
@@ -63,6 +63,9 @@ export function BackupsView() {
   const [backupListPage, setBackupListPage] = useState(1);
   const [backupListSort] = useState<'date' | 'size' | 'status'>('date');
   const [backupListOrder] = useState<'asc' | 'desc'>('desc');
+
+  const { t } = useT();
+
 
   const backupsData = useBackupsData({
     page: backupListPage,
@@ -139,7 +142,7 @@ export function BackupsView() {
 
   const downloadBackup = async (backup: BackupSummary) => {
     if (!backup.id) {
-      toast.error(UI_COPY.backupIdentifierInvalid);
+      toast.error(t('backups:backupIdentifierInvalid'));
       return;
     }
 
@@ -153,15 +156,15 @@ export function BackupsView() {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      toast.success(UI_COPY.backupDownloadStarted);
+      toast.success(t('backups:backupDownloadStarted'));
     } catch {
-      toast.error(UI_COPY.backupDownloadFailed);
+      toast.error(t('backups:backupDownloadFailed'));
     }
   };
 
   const handleSaveConfig = () => {
     if (configDraft.schedule === 'custom' && !configDraft.customSchedule.trim()) {
-      toast.error(UI_COPY.backupCronRequired);
+      toast.error(t('backups:backupCronRequired'));
       return;
     }
     actions.saveConfigMutation.mutate(configDraft);
@@ -186,8 +189,8 @@ export function BackupsView() {
      const displayName = getBackupDisplayName(backup);
      setConfirmConfig({
        isOpen: true,
-       title: UI_COPY.deleteBackup,
-       description: UI_COPY.deleteBackupDescription(displayName),
+       title: t('common:deleteBackup'),
+       description: t('common:deleteBackupDescription', { name: displayName }),
        confirmText: backup.id,
        variant: 'danger',
        onConfirm: () => {

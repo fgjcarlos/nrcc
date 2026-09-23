@@ -1,4 +1,5 @@
 import { Sun, Moon, Monitor } from 'lucide-react';
+import { useT } from '@/i18n';
 import { useTheme } from '@/shared/hooks';
 
 export function ThemeToggle() {
@@ -10,10 +11,11 @@ export function ThemeToggle() {
     return <Monitor className="w-5 h-5" />;
   };
 
+  const { t } = useT();
   const getLabel = () => {
-    if (theme === 'light') return 'Claro';
-    if (theme === 'dark') return 'Oscuro';
-    return 'Sistema';
+    if (theme === 'light') return t('common:themeLight');
+    if (theme === 'dark') return t('common:themeDark');
+    return t('common:themeSystem');
   };
 
   return (

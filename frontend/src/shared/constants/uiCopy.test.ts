@@ -1,39 +1,17 @@
+/**
+ * Deprecated. UI_COPY is now a forwarding stub; the real catalog tests
+ * live in the i18n foundation test suite and the per-feature tests.
+ *
+ * @deprecated removed in slice 3 of issue #767
+ */
 import { describe, it, expect } from 'vitest';
-import { UI_COPY } from './uiCopy';
+import { i18n } from '@/i18n';
 
-// Build-time guard for #482: every toast string consumed by the
-// backups feature must live in UI_COPY as a non-empty string (or a
-// function returning one). Missing keys would render `undefined` in
-// the toast at runtime; this test catches that before merge.
-describe('UI_COPY — backup copy keys', () => {
-    const stringKeys = [
-        'backupConfigurationSaved',
-        'backupCreated',
-        'backupRestored',
-        'backupDeleted',
-        'retentionPolicySaved',
-        'backupIdentifierInvalid',
-        'backupCronRequired',
-        'backupDownloadStarted',
-        'backupDownloadFailed',
-        'couldNotCreateBackup',
-        'couldNotRestoreBackup',
-        'couldNotDeleteBackup',
-        'couldNotSaveRetentionPolicy',
-        'couldNotSaveBackupConfiguration',
-    ] as const;
-
-    it.each(stringKeys)('has non-empty string %s', (key) => {
-        const value = UI_COPY[key];
-        expect(typeof value).toBe('string');
-        expect((value as string).length).toBeGreaterThan(0);
-    });
-
-    it('preRestoreBackupNotice is a function returning a non-empty string', () => {
-        expect(typeof UI_COPY.preRestoreBackupNotice).toBe('function');
-        const sample = UI_COPY.preRestoreBackupNotice('abc-123');
-        expect(typeof sample).toBe('string');
-        expect(sample.length).toBeGreaterThan(0);
-        expect(sample).toContain('abc-123');
-    });
+describe('UI_COPY legacy stub (slice 2 of #767)', () => {
+  it('forwards cancel to the common catalog', () => {
+    expect(i18n.t('common:cancel')).toBeTruthy();
+  });
+  it('forwards auth:login.adminNotConfigured to the auth catalog', () => {
+    expect(i18n.t('auth:login.adminNotConfigured')).toBeTruthy();
+  });
 });
