@@ -31,7 +31,7 @@ jobs:
         # reviewers see them.
         run: |
           set +e
-          go run ./tools/langscan > /tmp/audit.json
+          go run ./tools/langscan . > /tmp/audit.json
           set -e
           cat /tmp/audit.json
           findings_count=$(jq 'length' /tmp/audit.json 2>/dev/null || echo 0)

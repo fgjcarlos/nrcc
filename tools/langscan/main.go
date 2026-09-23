@@ -328,16 +328,28 @@ func RenderMarkdown(findings []Finding) string {
 }
 
 func main() {
-	root := "."
-	if len(os.Args) > 1 {
-		root = os.Args[1]
+	flag.Parse()
+	if flag.NArg() < 1 {
+		fmt.Fprintln(os.Stderr, "usage: langscan <root>")
+		os.Exit(2)
+	}
+	root, err := filepath.Abs(flag.Arg(0))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "resolve root: %v\n", err)
+		os.Exit(2)
+	}
+	info, err := os.Stat(root)
+	if err != nil || !info.IsDir() {
+		fmt.Fprintln(os.Stderr, "root must be an existing directory")
+		os.Exit(2)
 	}
 	findings, err := Scan(root)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "scan error:", err)
 		os.Exit(2)
 	}
-	if format := flag.String("format", "json", "output format: json or markdown"); *format == "markdown" {
+	format := flag.String("format", "json", "output format: json or markdown")
+	if *format == "markdown" {
 		fmt.Print(RenderMarkdown(findings))
 		return
 	}
