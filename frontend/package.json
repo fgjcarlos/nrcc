@@ -18,6 +18,8 @@
     "test:e2e": "playwright test",
     "test:e2e:stack": "playwright test --config playwright.stack.config.ts",
     "typecheck": "tsc --noEmit",
+    "i18n:check": "node scripts/check-no-hardcoded-i18n.mjs",
+    "i18n:coverage": "node scripts/i18n-coverage.mjs",
     "gen:api": "openapi-typescript ../docs/openapi.yaml -o src/shared/api/schema.ts"
   },
   "dependencies": {
