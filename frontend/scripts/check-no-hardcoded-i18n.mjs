@@ -41,9 +41,17 @@ function isCodeLike(literal) {
     /\b\w+\s*\{/.test(literal) || /\b\w+\([^)]*\)/.test(literal);
 }
 
+function isTypeIdentifier(literal) {
+  // Single PascalCase identifier (e.g. Promise, Component, ReactNode).
+  // Avoids flagging arrow-then-generic patterns like '() => Promise<...>'
+  // where the captured 'Promise' sits between the arrow and the generic.
+  const trimmed = literal.trim();
+  return /^[A-Z][A-Za-z0-9]*$/.test(trimmed) && trimmed.length >= 3;
+}
+
 function isViolation(literal) {
   if (!literal || /^\s*$/.test(literal) || /^[\p{P}\p{S}\s]+$/u.test(literal)) return false;
-  if (brands.has(literal) || isCodeLike(literal)) return false;
+  if (brands.has(literal) || isCodeLike(literal) || isTypeIdentifier(literal)) return false;
   if (/^[a-z]+$/.test(literal) && literal.length <= 4) return false;
   const letters = (literal.match(/[A-Za-z]/g) ?? []).length;
   return letters >= 3 && literal.length >= 5;
