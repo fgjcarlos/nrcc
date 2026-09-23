@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { X, CheckCircle2, AlertTriangle, ClipboardPaste } from 'lucide-react';
 import { envService, type BulkEnvResult } from '../services/envService';
+import { useT } from '@/i18n';
 
 interface BulkImportModalProps {
   open: boolean;
@@ -16,6 +17,7 @@ TOKEN=hunter2#secret
 `;
 
 export function BulkImportModal({ open, onClose, onImported }: BulkImportModalProps) {
+  const { t } = useT();
   const [content, setContent] = useState('');
   const [report, setReport] = useState<BulkEnvResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -84,17 +86,15 @@ export function BulkImportModal({ open, onClose, onImported }: BulkImportModalPr
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="w-full max-w-3xl rounded-lg bg-base-100 shadow-xl">
         <div className="flex items-center justify-between border-b border-base-300 px-5 py-3">
-          <h2 className="text-lg font-semibold">Bulk import environment variables</h2>
-          <button type="button" className="btn btn-ghost btn-sm" onClick={onClose} aria-label="Close">
+          <h2 className="text-lg font-semibold">{t('env-vars:bulkTitle')}</h2>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={onClose} aria-label={t('common:close')}>
             <X size={18} />
           </button>
         </div>
 
         <div className="space-y-4 px-5 py-4">
           <p className="text-sm text-base-content/70">
-            Paste <code className="rounded bg-base-200 px-1">KEY=VALUE[#type]</code> lines. Supported types:{' '}
-            <code>string</code>, <code>number</code>, <code>boolean</code>, <code>secret</code>. Secrets stay in
-            NRCC and never reach Node-RED. Empty lines and lines starting with <code>#</code> are ignored.
+            {t('env-vars:bulkHelp')}
           </p>
 
           <textarea
@@ -106,7 +106,7 @@ export function BulkImportModal({ open, onClose, onImported }: BulkImportModalPr
 
           <div className="flex flex-wrap items-center gap-2">
             <button type="button" className="btn btn-primary btn-sm" onClick={handleValidate} disabled={loading}>
-              Validate
+              {t('env-vars:bulkValidate')}
             </button>
             <button
               type="button"
@@ -115,11 +115,11 @@ export function BulkImportModal({ open, onClose, onImported }: BulkImportModalPr
               disabled={loading || !report?.valid}
             >
               <CheckCircle2 size={14} />
-              Import
+              {t('env-vars:bulkImportAction')}
             </button>
             <button type="button" className="btn btn-ghost btn-sm" onClick={handlePasteExample}>
               <ClipboardPaste size={14} />
-              Example
+              {t('env-vars:bulkExample')}
             </button>
             {report && (
               <span
@@ -140,11 +140,11 @@ export function BulkImportModal({ open, onClose, onImported }: BulkImportModalPr
               <table className="table table-xs">
                 <thead>
                   <tr>
-                    <th>Line</th>
-                    <th>Key</th>
-                    <th>Value</th>
-                    <th>Type</th>
-                    <th>Status</th>
+                    <th>{t('env-vars:bulkLine')}</th>
+                    <th>{t('env-vars:bulkKey')}</th>
+                    <th>{t('env-vars:bulkValue')}</th>
+                    <th>{t('env-vars:bulkType')}</th>
+                    <th>{t('env-vars:bulkStatus')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -169,7 +169,7 @@ export function BulkImportModal({ open, onClose, onImported }: BulkImportModalPr
                               {issue}
                             </span>
                           ) : parsed ? (
-                            'ok'
+                            t('env-vars:bulkOk')
                           ) : (
                             ''
                           )}

@@ -1,5 +1,6 @@
 import { type EnvVar } from '@/features/env-vars/services/envService';
 import { Eye, EyeOff, Trash2, Pencil } from 'lucide-react';
+import { useT } from '@/i18n';
 
 export function EnvVarRow({ envVar, onDelete, onToggleSecret, onEdit, showSecret }: {
   envVar: EnvVar;
@@ -8,6 +9,7 @@ export function EnvVarRow({ envVar, onDelete, onToggleSecret, onEdit, showSecret
   onEdit: (envVar: EnvVar) => void;
   showSecret: boolean;
 }) {
+  const { t } = useT();
   return (
     <tr className="table-row-hover">
       <td className="px-4 py-3 font-mono text-sm text-base-content">{envVar.key}</td>
@@ -33,7 +35,7 @@ export function EnvVarRow({ envVar, onDelete, onToggleSecret, onEdit, showSecret
           'bg-base-300/70 text-base-content'
         }`}>{envVar.type}</span>
         {envVar.type === 'secret' && (
-          <span className="ml-2 text-xs text-base-content/50">runtime only</span>
+          <span className="ml-2 text-xs text-base-content/50">{t('env-vars:runtimeOnly')}</span>
         )}
       </td>
       <td className="px-4 py-3 text-sm text-base-content/60">

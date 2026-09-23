@@ -34,7 +34,7 @@ export function DotenvEditor() {
       }
     },
     onError: (error: unknown) => {
-      let message = 'Error al guardar .env';
+      let message = t('env-vars:dotenvSaveError');
       if (error && typeof error === 'object' && 'response' in error) {
         const err = error as { response?: { data?: { error?: { message?: string } } } };
         if (err.response?.data?.error?.message) {
@@ -65,7 +65,7 @@ export function DotenvEditor() {
     <div className="space-y-4">
       <div className="flex justify-between items-start">
         <div>
-          <h2 className="text-lg font-semibold text-base-content">Archivo .env</h2>
+          <h2 className="text-lg font-semibold text-base-content">{t('env-vars:dotenvTitle')}</h2>
           <p className="text-sm text-base-content/60 mt-1">
             {t('env-vars:editorHelpText')}
           </p>
@@ -109,10 +109,10 @@ export function DotenvEditor() {
                 {saveMutation.isPending ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    Guardando...
+                    {t('env-vars:dotenvSaving')}
                   </>
                 ) : (
-                  'Guardar .env'
+                  t('env-vars:dotenvSave')
                 )}
               </button>
               {isEditing && (
@@ -121,7 +121,7 @@ export function DotenvEditor() {
                   disabled={saveMutation.isPending}
                   className="action-btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Cancelar
+                  {t('common:cancel')}
                 </button>
               )}
             </div>
