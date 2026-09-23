@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import { Loader2, AlertCircle } from 'lucide-react';
+import { useT } from '@/i18n';
 
 /**
  * Presentational component for standardized loading/error/empty state branching
@@ -24,13 +25,15 @@ export function StateContainer({
   emptySlot,
   children,
 }: StateContainerProps) {
+  const { t } = useT();
+
   // Priority order: loading → error → empty → children
   if (isLoading) {
     return (
       loadingSlot || (
         <div className="flex flex-col items-center justify-center gap-3 py-12">
           <Loader2 className="w-8 h-8 text-primary animate-spin" />
-          <p className="text-base-content/60">{loadingSlot || 'Loading...'}</p>
+          <p className="text-base-content/60">{loadingSlot || t('common:loading')}</p>
         </div>
       )
     );
@@ -43,8 +46,8 @@ export function StateContainer({
           <div className="flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-error flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-base-content font-medium">An error occurred</p>
-              <p className="text-base-content/60 text-sm mt-1">Please try again later</p>
+              <p className="text-base-content font-medium">{t('common:errorOccurred')}</p>
+              <p className="text-base-content/60 text-sm mt-1">{t('common:tryAgainLater')}</p>
             </div>
           </div>
         </div>
@@ -56,7 +59,7 @@ export function StateContainer({
     return (
       emptySlot || (
         <div className="flex flex-col items-center justify-center gap-2 py-12">
-          <p className="text-base-content/60">No items yet</p>
+          <p className="text-base-content/60">{t('common:noItemsYet')}</p>
         </div>
       )
     );

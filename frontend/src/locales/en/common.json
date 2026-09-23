@@ -6,6 +6,8 @@
   "loading": "Loading...",
   "errorOccurred": "An error occurred",
   "tryAgain": "Try again",
+  "tryAgainLater": "Please try again later",
+  "noItemsYet": "No items yet",
   "delete": "Delete",
   "add": "Add",
   "saving": "Saving...",
