@@ -7,6 +7,7 @@ import {
   Tooltip,
   CartesianGrid,
 } from 'recharts';
+import { useT } from '@/i18n';
 import type { MetricsSnapshot } from '../types/history';
 
 interface MetricsChartProps {
@@ -23,6 +24,7 @@ function formatTime(timestamp: string): string {
 }
 
 export function MetricsChart({ data, dataKey, label, color, loading = false }: MetricsChartProps) {
+  const { t } = useT();
   if (loading) {
     return (
       <div className="flex flex-col gap-1">
@@ -37,7 +39,7 @@ export function MetricsChart({ data, dataKey, label, color, loading = false }: M
       <div className="flex flex-col gap-1">
         <span className="text-xs font-medium text-body-secondary">{label}</span>
         <div className="flex h-16 items-center justify-center rounded border border-border bg-base-200">
-          <span className="text-xs text-body-secondary">No data yet</span>
+          <span className="text-xs text-body-secondary">{t('common:noDataYet')}</span>
         </div>
       </div>
     );

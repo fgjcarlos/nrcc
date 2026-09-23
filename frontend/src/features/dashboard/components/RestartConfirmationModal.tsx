@@ -15,7 +15,7 @@ export function RestartConfirmationModal({ isOpen, onCancel, onConfirm }: Restar
   }
 
   // Portaled to document.body so `position: fixed` resolves against the
-  // viewport, not the surrounding <main> scroll container (which had a
+  // viewport, not the surrounding main scroll container (which had a
   // sticky header establishing a containing block). See issue #704.
   return createPortal(
     <div className="modal-overlay" onClick={onCancel}>
@@ -39,7 +39,7 @@ export function RestartConfirmationModal({ isOpen, onCancel, onConfirm }: Restar
         </div>
         <div className="flex justify-end gap-2 pt-2">
           <button onClick={onCancel} className="action-btn-secondary">
-            Cancelar
+            {t('common:cancel')}
           </button>
           <button onClick={onConfirm} className="action-btn-primary gap-2">
             <RefreshCw className="h-4 w-4" />
