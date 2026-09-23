@@ -2,6 +2,7 @@ import { ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn, formatBytes } from '@/shared/lib';
 import type { BackupSummary } from '../services/backupService';
 import type { SortOrder } from '../types';
+import { useT } from '@/i18n';
 
 export interface BackupTableProps {
   items: BackupSummary[];
@@ -46,6 +47,7 @@ export function BackupTable({
   onPageChange,
   onSort,
 }: BackupTableProps) {
+  const { t } = useT();
   const totalPages = Math.ceil(total / limit);
   const hasPrevious = page > 1;
   const hasNext = page < totalPages;
@@ -88,7 +90,7 @@ export function BackupTable({
   if (items.length === 0) {
     return (
       <div className="text-center py-12">
-        <p className="text-muted-foreground">No backups yet. Configure the scheduler to start creating backups automatically.</p>
+        <p className="text-muted-foreground">{t('backups:noBackupsConfigured')}</p>
       </div>
     );
   }
@@ -99,12 +101,12 @@ export function BackupTable({
         <table className="w-full">
           <thead className="bg-muted/50">
             <tr>
-              <SortHeader column="date" label="Date Created" />
-              <th className="px-4 py-2 text-left text-sm font-medium text-muted-foreground">Name</th>
-              <th className="px-4 py-2 text-left text-sm font-medium text-muted-foreground">Type</th>
-              <SortHeader column="size" label="Size" />
-              <th className="px-4 py-2 text-left text-sm font-medium text-muted-foreground">Files</th>
-              <th className="px-4 py-2 text-left text-sm font-medium text-muted-foreground">Triggered By</th>
+              <SortHeader column="date" label={t('backups:dateCreated')} />
+              <th className="px-4 py-2 text-left text-sm font-medium text-muted-foreground">{t('common:name')}</th>
+              <th className="px-4 py-2 text-left text-sm font-medium text-muted-foreground">{t('common:type')}</th>
+              <SortHeader column="size" label={t('common:size')} />
+              <th className="px-4 py-2 text-left text-sm font-medium text-muted-foreground">{t('common:files')}</th>
+              <th className="px-4 py-2 text-left text-sm font-medium text-muted-foreground">{t('backups:triggeredBy')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -143,7 +145,7 @@ export function BackupTable({
               aria-label="Previous page"
             >
               <ChevronLeft size={16} />
-              Previous
+              {t('common:previousPage')}
             </button>
             <button
               onClick={() => onPageChange(page + 1)}
@@ -151,7 +153,7 @@ export function BackupTable({
               className="inline-flex items-center gap-1 px-3 py-1 rounded text-sm font-medium hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               aria-label="Next page"
             >
-              Next
+              {t('common:nextPage')}
               <ChevronRight size={16} />
             </button>
           </div>

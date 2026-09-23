@@ -68,8 +68,8 @@ export function BackupListSection(props: BackupListSectionProps) {
     <div className="surface-card p-6">
       <div className="mb-4 flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold text-base-content">Available Backups</h2>
-          <p className="text-sm text-base-content/65">Download, restore or delete local snapshots</p>
+          <h2 className="text-lg font-semibold text-base-content">{t('backups:availableBackups')}</h2>
+          <p className="text-sm text-base-content/65">{t('backups:downloadRestoreOrDelete')}</p>
         </div>
         {isLoading && <span className="text-sm text-base-content/60">{t('flows:loading')}</span>}
       </div>

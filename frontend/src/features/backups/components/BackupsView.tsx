@@ -204,9 +204,9 @@ export function BackupsView() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">Backups locales</p>
-          <h1 className="text-2xl font-bold text-base-content">Backups</h1>
-          <p className="text-sm text-base-content/65">Snapshots locales de flows, settings y archivos clave con restore y retención integrados.</p>
+          <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">{t('backups:localBackupsLabel')}</p>
+          <h1 className="text-2xl font-bold text-base-content">{t('backups:backupsTitle')}</h1>
+          <p className="text-sm text-base-content/65">{t('backups:localBackupsSubtitle')}</p>
         </div>
 
         <button
@@ -215,7 +215,7 @@ export function BackupsView() {
           className="action-btn-primary"
         >
           <Archive className={cn('h-4 w-4', actions.createMutation.isPending && 'animate-pulse')} />
-          Crear backup ahora
+          {t('backups:createBackupNow')}
         </button>
       </div>
 
@@ -247,7 +247,7 @@ export function BackupsView() {
             className="flex items-center gap-1.5 rounded-md border border-base-content/20 px-2.5 py-1.5 text-xs font-medium hover:bg-base-content/5"
           >
             <RefreshCw className="h-3.5 w-3.5" />
-            Reintentar
+            {t('backups:retrySync')}
           </button>
         </div>
       )}

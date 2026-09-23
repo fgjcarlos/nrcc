@@ -1,6 +1,7 @@
 import { cn } from '@/shared/lib';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { BackupEvent } from '../services/backupService';
+import { useT } from '@/i18n';
 
 export interface SchedulerHistoryProps {
   events: BackupEvent[];
@@ -17,6 +18,7 @@ export function SchedulerHistory({
   total,
   onPageChange,
 }: SchedulerHistoryProps) {
+  const { t } = useT();
   const totalPages = Math.ceil(total / limit);
   const showPagination = total > limit;
 
@@ -42,7 +44,7 @@ export function SchedulerHistory({
                   </div>
                   {event.status === 'error' && (
                     <span className="inline-block rounded-full bg-error/20 px-2.5 py-0.5 text-xs font-medium text-error">
-                      Error
+                      {t('common:error')}
                     </span>
                   )}
                 </div>
@@ -86,7 +88,7 @@ export function SchedulerHistory({
         </>
       ) : (
         <div className="rounded-2xl border border-dashed border-border bg-base-200/15 p-6 text-center text-sm text-base-content/60">
-          No scheduler history yet
+          {t('backups:noSchedulerHistory')}
         </div>
       )}
     </div>

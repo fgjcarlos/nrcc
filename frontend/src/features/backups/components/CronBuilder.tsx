@@ -179,7 +179,7 @@ export function CronBuilder({
   return (
     <div className="space-y-4">
       <label className="space-y-2 block">
-        <span className="text-sm font-medium text-base-content">Schedule</span>
+        <span className="text-sm font-medium text-base-content">{t('backups:scheduleLabel')}</span>
         <select
           data-testid="preset-select"
           value={schedule}
@@ -197,12 +197,12 @@ export function CronBuilder({
       {schedule !== 'disabled' && (
         <div className="rounded-lg border border-border bg-base-content/5 px-3 py-2 text-sm text-base-content/75">
           {schedule !== 'custom' && activeCron && (
-            <span>Cron: <code className="font-mono">{activeCron}</code></span>
+            <span>{t('backups:cronPrefix')} <code className="font-mono">{activeCron}</code></span>
           )}
           {schedule === 'custom' && activeCron && (
             <span>
-              Runs once on <strong>{customDate}</strong> at <strong>{customTime}</strong>{' '}
-              (cron: <code className="font-mono">{activeCron}</code>)
+              {t('backups:runsOnceOn')} <strong>{customDate}</strong> {t('backups:at')} <strong>{customTime}</strong>{' '}
+              ({t('backups:cronPrefix')} <code className="font-mono">{activeCron}</code>)
             </span>
           )}
         </div>
@@ -241,12 +241,12 @@ export function CronBuilder({
               onChange={(e) => setShowRawCron(e.target.checked)}
               className="h-4 w-4"
             />
-            Advanced (edit raw cron)
+            {t('backups:advancedEditCron')}
           </label>
 
           {showRawCron && (
             <label className="space-y-2 block">
-              <span className="text-sm font-medium text-base-content">Cron expression</span>
+              <span className="text-sm font-medium text-base-content">{t('backups:cronExpression')}</span>
               <input
                 type="text"
                 data-testid="custom-cron-input"
@@ -259,7 +259,7 @@ export function CronBuilder({
                 }`}
               />
               <p className="text-xs text-base-content/55">
-                5-field format: minute hour day-of-month month day-of-week
+                {t('backups:cronFormatHint')}
               </p>
             </label>
           )}
@@ -299,7 +299,7 @@ export function CronBuilder({
             className="action-btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="cron-save-button"
           >
-            {saveState === 'saving' ? t('common:saving') : 'Save Schedule'}
+            {saveState === 'saving' ? t('common:saving') : t('backups:saveSchedule')}
           </button>
         </div>
       )}
