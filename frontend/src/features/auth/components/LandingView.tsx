@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../../shared/hooks/useTheme';
 import { authService } from '../services/authService';
@@ -36,36 +36,46 @@ type LandingAuthState = 'checking' | 'authenticated' | 'login-required' | 'setup
 // Feature Data
 // ============================================================================
 
-const capabilities: Capability[] = [
+type CapabilityDef = Omit<Capability, 'title' | 'description'> & {
+  titleKey: string;
+  descriptionKey: string;
+};
+
+const capabilityDefs: CapabilityDef[] = [
   {
-    title: 'Orquestación de flows',
-    description:
-      'Despliega, versiona y revisa flujos Node-RED con una experiencia pensada para equipos OT/IT.',
+    titleKey: 'auth:landing.flowOrchestrationTitle',
+    descriptionKey: 'auth:landing.flowOrchestrationBody',
     icon: GitBranch,
     accent: 'from-primary/20 to-primary/5 text-primary',
   },
   {
-    title: 'Observabilidad industrial',
-    description:
-      'Supervisa estado, métricas y señales operativas para detectar incidencias antes de tocar producción.',
+    titleKey: 'auth:landing.observabilityTitle',
+    descriptionKey: 'auth:landing.observabilityBody',
     icon: Activity,
     accent: 'from-accent/20 to-accent/5 text-accent',
   },
   {
-    title: 'Runtime bajo control',
-    description:
-      'Gestiona contenedores, entorno y librerías npm sin saltar entre terminales ni paneles aislados.',
+    titleKey: 'auth:landing.dockerLibrariesTitle',
+    descriptionKey: 'auth:landing.dockerLibrariesBody',
     icon: Container,
     accent: 'from-info/20 to-info/5 text-info',
   },
   {
-    title: 'Cambios recuperables',
-    description:
-      'Protege configuración, backups y variables críticas con acciones claras y trazables.',
+    titleKey: 'auth:landing.securityTitle',
+    descriptionKey: 'auth:landing.securityBody',
     icon: Archive,
     accent: 'from-success/20 to-success/5 text-success',
   },
 ];
+
+function buildCapabilities(t: (key: string) => string): Capability[] {
+  return capabilityDefs.map((def) => ({
+    title: t(def.titleKey),
+    description: t(def.descriptionKey),
+    icon: def.icon,
+    accent: def.accent,
+  }));
+}
 
 // Trust signals list — translated at render time so the array
 // stays static and matches the typed catalog structure.
@@ -115,6 +125,7 @@ export function LandingView() {
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const [authState, setAuthState] = useState<LandingAuthState>('checking');
+  const capabilities = useMemo(() => buildCapabilities(t), [t]);
 
   useEffect(() => {
     let isMounted = true;
@@ -163,16 +174,17 @@ export function LandingView() {
   };
 
   const getThemeLabel = () => {
-    if (theme === 'dark') return 'Modo oscuro';
-    if (theme === 'light') return 'Modo claro';
-    return 'Sistema';
+    if (theme === 'dark') return t('common:themeDark');
+    if (theme === 'light') return t('common:themeLight');
+    return t('common:themeSystem');
   };
 
-  const primaryActionLabel = authState === 'authenticated' ? 'Iniciar proceso' : 'Loguearse';
+  const primaryActionLabel =
+    authState === 'authenticated' ? t('auth:landing.startProcess') : t('auth:landing.signIn');
   const primaryActionHelp =
     authState === 'authenticated'
-      ? 'Accede al dashboard operativo para continuar con el flujo principal.'
-      : 'Inicia sesión para desbloquear el flujo principal de administración.';
+      ? t('auth:landing.openDashboardHelp')
+      : t('auth:landing.signInPrompt');
 
   const handlePrimaryAction = () => {
     if (authState === 'setup-required') {
@@ -201,7 +213,7 @@ export function LandingView() {
             </div>
             <div>
               <p className="text-sm font-semibold text-base-content">NRCC</p>
-              <p className="text-xs uppercase tracking-[0.2em] text-base-content/50">Control Center</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-base-content/50">{t('common:productShortName')}</p>
             </div>
           </div>
 
@@ -209,7 +221,7 @@ export function LandingView() {
             type="button"
             onClick={cycleTheme}
             className="theme-toggle-shell inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm text-base-content transition-colors hover:text-primary"
-            aria-label={`Cambiar tema: ${getThemeLabel()}`}
+            aria-label={t('auth:landing.changeTheme', { label: getThemeLabel() })}
             title={getThemeLabel()}
           >
             {getThemeIcon()}
@@ -227,16 +239,15 @@ export function LandingView() {
             <div>
               <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-primary">
                 <ShieldCheck className="h-4 w-4" aria-hidden="true" />
-                Consola OT/IT para Node-RED
+                {t('auth:landing.otItConsole')}
               </p>
 
               <h1 className="max-w-4xl text-4xl font-black tracking-tight text-base-content sm:text-5xl lg:text-7xl">
-                Node-RED <span className="text-primary">Control Center</span>
+                Node-RED <span className="text-primary">{t('common:productShortName')}</span>
               </h1>
 
               <p className="mt-6 max-w-2xl text-lg leading-8 text-base-content/75 sm:text-xl">
-                Controla instancias Node-RED desde una consola operativa que reúne flows,
-                runtime, Docker, librerías, backups y configuración crítica para entornos de automatización.
+                {t('auth:landing.consoleIntroBody')}
               </p>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -248,9 +259,9 @@ export function LandingView() {
                   aria-describedby="landing-primary-action-help"
                 >
                   {authState === 'checking'
-                    ? 'Comprobando acceso…'
+                    ? t('auth:landing.checkingAccess')
                     : authState === 'setup-required'
-                      ? 'Crear administrador'
+                      ? t('auth:landing.createAdmin')
                       : primaryActionLabel}
                   <ArrowRight className="h-5 w-5" aria-hidden="true" />
                 </button>
@@ -258,12 +269,12 @@ export function LandingView() {
                   href="#capabilities"
                   className="inline-flex items-center justify-center rounded-2xl border border-border bg-base-100/70 px-6 py-3 font-semibold text-base-content transition hover:border-accent/50 hover:text-accent"
                 >
-                  Ver capacidades
+                  {t('auth:landing.viewCapabilities')}
                 </a>
               </div>
               <p id="landing-primary-action-help" className="mt-3 text-sm text-base-content/60">
                 {authState === 'setup-required'
-                  ? 'El sistema necesita crear el primer usuario administrador antes de continuar.'
+                  ? t('auth:landing.setupHelp')
                   : primaryActionHelp}
               </p>
 
@@ -282,8 +293,8 @@ export function LandingView() {
               <div className="relative">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">Estado de plataforma</p>
-                    <h2 className="mt-2 text-2xl font-bold text-base-content">Preparado para operar</h2>
+                    <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">{t('auth:landing.platformStatus')}</p>
+                    <h2 className="mt-2 text-2xl font-bold text-base-content">{t('auth:landing.readyToOperate')}</h2>
                   </div>
                   <div className="rounded-2xl border border-success/30 bg-success/10 p-3 text-success">
                     <Settings2 className="h-6 w-6" aria-hidden="true" />
@@ -291,31 +302,31 @@ export function LandingView() {
                 </div>
 
                 <dl className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-                  <SignalMetric label="Scope" value="Flows" />
-                  <SignalMetric label="Runtime" value="Docker" />
-                  <SignalMetric label="Recovery" value="Backups" />
+                  <SignalMetric label={t('auth:landing.scopeLabel')} value={t('auth:landing.scopeFlows')} />
+                  <SignalMetric label={t('auth:landing.runtimeLabel')} value={t('auth:landing.runtimeDocker')} />
+                  <SignalMetric label={t('auth:landing.recoveryLabel')} value={t('auth:landing.recoveryBackups')} />
                 </dl>
 
                 <div className="mt-6 rounded-3xl border border-border bg-base-100/60 p-5">
-                  <p className="text-sm font-semibold text-base-content">Flujo recomendado</p>
+                  <p className="text-sm font-semibold text-base-content">{t('auth:landing.recommendedFlow')}</p>
                   <ol className="mt-4 space-y-3 text-sm text-base-content/70">
                     <li className="flex gap-3">
                       <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">
                         1
                       </span>
-                      Revisar salud del runtime y contenedor Node-RED.
+                      {t('auth:landing.recommendedStep1')}
                     </li>
                     <li className="flex gap-3">
                       <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/15 text-xs font-bold text-accent">
                         2
                       </span>
-                      Validar flows, variables y librerías antes de desplegar cambios.
+                      {t('auth:landing.recommendedStep2')}
                     </li>
                     <li className="flex gap-3">
                       <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-success/15 text-xs font-bold text-success">
                         3
                       </span>
-                      Generar backup y continuar desde el dashboard principal.
+                      {t('auth:landing.recommendedStep3')}
                     </li>
                   </ol>
                 </div>
@@ -327,12 +338,12 @@ export function LandingView() {
         <section id="capabilities" className="px-4 pb-16 sm:px-6 lg:px-8" aria-labelledby="capabilities-heading">
           <div className="container mx-auto max-w-7xl">
             <div className="mb-8 max-w-3xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-accent">Capacidades clave</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-accent">{t('auth:landing.capabilitiesKey')}</p>
               <h2 id="capabilities-heading" className="mt-3 text-3xl font-bold text-base-content sm:text-4xl">
-                Una entrada clara para pasar de contexto a acción
+                {t('auth:landing.contextToAction')}
               </h2>
               <p className="mt-4 text-base leading-7 text-base-content/70">
-                La home presenta qué hace NRCC, a quién ayuda y por qué usarlo antes de entrar al flujo operativo.
+                {t('auth:landing.contextToActionBody')}
               </p>
             </div>
 

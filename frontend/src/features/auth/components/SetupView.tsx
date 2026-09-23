@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useT } from '@/i18n';
 
 const setupSchema = z.object({
   username: z
@@ -28,6 +29,7 @@ type SetupFormData = z.infer<typeof setupSchema>;
 
 export function SetupView() {
   const navigate = useNavigate();
+  const { t } = useT();
 
   const {
     register,
@@ -74,9 +76,9 @@ export function SetupView() {
     <div className="auth-shell min-h-screen flex items-center justify-center px-4">
       <div className="surface-card w-full max-w-md space-y-6 border border-border p-8">
         <div className="text-center">
-          <p className="mb-2 text-xs uppercase tracking-[0.24em] text-base-content/50">Bootstrap</p>
-          <h1 className="text-2xl font-bold text-base-content">Node-RED Control Center</h1>
-          <p className="mt-2 text-base-content/70">Initial Setup</p>
+          <p className="mb-2 text-xs uppercase tracking-[0.24em] text-base-content/50">{t('auth:setup.bootstrap')}</p>
+          <h1 className="text-2xl font-bold text-base-content">{t('common:productFullName')}</h1>
+          <p className="mt-2 text-base-content/70">{t('auth:setup.initialSetup')}</p>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -88,7 +90,7 @@ export function SetupView() {
 
           <div>
             <label htmlFor="username" className="mb-1 block text-sm font-medium text-base-content">
-              Username
+              {t('auth:setup.usernameLabel')}
             </label>
             <input
               id="username"
@@ -104,7 +106,7 @@ export function SetupView() {
 
           <div>
             <label htmlFor="password" className="mb-1 block text-sm font-medium text-base-content">
-              Password
+              {t('auth:setup.passwordLabel')}
             </label>
             <input
               id="password"
@@ -120,7 +122,7 @@ export function SetupView() {
 
           <div>
             <label htmlFor="confirmPassword" className="mb-1 block text-sm font-medium text-base-content">
-              Confirm Password
+              {t('auth:setup.confirmPasswordLabel')}
             </label>
             <input
               id="confirmPassword"
@@ -139,7 +141,7 @@ export function SetupView() {
             disabled={isSubmitting}
             className="w-full rounded-xl bg-primary px-4 py-2 text-primary-content hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isSubmitting ? 'Creating account...' : 'Create account and continue'}
+            {isSubmitting ? t('auth:setup.creatingAccount') : t('auth:setup.createAccount')}
           </button>
         </form>
       </div>
