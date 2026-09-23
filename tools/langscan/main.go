@@ -250,12 +250,14 @@ func Scan(root string) ([]Finding, error) {
 // exemption marker (// l10n: <reason>) inline OR when the previous
 // line is exactly a marker line.
 func scanFile(root, rel string) ([]Finding, error) {
+	// #nosec G304 G703 — root comes from CLI arg, rel comes from filepath.WalkDir over root.
 	full := filepath.Join(root, rel)
+	// #nosec G304 — full is rooted at the user-supplied repo root and filtered by exclusions upstream.
 	f, err := os.Open(full)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	var findings []Finding
 	scanner := bufio.NewScanner(f)
