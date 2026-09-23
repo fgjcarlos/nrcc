@@ -1,11 +1,6 @@
 import React, { useEffect } from 'react';
-import { I18nextProvider, useTranslation } from 'react-i18next';
-import {
-  I18N_STORAGE_KEY,
-  SUPPORTED_LOCALES,
-  DEFAULT_LOCALE,
-  type SupportedLocale,
-} from './constants';
+import { I18nextProvider } from 'react-i18next';
+import { I18N_STORAGE_KEY, DEFAULT_LOCALE } from './constants';
 import { readStoredLocale } from './helpers';
 import i18n from './config';
 

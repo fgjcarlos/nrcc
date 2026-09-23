@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { i18n } from '@/i18n';
 
 /**
  * Extracts the user-facing message from an unknown thrown value.
@@ -16,10 +17,14 @@ export function errorMessage(err: unknown): string {
     const data = err.response?.data as { error?: { code?: string; message?: string } } | undefined;
     if (data?.error?.message) {
       const code = data.error.code ? ` (code: ${data.error.code})` : '';
-      return `${data.error.message}${code}`;
+      return translateMessage(`${data.error.message}${code}`);
     }
-    return err.message;
+    return translateMessage(err.message);
   }
-  if (err instanceof Error) return err.message;
-  return String(err);
+  if (err instanceof Error) return translateMessage(err.message);
+  return translateMessage(String(err));
+}
+
+function translateMessage(message: string): string {
+  return i18n.exists(message) ? i18n.t(message) : message;
 }

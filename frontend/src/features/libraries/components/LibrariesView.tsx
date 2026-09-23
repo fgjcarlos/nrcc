@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import { useLibrariesData } from '@/features/libraries/hooks/useLibrariesData';
 import { useLibrariesActions } from '@/features/libraries/hooks/useLibrariesActions';
 import { ChevronLeft, ChevronRight, ExternalLink, Trash2 } from 'lucide-react';
+import { useT } from '@/i18n';
 
 export function LibrariesView() {
   const [searchQuery, setSearchQuery] = useState('');
   const [confirmingUninstall, setConfirmingUninstall] = useState<string | null>(null);
   const [installedPage, setInstalledPage] = useState(1);
   const installedPageSize = 5;
+  const { t } = useT();
 
   // Data hooks
   const { libraries, isLoading, isError } = useLibrariesData();
@@ -76,17 +78,15 @@ export function LibrariesView() {
     <div className="space-y-8 p-4 sm:p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs uppercase tracking-[0.28em] text-base-content/50">Extensions</p>
-          <h1 className="text-3xl font-bold tracking-tight text-base-content">npm Libraries</h1>
-          <p className="mt-2 max-w-2xl text-sm text-base-content/65">
-            Search, install and remove Node-RED libraries from a single operational console.
-          </p>
+          <p className="text-xs uppercase tracking-[0.28em] text-base-content/50">{t('libraries:extensions')}</p>
+          <h1 className="text-3xl font-bold tracking-tight text-base-content">{t('libraries:title')}</h1>
+          <p className="mt-2 max-w-2xl text-sm text-base-content/65">{t('libraries:description')}</p>
         </div>
 
         <div className="flex flex-wrap gap-2 text-sm text-base-content/70">
-          <span className="rounded-full border border-border bg-base-300/60 px-3 py-1">Installed: {libraries.length}</span>
+          <span className="rounded-full border border-border bg-base-300/60 px-3 py-1">{t('libraries:installedCount', { count: libraries.length })}</span>
           <span className="rounded-full border border-border bg-base-300/60 px-3 py-1">
-            Search: {searchResults.length} results
+            {t('libraries:searchCount', { count: searchResults.length })}
           </span>
         </div>
       </div>
@@ -96,10 +96,8 @@ export function LibrariesView() {
         <div className="space-y-4">
           <div className="surface-card overflow-hidden p-0">
             <div className="border-b border-border p-5">
-              <h2 className="text-lg font-semibold text-base-content">Search and install</h2>
-              <p className="mt-1 text-sm text-base-content/65">
-                Search npm and add packages to the Node-RED runtime.
-              </p>
+              <h2 className="text-lg font-semibold text-base-content">{t('libraries:searchAndInstall')}</h2>
+              <p className="mt-1 text-sm text-base-content/65">{t('libraries:searchHint')}</p>
             </div>
             <div className="p-5">
             <div className="mt-4">
@@ -110,13 +108,13 @@ export function LibrariesView() {
                   setSearchQuery(e.target.value);
                   handleSearch(e.target.value);
                 }}
-                placeholder="Search npm packages..."
+                placeholder={t('libraries:searchPlaceholder')}
                 className="glass-panel w-full rounded-xl border border-border px-3 py-2 text-base-content transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50"
               />
             </div>
 
             {searching && (
-              <div className="mt-4 text-sm text-base-content/60">Searching...</div>
+              <div className="mt-4 text-sm text-base-content/60">{t('libraries:searching')}</div>
             )}
 
             <div className="mt-4 space-y-2">
@@ -144,7 +142,7 @@ export function LibrariesView() {
                     )}
                     {typeof result.downloads === 'number' && (
                       <div className="text-xs text-base-content/55">
-                        {result.downloads.toLocaleString()} downloads/week
+                        {t('libraries:downloadsPerWeek', { count: result.downloads.toLocaleString() })}
                       </div>
                     )}
                     <a
@@ -154,7 +152,7 @@ export function LibrariesView() {
                       className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
                     >
                       <ExternalLink size={12} />
-                      View package
+                      {t('libraries:viewPackage')}
                     </a>
                   </div>
                   <button
@@ -162,14 +160,14 @@ export function LibrariesView() {
                     disabled={installMutation.isPending}
                     className="action-btn-primary justify-center shrink-0 text-sm"
                   >
-                    Install
+                    {t('libraries:install')}
                   </button>
                 </div>
               ))}
 
               {!searching && searchQuery.length >= 2 && searchResults.length === 0 && (
                 <div className="glass-panel rounded-2xl border border-dashed border-border px-4 py-8 text-center text-sm text-base-content/60">
-                  No results yet. Try a different package name.
+                  {t('libraries:noResults')}
                 </div>
               )}
             </div>
@@ -181,17 +179,15 @@ export function LibrariesView() {
         <div className="space-y-4">
           <div className="surface-card overflow-hidden p-0">
             <div className="border-b border-border p-5">
-              <h2 className="text-lg font-semibold text-base-content">Installed libraries</h2>
-              <p className="mt-1 text-sm text-base-content/65">
-                Active packages detected in the Node-RED runtime.
-              </p>
+              <h2 className="text-lg font-semibold text-base-content">{t('libraries:installedLibraries')}</h2>
+              <p className="mt-1 text-sm text-base-content/65">{t('libraries:installedHint')}</p>
             </div>
 
             <div className="p-5">
             {isError ? (
               <div className="rounded-2xl border border-error/40 bg-error/10 px-4 py-8 text-center">
-                <p className="font-medium text-error">Could not load libraries.</p>
-                <p className="mt-1 text-sm text-base-content/60">Check that the backend is running and authenticated.</p>
+                <p className="font-medium text-error">{t('libraries:loadFailed')}</p>
+                <p className="mt-1 text-sm text-base-content/60">{t('libraries:loadHint')}</p>
               </div>
             ) : isLoading ? (
               <div className="animate-pulse space-y-2">
@@ -200,8 +196,8 @@ export function LibrariesView() {
               </div>
             ) : libraries.length === 0 ? (
               <div className="mt-4 rounded-2xl border border-dashed border-border px-4 py-8 text-center">
-                <p className="font-medium text-base-content">No installed libraries</p>
-                <p className="mt-1 text-sm text-base-content/60">Install one from the search column.</p>
+                <p className="font-medium text-base-content">{t('libraries:empty')}</p>
+                <p className="mt-1 text-sm text-base-content/60">{t('libraries:emptyHint')}</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -227,14 +223,14 @@ export function LibrariesView() {
                       <button
                         onClick={() => handleConfirmUninstall(lib.name)}
                         disabled={uninstallMutation.isPending}
-                        title="Uninstall"
+                        title={t('libraries:uninstall')}
                         className={
                           confirmingUninstall === lib.name
                             ? 'btn btn-error btn-xs shrink-0 px-3'
                             : 'btn btn-ghost btn-xs shrink-0'
                         }
                       >
-                        {confirmingUninstall === lib.name ? 'Confirm' : <Trash2 size={16} />}
+                        {confirmingUninstall === lib.name ? t('libraries:confirm') : <Trash2 size={16} />}
                       </button>
                     </div>
 
@@ -270,10 +266,10 @@ export function LibrariesView() {
                           target="_blank"
                           rel="noopener noreferrer"
                           className="btn btn-ghost btn-xs text-xs gap-1"
-                          title="Visit homepage"
+                          title={t('libraries:visitHomepage')}
                         >
                           <ExternalLink size={14} />
-                          Homepage
+                          {t('libraries:homepage')}
                         </a>
                       )}
                       <a
@@ -281,7 +277,7 @@ export function LibrariesView() {
                         target="_blank"
                         rel="noopener noreferrer"
                         className="btn btn-ghost btn-xs text-xs gap-1"
-                        title="View on npm"
+                        title={t('libraries:viewOnNpm')}
                       >
                         <ExternalLink size={14} />
                         npm
@@ -291,10 +287,10 @@ export function LibrariesView() {
                         target="_blank"
                         rel="noopener noreferrer"
                         className="btn btn-ghost btn-xs text-xs gap-1"
-                        title="View on Node-RED Flows"
+                        title={t('libraries:viewOnFlows')}
                       >
                         <ExternalLink size={14} />
-                        Flows
+                        {t('libraries:viewOnFlows')}
                       </a>
                     </div>
                   </div>
@@ -302,8 +298,11 @@ export function LibrariesView() {
                 {libraries.length > installedPageSize && (
                   <div className="flex flex-col gap-3 border-t border-border/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
                     <p className="text-xs font-medium text-base-content/55">
-                      Showing {(installedPage - 1) * installedPageSize + 1}-
-                      {Math.min(installedPage * installedPageSize, libraries.length)} of {libraries.length}
+                      {t('libraries:showing', {
+                        from: (installedPage - 1) * installedPageSize + 1,
+                        to: Math.min(installedPage * installedPageSize, libraries.length),
+                        total: libraries.length,
+                      })}
                     </p>
                     <div className="glass-panel inline-flex items-center gap-1 rounded-full border border-border p-1 self-start sm:self-auto">
                       <button
@@ -311,10 +310,10 @@ export function LibrariesView() {
                         className="inline-flex h-8 items-center gap-1 rounded-full px-3 text-xs font-semibold text-base-content/70 transition-colors hover:bg-primary/10 hover:text-primary disabled:pointer-events-none disabled:opacity-35"
                         disabled={installedPage === 1}
                         onClick={() => setInstalledPage((page) => Math.max(1, page - 1))}
-                        aria-label="Previous page"
+                        aria-label={t('libraries:previousPage')}
                       >
                         <ChevronLeft size={14} />
-                        Previous
+                        {t('libraries:previous')}
                       </button>
                       <span className="rounded-full bg-primary/15 px-3 py-1.5 font-mono text-xs font-bold text-primary">
                         {installedPage} / {totalInstalledPages}
@@ -324,9 +323,9 @@ export function LibrariesView() {
                         className="inline-flex h-8 items-center gap-1 rounded-full px-3 text-xs font-semibold text-base-content/70 transition-colors hover:bg-primary/10 hover:text-primary disabled:pointer-events-none disabled:opacity-35"
                         disabled={installedPage === totalInstalledPages}
                         onClick={() => setInstalledPage((page) => Math.min(totalInstalledPages, page + 1))}
-                        aria-label="Next page"
+                        aria-label={t('libraries:nextPage')}
                       >
-                        Next
+                        {t('libraries:next')}
                         <ChevronRight size={14} />
                       </button>
                     </div>

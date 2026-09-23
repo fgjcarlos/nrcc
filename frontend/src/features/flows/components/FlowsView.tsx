@@ -76,7 +76,7 @@ export function FlowsView() {
       setAnalysisResults(prev => ({ ...prev, ...results }));
       setExpandedResults(new Set(ids.filter(id => results[id])));
     } catch {
-      toast.error('Failed to analyze flows');
+      toast.error(t('flows:analysisFailed'));
     } finally {
       // Always clear the analyzing state so the Analyze bar never stays stuck.
       setAnalyzing(false);
@@ -89,8 +89,8 @@ export function FlowsView() {
   const loadingSlot = (
     <div className="space-y-4">
       <div>
-        <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">AI pipeline</p>
-        <h1 className="text-2xl font-bold text-base-content">Flows</h1>
+        <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">{t('flows:aiPipeline')}</p>
+        <h1 className="text-2xl font-bold text-base-content">{t('flows:title')}</h1>
       </div>
       <div className="space-y-3 animate-pulse">
         {[1, 2, 3].map(i => (
@@ -103,11 +103,11 @@ export function FlowsView() {
   const errorSlot = (
     <div>
       <div>
-        <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">AI pipeline</p>
-        <h1 className="text-2xl font-bold text-base-content">Flows</h1>
+        <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">{t('flows:aiPipeline')}</p>
+        <h1 className="text-2xl font-bold text-base-content">{t('flows:title')}</h1>
       </div>
       <div className="mt-4 rounded-2xl border border-error/20 bg-error/10 p-4 shadow-glow">
-        <p className="text-error">Error loading flows: {error?.message}</p>
+        <p className="text-error">{t('flows:failedToLoad')}: {error?.message}</p>
       </div>
     </div>
   );
@@ -115,8 +115,8 @@ export function FlowsView() {
   const unavailableSlot = (
     <div>
       <div>
-        <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">AI pipeline</p>
-        <h1 className="text-2xl font-bold text-base-content">Flows</h1>
+        <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">{t('flows:aiPipeline')}</p>
+        <h1 className="text-2xl font-bold text-base-content">{t('flows:title')}</h1>
       </div>
       <div className="mt-4 flex items-start gap-3 rounded-2xl border border-warning/20 bg-warning/10 p-4 shadow-glow">
         <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
@@ -150,18 +150,18 @@ export function FlowsView() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div>
-            <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">AI pipeline</p>
-            <h1 className="text-2xl font-bold text-base-content">Flows</h1>
+            <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">{t('flows:aiPipeline')}</p>
+            <h1 className="text-2xl font-bold text-base-content">{t('flows:title')}</h1>
           </div>
           <span className="text-sm text-base-content/60">
-            {flows.length} flow{flows.length !== 1 ? 's' : ''}
+            {t('flows:count', { count: flows.length })}
           </span>
         </div>
         <Link
           to="/flows/versions"
           className="action-btn-secondary text-sm"
         >
-          Version History
+          {t('flows:versionHistory')}
         </Link>
         {flows.length > 0 && (
           <button
@@ -217,7 +217,7 @@ export function FlowsView() {
                 {aiCapability.message}
                 {canConfigureAI && (
                   <Link to="/configuration" className="ml-1 text-primary underline underline-offset-2">
-                    Configure AI provider
+                    {t('flows:configureAIProvider')}
                   </Link>
                 )}
               </span>
@@ -251,7 +251,7 @@ function FlowCard({
       <button
         onClick={onToggleSelect}
         className="mt-1 shrink-0 text-base-content/60 transition-colors hover:text-primary"
-        aria-label={selected ? 'Deselect flow' : 'Select flow'}
+        aria-label={selected ? t('flows:deselectFlow') : t('flows:selectFlow')}
       >
         {selected
           ? <CheckSquare className="w-5 h-5 text-primary" />

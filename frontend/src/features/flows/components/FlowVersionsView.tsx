@@ -5,8 +5,10 @@ import { flowService } from '../services/flowService';
 import type { FlowVersionEntry, FlowDiff } from '../types';
 
 import { queryKeys } from '@/shared/lib/queryKeys';
+import { useT } from '@/i18n';
 export function FlowVersionsView() {
   const queryClient = useQueryClient();
+  const { t } = useT();
   const [selectedVersions, setSelectedVersions] = useState<[string, string] | null>(null);
   const [revertTarget, setRevertTarget] = useState<string | null>(null);
 
@@ -26,20 +28,20 @@ export function FlowVersionsView() {
   const revertMutation = useMutation({
     mutationFn: flowService.revertToVersion,
     onSuccess: () => {
-      toast.success('Flows reverted successfully');
+      toast.success(t('flows:revertSucceeded'));
       queryClient.invalidateQueries({ queryKey: queryKeys.flows.versions });
       setRevertTarget(null);
     },
-    onError: () => toast.error('Failed to revert flows'),
+    onError: () => toast.error(t('flows:revertFailed')),
   });
 
   const snapshotMutation = useMutation({
     mutationFn: flowService.captureSnapshot,
     onSuccess: () => {
-      toast.success('Snapshot captured');
+      toast.success(t('flows:snapshotCaptured'));
       queryClient.invalidateQueries({ queryKey: queryKeys.flows.versions });
     },
-    onError: () => toast.error('Failed to capture snapshot'),
+    onError: () => toast.error(t('flows:snapshotFailed')),
   });
 
   const handleCompare = (fromIdx: number) => {
@@ -49,24 +51,24 @@ export function FlowVersionsView() {
   };
 
   if (isLoading) {
-    return <div className="p-6 text-muted-foreground">Loading versions...</div>;
+    return <div className="p-6 text-muted-foreground">{t('flows:loadingVersions')}</div>;
   }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-base-content">Flow Versions</h2>
+        <h2 className="text-xl font-bold text-base-content">{t('flows:versionsTitle')}</h2>
         <button
           onClick={() => snapshotMutation.mutate()}
           disabled={snapshotMutation.isPending}
           className="action-btn-secondary text-sm"
         >
-          {snapshotMutation.isPending ? 'Capturing...' : 'Capture Snapshot'}
+          {snapshotMutation.isPending ? t('flows:capturing') : t('flows:captureSnapshot')}
         </button>
       </div>
 
       {versions.length === 0 ? (
-        <p className="text-muted-foreground">No versions captured yet. Flow changes are detected automatically.</p>
+        <p className="text-muted-foreground">{t('flows:noVersions')}</p>
       ) : (
         <div className="space-y-2">
           {versions.map((v, idx) => (
@@ -77,6 +79,7 @@ export function FlowVersionsView() {
               onCompare={() => handleCompare(idx)}
               onRevert={() => setRevertTarget(v.id)}
               canCompare={idx + 1 < versions.length}
+              t={t}
             />
           ))}
         </div>
@@ -88,11 +91,12 @@ export function FlowVersionsView() {
           isPending={revertMutation.isPending}
           onConfirm={() => revertMutation.mutate(revertTarget)}
           onCancel={() => setRevertTarget(null)}
+          t={t}
         />
       )}
 
       {selectedVersions && (
-        <DiffPanel diff={diff ?? null} loading={diffLoading} onClose={() => setSelectedVersions(null)} />
+        <DiffPanel diff={diff ?? null} loading={diffLoading} onClose={() => setSelectedVersions(null)} t={t} />
       )}
     </div>
   );
@@ -104,12 +108,14 @@ function VersionRow({
   onCompare,
   onRevert,
   canCompare,
+  t,
 }: {
   version: FlowVersionEntry;
   isLatest: boolean;
   onCompare: () => void;
   onRevert: () => void;
   canCompare: boolean;
+  t: (key: string, options?: Record<string, unknown>) => string;
 }) {
   const date = version.timestamp ? new Date(version.timestamp).toLocaleString() : version.id;
 
@@ -119,22 +125,22 @@ function VersionRow({
         <div>
           <span className="text-sm font-medium text-base-content">{date}</span>
           {isLatest && (
-            <span className="ml-2 rounded bg-primary/20 px-2 py-0.5 text-xs text-primary">latest</span>
+            <span className="ml-2 rounded bg-primary/20 px-2 py-0.5 text-xs text-primary">{t('flows:latest')}</span>
           )}
         </div>
-        <span className="text-xs text-muted-foreground">{version.nodeCount} nodes</span>
+        <span className="text-xs text-muted-foreground">{t('flows:nodeCount', { count: version.nodeCount })}</span>
         <span className="text-xs text-muted-foreground">{(version.size / 1024).toFixed(1)} KB</span>
         <span className="font-mono text-xs text-muted-foreground">{version.hash}</span>
       </div>
       <div className="flex gap-2">
         {canCompare && (
           <button onClick={onCompare} className="action-btn-secondary text-xs">
-            Diff
+            {t('flows:diff')}
           </button>
         )}
         {!isLatest && (
           <button onClick={onRevert} className="action-btn-secondary text-xs text-warning">
-            Revert
+            {t('flows:revert')}
           </button>
         )}
       </div>
@@ -146,28 +152,30 @@ function DiffPanel({
   diff,
   loading,
   onClose,
+  t,
 }: {
   diff: FlowDiff | null;
   loading: boolean;
   onClose: () => void;
+  t: (key: string, options?: Record<string, unknown>) => string;
 }) {
   const isEmpty = diff && !diff.added?.length && !diff.removed?.length && !diff.modified?.length;
 
   return (
     <div className="surface-panel border border-border rounded-xl p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="font-bold text-base-content">Changes</h3>
+        <h3 className="font-bold text-base-content">{t('flows:changes')}</h3>
         <button onClick={onClose} className="text-muted-foreground hover:text-base-content text-sm">
-          Close
+          {t('common:close')}
         </button>
       </div>
 
-      {loading && <p className="text-muted-foreground text-sm">Computing diff...</p>}
-      {isEmpty && <p className="text-muted-foreground text-sm">No differences found.</p>}
+      {loading && <p className="text-muted-foreground text-sm">{t('flows:computingDiff')}</p>}
+      {isEmpty && <p className="text-muted-foreground text-sm">{t('flows:noDifferences')}</p>}
 
       {diff?.added && diff.added.length > 0 && (
         <div>
-          <h4 className="text-sm font-medium text-success mb-1">+ Added ({diff.added.length})</h4>
+          <h4 className="text-sm font-medium text-success mb-1">+ {t('flows:added', { count: diff.added.length })}</h4>
           {diff.added.map((n) => (
             <div key={n.id} className="text-sm text-muted-foreground ml-4">
               <span className="font-mono">{n.type}</span>
@@ -179,7 +187,7 @@ function DiffPanel({
 
       {diff?.removed && diff.removed.length > 0 && (
         <div>
-          <h4 className="text-sm font-medium text-error mb-1">- Removed ({diff.removed.length})</h4>
+          <h4 className="text-sm font-medium text-error mb-1">- {t('flows:removed', { count: diff.removed.length })}</h4>
           {diff.removed.map((n) => (
             <div key={n.id} className="text-sm text-muted-foreground ml-4">
               <span className="font-mono">{n.type}</span>
@@ -191,7 +199,7 @@ function DiffPanel({
 
       {diff?.modified && diff.modified.length > 0 && (
         <div>
-          <h4 className="text-sm font-medium text-warning mb-1">~ Modified ({diff.modified.length})</h4>
+          <h4 className="text-sm font-medium text-warning mb-1">~ {t('flows:modified', { count: diff.modified.length })}</h4>
           {diff.modified.map((n) => (
             <div key={n.id} className="text-sm text-muted-foreground ml-4">
               <span className="font-mono">{n.type}</span>
@@ -210,27 +218,26 @@ function RevertConfirm({
   isPending,
   onConfirm,
   onCancel,
+  t,
 }: {
   versionId: string;
   isPending: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  t: (key: string, options?: Record<string, unknown>) => string;
 }) {
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onCancel()}>
       <div className="surface-panel w-full max-w-md border border-border p-6 shadow-glow">
-        <h3 className="text-lg font-bold text-base-content mb-2">Confirm Revert</h3>
-        <p className="text-sm text-muted-foreground mb-4">
-          This will replace the current flows.json with the selected version. A snapshot of the current
-          state will be captured first.
-        </p>
+        <h3 className="text-lg font-bold text-base-content mb-2">{t('flows:confirmRevert')}</h3>
+        <p className="text-sm text-muted-foreground mb-4">{t('flows:revertDescription')}</p>
         <p className="text-xs font-mono text-muted-foreground mb-4">{versionId}</p>
         <div className="flex justify-end gap-2">
           <button onClick={onCancel} disabled={isPending} className="action-btn-secondary">
-            Cancel
+            {t('common:cancel')}
           </button>
           <button onClick={onConfirm} disabled={isPending} className="action-btn-primary">
-            {isPending ? 'Reverting...' : 'Revert'}
+            {isPending ? t('flows:reverting') : t('flows:revert')}
           </button>
         </div>
       </div>

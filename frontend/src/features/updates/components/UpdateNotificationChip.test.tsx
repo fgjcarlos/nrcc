@@ -260,7 +260,7 @@ describe('UpdateNotificationChip component', () => {
       wrapper: createWrapper(),
     })
 
-    expect(screen.getByText('Backing up...')).toBeInTheDocument()
+    expect(screen.getByText('Backing up Node-RED configuration...')).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveAttribute('aria-live', 'polite')
   })
 
@@ -319,7 +319,7 @@ describe('UpdateNotificationChip component', () => {
       wrapper: createWrapper(),
     })
 
-    expect(screen.getByText('Updated')).toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveAttribute('aria-label', 'Update completed')
+    expect(screen.getByText('Up to date')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveAttribute('aria-label', 'Update completed successfully!')
   })
 })
