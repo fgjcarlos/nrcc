@@ -138,40 +138,51 @@ Acceptance for slice 1:
 - CI lint / Markdown link check passes.
 - README aligns with #765 compatibility policy.
 
-## Slice 2 — CONTRIBUTING restore + cross-refs + tracker merge + PR
+## Slice 2 — final QA + tracker merge + PR
 
-Branch: `docs/issue-769-cross-refs-and-pr`
-From: `docs/issue-769-readme-structure` tip (slice 1).
+Branch: `docs/issue-769-readme` (slice 1 already on this branch —
+the docs are small enough that one branch carries both slices,
+no separate tracker needed for a 288 -> 267 line README change).
 
 Work:
 
-- Restore `## Language policy` in `CONTRIBUTING.md` (verbatim from
-  7be9b51). Adds back the rule, the scanner command, and the
-  excluded paths section. Lost during #830 squash merge.
-- `AGENTS.md` — small "Start here" pointer to the new README
-  sections so AI codegen has the canonical map. One-page reference,
-  no duplication of README content.
-- Verify the new README against the plan checklist (release-relevant
-  facts).
-- Verifies no broken internal links:
-  ```bash
-  grep -oP '\]\(\K[^)]+' README.md | while read -r f; do
-    [ -e "${f#./}" ] || echo "MISSING: $f"
-  done
-  ```
-- Tracker merge: `docs/issue-769-readme` from main merges slice 1,
-  then slice 2. Single PR to main. Closes #769.
+- Updated this plan doc to record the actual discoveries during
+  slice 1 (`## Language policy` in `CONTRIBUTING.md` IS present
+  on `origin/main` post #830 — the apparent regression was a
+  stale local-main checkout, not a real loss; `AGENTS.md` IS
+  also present). No "restore" work was needed.
+- Final acceptance run:
+  - `go test ./tools/langscan/... ./scripts/cite_check/...` —
+    18 tests pass (10 scanner + 7 workflow contract + 8 link-check,
+    with the workflow and cite_check subdirs).
+  - `go run ./tools/langscan .` — emits `[]` (no findings).
+  - `go run ./scripts/cite_check` on every doc file in the repo
+    (README, CONTRIBUTING, AGENTS, SECURITY, CHANGELOG, the plan
+    doc, env-contract, docker-stack, production-install-launch-guide,
+    and the two cross-referenced ADRs) — all OK, zero broken links.
+- Open PR `docs/issue-769-readme` -> `main`. Closes #769.
 
 Acceptance for slice 2:
 
-- CI green (lint, backend, frontend, language-policy, OpenAPI,
-  govulncheck, pnpm audit, Docker stack acceptance).
-- Internal-link check from slice 1 still passes after restore.
-- PR has scope summary linking back to #769 and #768.
+- All CI gates green on the PR.
+- PR description summarises slice 1 (rewrite + tool) and links
+  back to #769 and #765.
 
-## Tracker
+## Tracker (status)
 
-`docs/issue-769-readme` from `main`. Single PR. Closes #769.
+Single PR from `docs/issue-769-readme` -> `main`. Closes #769.
+
+## What this slice does NOT do
+
+- Does not introduce screenshots or animated captures. Both
+  require the redesigned UI from issue #766 to land first; the
+  README's "Read before opening an issue or PR" section calls
+  out screenshot freshness as a checklist item.
+- Does not restructure `docs/` itself. The handbook restructure
+  is #771.
+- Does not write i18n catalogs. That is #767.
+- Does not enable protected-branch auto-merge. The user controls
+  merge as always.
 
 ## Stop conditions
 
