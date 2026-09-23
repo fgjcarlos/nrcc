@@ -51,5 +51,22 @@
   "modified": "Modified ({{count}})",
   "confirmRevert": "Confirm Revert",
   "revertDescription": "This will replace the current flows.json with the selected version. A snapshot of the current state will be captured first.",
-  "reverting": "Reverting..."
+  "reverting": "Reverting...",
+  "flowNotLoaded": "Flow not loaded",
+  "loadFailed": "Failed to load flow.",
+  "backToFlows": "Back to flows",
+  "flowNotFound": "Flow not found",
+  "metricNodes": "Nodes",
+  "metricConnections": "Connections",
+  "metricDisabled": "Disabled",
+  "metricNodeTypes": "Node Types",
+  "aiAnalysisTitle": "AI Analysis",
+  "analyzeFlow": "Analyze Flow",
+  "analyzing": "Analyzing flow...",
+  "analyzePrompt": "Click \"Analyze Flow\" to get insights about this flow.",
+  "aiCopilotTitle": "AI Flow Copilot",
+  "nodeTypesTitle": "Node Types",
+  "aiReviewOnly": "Review only",
+  "candidateFlowJson": "Candidate flow JSON (manual review/import required)",
+  "rawJson": "raw JSON"
 }
