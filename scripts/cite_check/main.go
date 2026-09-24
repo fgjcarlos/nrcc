@@ -60,7 +60,7 @@ func Check(path string) []Finding {
 			// markdown file; target is parsed out of that file's body,
 			// which is exactly the surface the tool is designed to scan.
 			resolved := filepath.Join(dir, target) // #nosec G703
-			if _, err := os.Stat(resolved); err != nil {
+			if _, err := os.Stat(resolved); err != nil { // #nosec G703
 				findings = append(findings, Finding{
 					Path:   path,
 					Line:   lineNo,
