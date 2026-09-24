@@ -14,6 +14,18 @@
   "restart.title": "¿Reiniciar Node-RED?",
   "restart.description": "Node-RED se detendrá y volverá a arrancar. Los flujos activos se interrumpirán brevemente.",
   "restart.confirm": "Sí, reiniciar",
+  "actions": {
+    "unknownError": "Error desconocido",
+    "restartSuccessTitle": "Node-RED reiniciado",
+    "restartSuccessMessage": "El proceso ha arrancado correctamente.",
+    "restartErrorTitle": "No se pudo reiniciar Node-RED",
+    "startSuccessTitle": "Node-RED iniciado",
+    "startSuccessMessage": "El proceso ha arrancado correctamente.",
+    "startErrorTitle": "No se pudo iniciar Node-RED",
+    "stopSuccessTitle": "Node-RED detenido",
+    "stopSuccessMessage": "El proceso se ha detenido correctamente.",
+    "stopErrorTitle": "No se pudo detener Node-RED"
+  },
   "diskUsage": "Uso de disco",
   "scheduled": "Programado",
   "withAlerts": "Con alertas",

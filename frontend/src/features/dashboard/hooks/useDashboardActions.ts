@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { dashboardService } from '../services';
 
 import { queryKeys } from '@/shared/lib/queryKeys';
+import { useT } from '@/i18n';
 interface UseDashboardActionsOptions {
   uiPort?: number;
 }
@@ -20,6 +21,7 @@ interface RuntimeActionOptions {
 
 export function useDashboardActions({ uiPort }: UseDashboardActionsOptions) {
   const queryClient = useQueryClient();
+  const { t } = useT();
 
   const [pendingConfirm, setPendingConfirm] = useState(false);
   const [isRestarting, setIsRestarting] = useState(false);
@@ -30,7 +32,7 @@ export function useDashboardActions({ uiPort }: UseDashboardActionsOptions) {
   };
 
   const getErrorMessage = (error: unknown) =>
-    error instanceof Error ? error.message : 'Error desconocido';
+    error instanceof Error ? error.message : t('dashboard:actions.unknownError');
 
   const pushRuntimeSuccessToast = (title: string, message: string) => {
     toast.success(title, { description: message });
@@ -72,9 +74,9 @@ export function useDashboardActions({ uiPort }: UseDashboardActionsOptions) {
 
     const restarted = await runRuntimeAction({
       action: dashboardService.restartNodeRed,
-      successTitle: 'Node-RED reiniciado',
-      successMessage: 'El proceso ha arrancado correctamente.',
-      errorTitle: 'No se pudo reiniciar Node-RED',
+      successTitle: t('dashboard:actions.restartSuccessTitle'),
+      successMessage: t('dashboard:actions.restartSuccessMessage'),
+      errorTitle: t('dashboard:actions.restartErrorTitle'),
       onSuccess: invalidateRuntimeStatus,
       onError: () => setIsRestarting(false),
     });
@@ -94,9 +96,9 @@ export function useDashboardActions({ uiPort }: UseDashboardActionsOptions) {
 
     await runRuntimeAction({
       action: dashboardService.startNodeRed,
-      successTitle: 'Node-RED iniciado',
-      successMessage: 'El proceso ha arrancado correctamente.',
-      errorTitle: 'No se pudo iniciar Node-RED',
+      successTitle: t('dashboard:actions.startSuccessTitle'),
+      successMessage: t('dashboard:actions.startSuccessMessage'),
+      errorTitle: t('dashboard:actions.startErrorTitle'),
       onSuccess: invalidateRuntimeStatus,
       onFinally: () => setIsStartStopping(false),
     });
@@ -107,9 +109,9 @@ export function useDashboardActions({ uiPort }: UseDashboardActionsOptions) {
 
     await runRuntimeAction({
       action: dashboardService.stopNodeRed,
-      successTitle: 'Node-RED detenido',
-      successMessage: 'El proceso se ha detenido correctamente.',
-      errorTitle: 'No se pudo detener Node-RED',
+      successTitle: t('dashboard:actions.stopSuccessTitle'),
+      successMessage: t('dashboard:actions.stopSuccessMessage'),
+      errorTitle: t('dashboard:actions.stopErrorTitle'),
       onSuccess: invalidateRuntimeStatus,
       onFinally: () => setIsStartStopping(false),
     });

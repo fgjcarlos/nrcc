@@ -14,6 +14,18 @@
   "restart.title": "Restart Node-RED?",
   "restart.description": "Node-RED will stop and start again. Active flows will be briefly interrupted.",
   "restart.confirm": "Yes, restart",
+  "actions": {
+    "unknownError": "Unknown error",
+    "restartSuccessTitle": "Node-RED restarted",
+    "restartSuccessMessage": "The process started successfully.",
+    "restartErrorTitle": "Could not restart Node-RED",
+    "startSuccessTitle": "Node-RED started",
+    "startSuccessMessage": "The process started successfully.",
+    "startErrorTitle": "Could not start Node-RED",
+    "stopSuccessTitle": "Node-RED stopped",
+    "stopSuccessMessage": "The process stopped successfully.",
+    "stopErrorTitle": "Could not stop Node-RED"
+  },
   "diskUsage": "Disk Usage",
   "scheduled": "Scheduled",
   "withAlerts": "With alerts",
