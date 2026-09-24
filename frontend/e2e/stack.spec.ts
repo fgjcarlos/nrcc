@@ -159,9 +159,9 @@ test('dashboard restart changes the managed Node-RED process PID', async ({ page
   expect(before.data?.status?.pid).toBeGreaterThan(0)
 
   await login(page)
-  await page.getByRole('button', { name: 'Reiniciar' }).click()
-  await page.getByRole('button', { name: 'Sí, reiniciar' }).click()
-  await expect(page.getByText('Node-RED reiniciado')).toBeVisible()
+  await page.getByRole('button', { name: 'Restart' }).click()
+  await page.getByRole('button', { name: 'Yes, restart' }).click()
+  await expect(page.getByText('Node-RED restarted')).toBeVisible()
 
   await expect.poll(async () => {
     const response = await nrcc.get('/api/runtime/history?n=1', { headers })

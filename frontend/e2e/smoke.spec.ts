@@ -19,17 +19,17 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
     await expect(page.getByText('System Health')).toBeVisible()
     // Issue #676 promoted the Runtime card (with Restart/Open actions) out of
     // the metric row; QuickActionsCard was removed in favor of those buttons.
-    await expect(page.getByRole('button', { name: 'Reiniciar' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Abrir' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Restart' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Open' })).toBeVisible()
   })
 
-  test('restart flow drives the real Reiniciar button and shows the success toast', async ({ page }) => {
+  test('restart flow drives the real Restart button and shows the success toast', async ({ page }) => {
     await login(page)
     await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible()
-    await page.getByRole('button', { name: 'Reiniciar' }).click()
-    await expect(page.getByRole('heading', { name: '¿Reiniciar Node-RED?' })).toBeVisible()
-    await page.getByRole('button', { name: 'Sí, reiniciar' }).click()
-    await expect(page.getByText('Node-RED reiniciado')).toBeVisible()
+    await page.getByRole('button', { name: 'Restart' }).click()
+    await expect(page.getByRole('heading', { name: 'Restart Node-RED?' })).toBeVisible()
+    await page.getByRole('button', { name: 'Yes, restart' }).click()
+    await expect(page.getByText('Node-RED restarted')).toBeVisible()
   })
 
   test('backup creation uses fixture responses', async ({ page }) => {
@@ -38,7 +38,7 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
     // the "Backups" page heading).
     await page.getByRole('link', { name: /Recovery/ }).click()
     await expect(page.getByRole('heading', { name: 'Backups', exact: true })).toBeVisible()
-    await page.getByRole('button', { name: /Crear backup ahora/ }).first().click()
+    await page.getByRole('button', { name: /Create backup now/ }).first().click()
     await expect(page.getByRole('button', { name: 'Manual smoke backup' })).toBeVisible()
   })
 
