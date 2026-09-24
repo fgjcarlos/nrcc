@@ -20,7 +20,9 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
     // Issue #676 promoted the Runtime card (with Restart/Open actions) out of
     // the metric row; QuickActionsCard was removed in favor of those buttons.
     await expect(page.getByRole('button', { name: 'Restart' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Open' })).toBeVisible()
+    // exact:true disambiguates the RuntimeCard Open button from the
+    // user-menu trigger (whose aria-label contains 'open user menu').
+    await expect(page.getByRole('button', { name: 'Open', exact: true })).toBeVisible()
   })
 
   test('restart flow drives the real Restart button and shows the success toast', async ({ page }) => {

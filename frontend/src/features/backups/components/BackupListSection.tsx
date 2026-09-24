@@ -183,7 +183,7 @@ export function BackupListSection(props: BackupListSectionProps) {
                           <button
                             onClick={() => onRestore(backup)}
                             disabled={isActionPending && pendingActionId === backup.id}
-                            title={t('common:restore')}
+                            title={t('backups:actions.restore')}
                             className="icon-button"
                           >
                             {isActionPending && pendingActionId === backup.id ? (
