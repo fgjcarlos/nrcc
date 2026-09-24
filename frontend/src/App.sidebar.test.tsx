@@ -63,6 +63,10 @@ vi.mock('@/features/backups/components/BackupsView', () => ({
   BackupsView: () => <div>Backups page</div>,
 }));
 
+vi.mock('@/features/security/components/SecurityView', () => ({
+  SecurityView: () => <div>Security page</div>,
+}));
+
 vi.mock('@/features/files/components/FilesView', () => ({
   FilesView: () => <div>Files page</div>,
 }));

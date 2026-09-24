@@ -268,7 +268,7 @@ describe('ConfigurationView (issue #762 — Security tab for credentialSecret / 
     const user = userEvent.setup();
     renderConfiguration();
 
-    await user.click(await screen.findByRole('button', { name: /^Security$/ }));
+    await user.click(await screen.findByRole('button', { name: /^TLS & Secrets$/ }));
 
     // credentialSecret + https use the shared Input (label+id).
     // requireHttps is a ToggleField with no htmlFor link.
@@ -285,7 +285,7 @@ describe('ConfigurationView (issue #762 — Security tab for credentialSecret / 
     const user = userEvent.setup();
     renderConfiguration();
 
-    await user.click(await screen.findByRole('button', { name: /^Security$/ }));
+    await user.click(await screen.findByRole('button', { name: /^TLS & Secrets$/ }));
     const secretInput = screen.getByLabelText('Credential Secret') as HTMLInputElement;
     await user.type(secretInput, 'new-rotation-passphrase');
 
@@ -320,7 +320,7 @@ describe('ConfigurationView (issue #762 — Security tab for credentialSecret / 
 
     renderConfiguration();
 
-    await user.click(await screen.findByRole('button', { name: /^Security$/ }));
+    await user.click(await screen.findByRole('button', { name: /^TLS & Secrets$/ }));
     await user.click(findToggleButton(/^Require HTTPS$/));
     await user.type(screen.getByLabelText('Private Key Path'), '/etc/node-red/key.pem');
     await user.click(screen.getByText('Save', { selector: 'button' }));

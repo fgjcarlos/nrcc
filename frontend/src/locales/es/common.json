@@ -51,5 +51,6 @@
   "commandPalette": "Paleta de comandos",
   "commandPaletteShortcut": "⌘/Ctrl K",
   "searchCommands": "Buscar comandos",
-  "noMatchingCommands": "No hay comandos que coincidan"
+  "noMatchingCommands": "No hay comandos que coincidan",
+  "maintenanceLabel": "Mantenimiento"
 }

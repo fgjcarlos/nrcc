@@ -13,8 +13,8 @@ async function openSecurityCenter(page: import('@playwright/test').Page, apply: 
     const result = apply(JSON.parse(request.postData() ?? '{}'), count)
     return route.fulfill({ status: result.status, contentType: 'application/json', body: JSON.stringify(result.body) })
   })
-  await page.goto('/configuration')
-  await page.getByRole('button', { name: 'Authentication' }).click()
+  // Issue #766 slice A — Authentication tab lifted into /security.
+  await page.goto('/security')
   await expect(page.getByRole('heading', { name: 'Security Center' })).toBeVisible()
   await expect(page.getByLabel('Username').nth(0)).toHaveValue('operator')
 }

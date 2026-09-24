@@ -118,7 +118,9 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
     // (the dashboard-time cache otherwise wins).
     await page.reload()
 
-    await page.getByRole('button', { name: 'Security' }).click()
+    // Issue #766 slice A — 'Security' tab was renamed to 'TLS & Secrets'
+    // because 'Security' now refers to the dedicated top-level section.
+    await page.getByRole('button', { name: 'TLS & Secrets' }).click()
     await expect(page.getByText('Credential Encryption')).toBeVisible()
     await expect(page.getByLabel('Credential Secret')).toBeVisible()
     await expect(page.getByText('HTTPS Redirect')).toBeVisible()
@@ -134,8 +136,9 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
 
   test('Security Center exposes the canonical authentication surface in read-only mode', async ({ page }) => {
     await login(page)
-    await page.goto('/configuration')
-    await page.getByRole('button', { name: 'Authentication' }).click()
+    // Issue #766 slice A — Authentication tab lifted out of
+    // /configuration into the dedicated /security section.
+    await page.goto('/security')
     await expect(page.getByRole('heading', { name: 'Security Center' })).toBeVisible()
     await expect(page.getByText('Security Center is read-only because this runtime configuration is not editable.', { exact: true })).toContainText('read-only')
     await expect(page.getByRole('button', { name: 'Save Security Center' })).not.toBeVisible()

@@ -10,7 +10,8 @@ test('applies a mocked dashboard policy without displaying its secret', async ({
   await page.route('**/api/settings/raw', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify(envelope({ writable: true, revision: { fingerprint: 'revision', algorithm: 'sha256' } })) }));
   await page.route('**/api/dashboards/discovery', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify(envelope({ packages: { state: 'available' }, flows: { state: 'available' }, legacy: { path: '/ui' }, flowFuse: [], uiBases: [] })) }));
   await page.route('**/api/dashboards/access', async (route) => { request = JSON.parse(route.request().postData() ?? '{}'); await route.fulfill({ contentType: 'application/json', body: JSON.stringify(envelope({ document: {} })) }); });
-  await page.goto('/configuration'); await page.getByRole('button', { name: 'Authentication' }).click();
+  // Issue #766 slice A — Authentication tab lifted into /security.
+  await page.goto('/security');
   await page.getByLabel('Access secret').fill('browser-secret'); await page.getByLabel('Username').last().fill('operator');
   await page.getByRole('button', { name: 'Apply dashboard access' }).click();
   await expect.poll(() => request).toMatchObject({ target: 'legacy', username: 'operator', expectedRevision: 'revision' });

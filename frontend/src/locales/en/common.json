@@ -51,5 +51,6 @@
   "commandPalette": "Command palette",
   "commandPaletteShortcut": "⌘/Ctrl K",
   "searchCommands": "Search commands",
-  "noMatchingCommands": "No matching commands"
+  "noMatchingCommands": "No matching commands",
+  "maintenanceLabel": "Maintenance"
 }
