@@ -18,7 +18,7 @@ NRCC is for solo operators, small teams, and integrators who run one Node-RED in
 
 ## What NRCC does
 
-- **Visual configuration of Node-RED `settings.js`** — typed catalog of high-value settings (#762), source-preserving advanced escape hatches (#764), transactional apply (#758) with backups (#431) and atomic rollback.
+- **Visual configuration of Node-RED `settings.js`** — typed catalog of high-value settings (#762), source-preserving advanced escape hatches (#764), transactional apply (#758) with backups (#431) and atomic rollback. See [`docs/control-plane.md`](docs/control-plane.md) for the full roadmap traceability table.
 - **Access administration** — NRCC users and roles (#759), separate surface for Node-RED `adminAuth` (#760), Dashboard authentication (#761).
 - **Instance management** — lifecycle, live logs, environment, npm library, flow import/export, system metrics.
 - **Backup and restore** — in-volume timestamped snapshots (default) and optional Restic off-host encrypted backups (#432).

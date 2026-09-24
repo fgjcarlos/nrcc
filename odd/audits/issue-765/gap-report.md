@@ -8,19 +8,19 @@
 
 ## 1. Cluster status recap
 
-| Sub-issue | Status | Closing PR | Code in main | Named tests in main | Documentation |
-|---|---|---|---|---|---|
-| #756 | 🟡 AMBER | unknown | yes | 4/4 | none |
-| #757 | 🟢 GREEN | #777–#781 (fetched) | yes | 15/15 | none |
-| #758 | 🟡 AMBER | unknown | yes | 14/14 | none |
-| #759 | 🟡 AMBER | unknown | yes | 3/5 | none |
-| #760 | 🟡 AMBER | unknown | yes | 2/4 | none |
-| #761 | 🟢 GREEN | unknown | yes | 10/10 | in-CI |
-| #762 | 🟢 GREEN | unknown | yes | 10/10 | none |
-| #763 | 🟢 GREEN | #827/#828/#829 | yes | all 5 ACs | `odd/tasks/issue-763-navigation.md` |
-| #764 | 🟡 **AMBER** *(was RED; corrected after follow-up)* | unknown | yes | **4/4** | none |
+| Cluster | Theme | Status | Closing PR(s) | Evidence |
+|---|---|---|---|---|
+| #756 | NR 5.x compatibility contract | 🟢 GREEN | #772, #775 | 4 named contract tests present |
+| #757 | Settings.js source preservation | 🟢 GREEN | #777–#781 | 15 named tests across 3 slices |
+| #758 | Transactional settings apply | 🟢 GREEN | #781, #792, #793 | 14 named tests |
+| #759 | Reliable access administration | 🟡 AMBER | #794 | 3 of 5 named items; access-admin E2E + MFA E2E missing |
+| #760 | Authentication surfaces | 🟡 AMBER | #795, #797 | 2 of 4 named tests; `TestLegacyAuthFieldMigration` + `SecuritySurfaceIsolationE2E` missing |
+| #761 | Dashboard access surfaces | 🟢 GREEN | #800 | 10+ named tests + FlowFuse E2E in `stack.spec.ts:228` |
+| #762 | TLS, credentialSecret, requireHttps | 🟢 GREEN | #776, #777 | 10 named tests + ConfigurationView describe block |
+| #763 | Navigation focused on configuration | 🟢 GREEN | #827, #828, #829 | All 5 ACs mapped |
+| #764 | Advanced settings escape hatches | 🟡 AMBER | #828 | Code + all 4 named tests in `origin/main`; security review attestation pending |
 
-**Overall (corrected):** 5 GREEN, 4 AMBER, 0 RED.
+**Overall:** 6 🟢 GREEN, 3 🟡 AMBER, 0 🔴 RED.
 
 ---
 
@@ -58,20 +58,15 @@
   1. Add `frontend/e2e/access-administration.spec.ts` covering: create user, edit user role, disable user, admin MFA reset. Use the existing `frontend/e2e/auth.spec.ts` fixture pattern.
   2. Add `frontend/e2e/mfa-lifecycle.spec.ts` covering: enroll MFA, sign-in challenge, recovery code flow.
 
-### Gap G4 — No documentation pointers for any cluster
+### Gap G4 — No documentation pointers for any cluster *(RESOLVED)*
 
-- **Severity:** 🟡 AMBER.
-- **Claim under audit:** "Each managed catalog entry has a UI/recipe or explicit preserved-advanced classification and named verification evidence."
-- **Evidence:** No cluster has a `docs/` entry pointing at the evidence. Only #763 has a plan doc in `odd/tasks/`. README.md does not reference any cluster.
-- **Recommended remediation:**
-  1. Add a section in `README.md` (or a new `docs/control-plane.md`) that lists the 9 clusters with one-line summaries and links to the per-cluster evidence in `odd/audits/issue-765/`.
-  2. OpenAPI spec already references `catalogVersion` at line 2887 — expand that section to list the per-catalog-entry classification.
+- **Status:** 🟢 RESOLVED.
+- **Resolution:** `docs/control-plane.md` now lists all 9 clusters with status, closing PR(s), and per-cluster evidence link. Linked from `README.md` "What NRCC does" section.
 
-### Gap G5 — Closing PR numbers unknown for 5 clusters
+### Gap G5 — Closing PR numbers unknown *(RESOLVED)*
 
-- **Severity:** 🟡 AMBER.
-- **Clusters affected:** #756, #758, #759, #760, #762.
-- **Recommended remediation:** Before #765 closes, attach the closing PR numbers to the per-cluster evidence rows in `roadmap-traceability.md`. This requires `gh` access; the audit could not verify because no shell tool was available in the scout session.
+- **Status:** 🟢 RESOLVED.
+- **Resolution:** Closing PR(s) attached to every cluster in §1 above. Verified via `gh pr list --search` cross-referenced with PR body `Refs`/`Closes` footers.
 
 ### Gap G6 — Audit methodology (added in follow-up)
 
