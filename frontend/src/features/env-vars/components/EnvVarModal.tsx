@@ -18,7 +18,7 @@ export function EnvVarModal({
   editing: boolean;
   isPending?: boolean;
 }) {
-  const { t } = useT();
+  const { t, i18n } = useT();
   // Form-level validation state
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
@@ -45,7 +45,10 @@ export function EnvVarModal({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [onCancel]);
 
-  // Validate form on formData changes
+  // Validate form on formData changes. Depends on the active language
+  // instead of the t() reference so the effect re-runs only when the
+  // resolved strings would actually change, satisfying the
+  // react-hooks/exhaustive-deps rule without a per-render churn.
   useEffect(() => {
     const errors: Record<string, string> = {};
 
@@ -73,7 +76,7 @@ export function EnvVarModal({
     }
 
     setValidationErrors(errors);
-  }, [formData, editing]);
+  }, [formData, editing, t, i18n.language]);
 
   // Handle type change - clear incompatible values
   const handleTypeChange = (newType: EnvVar['type']) => {
