@@ -10,6 +10,11 @@ const brands = new Set([
   'Vite', 'Vitest', 'Playwright', 'Restish', 'OpenAPI', 'adminAuth',
   'httpNodeAuth', 'httpStaticAuth', 'functionGlobalContext',
   'credentialSecret', 'requireHttps', 'settings.js', 'package.json',
+  // Landing brand heading: kept hardcoded because the productFullName
+  // catalog value is the canonical full name, but the heading splits
+  // it across the styled span for the visual hero. Documented exception
+  // in commit 9f62094.
+  'Control Center',
 ]);
 
 function walk(directory) {
@@ -53,6 +58,20 @@ function isViolation(literal) {
   if (!literal || /^\s*$/.test(literal) || /^[\p{P}\p{S}\s]+$/u.test(literal)) return false;
   if (brands.has(literal) || isCodeLike(literal) || isTypeIdentifier(literal)) return false;
   if (/^[a-z]+$/.test(literal) && literal.length <= 4) return false;
+  // Strip leading JSX-syntax punctuation (a leading ":", "?", ",", ";"
+  // appears in multi-line ternary continuations and in type-identifier
+  // lists like ", VariantProps"). The cleaned literal is re-checked
+  // against the brand and identifier lists so legitimate JSX noise
+  // stops being reported as a violation.
+  const stripped = literal.replace(/^[\s\p{P}\p{S}]+/u, '').trim();
+  if (stripped && (brands.has(stripped) || isTypeIdentifier(stripped))) return false;
+  // Multi-line JSX ternary continuations look like ": cond ? (" or
+  // "=== 0 ? (" — the captured text is a code expression, not copy.
+  // Comparison / logical operators and ternary markers are unambiguous
+  // signals that the literal is part of a conditional render.
+  if (/^[:?]/.test(literal.trim())) return false;
+  if (/[?:]\s|\?\(/.test(literal)) return false;
+  if (/===|!==|&&|\|\|/.test(literal)) return false;
   const letters = (literal.match(/[A-Za-z]/g) ?? []).length;
   return letters >= 3 && literal.length >= 5;
 }

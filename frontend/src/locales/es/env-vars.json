@@ -29,6 +29,7 @@
   "modalValueRequired": "El valor es obligatorio",
   "modalValueMustBeNumber": "El valor debe ser un número válido",
   "modalValueMustBeBoolean": "El valor debe ser true o false",
+  "modalBooleanValueLabel": "Valor booleano",
   "modalValueLabel": "Valor",
   "modalEnvironmentLabel": "Entorno",
   "modalEditTitle": "Editar variable",

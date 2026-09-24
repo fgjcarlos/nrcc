@@ -79,6 +79,10 @@
   "noSchedulerHistory": "No scheduler history yet",
   "retrySync": "Retry",
   "noBackupsConfigured": "No backups yet. Configure the scheduler to start creating backups automatically.",
+  "syncErrorTitle": "Last backend sync failed",
+  "syncErrorStatusSuffix": " (scheduler status)",
+  "syncErrorObservabilitySuffix": " (observability)",
+  "syncErrorBody": "The data on screen may be out of date. Retry to resync.",
   "dateCreated": "Date Created",
   "triggeredBy": "Triggered By"
 }

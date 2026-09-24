@@ -120,7 +120,7 @@ export function EnvVarModal({
           <div className="flex min-h-12 w-full items-center justify-between gap-3 px-3">
             <span className="text-sm font-semibold text-base-content/70 uppercase tracking-wider">{t('env-vars:modalValueLabel')}:</span>
             <label className="flex items-center gap-2">
-              <span className="sr-only">Boolean value</span>
+              <span className="sr-only">{t('env-vars:modalBooleanValueLabel')}</span>
               <input
                 type="checkbox"
                 checked={formData.value === 'true'}

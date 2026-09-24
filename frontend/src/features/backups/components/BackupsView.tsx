@@ -227,11 +227,11 @@ export function BackupsView() {
           <AlertTriangle className="h-5 w-5 text-warning flex-shrink-0 mt-0.5" />
           <div className="flex-1 text-sm">
             <p className="font-medium text-base-content">
-              Última sincronización con el backend falló
-              {dataSyncError === 'status' ? ' (estado del scheduler)' : ' (observabilidad)'}.
+              {t('backups:syncErrorTitle')}
+              {dataSyncError === 'status' ? t('backups:syncErrorStatusSuffix') : t('backups:syncErrorObservabilitySuffix')}.
             </p>
             <p className="text-base-content/70 mt-1">
-              Los datos en pantalla pueden estar desactualizados. Reintentá para sincronizar los datos.
+              {t('backups:syncErrorBody')}
             </p>
           </div>
           <button

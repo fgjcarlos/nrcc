@@ -79,6 +79,10 @@
   "noSchedulerHistory": "Aún no hay historial del programador",
   "retrySync": "Reintentar",
   "noBackupsConfigured": "Aún no hay respaldos. Configura el programador para empezar a crear respaldos automáticamente.",
+  "syncErrorTitle": "Última sincronización con el backend falló",
+  "syncErrorStatusSuffix": " (estado del scheduler)",
+  "syncErrorObservabilitySuffix": " (observabilidad)",
+  "syncErrorBody": "Los datos en pantalla pueden estar desactualizados. Reintentá para sincronizar los datos.",
   "dateCreated": "Fecha de creación",
   "triggeredBy": "Disparado por"
 }
