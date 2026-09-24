@@ -10,11 +10,9 @@ import {
   EditorThemeSettings,
   AIProviderSettings,
 } from '.';
-import { SecurityCenter } from './SecurityCenter';
-import { DashboardAccess } from './DashboardAccess';
 import { AdvancedSettings } from './AdvancedSettings';
 import {
-  Settings, Server, Lock, Shield, Activity, Palette,
+  Settings, Server, Shield, Activity, Palette,
   Save, LockOpen, AlertTriangle, Bot
 } from 'lucide-react';
 import { useConfigurationData, useConfigurationActions } from '../hooks';
@@ -38,10 +36,9 @@ interface Section {
 
 const SECTIONS: Section[] = [
   { id: 'basic', label: 'Basic', icon: Server, component: BasicSettings },
-  { id: 'auth', label: 'Authentication', icon: Lock },
-  // Issue #762, slice 1 — TLS, credentialSecret and requireHttps tab.
+  // Issue #766 slice A — auth surfaces moved to /security.
   // Issue #762 — TLS, credentialSecret and requireHttps tab.
-  { id: 'security', label: 'Security', icon: Shield, component: SecuritySettings },
+  { id: 'tls', label: 'TLS & Secrets', icon: Shield, component: SecuritySettings },
   { id: 'logging', label: 'Logging', icon: Activity, component: LoggingSettings },
   { id: 'editor', label: 'Editor Theme', icon: Palette, component: EditorThemeSettings },
   { id: 'ai', label: 'AI Provider', icon: Bot },
@@ -330,7 +327,7 @@ export function ConfigurationView() {
 
        {/* Active Tab Content */}
        <div className="surface-card p-6">
-          {activeTab === 'auth' ? <><SecurityCenter config={data.config} rawSettingsContent={rawSettingsContent} expectedRevision={data.settingsDoc?.revision?.fingerprint} editable={data.hostStatus?.configuration?.editable === true} onApplied={() => { void data.refetchConfig(); void data.refetchSettings(); }} /><div className="my-6 border-t border-border" /><DashboardAccess editable={data.hostStatus?.configuration?.editable === true} expectedRevision={data.settingsDoc?.revision?.fingerprint} onApplied={() => { void data.refetchConfig(); void data.refetchSettings(); }} /></> : data.hostStatus?.configuration?.editable === false ? (
+          {data.hostStatus?.configuration?.editable === false ? (
            <div className="rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm text-warning" role="status">
              {t('configuration:controlsUnavailable')}
            </div>

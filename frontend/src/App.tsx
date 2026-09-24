@@ -64,6 +64,10 @@ const BackupsView = lazyNamed(
   () => import('@/features/backups/components/BackupsView'),
   'BackupsView',
 );
+const SecurityView = lazyNamed(
+  () => import('@/features/security/components/SecurityView'),
+  'SecurityView',
+);
 
 function RouteLoadingFallback({ label }: { label: string }) {
   const { t } = useT();
@@ -172,6 +176,7 @@ function AppRoutes() {
         <Route path="overview" element={routeElement('overview', <DashboardView />)} />
         <Route path="dashboard" element={<Navigate to="/overview" replace />} />
         <Route path="configuration" element={routeElement('configuration', <ConfigurationView />)} />
+        <Route path="security" element={routeElement('security', <SecurityView />)} />
         <Route path="profile" element={routeElement('profile', <ProfileView />)} />
         <Route path="settings/users" element={routeElement('users', <UsersView />, 'admin')} />
         <Route path="maintenance/updates" element={routeElement('maintenance updates', <UpdatesView />, 'admin')} />

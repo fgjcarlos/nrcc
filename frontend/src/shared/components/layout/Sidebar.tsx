@@ -11,6 +11,7 @@ import {
   Library,
   RotateCw,
   Settings,
+  Shield,
   SlidersHorizontal,
   UsersRound,
 } from 'lucide-react';
@@ -21,14 +22,18 @@ import { UserMenu } from './UserMenu';
 
 const navItems = [
   { to: '/overview', label: 'Overview', icon: Gauge },
-  { to: '/bootstrap', label: 'Bootstrap', icon: HardDrive },
   { to: '/configuration', label: 'Configuration', icon: Settings },
-  { to: '/backups', label: 'Recovery', icon: DatabaseBackup },
+  { to: '/security', label: 'Security', icon: Shield },
   { to: '/environment', label: 'Environment', icon: SlidersHorizontal },
+  { to: '/backups', label: 'Recovery', icon: DatabaseBackup },
+  { to: '/bootstrap', label: 'Bootstrap', icon: HardDrive },
 ];
 
 const adminItems = [
   { to: '/settings/users', label: 'Users', icon: UsersRound },
+];
+
+const maintenanceItems = [
   { to: '/maintenance/updates', label: 'Update Maintenance', icon: RotateCw },
   { to: '/maintenance/libraries', label: 'Library Maintenance', icon: Library },
 ];
@@ -148,6 +153,33 @@ export function Sidebar() {
                   </NavLink>
                 </li>
               ))}
+
+              {maintenanceItems.length > 0 && (
+                <>
+                  <li className="pt-3">
+                    {(!collapsed || isMobile) && (
+                      <p className="px-3 pb-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-base-content/45">
+                        {t('common:maintenanceLabel')}
+                      </p>
+                    )}
+                    {collapsed && !isMobile && (
+                      <div className="h-px bg-[var(--ds-border-default)]" aria-hidden="true" />
+                    )}
+                  </li>
+                  {maintenanceItems.map((item) => (
+                    <li key={item.to}>
+                      <NavLink
+                        to={item.to}
+                        className={({ isActive }) => navLinkClass(isActive)}
+                        title={collapsed && !isMobile ? item.label : undefined}
+                      >
+                        <item.icon className="h-5 w-5 flex-shrink-0 stroke-[1.8] text-base-content/55 transition-colors group-hover:text-accent" />
+                        {(!collapsed || isMobile) && <span className="truncate">{item.label}</span>}
+                      </NavLink>
+                    </li>
+                  ))}
+                </>
+              )}
             </>
           )}
         </ul>
