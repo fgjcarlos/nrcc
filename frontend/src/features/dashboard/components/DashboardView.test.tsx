@@ -75,8 +75,9 @@ describe('DashboardView', () => {
     renderDashboard()
 
     expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument()
+    // Default-locale EN copy from the dashboard catalog (issue #767/#832).
     expect(screen.getByText('Docker container is not running correctly. Some features may not work.')).toBeInTheDocument()
-    expect(screen.getByText('Node.js no está instalado. Node-RED aún no fue detectado. nrcc no puede escribir sobre settings.js.')).toBeInTheDocument()
+    expect(screen.getByText('Node.js is not installed. Node-RED has not been detected yet. nrcc cannot write to settings.js.')).toBeInTheDocument()
     expect(screen.getByText('Check environment for issues')).toBeInTheDocument()
   })
 
