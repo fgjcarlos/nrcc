@@ -1,11 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { CronBuilder, type PresetType } from './CronBuilder';
 import {
-  CronBuilder,
   cronFromDateTime,
   dateTimeFromCron,
-  type PresetType,
-} from './CronBuilder';
+} from './cronBuilder.helpers';
 import { validateCron } from '@/features/backups/lib/cronUtils';
 
 describe('validateCron', () => {
