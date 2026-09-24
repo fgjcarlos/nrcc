@@ -53,6 +53,9 @@ func Check(path string) []Finding {
 	if err != nil {
 		return []Finding{{Path: path, Line: 0, Target: "", Text: err.Error()}}
 	}
+	// #nosec G304 — absPath was just resolved and validated as a regular
+	// file by resolveCLIFile; gosec's taint analysis does not propagate
+	// the sanitizer status across function boundaries.
 	f, err := os.Open(absPath)
 	if err != nil {
 		return []Finding{{Path: path, Line: 0, Target: "", Text: err.Error()}}
@@ -75,6 +78,9 @@ func Check(path string) []Finding {
 				continue
 			}
 			target = stripFragment(target)
+			// #nosec G703 — dir is the directory of the sanitized CLI file
+			// and target is parsed out of that file's body, which is
+			// exactly the surface the tool is designed to scan.
 			resolved := filepath.Join(dir, target)
 			if _, err := os.Stat(resolved); err != nil {
 				findings = append(findings, Finding{
