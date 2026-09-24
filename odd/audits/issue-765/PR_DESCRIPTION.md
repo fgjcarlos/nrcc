@@ -32,17 +32,19 @@ Issue #765 explicitly demands cross-cutting evidence that each closed sub-cluste
 | #761 | Dashboard access surfaces | 🟢 GREEN | 10+ named tests + FlowFuse E2E in `stack.spec.ts:228` |
 | #762 | TLS, credentialSecret, requireHttps | 🟢 GREEN | 10 named tests + ConfigurationView describe block |
 | #763 | Navigation focused on configuration | 🟢 GREEN | All 5 ACs mapped; PRs #827/#828/#829 |
-| #764 | Advanced settings escape hatches | 🔴 **RED** | **0 of 4 named tests in main; 3 of 4 in worktree only** |
+| #764 | Advanced settings escape hatches | 🟡 AMBER *(corrected from RED after follow-up)* | Code + all 4 named tests in `origin/main`; security review attestation pending |
 
-**Overall:** 4 GREEN, 4 AMBER, 1 RED.
+**Overall (corrected):** 5 GREEN, 4 AMBER, 0 RED.
 
 ## Critical findings
 
-1. **#764 is RED, not merged.** The `#764 presets — merged ✅` claim in `odd/tasks/issue-767-i18n-en-es-localization.md` is contradicted by file-system evidence (zero preset files in the local main checkout; the 3 named tests live only in `nrcc-worktrees/issue-764-presets/`). The umbrella cannot close on the claim "all clusters closed".
+1. **#764 audit verdict was wrong (RED → AMBER after follow-up).** The original audit's local-main checkout was 54 commits behind `origin/main`, so every "0 preset files match" finding was a false negative. Re-verified: all 4 named tests are present in `origin/main`, including `TestAdvancedSettingsRollbackE2E` added in follow-up commit `b91ead7`. The original audit's contradiction with the `#764 presets — merged ✅` claim in `odd/tasks/issue-767-i18n-en-es-localization.md` was the audit's mistake, not the doc's. The only remaining gap for #764 is maintainer-level security review attestation.
 
 2. **No cluster has a `docs/` entry.** Every cluster's evidence is code + tests only. The umbrella's "RoadmapTraceabilityReview" needs documentation pointers.
 
 3. **Closing PR numbers are unknown for 5 clusters** (#756, #758, #759, #760, #762). The audit scout lacked `gh`/`bash` access; verification needs to happen in a follow-up step before #765 closes.
+
+4. **Audit methodology lesson:** future audits must run with `bash` access so the scout can verify against `origin/main` directly, or the scout's first action must be `git fetch origin main && git checkout origin/main`. The original scout substituted local refs and working-tree inspection, which produced stale evidence.
 
 ## Navigation review
 
@@ -54,9 +56,9 @@ Backend `apply` coordinator short-circuits on `migration`/`read-only` modes. Cat
 
 ## Recommended follow-up
 
-1. Correct the "#764 presets — merged ✅" claim in `odd/tasks/issue-767-i18n-en-es-localization.md`. *(Doc-only fix.)*
-2. Verify #764 status with the maintainer — either merge the worktree branch or attach an explicit "scope changed" rationale.
-3. Open follow-up issues for: #760 missing tests, #759 missing E2E, `CompatibilityModeE2E` Playwright, `docs/control-plane.md`.
+1. **(resolved)** Correct the "#764 presets — merged ✅" claim — *the claim was correct; the audit was wrong.*
+2. **(resolved)** Verify #764 status — *verified: all 4 named tests in `origin/main` after follow-up commit `b91ead7`.*
+3. Open follow-up issues for: #764 security review attestation, #760 missing tests, #759 missing E2E, `CompatibilityModeE2E` Playwright, `docs/control-plane.md`.
 4. Re-run the audit with `gh`/`bash` access to fill in closing PR numbers.
 
 ## Audit method
