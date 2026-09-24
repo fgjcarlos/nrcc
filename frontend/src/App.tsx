@@ -8,7 +8,7 @@ import { useAuth } from '@/features/auth/hooks/useAuth';
 import { authService } from '@/features/auth/services/authService';
 import { ErrorBoundary } from '@/shared/components/layout/ErrorBoundary';
 import { Button } from '@/shared/components/ui/Button';
-import { useT } from '@/i18n';
+import { useT, I18nProvider } from '@/i18n';
 
 function lazyNamed<T extends ComponentType<object>>(
   importer: () => Promise<Record<string, T>>,
@@ -203,12 +203,14 @@ function NavigatorRegistrar() {
 
 function App() {
   return (
-    <BrowserRouter>
-      <ErrorBoundary>
-        <NavigatorRegistrar />
-        <AppRoutes />
-      </ErrorBoundary>
-    </BrowserRouter>
+    <I18nProvider>
+      <BrowserRouter>
+        <ErrorBoundary>
+          <NavigatorRegistrar />
+          <AppRoutes />
+        </ErrorBoundary>
+      </BrowserRouter>
+    </I18nProvider>
   );
 }
 
