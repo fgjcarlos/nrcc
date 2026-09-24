@@ -39,6 +39,17 @@ function RuntimeCard({
   const { t } = useT();
   const runtimeStatus = runtime?.status ?? (host?.nodeRed.running ? 'running' : 'unknown');
 
+  // canRestart is true only when the runtime is actually present. The
+  // button stays mounted regardless so the user always sees the action
+  // affordance; only the enabled state changes. Without this gate the
+  // fallback telemetry card would either hide the action row or let
+  // through a restart that has nothing to act on.
+  const canRestart = Boolean(host?.nodeRed?.detected);
+  const restartLabel = isRestarting
+    ? t('dashboard:runtimeCard.restartingButton')
+    : t('dashboard:runtimeCard.restartButton');
+  const openLabel = t('dashboard:runtimeCard.openButton');
+
   return (
     <div className="p-6 border card surface-card border-border">
       <div className="flex items-center gap-3">
@@ -54,35 +65,37 @@ function RuntimeCard({
         </>
       ) : (
         <>
-          <p className="mt-2 text-2xl font-bold">{getDeploymentLabel(host?.nodeRed.mode)}</p>
+          <p className="mt-2 text-2xl font-bold">{getDeploymentLabel(host?.nodeRed.mode, t)}</p>
           <p className="mt-1 text-sm text-body-secondary">{host?.settings.path || 'No settings.js path detected'}</p>
         </>
       )}
 
-      {/* Actions co-located with the process state they act on (issue #676 item 1). */}
+      {/* Actions co-located with the process state they act on (issue #676 item 1).
+          Always mounted so the action affordance survives any telemetry
+          fallback; only the enabled state changes based on availability. */}
       <div className="grid grid-cols-2 gap-2.5 mt-5">
         <button
+          type="button"
+          aria-label={restartLabel}
           onClick={onRequestRestart}
-          disabled={isRestarting}
+          disabled={isRestarting || !canRestart}
           className="group action-btn-secondary flex items-center justify-center gap-3 rounded-xl p-4"
         >
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-warning/10 text-warning transition-colors group-hover:bg-warning/20">
             <RefreshCw className={cn('w-4 h-4', isRestarting && 'animate-spin')} />
           </div>
-          <span className="text-base font-medium">
-            {isRestarting
-              ? t('dashboard:runtimeCard.restartingButton')
-              : t('dashboard:runtimeCard.restartButton')}
-          </span>
+          <span className="text-base font-medium">{restartLabel}</span>
         </button>
         <button
+          type="button"
+          aria-label={openLabel}
           onClick={onOpenNodeRed}
           className="group action-btn-secondary flex items-center justify-center gap-3 rounded-xl p-4"
         >
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-info/10 text-info transition-colors group-hover:bg-info/20">
             <ExternalLink className="w-4 h-4" />
           </div>
-          <span className="text-base font-medium">{t('dashboard:runtimeCard.openButton')}</span>
+          <span className="text-base font-medium">{openLabel}</span>
         </button>
       </div>
     </div>

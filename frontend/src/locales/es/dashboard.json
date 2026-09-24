@@ -57,5 +57,14 @@
     "restartButton": "Reiniciar",
     "restartingButton": "Reiniciando…",
     "openButton": "Abrir"
-  }
+  },
+  "hostWarning": {
+    "nodejsMissing": "Node.js no está instalado.",
+    "nodeRedNotDetected": "Node-RED aún no fue detectado.",
+    "settingsNotWritable": "nrcc no puede escribir sobre settings.js."
+  },
+  "dockerWarning": "El contenedor de Docker no está funcionando correctamente. Algunas funciones pueden no estar disponibles.",
+  "deploymentDocker": "Docker",
+  "deploymentNative": "Nativo",
+  "deploymentUnknown": "Sin detectar"
 }
