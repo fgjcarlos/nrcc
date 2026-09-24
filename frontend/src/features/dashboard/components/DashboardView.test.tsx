@@ -75,8 +75,9 @@ describe('DashboardView', () => {
     renderDashboard()
 
     expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument()
+    // Default-locale EN copy from the dashboard catalog (issue #767/#832).
     expect(screen.getByText('Docker container is not running correctly. Some features may not work.')).toBeInTheDocument()
-    expect(screen.getByText('Node.js no está instalado. Node-RED aún no fue detectado. nrcc no puede escribir sobre settings.js.')).toBeInTheDocument()
+    expect(screen.getByText('Node.js is not installed. Node-RED has not been detected yet. nrcc cannot write to settings.js.')).toBeInTheDocument()
     expect(screen.getByText('Check environment for issues')).toBeInTheDocument()
   })
 
@@ -99,10 +100,11 @@ describe('DashboardView', () => {
     expect(screen.getByText('Disk Usage')).toBeInTheDocument()
     // Runtime card promoted to the top row (issue #676 item 1) carries the
     // Restart + Open actions; QuickActionsCard was removed from this row.
-    expect(screen.getByRole('button', { name: 'Reiniciar' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Abrir' })).toBeInTheDocument()
-    expect(screen.getByText('Sin detectar')).toBeInTheDocument()
-    expect(screen.getByText('Sin backups')).toBeInTheDocument()
-    expect(screen.getByText('Cargando observabilidad')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Restart' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open' })).toBeInTheDocument()
+    // Default-locale EN copy from the dashboard catalog (issue #767/#832).
+    expect(screen.getByText('Not detected')).toBeInTheDocument()
+    expect(screen.getByText('No backups')).toBeInTheDocument()
+    expect(screen.getByText('Loading observability')).toBeInTheDocument()
   })
 })

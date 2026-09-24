@@ -145,6 +145,12 @@ Mount the `backups/` subdirectory on a separate volume (or copy to S3/NFS) so sn
 - [docs/operations/docker-stack.md](docs/operations/docker-stack.md) — bring-up, multi-instance, backup, upgrade, uninstall
 - [docs/production-install-launch-guide.md](docs/production-install-launch-guide.md) — manual GitHub Pages, DNS, and release validation steps
 
+## Internationalization
+
+NRCC ships English as the canonical interface locale and Spanish as a maintained translation. Catalogs are organized by capability, and the selected locale persists in the browser with English as the deterministic fallback.
+
+Contributors should add UI copy to both catalogs and run the local i18n guards before review. See the [internationalization guide](docs/i18n.md) for the contract and [locale catalog notes](frontend/src/locales/README.md) for the contributor workflow.
+
 ## Development
 
 ### Prerequisites

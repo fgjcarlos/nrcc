@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { type EnvVar } from '@/features/env-vars/services/envService';
+import { useT } from '@/i18n';
 
 export function EnvVarModal({
   formData,
@@ -17,6 +18,7 @@ export function EnvVarModal({
   editing: boolean;
   isPending?: boolean;
 }) {
+  const { t, i18n } = useT();
   // Form-level validation state
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
@@ -43,35 +45,38 @@ export function EnvVarModal({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [onCancel]);
 
-  // Validate form on formData changes
+  // Validate form on formData changes. Depends on the active language
+  // instead of the t() reference so the effect re-runs only when the
+  // resolved strings would actually change, satisfying the
+  // react-hooks/exhaustive-deps rule without a per-render churn.
   useEffect(() => {
     const errors: Record<string, string> = {};
 
     // Key is required
     if (!formData.key.trim()) {
-      errors.key = 'Key is required';
+      errors.key = t('env-vars:modalKeyRequired');
     }
 
     // Value validation based on type
     if (!editing && !formData.value.trim()) {
-      errors.value = 'Value is required';
+      errors.value = t('env-vars:modalValueRequired');
     }
 
     if (formData.value && formData.type === 'number') {
       if (Number.isNaN(Number(formData.value))) {
-        errors.value = 'Value must be a valid number';
+        errors.value = t('env-vars:modalValueMustBeNumber');
       }
     }
 
     if (formData.value && formData.type === 'boolean') {
       const lower = formData.value.toLowerCase();
       if (lower !== 'true' && lower !== 'false') {
-        errors.value = 'Value must be true or false';
+        errors.value = t('env-vars:modalValueMustBeBoolean');
       }
     }
 
     setValidationErrors(errors);
-  }, [formData, editing]);
+  }, [formData, editing, t, i18n.language]);
 
   // Handle type change - clear incompatible values
   const handleTypeChange = (newType: EnvVar['type']) => {
@@ -113,9 +118,9 @@ export function EnvVarModal({
       case 'boolean':
         return (
           <div className="flex min-h-12 w-full items-center justify-between gap-3 px-3">
-            <span className="text-sm font-semibold text-base-content/70 uppercase tracking-wider">Value:</span>
+            <span className="text-sm font-semibold text-base-content/70 uppercase tracking-wider">{t('env-vars:modalValueLabel')}:</span>
             <label className="flex items-center gap-2">
-              <span className="sr-only">Boolean value</span>
+              <span className="sr-only">{t('env-vars:modalBooleanValueLabel')}</span>
               <input
                 type="checkbox"
                 checked={formData.value === 'true'}
@@ -170,14 +175,14 @@ export function EnvVarModal({
       >
         <div className="mb-4 flex items-start justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">Environment</p>
-            <h2 id="env-var-modal-title" className="text-xl font-bold text-base-content">{editing ? 'Edit Variable' : 'New Variable'}</h2>
+            <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">{t('env-vars:modalEnvironmentLabel')}</p>
+            <h2 id="env-var-modal-title" className="text-xl font-bold text-base-content">{editing ? t('env-vars:modalEditTitle') : t('env-vars:modalNewTitle')}</h2>
           </div>
         </div>
         <form onSubmit={onSubmit} className="space-y-5">
           {/* Key field */}
           <div>
-            <label className="mb-2 block text-xs font-semibold text-base-content/70 uppercase tracking-wider">Key</label>
+            <label className="mb-2 block text-xs font-semibold text-base-content/70 uppercase tracking-wider">{t('env-vars:modalKeyLabel')}</label>
             <input
               type="text"
               value={formData.key}
@@ -196,22 +201,22 @@ export function EnvVarModal({
 
           {/* Type selector (moved before Value) */}
           <div>
-            <label className="mb-2 block text-xs font-semibold text-base-content/70 uppercase tracking-wider">Type</label>
+            <label className="mb-2 block text-xs font-semibold text-base-content/70 uppercase tracking-wider">{t('env-vars:modalTypeLabel')}</label>
             <select
               value={formData.type}
               onChange={(e) => handleTypeChange(e.target.value as EnvVar['type'])}
               className="glass-panel w-full rounded-xl border border-border px-3 py-2 text-base-content"
             >
-              <option value="string">String</option>
-              <option value="number">Number</option>
-              <option value="boolean">Boolean</option>
-              <option value="secret">Secret (encrypted)</option>
+              <option value="string">{t('env-vars:typeString')}</option>
+              <option value="number">{t('env-vars:typeNumber')}</option>
+              <option value="boolean">{t('env-vars:typeBoolean')}</option>
+              <option value="secret">{t('env-vars:typeSecret')}</option>
             </select>
           </div>
 
           {/* Type-aware Value field */}
           <div>
-            <label className="mb-2 block text-xs font-semibold text-base-content/70 uppercase tracking-wider">Value</label>
+            <label className="mb-2 block text-xs font-semibold text-base-content/70 uppercase tracking-wider">{t('env-vars:modalValueFieldLabel')}</label>
             <div
               data-testid="env-var-value-field"
               className={`min-h-12 rounded-xl border transition-all duration-150 ${
@@ -227,7 +232,7 @@ export function EnvVarModal({
 
           {/* Description field */}
           <div>
-            <label className="mb-2 block text-xs font-semibold text-base-content/70 uppercase tracking-wider">Description (optional)</label>
+            <label className="mb-2 block text-xs font-semibold text-base-content/70 uppercase tracking-wider">{t('env-vars:modalDescriptionLabel')}</label>
             <input
               type="text"
               value={formData.description}
@@ -245,7 +250,7 @@ export function EnvVarModal({
               disabled={isPending}
               className="action-btn-secondary disabled:opacity-50"
             >
-              Cancel
+              {t('common:cancel')}
             </button>
             <button
               type="submit"
@@ -254,7 +259,7 @@ export function EnvVarModal({
             >
               {isPending ? (
                 <>
-                  <span className="opacity-0">Save</span>
+                  <span className="opacity-0">{t('common:save')}</span>
                   <span className="absolute inset-0 flex items-center justify-center">
                     <span className="loading loading-spinner loading-sm"></span>
                   </span>

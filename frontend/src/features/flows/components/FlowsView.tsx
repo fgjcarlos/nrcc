@@ -21,7 +21,7 @@ import { useFlowsActions } from '@/features/flows/hooks/useFlowsActions';
 import { useAICapability } from '@/features/flows/hooks/useAICapability';
 import { useAuth } from '@/features/auth/hooks';
 import { StateContainer } from '@/shared/components/StateContainer';
-import { UI_COPY } from '@/shared/constants/uiCopy';
+import { useT } from '@/i18n';
 import { toast } from 'sonner';
 
 export function FlowsView() {
@@ -32,6 +32,8 @@ export function FlowsView() {
 
   const { flows, available, isLoading, error } = useFlowsData();
   const { analyzeFlows } = useFlowsActions();
+  const { t } = useT();
+
   const aiCapability = useAICapability();
   const { user } = useAuth();
   const canConfigureAI = user?.role === 'admin';
@@ -74,7 +76,7 @@ export function FlowsView() {
       setAnalysisResults(prev => ({ ...prev, ...results }));
       setExpandedResults(new Set(ids.filter(id => results[id])));
     } catch {
-      toast.error('Failed to analyze flows');
+      toast.error(t('flows:analysisFailed'));
     } finally {
       // Always clear the analyzing state so the Analyze bar never stays stuck.
       setAnalyzing(false);
@@ -87,8 +89,8 @@ export function FlowsView() {
   const loadingSlot = (
     <div className="space-y-4">
       <div>
-        <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">AI pipeline</p>
-        <h1 className="text-2xl font-bold text-base-content">Flows</h1>
+        <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">{t('flows:aiPipeline')}</p>
+        <h1 className="text-2xl font-bold text-base-content">{t('flows:title')}</h1>
       </div>
       <div className="space-y-3 animate-pulse">
         {[1, 2, 3].map(i => (
@@ -101,11 +103,11 @@ export function FlowsView() {
   const errorSlot = (
     <div>
       <div>
-        <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">AI pipeline</p>
-        <h1 className="text-2xl font-bold text-base-content">Flows</h1>
+        <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">{t('flows:aiPipeline')}</p>
+        <h1 className="text-2xl font-bold text-base-content">{t('flows:title')}</h1>
       </div>
       <div className="mt-4 rounded-2xl border border-error/20 bg-error/10 p-4 shadow-glow">
-        <p className="text-error">Error loading flows: {error?.message}</p>
+        <p className="text-error">{t('flows:failedToLoad')}: {error?.message}</p>
       </div>
     </div>
   );
@@ -113,15 +115,15 @@ export function FlowsView() {
   const unavailableSlot = (
     <div>
       <div>
-        <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">AI pipeline</p>
-        <h1 className="text-2xl font-bold text-base-content">Flows</h1>
+        <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">{t('flows:aiPipeline')}</p>
+        <h1 className="text-2xl font-bold text-base-content">{t('flows:title')}</h1>
       </div>
       <div className="mt-4 flex items-start gap-3 rounded-2xl border border-warning/20 bg-warning/10 p-4 shadow-glow">
         <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
         <div>
-          <p className="font-medium text-base-content">{UI_COPY.nodeRedUnavailable}</p>
+          <p className="font-medium text-base-content">{t('flows:nodeRedUnavailable')}</p>
           <p className="mt-1 text-sm text-base-content/70">
-            {UI_COPY.checkNodeRedContainer}
+            {t('flows:checkNodeRedContainer')}
           </p>
         </div>
       </div>
@@ -131,7 +133,7 @@ export function FlowsView() {
   const emptySlot = (
     <div className="py-12 text-center">
       <Activity className="mx-auto mb-4 h-12 w-12 text-base-content/40" />
-      <p className="text-base-content/60">{UI_COPY.noFlowsFound}</p>
+      <p className="text-base-content/60">{t('flows:noFlowsFound')}</p>
     </div>
   );
 
@@ -148,18 +150,18 @@ export function FlowsView() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div>
-            <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">AI pipeline</p>
-            <h1 className="text-2xl font-bold text-base-content">Flows</h1>
+            <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">{t('flows:aiPipeline')}</p>
+            <h1 className="text-2xl font-bold text-base-content">{t('flows:title')}</h1>
           </div>
           <span className="text-sm text-base-content/60">
-            {flows.length} flow{flows.length !== 1 ? 's' : ''}
+            {t('flows:count', { count: flows.length })}
           </span>
         </div>
         <Link
           to="/flows/versions"
           className="action-btn-secondary text-sm"
         >
-          Version History
+          {t('flows:versionHistory')}
         </Link>
         {flows.length > 0 && (
           <button
@@ -169,7 +171,7 @@ export function FlowsView() {
             {allSelected
               ? <CheckSquare className="w-4 h-4" />
               : <Square className="w-4 h-4" />}
-            {allSelected ? UI_COPY.deselectAll : UI_COPY.selectAll}
+            {allSelected ? t('flows:deselectAll') : t('flows:selectAll')}
           </button>
         )}
       </div>
@@ -198,7 +200,7 @@ export function FlowsView() {
         <div className="fixed z-50 -translate-x-1/2 bottom-6 left-1/2">
           <div className="glass-panel flex items-center gap-4 rounded-full border border-border px-6 py-3 shadow-glow">
             <span className="text-sm text-base-content/65">
-              {UI_COPY.selected(selected.size)}
+              {t('common:selected', { count: selected.size })}
             </span>
             <button
               onClick={handleAnalyze}
@@ -208,14 +210,14 @@ export function FlowsView() {
               {analyzing
                 ? <Loader2 className="w-4 h-4 animate-spin" />
                 : <Sparkles className="w-4 h-4" />}
-              {analyzing ? UI_COPY.analyzing : UI_COPY.analyzeWithAI}
+              {analyzing ? t('flows:analyzing') : t('flows:analyzeWithAI')}
             </button>
             {!aiCapability.isReady && (
               <span className="max-w-56 text-xs text-base-content/60" aria-live="polite">
                 {aiCapability.message}
                 {canConfigureAI && (
                   <Link to="/configuration" className="ml-1 text-primary underline underline-offset-2">
-                    Configure AI provider
+                    {t('flows:configureAIProvider')}
                   </Link>
                 )}
               </span>
@@ -237,6 +239,7 @@ function FlowCard({
   selected: boolean;
   onToggleSelect: () => void;
 }) {
+  const { t } = useT();
   return (
     <div
       className={cn(
@@ -248,7 +251,7 @@ function FlowCard({
       <button
         onClick={onToggleSelect}
         className="mt-1 shrink-0 text-base-content/60 transition-colors hover:text-primary"
-        aria-label={selected ? 'Deselect flow' : 'Select flow'}
+        aria-label={selected ? t('flows:deselectFlow') : t('flows:selectFlow')}
       >
         {selected
           ? <CheckSquare className="w-5 h-5 text-primary" />
@@ -274,10 +277,10 @@ function FlowCard({
           {flow.label}
         </Link>
         <div className="mt-1 flex items-center gap-4 text-sm text-base-content/65">
-          <span>{flow.nodes} {UI_COPY.nodes}</span>
-          <span>{flow.connections} {UI_COPY.connections}</span>
+          <span>{flow.nodes} {t('flows:nodes')}</span>
+          <span>{flow.connections} {t('flows:connections')}</span>
           {flow.disabled && (
-            <span className="text-warning">{UI_COPY.disabled}</span>
+            <span className="text-warning">{t('flows:disabled')}</span>
           )}
         </div>
       </div>
@@ -294,6 +297,7 @@ function AnalysisPanel({
   expanded: boolean;
   onToggle: () => void;
 }) {
+  const { t } = useT();
   return (
     <div className="overflow-hidden rounded-b-2xl border border-t-0 border-primary/25 bg-primary/8">
       <button
@@ -302,7 +306,7 @@ function AnalysisPanel({
       >
         <span className="flex items-center gap-2 font-medium">
           <Sparkles className="w-4 h-4" />
-          {UI_COPY.aiAnalysis}
+          {t('flows:aiAnalysis')}
         </span>
         {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
       </button>
@@ -315,7 +319,7 @@ function AnalysisPanel({
             <div>
               <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-success-content">
                 <ThumbsUp className="w-3.5 h-3.5" />
-                {UI_COPY.strengths}
+                {t('flows:strengths')}
               </div>
               <ul className="space-y-1">
                 {result.pros.map((item, i) => (
@@ -332,7 +336,7 @@ function AnalysisPanel({
             <div>
               <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-error-content">
                 <ThumbsDown className="w-3.5 h-3.5" />
-                {UI_COPY.improvements}
+                {t('flows:improvements')}
               </div>
               <ul className="space-y-1">
                 {result.cons.map((item, i) => (
@@ -349,7 +353,7 @@ function AnalysisPanel({
             <div>
               <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-info-content">
                 <Lightbulb className="w-3.5 h-3.5" />
-                {UI_COPY.suggestions}
+                {t('flows:suggestions')}
               </div>
               <ul className="space-y-1">
                 {result.suggestions.map((item, i) => (
@@ -363,7 +367,7 @@ function AnalysisPanel({
           )}
 
           <p className="text-xs text-base-content/50">
-            {UI_COPY.analyzedAt(new Date(result.analyzedAt).toLocaleString())}
+            {t('flows:analyzedAt', { date: new Date(result.analyzedAt).toLocaleString() })}
           </p>
         </div>
       )}

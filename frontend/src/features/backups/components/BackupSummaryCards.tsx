@@ -1,6 +1,7 @@
 import type { BackupSummary, BackupSchedulerStatus } from '@/features/backups/services';
 import { formatBackupDate, formatBackupSize, getBackupDisplayName } from '@/features/backups/lib/formatters';
 import { cn } from '@/shared/lib';
+import { useT } from '@/i18n';
 
 interface StorageSummary {
   totalBackups: number;
@@ -27,26 +28,27 @@ interface BackupSummaryCardsProps {
 
 export function BackupSummaryCards(props: BackupSummaryCardsProps) {
   const { latestBackup, schedulerStatus, schedulerTone, schedulerLabel, storage } = props;
+  const { t } = useT();
 
   return (
     <div className="grid gap-3 md:grid-cols-3">
       {/* Last Backup Card */}
       <div className="surface-card p-5">
-        <p className="text-xs uppercase tracking-[0.18em] text-base-content/45">Último backup</p>
+        <p className="text-xs uppercase tracking-[0.18em] text-base-content/45">{t('backups:lastBackupLabel')}</p>
         <div className="mt-2 text-lg font-semibold text-base-content">
-          {latestBackup ? getBackupDisplayName(latestBackup) : 'Sin backups'}
+          {latestBackup ? getBackupDisplayName(latestBackup) : t('backups:noBackupsShort')}
         </div>
         <p className="mt-1 text-sm text-base-content/60">
           {latestBackup
             ? formatBackupDate(latestBackup.createdAt)
-            : 'Creá el primero manualmente para iniciar el historial local.'}
+            : t('backups:createFirstLocal')}
         </p>
       </div>
 
       {/* Next Execution Card */}
       <div className="surface-card p-5">
         <div className="flex items-center justify-between gap-3">
-          <p className="text-xs uppercase tracking-[0.18em] text-base-content/45">Próxima ejecución</p>
+          <p className="text-xs uppercase tracking-[0.18em] text-base-content/45">{t('backups:nextRunLabel')}</p>
           <span
             className={cn(
               'inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium',
@@ -61,22 +63,22 @@ export function BackupSummaryCards(props: BackupSummaryCardsProps) {
           </span>
         </div>
         <div className="mt-2 text-lg font-semibold text-base-content">
-          {schedulerStatus.nextRunAt ? formatBackupDate(schedulerStatus.nextRunAt) : 'Sin programar'}
+          {schedulerStatus.nextRunAt ? formatBackupDate(schedulerStatus.nextRunAt) : t('backups:notScheduled')}
         </div>
         <p className="mt-1 text-sm text-base-content/60">
           {schedulerStatus.schedule === 'custom' && schedulerStatus.customSchedule
-            ? `Cron: ${schedulerStatus.customSchedule}`
+            ? `${t('backups:cronPrefix')} ${schedulerStatus.customSchedule}`
             : schedulerStatus.activeSpec
-              ? `Spec activa: ${schedulerStatus.activeSpec}`
-              : 'Guardá una frecuencia para activar el scheduler automático.'}
+              ? `${t('backups:activeSpecPrefix')} ${schedulerStatus.activeSpec}`
+              : t('backups:saveFrequencyToActivate')}
         </p>
       </div>
 
       {/* Storage Card */}
       <div className="surface-card p-5">
-        <p className="text-xs uppercase tracking-[0.18em] text-base-content/45">Espacio ocupado</p>
+        <p className="text-xs uppercase tracking-[0.18em] text-base-content/45">{t('backups:storageLabel')}</p>
         <div className="mt-2 text-lg font-semibold text-base-content">{formatBackupSize(storage.totalSize)}</div>
-        <p className="mt-1 text-sm text-base-content/60">{storage.totalBackups} backups locales detectados</p>
+        <p className="mt-1 text-sm text-base-content/60">{t('backups:storageBackupsDetected', { count: storage.totalBackups })}</p>
       </div>
     </div>
   );

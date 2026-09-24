@@ -1,0 +1,70 @@
+{
+  "restart": {
+    "title": "¿Reiniciar Node-RED?",
+    "description": "Node-RED se detendrá y volverá a arrancar. Los flujos activos se interrumpirán brevemente.",
+    "confirm": "Sí, reiniciar",
+    "cancel": "Cancelar"
+  },
+  "container": {
+    "restartTitle": "Reiniciar contenedor",
+    "restartDescription": "¿Seguro que quieres reiniciar el contenedor Node-RED? El servicio no estará disponible durante unos instantes.",
+    "stopTitle": "Detener contenedor",
+    "stopDescription": "¿Seguro que quieres detener el contenedor Node-RED? El servicio no estará disponible hasta que lo reinicies."
+  },
+  "restart.title": "¿Reiniciar Node-RED?",
+  "restart.description": "Node-RED se detendrá y volverá a arrancar. Los flujos activos se interrumpirán brevemente.",
+  "restart.confirm": "Sí, reiniciar",
+  "actions": {
+    "unknownError": "Error desconocido",
+    "restartSuccessTitle": "Node-RED reiniciado",
+    "restartSuccessMessage": "El proceso ha arrancado correctamente.",
+    "restartErrorTitle": "No se pudo reiniciar Node-RED",
+    "startSuccessTitle": "Node-RED iniciado",
+    "startSuccessMessage": "El proceso ha arrancado correctamente.",
+    "startErrorTitle": "No se pudo iniciar Node-RED",
+    "stopSuccessTitle": "Node-RED detenido",
+    "stopSuccessMessage": "El proceso se ha detenido correctamente.",
+    "stopErrorTitle": "No se pudo detener Node-RED"
+  },
+  "diskUsage": "Uso de disco",
+  "scheduled": "Programado",
+  "withAlerts": "Con alertas",
+  "notScheduled": "Sin programar",
+  "localBackups": "Respaldos locales",
+  "schedulerActive": "Scheduler activo",
+  "schedulerInactive": "Scheduler sin programación activa",
+  "nextRun": "próxima",
+  "lastBackup": "Último respaldo",
+  "noBackupsShort": "Sin respaldos",
+  "noSnapshotsYet": "Todavía no hay snapshots locales",
+  "lastAutomatic": "Último automático",
+  "backup": "Respaldo",
+  "noAutomaticRuns": "Sin ejecuciones automáticas exitosas aún",
+  "storageUsed": "Espacio ocupado",
+  "localBackupsCount": "respaldos locales",
+  "loadingObservability": "Cargando observabilidad",
+  "recentActivity": "Actividad reciente",
+  "noEvents": "Sin eventos",
+  "noEventsRecorded": "Todavía no hay eventos registrados para respaldos o scheduler.",
+  "systemOverview": "Resumen del sistema",
+  "overview": "Resumen",
+  "liveTelemetry": "Telemetría en vivo",
+  "systemHealth": "Salud del sistema",
+  "environmentOk": "Entorno OK",
+  "checkEnvironment": "Revisa el entorno por problemas",
+  "runtimeCard": {
+    "title": "Runtime",
+    "restartButton": "Reiniciar",
+    "restartingButton": "Reiniciando…",
+    "openButton": "Abrir"
+  },
+  "hostWarning": {
+    "nodejsMissing": "Node.js no está instalado.",
+    "nodeRedNotDetected": "Node-RED aún no fue detectado.",
+    "settingsNotWritable": "nrcc no puede escribir sobre settings.js."
+  },
+  "dockerWarning": "El contenedor de Docker no está funcionando correctamente. Algunas funciones pueden no estar disponibles.",
+  "deploymentDocker": "Docker",
+  "deploymentNative": "Nativo",
+  "deploymentUnknown": "Sin detectar"
+}

@@ -1,13 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { validateCron } from '@/features/backups/lib/cronUtils';
-import { UI_COPY } from '@/shared/constants/uiCopy';
-
-const PRESET_CRON: Record<string, string> = {
-  hourly: '0 * * * *',
-  every6h: '0 */6 * * *',
-  daily: '0 2 * * *',
-  weekly: '0 2 * * 0',
-};
+import { useT } from '@/i18n';
+import { PRESET_CRON, cronFromDateTime, dateTimeFromCron } from './cronBuilder.helpers';
 
 const PRESET_LABELS: Record<string, string> = {
   disabled: 'Disabled',
@@ -31,44 +25,6 @@ export interface CronBuilderProps {
   saveError?: string;
 }
 
-// Map a (date, time) pair to the canonical one-shot cron
-// `min hr dom mon dow` where dow is `*`. Returns null when the
-// inputs are empty or invalid.
-export function cronFromDateTime(date: string, time: string): string | null {
-  if (!date || !time) return null;
-  // date is YYYY-MM-DD, time is HH:MM
-  const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
-  const timeMatch = /^(\d{2}):(\d{2})$/.exec(time);
-  if (!dateMatch || !timeMatch) return null;
-  // Year is captured but not used (cron has no year field).
-  const mo = Number(dateMatch[2]);
-  const d = Number(dateMatch[3]);
-  const h = Number(timeMatch[1]);
-  const mi = Number(timeMatch[2]);
-  // Sanity ranges (the native pickers constrain these but
-  // a pasted value could be anything).
-  if (mo < 1 || mo > 12 || d < 1 || d > 31 || h < 0 || h > 23 || mi < 0 || mi > 59) return null;
-  return `${mi} ${h} ${d} ${mo} *`;
-}
-
-// Inverse of cronFromDateTime. Returns null when the cron is
-// not a one-shot (i.e. any field is `*`, `/`, or `-`).
-export function dateTimeFromCron(cron: string): { date: string; time: string } | null {
-  const trimmed = cron.trim();
-  const fields = trimmed.split(/\s+/);
-  if (fields.length !== 5) return null;
-  const [mi, hr, dom, mon, dow] = fields;
-  // one-shot: every field is a single number, no wildcards, dow = *
-  const isPlain = (s: string) => /^\d+$/.test(s);
-  if (!isPlain(mi) || !isPlain(hr) || !isPlain(dom) || !isPlain(mon) || dow !== '*') return null;
-  const today = new Date();
-  const y = today.getFullYear();
-  return {
-    date: `${y}-${String(mon).padStart(2, '0')}-${String(dom).padStart(2, '0')}`,
-    time: `${String(hr).padStart(2, '0')}:${String(mi).padStart(2, '0')}`,
-  };
-}
-
 export function CronBuilder({
   schedule,
   customSchedule,
@@ -88,6 +44,8 @@ export function CronBuilder({
   // picker (when schedule === 'custom') or the preset map. The
   // picker's cron is computed; the parent's customSchedule is the
   // source of truth while editing.
+  const { t } = useT();
+
   const activeCron = useMemo(() => {
     if (schedule !== 'custom') return PRESET_CRON[schedule] ?? '';
     return cronFromDateTime(customDate, customTime) ?? '';
@@ -177,7 +135,7 @@ export function CronBuilder({
   return (
     <div className="space-y-4">
       <label className="space-y-2 block">
-        <span className="text-sm font-medium text-base-content">Schedule</span>
+        <span className="text-sm font-medium text-base-content">{t('backups:scheduleLabel')}</span>
         <select
           data-testid="preset-select"
           value={schedule}
@@ -195,12 +153,12 @@ export function CronBuilder({
       {schedule !== 'disabled' && (
         <div className="rounded-lg border border-border bg-base-content/5 px-3 py-2 text-sm text-base-content/75">
           {schedule !== 'custom' && activeCron && (
-            <span>Cron: <code className="font-mono">{activeCron}</code></span>
+            <span>{t('backups:cronPrefix')} <code className="font-mono">{activeCron}</code></span>
           )}
           {schedule === 'custom' && activeCron && (
             <span>
-              Runs once on <strong>{customDate}</strong> at <strong>{customTime}</strong>{' '}
-              (cron: <code className="font-mono">{activeCron}</code>)
+              {t('backups:runsOnceOn')} <strong>{customDate}</strong> {t('backups:at')} <strong>{customTime}</strong>{' '}
+              ({t('backups:cronPrefix')} <code className="font-mono">{activeCron}</code>)
             </span>
           )}
         </div>
@@ -239,12 +197,12 @@ export function CronBuilder({
               onChange={(e) => setShowRawCron(e.target.checked)}
               className="h-4 w-4"
             />
-            Advanced (edit raw cron)
+            {t('backups:advancedEditCron')}
           </label>
 
           {showRawCron && (
             <label className="space-y-2 block">
-              <span className="text-sm font-medium text-base-content">Cron expression</span>
+              <span className="text-sm font-medium text-base-content">{t('backups:cronExpression')}</span>
               <input
                 type="text"
                 data-testid="custom-cron-input"
@@ -257,7 +215,7 @@ export function CronBuilder({
                 }`}
               />
               <p className="text-xs text-base-content/55">
-                5-field format: minute hour day-of-month month day-of-week
+                {t('backups:cronFormatHint')}
               </p>
             </label>
           )}
@@ -275,13 +233,13 @@ export function CronBuilder({
             {saveState === 'saving' && (
               <div className="flex items-center gap-2 text-sm text-base-content/60">
                 <div className="h-3 w-3 rounded-full bg-primary/60 animate-pulse" />
-                {UI_COPY.saving}
+                {t('common:saving')}
               </div>
             )}
             {saveState === 'saved' && (
               <div className="flex items-center gap-2 text-sm text-success">
                 <span className="inline-block h-3 w-3 rounded-full bg-success" />
-                {UI_COPY.saved}
+                {t('common:saved')}
               </div>
             )}
             {saveState === 'error' && saveError && (
@@ -297,7 +255,7 @@ export function CronBuilder({
             className="action-btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="cron-save-button"
           >
-            {saveState === 'saving' ? UI_COPY.saving : 'Save Schedule'}
+            {saveState === 'saving' ? t('common:saving') : t('backups:saveSchedule')}
           </button>
         </div>
       )}

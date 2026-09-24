@@ -1,3 +1,4 @@
+import { i18n } from '@/i18n';
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -10,8 +11,6 @@ import { buildAuthMock, buildUserMock } from '../__test-utils__/authMock'
 import type { User } from '../services/authService'
 import { server } from '@/test/msw/server'
 import { mockUser } from '@/test/msw/fixtures'
-import { UI_COPY } from '@/shared/constants/uiCopy'
-
 vi.mock('../hooks/useAuth', () => ({ useAuth: vi.fn() }))
 
 const ok = <T,>(data: T) =>
@@ -52,13 +51,13 @@ describe('UsersView access administration integration', () => {
     renderAccessManagement()
 
     expect(await screen.findAllByText('viewer')).not.toHaveLength(0)
-    expect(screen.getByText(UI_COPY.userManagementSafetyNotice)).toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: UI_COPY.delete })[0]).toBeDisabled()
+    expect(screen.getByText(i18n.t('auth:userManagementSafetyNotice'))).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: i18n.t('common:delete') })[0]).toBeDisabled()
 
-    await userEvent.setup().click(screen.getAllByRole('button', { name: UI_COPY.editUser })[0])
+    await userEvent.setup().click(screen.getAllByRole('button', { name: i18n.t('auth:editUser') })[0])
 
     expect(screen.getByDisplayValue('Admin')).toBeDisabled()
-    expect(screen.getByText(UI_COPY.cannotChangeOwnRole)).toBeInTheDocument()
+    expect(screen.getByText(i18n.t('auth:cannotChangeOwnRole'))).toBeInTheDocument()
   })
 
   it('sends create, role-update, and delete requests through the users transport', async () => {
@@ -81,7 +80,7 @@ describe('UsersView access administration integration', () => {
     renderAccessManagement()
     await screen.findAllByText('viewer')
 
-    await user.click(screen.getByRole('button', { name: new RegExp(`${UI_COPY.add}.*${UI_COPY.createUser}`) }))
+    await user.click(screen.getByRole('button', { name: new RegExp(`${i18n.t('common:add')}.*${i18n.t('auth:createUser')}`) }))
     await user.type(screen.getByRole('textbox'), 'new-user')
     const passwordInput = screen.getAllByDisplayValue('').find(
       (element) => element instanceof HTMLInputElement && element.type === 'password',
@@ -90,7 +89,7 @@ describe('UsersView access administration integration', () => {
       throw new Error('Password input is missing')
     }
     await user.type(passwordInput, 'securepass123')
-    await user.click(screen.getByRole('button', { name: UI_COPY.createUser }))
+    await user.click(screen.getByRole('button', { name: i18n.t('auth:createUser') }))
 
     await waitFor(() => {
       expect(requests).toContainEqual({
@@ -100,16 +99,16 @@ describe('UsersView access administration integration', () => {
       })
     })
 
-    await user.click(screen.getAllByRole('button', { name: UI_COPY.editUser })[2])
+    await user.click(screen.getAllByRole('button', { name: i18n.t('auth:editUser') })[2])
     await user.selectOptions(screen.getByDisplayValue('Admin'), 'viewer')
-    await user.click(screen.getByRole('button', { name: UI_COPY.confirm }))
+    await user.click(screen.getByRole('button', { name: i18n.t('common:confirm') }))
 
     await waitFor(() => {
       expect(requests).toContainEqual({ method: 'PATCH', path: '/api/auth/users/user-admin-2', body: { role: 'viewer' } })
     })
 
-    await user.click(screen.getAllByRole('button', { name: UI_COPY.delete })[1])
-    await user.click(screen.getByRole('button', { name: UI_COPY.confirm }))
+    await user.click(screen.getAllByRole('button', { name: i18n.t('common:delete') })[1])
+    await user.click(screen.getByRole('button', { name: i18n.t('common:confirm') }))
 
     await waitFor(() => {
       expect(requests).toContainEqual({ method: 'DELETE', path: '/api/auth/users/user-viewer' })

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { LoaderCircle } from 'lucide-react';
+import { useT } from '@/i18n';
 
 export interface RetentionEditorProps {
   retentionManual: number;
@@ -16,6 +17,7 @@ export function RetentionEditor({
   onSave,
   isSaving = false,
 }: RetentionEditorProps) {
+  const { t } = useT();
   const [manual, setManual] = useState(retentionManual);
   const [auto, setAuto] = useState(retentionAuto);
   const [preRestore, setPreRestore] = useState(retentionPreRestore);
@@ -34,7 +36,7 @@ export function RetentionEditor({
     <div className="space-y-4">
       <div className="grid gap-4 md:grid-cols-3">
         <label className="space-y-2">
-          <span className="text-sm font-medium text-base-content">Manual Backups</span>
+          <span className="text-sm font-medium text-base-content">{t('backups:manualBackups')}</span>
           <input
             type="number"
             min={1}
@@ -43,11 +45,11 @@ export function RetentionEditor({
             onChange={(e) => setManual(Number(e.target.value) || 1)}
             className="glass-panel w-full rounded-xl border border-border px-3 py-2 text-base-content focus:outline-none focus:ring-2 focus:ring-primary/50"
           />
-          <p className="text-xs text-base-content/55">Days to keep manual backups</p>
+          <p className="text-xs text-base-content/55">{t('backups:daysKeepManual')}</p>
         </label>
 
         <label className="space-y-2">
-          <span className="text-sm font-medium text-base-content">Automatic Backups</span>
+          <span className="text-sm font-medium text-base-content">{t('backups:automaticBackups')}</span>
           <input
             type="number"
             min={1}
@@ -56,11 +58,11 @@ export function RetentionEditor({
             onChange={(e) => setAuto(Number(e.target.value) || 1)}
             className="glass-panel w-full rounded-xl border border-border px-3 py-2 text-base-content focus:outline-none focus:ring-2 focus:ring-primary/50"
           />
-          <p className="text-xs text-base-content/55">Days to keep automatic backups</p>
+          <p className="text-xs text-base-content/55">{t('backups:daysKeepAutomatic')}</p>
         </label>
 
         <label className="space-y-2">
-          <span className="text-sm font-medium text-base-content">Pre-Restore Snapshots</span>
+          <span className="text-sm font-medium text-base-content">{t('backups:preRestoreSnapshots')}</span>
           <input
             type="number"
             min={1}
@@ -69,7 +71,7 @@ export function RetentionEditor({
             onChange={(e) => setPreRestore(Number(e.target.value) || 1)}
             className="glass-panel w-full rounded-xl border border-border px-3 py-2 text-base-content focus:outline-none focus:ring-2 focus:ring-primary/50"
           />
-          <p className="text-xs text-base-content/55">Days to keep pre-restore snapshots</p>
+          <p className="text-xs text-base-content/55">{t('backups:daysKeepPreRestore')}</p>
         </label>
       </div>
 
@@ -77,7 +79,7 @@ export function RetentionEditor({
         {isSaving && (
           <div className="inline-flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/8 px-3 py-2 text-xs text-base-content/75">
             <LoaderCircle className="h-3.5 w-3.5 animate-spin text-primary" />
-            Saving...
+            {t('common:saving')}...
           </div>
         )}
         <button
@@ -86,7 +88,7 @@ export function RetentionEditor({
           className="action-btn-primary"
         >
           {isSaving && <LoaderCircle className="h-4 w-4 animate-spin" />}
-          Save Retention Policy
+          {t('backups:saveRetentionPolicy')}
         </button>
       </div>
     </div>

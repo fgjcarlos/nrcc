@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AxiosError } from 'axios';
 import api from '@/shared/lib';
+import { useT } from '@/i18n';
 
 type State = 'available' | 'absent' | 'malformed' | 'unknown';
 type Discovery = { packages: { state: State }; flows: { state: State }; legacy?: { path: string }; flowFuse: unknown[]; uiBases: { nodeId: string; path?: string; state: State }[] };
@@ -9,6 +10,7 @@ type Target = 'legacy' | 'flowfuse';
 const ok = <T,>(response: { data: { data: T } }) => response.data.data;
 
 export function DashboardAccess({ editable, expectedRevision, onApplied }: { editable: boolean; expectedRevision?: string; onApplied: () => void }) {
+  const { t } = useT();
   const [discovery, setDiscovery] = useState<Discovery>();
   const [target, setTarget] = useState<Target>('legacy');
   const [recipe, setRecipe] = useState('basic-auth');
@@ -37,17 +39,17 @@ export function DashboardAccess({ editable, expectedRevision, onApplied }: { edi
     } finally { setSaving(false); }
   };
   return <section aria-labelledby="dashboard-access-title" className="space-y-6">
-    <div><h2 id="dashboard-access-title" className="text-lg font-medium">Dashboard Access</h2><p className="text-sm text-base-content/65">Configure a reviewed access policy without exposing credentials.</p></div>
-    <div role="status" aria-live="polite" className="rounded-xl border border-border bg-base-200/35 p-4 text-sm"><strong>Discovery:</strong> packages {discovery?.packages.state ?? 'unknown'}; flows {discovery?.flows.state ?? 'unknown'}; legacy {discovery?.legacy ? `${discovery.legacy.path} (deprecated)` : 'absent'}; FlowFuse paths {paths}.</div>
-    <aside aria-label="Redacted dashboard policy preview" className="rounded-xl border border-border bg-base-200/35 p-4 text-sm"><h3 className="font-medium">Redacted policy preview</h3><p>Target: {target}. Recipe: {recipe}. Credentials, hashes, and authorization values are never shown.</p></aside>
+    <div><h2 id="dashboard-access-title" className="text-lg font-medium">{t('configuration:dashboardAccess.title')}</h2><p className="text-sm text-base-content/65">{t('configuration:dashboardAccess.subtitle')}</p></div>
+    <div role="status" aria-live="polite" className="rounded-xl border border-border bg-base-200/35 p-4 text-sm"><strong>{t('configuration:dashboardAccess.discovery')}</strong> {t('configuration:dashboardAccess.discoverySummary', { packages: discovery?.packages.state ?? t('common:unknown'), flows: discovery?.flows.state ?? t('common:unknown'), legacy: discovery?.legacy ? `${discovery.legacy.path} (deprecated)` : t('configuration:dashboardAccess.absent'), paths })}</div>
+    <aside aria-label={t('configuration:dashboardAccess.previewLabel')} className="rounded-xl border border-border bg-base-200/35 p-4 text-sm"><h3 className="font-medium">{t('configuration:dashboardAccess.previewTitle')}</h3><p>{t('configuration:dashboardAccess.previewBody', { target, recipe })}</p></aside>
     {status && <p role="status" aria-live="polite" className="rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm text-warning">{status}</p>}
-    {!editable && <p role="status" className="rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm text-warning">Dashboard Access is read-only because this runtime configuration is not editable.</p>}
+    {!editable && <p role="status" className="rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm text-warning">{t('configuration:dashboardAccess.readOnly')}</p>}
     <fieldset disabled={formDisabled} className="space-y-4">
-      <label className="block text-sm">Dashboard target<select aria-label="Dashboard target" className="select select-bordered mt-1 w-full" value={target} onChange={(event) => setTarget(event.target.value as Target)}><option value="legacy">Legacy dashboard (deprecated){discovery?.legacy ? ` (${discovery.legacy.path})` : ' (unavailable)'}</option><option value="flowfuse">FlowFuse dashboard ({discovery?.uiBases.length ?? 0} ui-base paths)</option></select></label>
-      <label className="block text-sm">Access recipe<select aria-label="Access recipe" className="select select-bordered mt-1 w-full" value={recipe} onChange={(event) => setRecipe(event.target.value)}><option value="basic-auth">Basic authentication</option><option value="reverse-proxy-sso">Reverse proxy SSO</option></select></label>
-      {recipe === 'basic-auth' && <label className="block text-sm">Username<input className="input input-bordered mt-1 w-full" value={username} onChange={(event) => setUsername(event.target.value)} /></label>}
-      <label className="block text-sm">Access secret<input className="input input-bordered mt-1 w-full" type="password" value={secret} onChange={(event) => setSecret(event.target.value)} /></label>
-      <button type="button" className="action-btn-primary" disabled={formDisabled || !eligible || !secret || (recipe === 'basic-auth' && !username)} onClick={apply}>{saving ? 'Applying…' : 'Apply dashboard access'}</button>
+      <label className="block text-sm">{t('configuration:dashboardAccess.target')}<select aria-label="Dashboard target" className="select select-bordered mt-1 w-full" value={target} onChange={(event) => setTarget(event.target.value as Target)}><option value="legacy">{t('configuration:dashboardAccess.legacyOption')}{discovery?.legacy ? ` (${discovery.legacy.path})` : ` ${t('configuration:dashboardAccess.unavailable')}`}</option><option value="flowfuse">{t('configuration:dashboardAccess.flowFuseOption', { count: discovery?.uiBases.length ?? 0 })}</option></select></label>
+      <label className="block text-sm">{t('configuration:dashboardAccess.recipe')}<select aria-label="Access recipe" className="select select-bordered mt-1 w-full" value={recipe} onChange={(event) => setRecipe(event.target.value)}><option value="basic-auth">{t('configuration:dashboardAccess.basicAuth')}</option><option value="reverse-proxy-sso">{t('configuration:dashboardAccess.reverseProxySso')}</option></select></label>
+      {recipe === 'basic-auth' && <label className="block text-sm">{t('configuration:dashboardAccess.username')}<input className="input input-bordered mt-1 w-full" value={username} onChange={(event) => setUsername(event.target.value)} /></label>}
+      <label className="block text-sm">{t('configuration:dashboardAccess.secret')}<input className="input input-bordered mt-1 w-full" type="password" value={secret} onChange={(event) => setSecret(event.target.value)} /></label>
+      <button type="button" className="action-btn-primary" disabled={formDisabled || !eligible || !secret || (recipe === 'basic-auth' && !username)} onClick={apply}>{saving ? t('configuration:dashboardAccess.applying') : t('configuration:dashboardAccess.apply')}</button>
     </fieldset>
   </section>;
 }

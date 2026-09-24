@@ -1,0 +1,70 @@
+{
+  "restart": {
+    "title": "Restart Node-RED?",
+    "description": "Node-RED will stop and start again. Active flows will be briefly interrupted.",
+    "confirm": "Yes, restart",
+    "cancel": "Cancel"
+  },
+  "container": {
+    "restartTitle": "Restart container",
+    "restartDescription": "Are you sure you want to restart the Node-RED container? The service will be briefly unavailable.",
+    "stopTitle": "Stop container",
+    "stopDescription": "Are you sure you want to stop the Node-RED container? The service will be unavailable until you restart it."
+  },
+  "restart.title": "Restart Node-RED?",
+  "restart.description": "Node-RED will stop and start again. Active flows will be briefly interrupted.",
+  "restart.confirm": "Yes, restart",
+  "actions": {
+    "unknownError": "Unknown error",
+    "restartSuccessTitle": "Node-RED restarted",
+    "restartSuccessMessage": "The process started successfully.",
+    "restartErrorTitle": "Could not restart Node-RED",
+    "startSuccessTitle": "Node-RED started",
+    "startSuccessMessage": "The process started successfully.",
+    "startErrorTitle": "Could not start Node-RED",
+    "stopSuccessTitle": "Node-RED stopped",
+    "stopSuccessMessage": "The process stopped successfully.",
+    "stopErrorTitle": "Could not stop Node-RED"
+  },
+  "diskUsage": "Disk Usage",
+  "scheduled": "Scheduled",
+  "withAlerts": "With alerts",
+  "notScheduled": "Not scheduled",
+  "localBackups": "Local backups",
+  "schedulerActive": "Active scheduler",
+  "schedulerInactive": "No active scheduler",
+  "nextRun": "next",
+  "lastBackup": "Last backup",
+  "noBackupsShort": "No backups",
+  "noSnapshotsYet": "No local snapshots yet",
+  "lastAutomatic": "Last automatic",
+  "backup": "Backup",
+  "noAutomaticRuns": "No successful automatic runs yet",
+  "storageUsed": "Storage used",
+  "localBackupsCount": "local backups",
+  "loadingObservability": "Loading observability",
+  "recentActivity": "Recent activity",
+  "noEvents": "No events",
+  "noEventsRecorded": "No events recorded for backups or scheduler yet.",
+  "systemOverview": "System overview",
+  "overview": "Overview",
+  "liveTelemetry": "Live telemetry",
+  "systemHealth": "System Health",
+  "environmentOk": "Environment OK",
+  "checkEnvironment": "Check environment for issues",
+  "runtimeCard": {
+    "title": "Runtime",
+    "restartButton": "Restart",
+    "restartingButton": "Restarting…",
+    "openButton": "Open"
+  },
+  "hostWarning": {
+    "nodejsMissing": "Node.js is not installed.",
+    "nodeRedNotDetected": "Node-RED has not been detected yet.",
+    "settingsNotWritable": "nrcc cannot write to settings.js."
+  },
+  "dockerWarning": "Docker container is not running correctly. Some features may not work.",
+  "deploymentDocker": "Docker",
+  "deploymentNative": "Native",
+  "deploymentUnknown": "Not detected"
+}

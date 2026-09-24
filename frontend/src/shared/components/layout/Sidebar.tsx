@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { useAuth } from '@/features/auth/hooks/useAuth';
+import { useT } from '@/i18n';
 import { UserMenu } from './UserMenu';
 
 const navItems = [
@@ -38,6 +39,7 @@ const MOBILE_BREAKPOINT = 768;
 export function Sidebar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { t } = useT();
   const isAdmin = user?.role === 'admin';
   
   const [isMobile, setIsMobile] = useState(false);
@@ -93,7 +95,7 @@ export function Sidebar() {
               <div className="min-w-0">
                 <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-base-content/50">Orchestrator</p>
                 <h1 className="truncate text-lg font-bold leading-tight text-base-content">Node-RED</h1>
-                <p className="text-xs text-base-content/65">Control Center</p>
+                <p className="text-xs text-base-content/65">{t('common:productShortName')}</p>
               </div>
             </div>
           )}

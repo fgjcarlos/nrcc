@@ -2,10 +2,12 @@ import { Menu, RadioTower } from 'lucide-react';
 import { ThemeToggle } from '@/shared/components';
 import { UpdateNotificationChip } from '@/features/updates/components/UpdateNotificationChip';
 import { CommandPalette } from '@/shared/components/command-palette';
+import { LocaleSwitcher, useT } from '@/i18n';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export function Header() {
+  const { t } = useT();
 
   return (
     <header
@@ -26,8 +28,8 @@ export function Header() {
               <RadioTower className="h-5 w-5 stroke-[1.8]" />
             </div>
             <div className="min-w-0 leading-tight">
-              <span className="block text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-base-content/55">Command Center</span>
-              <span className="block truncate text-sm font-semibold text-base-content sm:text-base">Node-RED Control Center</span>
+              <span className="block text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-base-content/55">{t('common:productShortName')}</span>
+              <span className="block truncate text-sm font-semibold text-base-content sm:text-base">{t('common:productFullName')}</span>
             </div>
           </div>
         </div>
@@ -35,6 +37,7 @@ export function Header() {
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           <CommandPalette />
           <UpdateNotificationChip />
+          <LocaleSwitcher />
           <ThemeToggle />
           <span className="api-status-chip hidden max-w-[18rem] truncate rounded-xl border px-3 py-2 text-xs font-medium text-base-content/70 xl:inline-flex">
             API: {API_URL}

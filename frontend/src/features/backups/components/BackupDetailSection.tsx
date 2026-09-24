@@ -1,6 +1,7 @@
 import { LoaderCircle, X } from 'lucide-react';
 import type { BackupSummary } from '@/features/backups/services';
 import { formatBackupSize, getBackupSummary } from '@/features/backups/lib/formatters';
+import { useT } from '@/i18n';
 
 interface BackupDetail {
   files: Array<{
@@ -25,6 +26,7 @@ const typeLabels: Record<BackupSummary['type'], string> = {
 
 export function BackupDetailSection(props: BackupDetailSectionProps) {
   const { backup, detail, isLoading, onClose } = props;
+  const { t } = useT();
 
   if (!detail && !isLoading) {
     return null;
@@ -35,7 +37,7 @@ export function BackupDetailSection(props: BackupDetailSectionProps) {
       {/* Header */}
       <div className="mb-4 flex items-center justify-between gap-4">
         <div>
-          <h3 className="text-lg font-semibold text-base-content">Detalle del backup</h3>
+          <h3 className="text-lg font-semibold text-base-content">{t('backups:backupDetailTitle')}</h3>
           <p className="text-sm text-base-content/65">{getBackupSummary(backup, typeLabels)}</p>
         </div>
         <button onClick={onClose} className="icon-button text-base-content/60 hover:text-base-content">
@@ -48,18 +50,17 @@ export function BackupDetailSection(props: BackupDetailSectionProps) {
         <div className="flex items-center justify-center py-8">
           <div className="text-center">
             <LoaderCircle className="mx-auto mb-3 h-10 w-10 animate-spin text-base-content/40" />
-            <p className="text-sm text-base-content/65">Cargando detalle...</p>
+            <p className="text-sm text-base-content/65">{t('backups:loadingDetail')}</p>
           </div>
         </div>
       ) : detail && detail.files && detail.files.length > 0 ? (
-        /* File List */
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs text-base-content/60">
-                <th className="py-3 pr-4">Ruta</th>
-                <th className="py-3 pr-4 text-right">Tamaño</th>
-                <th className="py-3 pr-4">Checksum</th>
+                <th className="py-3 pr-4">{t('backups:filePath')}</th>
+                <th className="py-3 pr-4 text-right">{t('backups:fileSize')}</th>
+                <th className="py-3 pr-4">{t('backups:fileChecksum')}</th>
               </tr>
             </thead>
             <tbody>
@@ -74,9 +75,8 @@ export function BackupDetailSection(props: BackupDetailSectionProps) {
           </table>
         </div>
       ) : (
-        /* No Files */
         <div className="rounded-lg border border-border bg-base-200/20 p-4 text-center">
-          <p className="text-sm text-base-content/65">No hay archivos en este backup</p>
+          <p className="text-sm text-base-content/65">{t('backups:noFilesInBackup')}</p>
         </div>
       )}
     </div>

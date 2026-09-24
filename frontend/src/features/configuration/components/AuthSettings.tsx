@@ -2,6 +2,7 @@ import { Lock } from 'lucide-react';
 import { InputField, ToggleField } from './FormFields';
 import type { NodeRedConfigFormData } from '@/shared/types';
 import { passwordSchema } from '@/shared/validation/schemas';
+import { useT } from '@/i18n';
 
 interface AuthSettingsProps {
   settings: NodeRedConfigFormData;
@@ -20,17 +21,18 @@ function passwordHelp(value: string): string | undefined {
 }
 
 export function AuthSettings({ settings, onUpdate, disabled }: AuthSettingsProps) {
+  const { t } = useT();
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 mb-4">
         <Lock className="w-5 h-5 text-base-content/60" />
-        <h3 className="text-lg font-medium text-base-content">Authentication</h3>
+        <h3 className="text-lg font-medium text-base-content">{t('configuration:authentication')}</h3>
       </div>
 
       <div className="space-y-6">
         {/* Admin Auth */}
         <div>
-          <h4 className="mb-3 text-sm font-medium text-base-content/60">Admin Authentication</h4>
+          <h4 className="mb-3 text-sm font-medium text-base-content/60">{t('configuration:adminAuth')}</h4>
           <div className="space-y-3">
             <ToggleField
               label="Enable Admin Auth"
@@ -69,7 +71,7 @@ export function AuthSettings({ settings, onUpdate, disabled }: AuthSettingsProps
 
         {/* Node HTTP Auth */}
         <div>
-          <h4 className="mb-3 text-sm font-medium text-base-content/60">Node HTTP Authentication</h4>
+          <h4 className="mb-3 text-sm font-medium text-base-content/60">{t('configuration:nodeHttpAuth')}</h4>
           <div className="space-y-3">
             <ToggleField
               label="Enable Node HTTP Auth"
@@ -108,7 +110,7 @@ export function AuthSettings({ settings, onUpdate, disabled }: AuthSettingsProps
 
         {/* Static Auth */}
         <div>
-          <h4 className="mb-3 text-sm font-medium text-base-content/60">Static Authentication</h4>
+          <h4 className="mb-3 text-sm font-medium text-base-content/60">{t('configuration:staticAuth')}</h4>
           <div className="space-y-3">
             <ToggleField
               label="Enable Static Auth"

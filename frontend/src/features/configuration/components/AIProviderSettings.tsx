@@ -3,10 +3,12 @@ import { Bot, Save, Wifi } from 'lucide-react';
 import { toast } from 'sonner';
 import { aiService, type AIConfigInput, type AIProviderStatus } from '../services';
 import { InputField, SelectField, ToggleField } from './FormFields';
+import { useT } from '@/i18n';
 
 const initialConfig: AIConfigInput = { enabled: false, provider: 'offline', endpoint: '', model: '' };
 
 export function AIProviderSettings() {
+  const { t } = useT();
   const [config, setConfig] = useState<AIConfigInput>(initialConfig);
   const [status, setStatus] = useState<AIProviderStatus>();
   const [loading, setLoading] = useState(true);
@@ -54,7 +56,7 @@ export function AIProviderSettings() {
     }
   };
 
-  if (loading) return <div className="py-8 text-sm text-base-content/60">Loading AI provider settings…</div>;
+  if (loading) return <div className="py-8 text-sm text-base-content/60">{t('configuration:aiLoading')}</div>;
 
   const remoteProvider = config.provider === 'openai';
   return (
@@ -62,8 +64,8 @@ export function AIProviderSettings() {
       <div className="flex items-start gap-3">
         <Bot className="mt-0.5 h-5 w-5 text-primary" aria-hidden="true" />
         <div>
-          <h3 className="text-lg font-medium text-base-content">AI Provider</h3>
-          <p className="text-sm text-base-content/60">Configure optional, review-first AI flow assistance.</p>
+<h3 className="text-lg font-medium text-base-content">{t('configuration:aiProvider')}</h3>
+          <p className="text-sm text-base-content/60">{t('configuration:aiProviderDesc')}</p>
         </div>
       </div>
 

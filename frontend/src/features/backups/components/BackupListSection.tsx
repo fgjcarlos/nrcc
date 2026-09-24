@@ -3,7 +3,7 @@ import type { BackupSummary } from '@/features/backups/services';
 import { formatBackupDate, formatBackupSize, getBackupDisplayName, getBackupSummary } from '@/features/backups/lib/formatters';
 import { cn } from '@/shared/lib';
 import { StateContainer } from '@/shared/components';
-import { UI_COPY } from '@/shared/constants/uiCopy';
+import { useT } from '@/i18n';
 
 interface BackupListSectionProps {
   backups: BackupSummary[];
@@ -41,6 +41,7 @@ const typeStyles: Record<BackupSummary['type'], string> = {
 };
 
 export function BackupListSection(props: BackupListSectionProps) {
+  const { t } = useT();
   const {
     backups,
     isLoading,
@@ -67,10 +68,10 @@ export function BackupListSection(props: BackupListSectionProps) {
     <div className="surface-card p-6">
       <div className="mb-4 flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold text-base-content">Available Backups</h2>
-          <p className="text-sm text-base-content/65">Download, restore or delete local snapshots</p>
+          <h2 className="text-lg font-semibold text-base-content">{t('backups:availableBackups')}</h2>
+          <p className="text-sm text-base-content/65">{t('backups:downloadRestoreOrDelete')}</p>
         </div>
-        {isLoading && <span className="text-sm text-base-content/60">{UI_COPY.loading}</span>}
+        {isLoading && <span className="text-sm text-base-content/60">{t('flows:loading')}</span>}
       </div>
 
       <StateContainer
@@ -80,27 +81,27 @@ export function BackupListSection(props: BackupListSectionProps) {
         loadingSlot={
           <div className="glass-panel rounded-2xl border border-border p-10 text-center">
             <LoaderCircle className="mx-auto mb-3 h-10 w-10 animate-spin text-base-content/40" />
-            <p className="font-medium text-base-content">{UI_COPY.loadingBackups}</p>
-            <p className="text-sm text-base-content/65">{UI_COPY.readingBackups}</p>
+            <p className="font-medium text-base-content">{t('common:loadingBackups')}</p>
+            <p className="text-sm text-base-content/65">{t('common:readingBackups')}</p>
           </div>
         }
         errorSlot={
           <div className="rounded-2xl border border-error/20 bg-error/8 p-6 text-sm text-base-content">
             <div className="flex items-center gap-2 font-medium text-error">
               <CircleAlert className="h-4 w-4" />
-              {UI_COPY.failedToLoadBackups}
+              {t('common:failedToLoadBackups')}
             </div>
-            <p className="mt-2 text-base-content/70">{UI_COPY.retryLoadBackups}</p>
+            <p className="mt-2 text-base-content/70">{t('common:retryLoadBackups')}</p>
           </div>
         }
         emptySlot={
           <div className="glass-panel rounded-2xl border border-dashed border-border p-10 text-center">
             <HardDrive className="mx-auto mb-3 h-10 w-10 text-base-content/40" />
-            <p className="font-medium text-base-content">{UI_COPY.noBackupsYet}</p>
-            <p className="text-sm text-base-content/65">{UI_COPY.createBackupDesc}</p>
+            <p className="font-medium text-base-content">{t('backups:noBackupsYet')}</p>
+            <p className="text-sm text-base-content/65">{t('common:createBackupDesc')}</p>
             <button onClick={onCreateBackup} disabled={isCreating} className="action-btn-primary mt-4">
               {isCreating && <LoaderCircle className="h-4 w-4 animate-spin" />}
-              {UI_COPY.add} {UI_COPY.createFirstBackup}
+              {t('common:add')} {t('common:createFirstBackup')}
             </button>
           </div>
         }
@@ -111,12 +112,12 @@ export function BackupListSection(props: BackupListSectionProps) {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border text-left text-sm text-base-content/60">
-                    <th className="py-3 pr-4">{UI_COPY.type}</th>
-                    <th className="py-3 pr-4">{UI_COPY.name}</th>
-                    <th className="py-3 pr-4">{UI_COPY.date}</th>
-                    <th className="py-3 pr-4">{UI_COPY.files}</th>
-                    <th className="py-3 pr-4">{UI_COPY.size}</th>
-                    <th className="py-3 pr-4">{UI_COPY.actions}</th>
+                    <th className="py-3 pr-4">{t('common:type')}</th>
+                    <th className="py-3 pr-4">{t('common:name')}</th>
+                    <th className="py-3 pr-4">{t('common:date')}</th>
+                    <th className="py-3 pr-4">{t('common:files')}</th>
+                    <th className="py-3 pr-4">{t('common:size')}</th>
+                    <th className="py-3 pr-4">{t('backups:actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -170,7 +171,7 @@ export function BackupListSection(props: BackupListSectionProps) {
                           <button
                             onClick={() => onDownload(backup)}
                             disabled={isActionPending && pendingActionId === backup.id}
-                            title={UI_COPY.download}
+                            title={t('common:download')}
                             className="icon-button"
                           >
                             {isActionPending && pendingActionId === backup.id ? (
@@ -182,7 +183,7 @@ export function BackupListSection(props: BackupListSectionProps) {
                           <button
                             onClick={() => onRestore(backup)}
                             disabled={isActionPending && pendingActionId === backup.id}
-                            title={UI_COPY.restore}
+                            title={t('backups:actions.restore')}
                             className="icon-button"
                           >
                             {isActionPending && pendingActionId === backup.id ? (
@@ -194,7 +195,7 @@ export function BackupListSection(props: BackupListSectionProps) {
                           <button
                             onClick={() => onDelete(backup)}
                             disabled={isActionPending && pendingActionId === backup.id}
-                            title={UI_COPY.delete}
+                            title={t('common:delete')}
                             className="icon-button text-error hover:text-error/80"
                           >
                             {isActionPending && pendingActionId === backup.id ? (
@@ -216,7 +217,7 @@ export function BackupListSection(props: BackupListSectionProps) {
           {totalPages > 1 && (
             <div className="flex items-center justify-between">
               <div className="text-sm text-base-content/60">
-                {UI_COPY.pageOf(page, totalPages)}
+                {t('common:pageOf', { current: page, total: totalPages })}
               </div>
               <div className="flex gap-2">
                 <button
@@ -224,14 +225,14 @@ export function BackupListSection(props: BackupListSectionProps) {
                   disabled={!canPrev}
                   className="btn-secondary btn-sm"
                 >
-                  {UI_COPY.previousPage}
+                  {t('common:previousPage')}
                 </button>
                 <button
                   onClick={() => onPageChange(page + 1)}
                   disabled={!canNext}
                   className="btn-secondary btn-sm"
                 >
-                  {UI_COPY.nextPage}
+                  {t('common:nextPage')}
                 </button>
               </div>
             </div>

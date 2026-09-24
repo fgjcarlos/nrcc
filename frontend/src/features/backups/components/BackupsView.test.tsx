@@ -74,7 +74,7 @@ describe('BackupsView error retry', () => {
     const user = userEvent.setup();
     renderWithProviders();
 
-    const retry = await screen.findByRole('button', { name: /reintentar/i });
+    const retry = await screen.findByRole('button', { name: /retry/i });
     await user.click(retry);
 
     expect(refetchConfig).toHaveBeenCalledTimes(1);

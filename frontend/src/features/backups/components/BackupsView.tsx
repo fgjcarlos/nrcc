@@ -12,7 +12,7 @@ import {
 import { useBackupsData } from '@/features/backups/hooks/useBackupsData';
 import { useBackupsActions } from '@/features/backups/hooks/useBackupsActions';
 import { backupService, defaultBackupConfig, type BackupConfig, type BackupSummary } from '@/features/backups/services';
-import { UI_COPY } from '@/shared/constants/uiCopy';
+import { useT } from '@/i18n';
 import {
   getErrorMessage,
   getBackupFileLabel,
@@ -63,6 +63,9 @@ export function BackupsView() {
   const [backupListPage, setBackupListPage] = useState(1);
   const [backupListSort] = useState<'date' | 'size' | 'status'>('date');
   const [backupListOrder] = useState<'asc' | 'desc'>('desc');
+
+  const { t } = useT();
+
 
   const backupsData = useBackupsData({
     page: backupListPage,
@@ -139,7 +142,7 @@ export function BackupsView() {
 
   const downloadBackup = async (backup: BackupSummary) => {
     if (!backup.id) {
-      toast.error(UI_COPY.backupIdentifierInvalid);
+      toast.error(t('backups:backupIdentifierInvalid'));
       return;
     }
 
@@ -153,15 +156,15 @@ export function BackupsView() {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      toast.success(UI_COPY.backupDownloadStarted);
+      toast.success(t('backups:backupDownloadStarted'));
     } catch {
-      toast.error(UI_COPY.backupDownloadFailed);
+      toast.error(t('backups:backupDownloadFailed'));
     }
   };
 
   const handleSaveConfig = () => {
     if (configDraft.schedule === 'custom' && !configDraft.customSchedule.trim()) {
-      toast.error(UI_COPY.backupCronRequired);
+      toast.error(t('backups:backupCronRequired'));
       return;
     }
     actions.saveConfigMutation.mutate(configDraft);
@@ -186,8 +189,8 @@ export function BackupsView() {
      const displayName = getBackupDisplayName(backup);
      setConfirmConfig({
        isOpen: true,
-       title: UI_COPY.deleteBackup,
-       description: UI_COPY.deleteBackupDescription(displayName),
+       title: t('common:deleteBackup'),
+       description: t('common:deleteBackupDescription', { name: displayName }),
        confirmText: backup.id,
        variant: 'danger',
        onConfirm: () => {
@@ -201,9 +204,9 @@ export function BackupsView() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">Backups locales</p>
-          <h1 className="text-2xl font-bold text-base-content">Backups</h1>
-          <p className="text-sm text-base-content/65">Snapshots locales de flows, settings y archivos clave con restore y retención integrados.</p>
+          <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">{t('backups:localBackupsLabel')}</p>
+          <h1 className="text-2xl font-bold text-base-content">{t('backups:backupsTitle')}</h1>
+          <p className="text-sm text-base-content/65">{t('backups:localBackupsSubtitle')}</p>
         </div>
 
         <button
@@ -212,7 +215,7 @@ export function BackupsView() {
           className="action-btn-primary"
         >
           <Archive className={cn('h-4 w-4', actions.createMutation.isPending && 'animate-pulse')} />
-          Crear backup ahora
+          {t('backups:createBackupNow')}
         </button>
       </div>
 
@@ -224,11 +227,11 @@ export function BackupsView() {
           <AlertTriangle className="h-5 w-5 text-warning flex-shrink-0 mt-0.5" />
           <div className="flex-1 text-sm">
             <p className="font-medium text-base-content">
-              Última sincronización con el backend falló
-              {dataSyncError === 'status' ? ' (estado del scheduler)' : ' (observabilidad)'}.
+              {t('backups:syncErrorTitle')}
+              {dataSyncError === 'status' ? t('backups:syncErrorStatusSuffix') : t('backups:syncErrorObservabilitySuffix')}.
             </p>
             <p className="text-base-content/70 mt-1">
-              Los datos en pantalla pueden estar desactualizados. Reintentá para sincronizar los datos.
+              {t('backups:syncErrorBody')}
             </p>
           </div>
           <button
@@ -244,7 +247,7 @@ export function BackupsView() {
             className="flex items-center gap-1.5 rounded-md border border-base-content/20 px-2.5 py-1.5 text-xs font-medium hover:bg-base-content/5"
           >
             <RefreshCw className="h-3.5 w-3.5" />
-            Reintentar
+            {t('backups:retrySync')}
           </button>
         </div>
       )}

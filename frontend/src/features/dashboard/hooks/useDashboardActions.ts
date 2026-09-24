@@ -4,6 +4,8 @@ import { toast } from 'sonner';
 import { dashboardService } from '../services';
 
 import { queryKeys } from '@/shared/lib/queryKeys';
+import { useT } from '@/i18n';
+
 interface UseDashboardActionsOptions {
   uiPort?: number;
 }
@@ -20,6 +22,7 @@ interface RuntimeActionOptions {
 
 export function useDashboardActions({ uiPort }: UseDashboardActionsOptions) {
   const queryClient = useQueryClient();
+  const { t } = useT();
 
   const [pendingConfirm, setPendingConfirm] = useState(false);
   const [isRestarting, setIsRestarting] = useState(false);
@@ -30,7 +33,7 @@ export function useDashboardActions({ uiPort }: UseDashboardActionsOptions) {
   };
 
   const getErrorMessage = (error: unknown) =>
-    error instanceof Error ? error.message : 'Error desconocido';
+    error instanceof Error ? error.message : t('dashboard:actions.unknownError');
 
   const pushRuntimeSuccessToast = (title: string, message: string) => {
     toast.success(title, { description: message });
@@ -72,9 +75,9 @@ export function useDashboardActions({ uiPort }: UseDashboardActionsOptions) {
 
     const restarted = await runRuntimeAction({
       action: dashboardService.restartNodeRed,
-      successTitle: 'Node-RED reiniciado',
-      successMessage: 'El proceso ha arrancado correctamente.',
-      errorTitle: 'No se pudo reiniciar Node-RED',
+      successTitle: t('dashboard:actions.restartSuccessTitle'),
+      successMessage: t('dashboard:actions.restartSuccessMessage'),
+      errorTitle: t('dashboard:actions.restartErrorTitle'),
       onSuccess: invalidateRuntimeStatus,
       onError: () => setIsRestarting(false),
     });
@@ -94,9 +97,9 @@ export function useDashboardActions({ uiPort }: UseDashboardActionsOptions) {
 
     await runRuntimeAction({
       action: dashboardService.startNodeRed,
-      successTitle: 'Node-RED iniciado',
-      successMessage: 'El proceso ha arrancado correctamente.',
-      errorTitle: 'No se pudo iniciar Node-RED',
+      successTitle: t('dashboard:actions.startSuccessTitle'),
+      successMessage: t('dashboard:actions.startSuccessMessage'),
+      errorTitle: t('dashboard:actions.startErrorTitle'),
       onSuccess: invalidateRuntimeStatus,
       onFinally: () => setIsStartStopping(false),
     });
@@ -107,21 +110,23 @@ export function useDashboardActions({ uiPort }: UseDashboardActionsOptions) {
 
     await runRuntimeAction({
       action: dashboardService.stopNodeRed,
-      successTitle: 'Node-RED detenido',
-      successMessage: 'El proceso se ha detenido correctamente.',
-      errorTitle: 'No se pudo detener Node-RED',
+      successTitle: t('dashboard:actions.stopSuccessTitle'),
+      successMessage: t('dashboard:actions.stopSuccessMessage'),
+      errorTitle: t('dashboard:actions.stopErrorTitle'),
       onSuccess: invalidateRuntimeStatus,
       onFinally: () => setIsStartStopping(false),
     });
   };
 
   const handleOpenNodeRed = () => {
-    const url = new URL(window.location.href);
-    url.port = String(uiPort || 1880);
-    url.pathname = '/';
-    url.search = '';
-    url.hash = '';
-    window.open(url.toString(), '_blank', 'noopener,noreferrer');
+    // Validate uiPort is a positive integer in the valid TCP port range
+    // before constructing the loopback URL. Defends against misconfigured
+    // backend responses or env injection. Mirrors the same guard used by
+    // the Open Node-RED Editor command in CommandPalette so the two entry
+    // points cannot drift apart.
+    const parsed = Number.parseInt(String(uiPort), 10);
+    const safePort = Number.isInteger(parsed) && parsed >= 1 && parsed <= 65535 ? parsed : 1880;
+    window.open(`http://localhost:${safePort}`, '_blank', 'noopener,noreferrer');
   };
 
   return {

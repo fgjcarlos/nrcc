@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { type User } from '@/features/auth/services/authService';
-import { UI_COPY } from '@/shared/constants/uiCopy';
+import { useT } from '@/i18n';
 import { passwordSchema } from '@/shared/validation/schemas';
 
 type ModalMode = 'create' | 'edit_full' | 'edit_password';
@@ -70,6 +70,9 @@ export function UserModal({
     return true;
   };
 
+  const { t } = useT();
+
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -103,9 +106,9 @@ export function UserModal({
   };
 
   const getTitle = () => {
-    if (mode === 'create') return UI_COPY.createUser;
-    if (mode === 'edit_full') return UI_COPY.editUser;
-    return UI_COPY.changePassword;
+    if (mode === 'create') return t('auth:createUser');
+    if (mode === 'edit_full') return t('auth:editUser');
+    return t('auth:changePassword');
   };
 
   return (
@@ -123,7 +126,7 @@ export function UserModal({
           {(mode === 'create' || mode === 'edit_full') && (
             <div>
               <label className="mb-1 block text-sm font-medium text-base-content">
-                {UI_COPY.usernameLabel}
+                {t('auth:usernameLabel')}
               </label>
               <input
                 type="text"
@@ -142,7 +145,7 @@ export function UserModal({
           {(mode === 'create' || mode === 'edit_full') && (
             <div>
               <label className="mb-1 block text-sm font-medium text-base-content">
-                {UI_COPY.roleLabel}
+                {t('auth:roleLabel')}
               </label>
               <select
                 value={formData.role}
@@ -157,10 +160,10 @@ export function UserModal({
                 <option value="admin">Admin</option>
               </select>
               {isLastAdmin && (
-                <p className="mt-2 text-sm text-error">{UI_COPY.cannotDemoteLastAdmin}</p>
+                <p className="mt-2 text-sm text-error">{t('auth:cannotDemoteLastAdmin')}</p>
               )}
               {isCurrentUser && (
-                <p className="mt-2 text-sm text-base-content/60">{UI_COPY.cannotChangeOwnRole}</p>
+                <p className="mt-2 text-sm text-base-content/60">{t('auth:cannotChangeOwnRole')}</p>
               )}
             </div>
           )}
@@ -168,7 +171,7 @@ export function UserModal({
           {/* Password field - visible in all modes */}
           <div>
             <label className="mb-1 block text-sm font-medium text-base-content">
-              {mode === 'create' ? UI_COPY.passwordLabel : UI_COPY.newPasswordLabel}
+              {mode === 'create' ? t('auth:passwordLabel') : t('auth:newPasswordLabel')}
             </label>
             <input
               type="password"
@@ -180,7 +183,7 @@ export function UserModal({
               className="glass-panel w-full rounded-xl border border-border px-3 py-2 text-base-content focus:outline-none focus:ring-2 focus:ring-primary/50"
               required={mode === 'create' || mode === 'edit_password'}
               minLength={8}
-              placeholder={mode === 'edit_full' ? UI_COPY.keepCurrentPasswordPlaceholder : undefined}
+              placeholder={mode === 'edit_full' ? t('auth:keepCurrentPasswordPlaceholder') : undefined}
             />
             {passwordError && (
               <p className="mt-1 text-sm text-error">{passwordError}</p>
@@ -194,7 +197,7 @@ export function UserModal({
               disabled={isPending}
               className="action-btn-secondary disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {UI_COPY.cancel}
+              {t('common:cancel')}
             </button>
             <button
               type="submit"
@@ -204,7 +207,7 @@ export function UserModal({
               {isPending && (
                 <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-current"></div>
               )}
-              {mode === 'create' ? UI_COPY.createUser : UI_COPY.confirm}
+              {mode === 'create' ? t('auth:createUser') : t('common:confirm')}
             </button>
           </div>
         </form>

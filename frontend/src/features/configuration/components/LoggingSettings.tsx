@@ -1,6 +1,7 @@
 import { Activity } from 'lucide-react';
 import { SelectField, ToggleField, LOGGING_LEVELS } from './FormFields';
 import type { NodeRedConfigFormData } from '@/shared/types';
+import { useT } from '@/i18n';
 
 interface LoggingSettingsProps {
   settings: NodeRedConfigFormData;
@@ -9,17 +10,18 @@ interface LoggingSettingsProps {
 }
 
 export function LoggingSettings({ settings, onUpdate, disabled }: LoggingSettingsProps) {
+  const { t } = useT();
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 mb-4">
         <Activity className="w-5 h-5 text-base-content/60" />
-        <h3 className="text-lg font-medium text-base-content">Logging</h3>
+        <h3 className="text-lg font-medium text-base-content">{t('configuration:logging')}</h3>
       </div>
-      
+
       <div className="space-y-6">
         {/* Console Handler */}
         <div>
-          <h4 className="mb-3 text-sm font-medium text-base-content/60">Console Handler</h4>
+          <h4 className="mb-3 text-sm font-medium text-base-content/60">{t('configuration:consoleHandler')}</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <SelectField
               label="Console Level"
@@ -40,7 +42,7 @@ export function LoggingSettings({ settings, onUpdate, disabled }: LoggingSetting
 
         {/* Internal Handler */}
         <div>
-          <h4 className="mb-3 text-sm font-medium text-base-content/60">Internal Handler</h4>
+          <h4 className="mb-3 text-sm font-medium text-base-content/60">{t('configuration:internalHandler')}</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <SelectField
               label="Internal Level"

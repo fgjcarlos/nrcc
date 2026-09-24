@@ -14,8 +14,10 @@ import {
   Bot,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useT } from '@/i18n';
 
 export function FlowDetailView() {
+  const { t } = useT();
   const { id } = useParams<{ id: string }>();
 
   // Hooks for data and actions
@@ -39,7 +41,7 @@ export function FlowDetailView() {
     }
     const loadedFlow = flow;
     if (!loadedFlow) {
-      toast.error('Flow not loaded');
+      toast.error(t('flows:flowNotLoaded'));
       return;
     }
     aiFlowMutation.mutate({ action, flow: loadedFlow, prompt: aiPrompt });
@@ -61,13 +63,13 @@ export function FlowDetailView() {
   if (flowError) {
     return (
       <div className="p-6 space-y-4">
-        <p className="text-base-content/60">Failed to load flow.</p>
+        <p className="text-base-content/60">{t('flows:loadFailed')}</p>
         <div className="flex items-center gap-3">
           <button onClick={() => refetchFlow()} className="action-btn-primary">
-            Try again
+            {t('common:tryAgain')}
           </button>
           <Link to="/flows" className="action-btn-ghost">
-            Back to flows
+            {t('flows:backToFlows')}
           </Link>
         </div>
       </div>
@@ -78,7 +80,7 @@ export function FlowDetailView() {
   if (!flow) {
     return (
       <div className="p-6">
-        <p className="text-base-content/60">Flow not found</p>
+        <p className="text-base-content/60">{t('flows:flowNotFound')}</p>
       </div>
     );
   }
@@ -100,23 +102,23 @@ export function FlowDetailView() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <MetricCard
           icon={Activity}
-          label="Nodes"
+          label={t('flows:metricNodes')}
           value={metrics?.nodeCount || 0}
         />
         <MetricCard
           icon={Activity}
-          label="Connections"
+          label={t('flows:metricConnections')}
           value={metrics?.connectionCount || 0}
         />
         <MetricCard
           icon={AlertTriangle}
-          label="Disabled"
+          label={t('flows:metricDisabled')}
           value={metrics?.disabledNodes || 0}
           warning={metrics?.disabledNodes ? metrics.disabledNodes > 0 : false}
         />
         <MetricCard
           icon={Lightbulb}
-          label="Node Types"
+          label={t('flows:metricNodeTypes')}
           value={Object.keys(metrics?.nodeTypes || {}).length}
         />
       </div>
@@ -124,7 +126,7 @@ export function FlowDetailView() {
       {/* AI Analysis */}
       <div className="surface-card space-y-4 p-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-base-content">AI Analysis</h2>
+          <h2 className="text-lg font-semibold text-base-content">{t('flows:aiAnalysisTitle')}</h2>
           <div className="flex items-center gap-2">
             <button
               onClick={() => {
@@ -140,7 +142,7 @@ export function FlowDetailView() {
               {analyzeFlowMutation.isPending && (
                 <Loader2 className="w-4 h-4 animate-spin" />
               )}
-              Analyze Flow
+              {t('flows:analyzeFlow')}
             </button>
           </div>
         </div>
@@ -150,7 +152,7 @@ export function FlowDetailView() {
             {aiCapability.message}
             {canConfigureAI && (
               <Link to="/configuration" className="ml-2 text-primary underline underline-offset-2">
-                Configure AI provider
+                {t('flows:configureAIProvider')}
               </Link>
             )}
           </p>
@@ -160,13 +162,13 @@ export function FlowDetailView() {
         {analyzeFlowMutation.isPending ? (
           <div className="flex items-center gap-2 text-base-content/60">
             <Loader2 className="w-5 h-5 animate-spin" />
-            Analyzing flow...
+            {t('flows:analyzing')}
           </div>
         ) : analyzeFlowMutation.data ? (
           <AnalysisResultView result={analyzeFlowMutation.data} />
         ) : (
           <p className="text-base-content/60">
-            Click "Analyze Flow" to get insights about this flow.
+            {t('flows:analyzePrompt')}
           </p>
         )}
 
@@ -181,7 +183,7 @@ export function FlowDetailView() {
         <div>
           <h2 className="flex items-center gap-2 text-lg font-semibold text-base-content">
             <Bot className="h-5 w-5" />
-            AI Flow Copilot
+            {t('flows:aiCopilotTitle')}
           </h2>
           <p className="mt-1 text-sm text-base-content/60">
             Review-first actions are available only when AI is explicitly configured. Secrets are redacted before requests leave this host; generated JSON is never auto-applied.
@@ -213,7 +215,7 @@ export function FlowDetailView() {
           <div className="surface-panel space-y-3 p-4">
             <div className="flex flex-wrap gap-2 text-xs">
               <span className="rounded-full bg-primary/10 px-2 py-1 text-primary">Provider: {aiFlowMutation.data.provider}</span>
-              <span className="rounded-full bg-success/10 px-2 py-1 text-success">Review only</span>
+              <span className="rounded-full bg-success/10 px-2 py-1 text-success">{t('flows:aiReviewOnly')}</span>
               <span className="rounded-full bg-success/10 px-2 py-1 text-success">Redacted</span>
             </div>
             <p className="text-sm text-base-content/80">{aiFlowMutation.data.summary}</p>
@@ -233,7 +235,7 @@ export function FlowDetailView() {
             )}
             {aiFlowMutation.data.candidateFlow && (
               <div>
-                <p className="mb-2 text-sm font-medium text-base-content">Candidate flow JSON (manual review/import required)</p>
+                <p className="mb-2 text-sm font-medium text-base-content">{t('flows:candidateFlowJson')}</p>
                 <pre className="overflow-x-auto code-block-bg text-xs text-base-content/70">
                   {JSON.stringify(aiFlowMutation.data.candidateFlow, null, 2)}
                 </pre>
@@ -246,7 +248,7 @@ export function FlowDetailView() {
       {/* Node Types */}
       <div className="surface-card p-6">
         <h2 className="mb-4 text-lg font-semibold text-base-content">
-          Node Types
+          {t('flows:nodeTypesTitle')}
         </h2>
         <div className="flex flex-wrap gap-2">
           {metrics?.nodeTypes &&
@@ -267,7 +269,7 @@ export function FlowDetailView() {
           onClick={() => setShowRawJson(!showRawJson)}
           className="text-sm text-base-content/60 transition-colors hover:text-base-content"
         >
-          {showRawJson ? 'Hide' : 'Show'} raw JSON
+          {showRawJson ? t('common:hide') : t('common:show')} {t('flows:rawJson')}
         </button>
         {showRawJson && (
           <pre className="mt-4 overflow-x-auto code-block-bg text-xs text-base-content/70">

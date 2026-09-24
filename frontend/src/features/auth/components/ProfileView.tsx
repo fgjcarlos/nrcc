@@ -2,6 +2,7 @@ import { FormEvent, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { useAuth } from '../hooks/useAuth';
 import { authService } from '../services/authService';
+import { useT } from '@/i18n';
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -19,6 +20,7 @@ function formatDate(value?: string) {
 
 export function ProfileView() {
   const { user } = useAuth();
+  const { t } = useT();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -29,8 +31,8 @@ export function ProfileView() {
   if (!user) {
     return (
       <div className="p-6">
-        <h1 className="text-2xl font-bold text-base-content">Profile</h1>
-        <p className="mt-2 text-base-content/60">Sign in to view your account details.</p>
+        <h1 className="text-2xl font-bold text-base-content">{t('auth:profile.title')}</h1>
+        <p className="mt-2 text-base-content/60">{t('auth:profile.signInRequired')}</p>
       </div>
     );
   }
@@ -69,10 +71,10 @@ export function ProfileView() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-base-content/50">Account</p>
-        <h1 className="mt-2 text-2xl font-bold text-base-content">Profile</h1>
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-base-content/50">{t('auth:profile.account')}</p>
+        <h1 className="mt-2 text-2xl font-bold text-base-content">{t('auth:profile.title')}</h1>
         <p className="mt-2 text-sm text-base-content/60">
-          Review your account details and update your own password.
+          {t('auth:profile.reviewPrompt')}
         </p>
       </div>
 
@@ -89,7 +91,7 @@ export function ProfileView() {
 
         <dl className="mt-6 grid gap-4 md:grid-cols-3">
           <div className="rounded-xl border border-border bg-base-200/45 p-4">
-            <dt className="text-xs font-semibold uppercase tracking-wide text-base-content/50">User ID</dt>
+            <dt className="text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('auth:profile.userId')}</dt>
             <dd className="mt-2 break-all text-sm text-base-content">{user.id}</dd>
           </div>
           <div className="rounded-xl border border-border bg-base-200/45 p-4">
@@ -97,7 +99,7 @@ export function ProfileView() {
             <dd className="mt-2 text-sm text-base-content">{formatDate(user.createdAt)}</dd>
           </div>
           <div className="rounded-xl border border-border bg-base-200/45 p-4">
-            <dt className="text-xs font-semibold uppercase tracking-wide text-base-content/50">Last updated</dt>
+            <dt className="text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('auth:profile.lastUpdated')}</dt>
             <dd className="mt-2 text-sm text-base-content">{formatDate(user.updatedAt)}</dd>
           </div>
         </dl>
@@ -114,7 +116,7 @@ export function ProfileView() {
         <form onSubmit={handleSubmit} className="max-w-lg space-y-4">
           <div>
             <label htmlFor="new-password" className="mb-1 block text-sm font-medium text-base-content">
-              New password
+              {t('auth:profile.newPasswordLabel')}
             </label>
             <input
               id="new-password"
@@ -130,7 +132,7 @@ export function ProfileView() {
 
           <div>
             <label htmlFor="confirm-new-password" className="mb-1 block text-sm font-medium text-base-content">
-              Confirm new password
+              {t('auth:profile.confirmNewPasswordLabel')}
             </label>
             <input
               id="confirm-new-password"
@@ -151,7 +153,7 @@ export function ProfileView() {
           )}
 
           <button type="submit" className="action-btn-primary disabled:opacity-50" disabled={isSubmitting}>
-            {isSubmitting ? 'Updating…' : 'Update password'}
+            {isSubmitting ? t('auth:profile.updating') : t('auth:profile.updatePassword')}
           </button>
         </form>
       </section>

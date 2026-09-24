@@ -1,0 +1,85 @@
+name: i18n checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  hardcoded-copy:
+    name: Hardcoded copy guard
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        # actions/checkout v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      # corepack must run BEFORE actions/setup-node with cache: pnpm so the
+      # cache lookup finds pnpm on PATH. Mirrors the pattern in pr.yml so the
+      # two workflows cannot drift apart.
+      - name: Setup pnpm via corepack
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.12.0 --activate
+          pnpm --version
+
+      - name: Set up Node.js
+        # actions/setup-node v7.0.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check for hardcoded JSX copy
+        run: pnpm i18n:check
+
+  catalog-coverage:
+    name: i18n catalog coverage
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        # actions/checkout v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      # corepack must run BEFORE actions/setup-node with cache: pnpm so the
+      # cache lookup finds pnpm on PATH. Mirrors the pattern in pr.yml so the
+      # two workflows cannot drift apart.
+      - name: Setup pnpm via corepack
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.12.0 --activate
+          pnpm --version
+
+      - name: Set up Node.js
+        # actions/setup-node v7.0.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate catalog coverage report
+        run: pnpm i18n:coverage
+
+      - name: Upload catalog coverage report
+        # actions/upload-artifact v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: i18n-coverage
+          path: docs/i18n-coverage.md

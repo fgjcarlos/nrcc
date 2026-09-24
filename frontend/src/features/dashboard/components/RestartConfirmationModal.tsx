@@ -1,5 +1,6 @@
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { createPortal } from 'react-dom';
+import { useT } from '@/i18n';
 
 interface RestartConfirmationModalProps {
   isOpen: boolean;
@@ -8,12 +9,13 @@ interface RestartConfirmationModalProps {
 }
 
 export function RestartConfirmationModal({ isOpen, onCancel, onConfirm }: RestartConfirmationModalProps) {
+  const { t } = useT();
   if (!isOpen) {
     return null;
   }
 
   // Portaled to document.body so `position: fixed` resolves against the
-  // viewport, not the surrounding <main> scroll container (which had a
+  // viewport, not the surrounding main scroll container (which had a
   // sticky header establishing a containing block). See issue #704.
   return createPortal(
     <div className="modal-overlay" onClick={onCancel}>
@@ -29,19 +31,19 @@ export function RestartConfirmationModal({ isOpen, onCancel, onConfirm }: Restar
             <AlertTriangle className="h-7 w-7" />
           </div>
           <div>
-            <h3 id="restart-confirmation-modal-title" className="text-lg font-bold">¿Reiniciar Node-RED?</h3>
+            <h3 id="restart-confirmation-modal-title" className="text-lg font-bold">{t('dashboard:restart.title')}</h3>
             <p className="mt-1 text-sm text-base-content/60">
-              Node-RED se detendrá y volverá a arrancar. Los flujos activos se interrumpirán brevemente.
+              {t('dashboard:restart.description')}
             </p>
           </div>
         </div>
         <div className="flex justify-end gap-2 pt-2">
           <button onClick={onCancel} className="action-btn-secondary">
-            Cancelar
+            {t('common:cancel')}
           </button>
           <button onClick={onConfirm} className="action-btn-primary gap-2">
             <RefreshCw className="h-4 w-4" />
-            Sí, reiniciar
+            {t('dashboard:restart.confirm')}
           </button>
         </div>
       </div>

@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { AlertCircle } from 'lucide-react';
 
 import { queryKeys } from '@/shared/lib/queryKeys';
+import { useT } from '@/i18n';
 const loginSchema = z.object({
   username: z.string().min(1, 'Username is required'),
   password: z.string().min(1, 'Password is required'),
@@ -17,6 +18,7 @@ const loginSchema = z.object({
 type LoginFormData = z.infer<typeof loginSchema>;
 
 export function LoginView() {
+  const { t } = useT();
   const navigate = useNavigate();
   const location = useLocation();
   const { login } = useAuth();
@@ -70,9 +72,9 @@ export function LoginView() {
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-warning/15">
               <AlertCircle className="h-6 w-6 text-warning" />
             </div>
-            <h1 className="text-2xl font-bold text-base-content">Sistema No Inicializado</h1>
+            <h1 className="text-2xl font-bold text-base-content">{t('auth:login.systemNotInitialized')}</h1>
             <p className="mt-2 text-base-content/70">
-              Aún no se ha configurado el usuario administrador.
+              {t('auth:login.adminNotConfigured')}
             </p>
           </div>
 
@@ -81,7 +83,7 @@ export function LoginView() {
               to="/setup"
               className="block w-full rounded-xl bg-primary px-4 py-2 text-center font-medium text-primary-content hover:bg-primary/90"
             >
-              Crear Usuario Administrador
+              {t('auth:login.createAdminAction')}
             </Link>
           </div>
         </div>
@@ -94,9 +96,9 @@ export function LoginView() {
     <div className="auth-shell min-h-screen flex items-center justify-center px-4">
       <div className="surface-card w-full max-w-md space-y-6 border border-border p-8">
         <div className="text-center">
-          <p className="mb-2 text-xs uppercase tracking-[0.24em] text-base-content/50">Access console</p>
-          <h1 className="text-2xl font-bold text-base-content">Node-RED Control Center</h1>
-          <p className="mt-2 text-base-content/70">Sign in to your account</p>
+          <p className="mb-2 text-xs uppercase tracking-[0.24em] text-base-content/50">{t('auth:login.accessConsole')}</p>
+          <h1 className="text-2xl font-bold text-base-content">{t('common:productFullName')}</h1>
+          <p className="mt-2 text-base-content/70">{t('auth:login.signInPromptBody')}</p>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -108,7 +110,7 @@ export function LoginView() {
 
           <div>
             <label htmlFor="username" className="mb-1 block text-sm font-medium text-base-content">
-              Username
+              {t('auth:login.usernameLabel')}
             </label>
             <input
               id="username"
@@ -124,7 +126,7 @@ export function LoginView() {
 
           <div>
             <label htmlFor="password" className="mb-1 block text-sm font-medium text-base-content">
-              Password
+              {t('auth:login.passwordLabel')}
             </label>
             <input
               id="password"
@@ -143,7 +145,7 @@ export function LoginView() {
             disabled={isSubmitting}
             className="w-full rounded-xl bg-primary px-4 py-2 text-primary-content hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isSubmitting ? 'Signing in...' : 'Sign in'}
+            {isSubmitting ? t('auth:login.submitting') : t('auth:login.submit')}
           </button>
         </form>
       </div>

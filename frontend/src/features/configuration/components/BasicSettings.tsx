@@ -1,6 +1,7 @@
 import { Server } from 'lucide-react';
 import { InputField, ToggleField } from './FormFields';
 import type { NodeRedConfigFormData } from '@/shared/types';
+import { useT } from '@/i18n';
 
 interface BasicSettingsProps {
   settings: NodeRedConfigFormData;
@@ -9,11 +10,12 @@ interface BasicSettingsProps {
 }
 
 export function BasicSettings({ settings, onUpdate, disabled }: BasicSettingsProps) {
+  const { t } = useT();
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 mb-4">
         <Server className="w-5 h-5 text-base-content/60" />
-        <h3 className="text-lg font-medium text-base-content">Basic Settings</h3>
+        <h3 className="text-lg font-medium text-base-content">{t('configuration:basicSettings')}</h3>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

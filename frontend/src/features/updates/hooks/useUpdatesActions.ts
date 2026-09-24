@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { updateService } from '@/features/updates/services';
 
 import { queryKeys } from '@/shared/lib/queryKeys';
+import { useT } from '@/i18n';
 const DISMISS_KEY = 'cc-update-dismissed-version';
 
 /**
@@ -11,16 +12,17 @@ const DISMISS_KEY = 'cc-update-dismissed-version';
  */
 export function useUpdatesActions() {
   const queryClient = useQueryClient();
+  const { t } = useT();
 
   // Check for updates mutation
   const checkMutation = useMutation({
     mutationFn: updateService.check,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.updates.status });
-      toast.success('Check completed');
+      toast.success(t('updates:checkCompleted'));
     },
     onError: () => {
-      toast.error('Error checking for updates');
+      toast.error(t('updates:checkFailed'));
     },
   });
 
@@ -29,20 +31,20 @@ export function useUpdatesActions() {
     mutationFn: updateService.applyUpdate,
     onSuccess: async (data) => {
       if (data.success) {
-        const toVersion = data.toVersion || 'latest';
+        const toVersion = data.toVersion || t('updates:latest');
         if (data.toVersion) {
           localStorage.setItem(DISMISS_KEY, data.toVersion);
         }
-        toast.success(`Node-RED updated to ${toVersion}`);
+        toast.success(t('updates:updatedTo', { version: toVersion }));
         await queryClient.invalidateQueries({ queryKey: queryKeys.updates.status });
         await queryClient.invalidateQueries({ queryKey: queryKeys.updates.flowState });
         await queryClient.invalidateQueries({ queryKey: queryKeys.updates.history });
       } else {
-        toast.error(data.message);
+        toast.error(data.message || t('updates:applyFailed'));
       }
     },
     onError: () => {
-      toast.error('Error applying update');
+      toast.error(t('updates:applyFailed'));
     },
   });
 

@@ -9,8 +9,10 @@ import { ConfirmationDialog } from '@/shared/components';
 import { useEnvVarsData, useEnvVarsActions } from '@/features/env-vars/hooks';
 import { useAuth } from '@/features/auth/hooks';
 import { envService } from '@/features/env-vars/services';
+import { useT } from '@/i18n';
 
 export function EnvVarsView() {
+  const { t } = useT();
   const { user } = useAuth();
 
   // Data queries
@@ -113,8 +115,8 @@ export function EnvVarsView() {
   const handleDelete = (key: string) => {
     setConfirmConfig({
       isOpen: true,
-      title: 'Delete environment variable',
-      description: `Are you sure you want to delete ${key}? Node-RED will restart.`,
+      title: t('env-vars:deleteDialogTitle'),
+      description: t('env-vars:deleteDialogDescription', { key }),
       confirmText: key,
       variant: 'danger',
       onConfirm: () => {
@@ -128,8 +130,8 @@ export function EnvVarsView() {
     <div className="space-y-6 p-6">
       <div className="flex justify-between items-center">
         <div>
-          <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">Secrets</p>
-          <h1 className="text-2xl font-bold text-base-content">Environment Variables</h1>
+          <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">{t('env-vars:secretsLabel')}</p>
+          <h1 className="text-2xl font-bold text-base-content">{t('env-vars:pageTitle')}</h1>
         </div>
         {activeTab === 'table' && (
           <div className="flex gap-2">
@@ -138,10 +140,10 @@ export function EnvVarsView() {
               disabled={nodeRedSyncState === 'loading'}
               className="action-btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
               data-testid="import-from-node-red-button"
-              title="Resynchronize environment entries from Node-RED 5 global-config"
+              title={t('env-vars:resyncTitle')}
             >
               <Download className="w-4 h-4" />
-              {nodeRedSyncState === 'loading' ? 'Resyncing…' : 'Resync Node-RED'}
+              {nodeRedSyncState === 'loading' ? t('env-vars:resyncing') : t('env-vars:resyncNodeRed')}
             </button>
             <button
               onClick={() => setIsBulkOpen(true)}
@@ -149,11 +151,11 @@ export function EnvVarsView() {
               data-testid="bulk-import-button"
             >
               <FileStack className="w-4 h-4" />
-              Bulk import
+              {t('env-vars:bulkImport')}
             </button>
             <button onClick={() => openModal()} className="action-btn-primary">
               <Plus className="w-4 h-4" />
-              Add
+              {t('env-vars:add')}
             </button>
           </div>
         )}
@@ -186,13 +188,13 @@ export function EnvVarsView() {
           onClick={() => setActiveTab('table')}
           className={`tab ${activeTab === 'table' ? 'tab-active' : ''}`}
         >
-          Configured
+          {t('env-vars:tabConfigured')}
         </button>
         <button
           onClick={() => setActiveTab('dotenv')}
           className={`tab ${activeTab === 'dotenv' ? 'tab-active' : ''}`}
         >
-          .env file
+          {t('env-vars:tabDotenv')}
         </button>
       </div>
 
@@ -202,25 +204,25 @@ export function EnvVarsView() {
           <table className="w-full">
             <thead className="table-header-subtle">
               <tr>
-                <th className="px-4 py-3 text-left text-sm font-medium text-base-content">Key</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-base-content">Value</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-base-content">Type</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-base-content">Source</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-base-content">Description</th>
-                <th className="px-4 py-3 text-right text-sm font-medium text-base-content">Actions</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-base-content">{t('env-vars:colKey')}</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-base-content">{t('env-vars:colValue')}</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-base-content">{t('env-vars:colType')}</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-base-content">{t('env-vars:colSource')}</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-base-content">{t('env-vars:colDescription')}</th>
+                <th className="px-4 py-3 text-right text-sm font-medium text-base-content">{t('env-vars:colActions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {isLoading ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-base-content/60">
-                    Loading...
+                    {t('common:loading')}
                   </td>
                 </tr>
                 ) : envVars.length === 0 ? (
                   <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-base-content/60">
-                      No environment variables configured
+                      {t('env-vars:noEnvVarsConfigured')}
                     </td>
                   </tr>
                 ) : (

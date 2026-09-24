@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronDown, LogOut } from 'lucide-react';
 import { User } from '@/features/auth/services/authService';
+import { useT } from '@/i18n';
 
 export interface UserMenuProps {
   user: User;
@@ -22,6 +23,7 @@ export function UserMenu({ user, onLogout, logoutBusy = false }: UserMenuProps) 
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const { t } = useT();
 
   // Get deterministic avatar color from username
   const avatarColorIndex = user.username.charCodeAt(0) % AVATAR_COLORS.length;
@@ -96,7 +98,7 @@ export function UserMenu({ user, onLogout, logoutBusy = false }: UserMenuProps) 
            className="absolute bottom-full left-0 mb-2 w-full rounded-xl border border-base-300/60 bg-base-200 shadow-lg transition-all duration-150 origin-bottom animate-slide-up"
          >
            <div className="border-b border-base-300/50 px-4 py-3">
-             <p className="text-xs text-base-content/50 uppercase tracking-widest">Signed in as</p>
+             <p className="text-xs text-base-content/50 uppercase tracking-widest">{t('common:signedInAs')}</p>
              <p className="mt-0.5 font-semibold text-base-content">{user.username}</p>
            </div>
            <div className="p-2 space-y-1">
@@ -106,7 +108,7 @@ export function UserMenu({ user, onLogout, logoutBusy = false }: UserMenuProps) 
                onClick={handleProfile}
                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-base-content/70 transition-colors duration-150 hover:bg-base-300/70 hover:text-base-content"
              >
-               Profile
+               {t('common:profile')}
              </button>
              {/* Logout button */}
              <button
@@ -117,7 +119,7 @@ export function UserMenu({ user, onLogout, logoutBusy = false }: UserMenuProps) 
                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-base-content/70 transition-colors duration-150 hover:bg-error/15 hover:text-error/90 disabled:opacity-50 disabled:cursor-not-allowed"
              >
                <LogOut className="w-4 h-4 shrink-0" />
-               <span>{logoutBusy ? 'Signing out…' : 'Sign out'}</span>
+               <span>{logoutBusy ? t('common:signingOut') : t('common:signOut')}</span>
              </button>
            </div>
         </div>

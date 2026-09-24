@@ -1,6 +1,7 @@
 import { Shield } from 'lucide-react';
 import { InputField, ToggleField } from './FormFields';
 import type { NodeRedConfigFormData } from '@/shared/types';
+import { useT } from '@/i18n';
 
 interface SecuritySettingsProps {
   settings: NodeRedConfigFormData;
@@ -12,15 +13,16 @@ interface SecuritySettingsProps {
 // requireHttps redirect (PR #776). Rotation confirmation lives in
 // ConfigurationView (save time). Hidden when editable=false.
 export function SecuritySettings({ settings, onUpdate, disabled }: SecuritySettingsProps) {
+  const { t } = useT();
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2 mb-4">
         <Shield className="w-5 h-5 text-base-content/60" />
-        <h3 className="text-lg font-medium text-base-content">Security</h3>
+        <h3 className="text-lg font-medium text-base-content">{t('configuration:security')}</h3>
       </div>
 
       <div>
-        <h4 className="mb-3 text-sm font-medium text-base-content/60">Credential Encryption</h4>
+        <h4 className="mb-3 text-sm font-medium text-base-content/60">{t('configuration:credentialEncryption')}</h4>
         <InputField
           label="Credential Secret"
           value={settings.credentialSecret ?? ''}
@@ -33,7 +35,7 @@ export function SecuritySettings({ settings, onUpdate, disabled }: SecuritySetti
       </div>
 
       <div>
-        <h4 className="mb-3 text-sm font-medium text-base-content/60">HTTPS Redirect</h4>
+        <h4 className="mb-3 text-sm font-medium text-base-content/60">{t('configuration:httpsRedirect')}</h4>
         <ToggleField
           label="Require HTTPS"
           value={settings.requireHttps ?? false}
@@ -46,7 +48,7 @@ export function SecuritySettings({ settings, onUpdate, disabled }: SecuritySetti
       {/* TLS settings. Each input is an on-disk path rendered as
           fs.readFileSync(<path>) — certificate bytes never embedded. */}
       <div>
-        <h4 className="mb-3 text-sm font-medium text-base-content/60">TLS (HTTPS Listener)</h4>
+        <h4 className="mb-3 text-sm font-medium text-base-content/60">{t('configuration:tlsHttpsListener')}</h4>
         <p className="mb-3 text-xs text-base-content/60">
           On-disk paths to PEM-encoded files. Node-RED reads each entry through fs.readFileSync at startup; the file must remain readable by the Node-RED process and Node-RED must be restarted for changes to take effect.
         </p>

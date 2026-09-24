@@ -2,6 +2,7 @@ import { Palette } from 'lucide-react';
 import { InputField, ToggleField, SelectField } from './FormFields';
 import { ImageUpload } from './ImageUpload';
 import type { NodeRedConfigFormData } from '@/shared/types';
+import { useT } from '@/i18n';
 
 interface EditorThemeSettingsProps {
   settings: NodeRedConfigFormData;
@@ -10,17 +11,18 @@ interface EditorThemeSettingsProps {
 }
 
 export function EditorThemeSettings({ settings, onUpdate, disabled }: EditorThemeSettingsProps) {
+  const { t } = useT();
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 mb-4">
         <Palette className="w-5 h-5 text-base-content/60" />
-        <h3 className="text-lg font-medium text-base-content">Editor Theme</h3>
+        <h3 className="text-lg font-medium text-base-content">{t('configuration:editorTheme')}</h3>
       </div>
-      
+
       <div className="space-y-6">
         {/* Page Settings */}
         <div>
-          <h4 className="mb-3 text-sm font-medium text-base-content/60">Page</h4>
+          <h4 className="mb-3 text-sm font-medium text-base-content/60">{t('configuration:editorPage')}</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <InputField
               label="Page Title"
@@ -94,7 +96,7 @@ export function EditorThemeSettings({ settings, onUpdate, disabled }: EditorThem
 
         {/* Code Editor */}
         <div>
-          <h4 className="mb-3 text-sm font-medium text-base-content/60">Code Editor</h4>
+          <h4 className="mb-3 text-sm font-medium text-base-content/60">{t('configuration:codeEditor')}</h4>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <SelectField
               label="Editor Library"
@@ -154,7 +156,7 @@ export function EditorThemeSettings({ settings, onUpdate, disabled }: EditorThem
 
         {/* Login Image */}
         <div>
-          <h4 className="mb-3 text-sm font-medium text-base-content/60">Login Screen</h4>
+          <h4 className="mb-3 text-sm font-medium text-base-content/60">{t('configuration:loginScreen')}</h4>
           <ImageUpload
             label="Login Background Image"
             value={settings.editorLoginImage}

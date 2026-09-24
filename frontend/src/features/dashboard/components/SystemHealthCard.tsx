@@ -2,12 +2,14 @@ import { AlertTriangle, CheckCircle2, Link as LinkIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { HostStatus } from '@/shared/types';
 import { getSystemHealthIssues } from '../lib';
+import { useT } from '@/i18n';
 
 interface SystemHealthCardProps {
   host?: HostStatus;
 }
 
 export function SystemHealthCard({ host }: SystemHealthCardProps) {
+  const { t } = useT();
   if (!host) {
     return null;
   }
@@ -24,15 +26,15 @@ export function SystemHealthCard({ host }: SystemHealthCardProps) {
             <AlertTriangle className="h-5 w-5 text-warning" />
           )}
           <div>
-            <span className="text-sm font-medium">System Health</span>
+            <span className="text-sm font-medium">{t('dashboard:systemHealth')}</span>
             <p className="mt-0.5 text-xs text-body-secondary">
-              {host.ready ? 'Environment OK' : 'Check environment for issues'}
+              {host.ready ? t('dashboard:environmentOk') : t('dashboard:checkEnvironment')}
             </p>
           </div>
         </div>
         <Link to="/bootstrap" className="btn btn-ghost btn-sm gap-1 text-xs">
           <LinkIcon className="h-3.5 w-3.5" />
-          View Details
+          {t('common:viewDetails')}
         </Link>
       </div>
 

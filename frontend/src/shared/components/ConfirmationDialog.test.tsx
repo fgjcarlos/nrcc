@@ -1,9 +1,8 @@
+import { i18n } from '@/i18n';
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { ConfirmationDialog } from './ConfirmationDialog';
-import { UI_COPY } from '@/shared/constants/uiCopy';
-
 describe('ConfirmationDialog', () => {
   it('renders when isOpen is true', () => {
     render(
@@ -18,8 +17,8 @@ describe('ConfirmationDialog', () => {
 
     expect(screen.getByText('Delete User')).toBeInTheDocument();
     expect(screen.getByText('Are you sure?')).toBeInTheDocument();
-    expect(screen.getByText(UI_COPY.cancel)).toBeInTheDocument();
-    expect(screen.getByText(UI_COPY.confirm)).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('common:cancel'))).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('common:confirm'))).toBeInTheDocument();
   });
 
   it('exposes dialog semantics for assistive technology (#296)', () => {
@@ -73,11 +72,11 @@ describe('ConfirmationDialog', () => {
       />
     );
 
-    const cancel = await screen.findByRole('button', { name: UI_COPY.cancel });
+    const cancel = await screen.findByRole('button', { name: i18n.t('common:cancel') });
     await waitFor(() => expect(cancel).toHaveFocus());
 
     const close = screen.getByRole('button', { name: 'Close dialog' });
-    const confirm = screen.getByRole('button', { name: UI_COPY.confirm });
+    const confirm = screen.getByRole('button', { name: i18n.t('common:confirm') });
     close.focus();
     await user.tab({ shift: true });
     expect(confirm).toHaveFocus();
@@ -111,9 +110,9 @@ describe('ConfirmationDialog', () => {
     );
 
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: UI_COPY.cancel })).toHaveFocus()
+      expect(screen.getByRole('button', { name: i18n.t('common:cancel') })).toHaveFocus()
     );
-    const confirm = screen.getByRole('button', { name: UI_COPY.confirm });
+    const confirm = screen.getByRole('button', { name: i18n.t('common:confirm') });
     confirm.focus();
     await user.keyboard('{Enter}');
 
@@ -146,7 +145,7 @@ describe('ConfirmationDialog', () => {
       />
     );
 
-    await userEvent.click(screen.getByText(UI_COPY.cancel));
+    await userEvent.click(screen.getByText(i18n.t('common:cancel')));
     expect(onCancel).toHaveBeenCalled();
   });
 
@@ -162,7 +161,7 @@ describe('ConfirmationDialog', () => {
       />
     );
 
-    await userEvent.click(screen.getByText(UI_COPY.confirm));
+    await userEvent.click(screen.getByText(i18n.t('common:confirm')));
     expect(onConfirm).toHaveBeenCalled();
   });
 
@@ -229,7 +228,7 @@ describe('ConfirmationDialog', () => {
       />
     );
 
-    expect(screen.getByText(UI_COPY.typeToConfirmDelete('username'))).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('common:typeToConfirmDelete', { identifier: 'username' }))).toBeInTheDocument();
   });
 
   it('disables confirm button when confirmText does not match input', async () => {
@@ -247,7 +246,7 @@ describe('ConfirmationDialog', () => {
     const input = screen.getByPlaceholderText('username');
     await userEvent.type(input, 'wrong');
 
-    const confirmBtn = screen.getByRole('button', { name: UI_COPY.confirm });
+    const confirmBtn = screen.getByRole('button', { name: i18n.t('common:confirm') });
     expect(confirmBtn).toBeDisabled();
   });
 
@@ -267,7 +266,7 @@ describe('ConfirmationDialog', () => {
     const input = screen.getByPlaceholderText('username') as HTMLInputElement;
     await userEvent.type(input, 'username');
 
-    const confirmBtn = screen.getByRole('button', { name: UI_COPY.confirm });
+    const confirmBtn = screen.getByRole('button', { name: i18n.t('common:confirm') });
     expect(confirmBtn).not.toBeDisabled();
 
     await userEvent.click(confirmBtn);
@@ -286,7 +285,7 @@ describe('ConfirmationDialog', () => {
       />
     );
 
-    expect(screen.getByText(UI_COPY.processing)).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('common:processing'))).toBeInTheDocument();
   });
 
   it('disables buttons when isPending is true', () => {
@@ -301,8 +300,8 @@ describe('ConfirmationDialog', () => {
       />
     );
 
-    const cancelBtn = screen.getByText(UI_COPY.cancel);
-    const confirmBtn = screen.getByText(UI_COPY.processing);
+    const cancelBtn = screen.getByText(i18n.t('common:cancel'));
+    const confirmBtn = screen.getByText(i18n.t('common:processing'));
 
     expect(cancelBtn).toBeDisabled();
     expect(confirmBtn).toBeDisabled();
@@ -320,7 +319,7 @@ describe('ConfirmationDialog', () => {
       />
     );
 
-    const confirmBtn = screen.getByText(UI_COPY.confirm);
+    const confirmBtn = screen.getByText(i18n.t('common:confirm'));
     expect(confirmBtn).toHaveClass('bg-error');
   });
 
@@ -357,7 +356,7 @@ describe('ConfirmationDialog', () => {
 
     const ack = screen.getByTestId('confirmation-dialog-ack');
     expect(ack).not.toBeChecked();
-    const confirmBtn = screen.getByRole('button', { name: UI_COPY.confirm });
+    const confirmBtn = screen.getByRole('button', { name: i18n.t('common:confirm') });
     expect(confirmBtn).toBeDisabled();
 
     await user.click(ack);
@@ -379,7 +378,7 @@ describe('ConfirmationDialog', () => {
       />
     );
 
-    const confirmBtn = screen.getByRole('button', { name: UI_COPY.confirm });
+    const confirmBtn = screen.getByRole('button', { name: i18n.t('common:confirm') });
     const ack = screen.getByTestId('confirmation-dialog-ack');
     const input = screen.getByPlaceholderText('settings.js') as HTMLInputElement;
 
@@ -436,6 +435,6 @@ describe('ConfirmationDialog', () => {
 
     // Re-opened dialog should not carry the previous tick.
     expect(screen.getByTestId('confirmation-dialog-ack')).not.toBeChecked();
-    expect(screen.getByRole('button', { name: UI_COPY.confirm })).toBeDisabled();
+    expect(screen.getByRole('button', { name: i18n.t('common:confirm') })).toBeDisabled();
   });
 });

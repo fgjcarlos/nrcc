@@ -8,6 +8,7 @@ import { useAuth } from '@/features/auth/hooks/useAuth';
 import { authService } from '@/features/auth/services/authService';
 import { ErrorBoundary } from '@/shared/components/layout/ErrorBoundary';
 import { Button } from '@/shared/components/ui/Button';
+import { useT, I18nProvider } from '@/i18n';
 
 function lazyNamed<T extends ComponentType<object>>(
   importer: () => Promise<Record<string, T>>,
@@ -65,30 +66,32 @@ const BackupsView = lazyNamed(
 );
 
 function RouteLoadingFallback({ label }: { label: string }) {
+  const { t } = useT();
   return (
     <div className="flex min-h-[24rem] flex-col items-center justify-center gap-3 rounded-box border border-base-300 bg-base-100 p-8 text-center shadow-sm">
       <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden="true" />
       <div>
-        <p className="font-medium text-base-content">Loading {label}</p>
-        <p className="text-sm text-base-content/60">Preparing this section...</p>
+        <p className="font-medium text-base-content">{t('common:loadingWithLabel', { label })}</p>
+        <p className="text-sm text-base-content/60">{t('common:preparingSection')}</p>
       </div>
     </div>
   );
 }
 
 function RouteErrorFallback({ label, onRetry }: { label: string; onRetry: () => void }) {
+  const { t } = useT();
   return (
     <div className="rounded-box border border-error/20 bg-error/8 p-6 shadow-sm">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
         <AlertCircle className="mt-0.5 h-6 w-6 flex-shrink-0 text-error" aria-hidden="true" />
         <div className="flex-1">
-          <h2 className="text-lg font-semibold text-base-content">Unable to load {label}</h2>
+          <h2 className="text-lg font-semibold text-base-content">{t('common:unableToLoad', { label })}</h2>
           <p className="mt-1 text-sm text-base-content/70">
-            This route failed to load. You can retry without leaving the current page.
+            {t('common:routeLoadFailed')}
           </p>
         </div>
         <Button type="button" onClick={onRetry} variant="secondary" size="sm">
-          Try again
+          {t('common:tryAgain')}
         </Button>
       </div>
     </div>
@@ -200,12 +203,14 @@ function NavigatorRegistrar() {
 
 function App() {
   return (
-    <BrowserRouter>
-      <ErrorBoundary>
-        <NavigatorRegistrar />
-        <AppRoutes />
-      </ErrorBoundary>
-    </BrowserRouter>
+    <I18nProvider>
+      <BrowserRouter>
+        <ErrorBoundary>
+          <NavigatorRegistrar />
+          <AppRoutes />
+        </ErrorBoundary>
+      </BrowserRouter>
+    </I18nProvider>
   );
 }
 

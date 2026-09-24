@@ -4,6 +4,7 @@ import { useUpdateStatus } from '@/features/updates/hooks';
 import { useUpdateFlowState } from '@/features/updates/hooks';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useState, useEffect } from 'react';
+import { useT } from '@/i18n';
 
 const DISMISS_KEY = 'cc-update-dismissed-version';
 
@@ -13,6 +14,7 @@ export function UpdateNotificationChip() {
   const { data: flowState } = useUpdateFlowState();
   const { user } = useAuth();
   const [dismissed, setDismissed] = useState<string | null>(null);
+  const { t } = useT();
 
   // Load dismissed version from localStorage on mount
   useEffect(() => {
@@ -43,20 +45,20 @@ export function UpdateNotificationChip() {
       <div
         className="flex items-center gap-2 px-3 py-2 rounded-lg bg-success/10 text-success"
         role="alert"
-        aria-label="Update available"
+        aria-label={t('updates:updateAvailable')}
       >
         <button
           onClick={handleClick}
           className="flex items-center gap-2 flex-1 hover:opacity-80 transition-opacity"
-          aria-label="Update available, click to go to updates page"
+          aria-label={t('updates:availableAria')}
         >
           <ArrowUpCircle className="w-4 h-4 flex-shrink-0" />
-          <span className="text-sm font-medium">Update available</span>
+          <span className="text-sm font-medium">{t('updates:updateAvailable')}</span>
         </button>
         <button
           onClick={handleDismiss}
           className="ml-2 p-0.5 rounded hover:bg-success/20 opacity-60 hover:opacity-100 transition-all flex-shrink-0"
-          aria-label="Dismiss update notification"
+          aria-label={t('updates:dismiss')}
         >
           <X className="w-3 h-3" />
         </button>
@@ -71,11 +73,11 @@ export function UpdateNotificationChip() {
         className="flex items-center gap-2 px-3 py-2 rounded-lg bg-accent/10 text-accent"
         role="status"
         aria-live="polite"
-        aria-label="Update in progress"
+        aria-label={t('updates:inProgress')}
       >
         <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
         <span className="text-sm font-medium">
-          {flowState?.state === 'BackingUp' ? 'Backing up...' : 'Updating...'}
+          {flowState?.state === 'BackingUp' ? t('updates:backingUp') : t('updates:updating')}
         </span>
       </div>
     );
@@ -87,10 +89,10 @@ export function UpdateNotificationChip() {
       <div
         className="flex items-center gap-2 px-3 py-2 rounded-lg bg-success/10 text-success"
         role="status"
-        aria-label="Update completed"
+        aria-label={t('updates:completed')}
       >
         <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-        <span className="text-sm font-medium">Updated</span>
+        <span className="text-sm font-medium">{t('updates:upToDate')}</span>
       </div>
     );
   }

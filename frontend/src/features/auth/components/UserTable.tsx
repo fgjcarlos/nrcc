@@ -1,5 +1,5 @@
 import { type User } from '@/features/auth/services/authService';
-import { UI_COPY } from '@/shared/constants/uiCopy';
+import { useT } from '@/i18n';
 
 interface UserTableProps {
   users: User[];
@@ -18,6 +18,7 @@ export function UserTable({
   onDelete,
   onChangePassword,
 }: UserTableProps) {
+  const { t } = useT();
   return (
     <>
       {/* Desktop table (md+) */}
@@ -26,16 +27,16 @@ export function UserTable({
           <thead className="table-header-subtle">
             <tr>
               <th className="px-4 py-3 text-left text-sm font-medium text-base-content">
-                {UI_COPY.usernameLabel}
+                {t('auth:usernameLabel')}
               </th>
               <th className="px-4 py-3 text-left text-sm font-medium text-base-content">
-                {UI_COPY.roleLabel}
+                {t('auth:roleLabel')}
               </th>
               <th className="px-4 py-3 text-left text-sm font-medium text-base-content">
-                {UI_COPY.createdLabel}
+                {t('auth:createdLabel')}
               </th>
               <th className="px-4 py-3 text-right text-sm font-medium text-base-content">
-                {UI_COPY.actions}
+                {t('backups:actions')}
               </th>
             </tr>
           </thead>
@@ -62,20 +63,20 @@ export function UserTable({
                     onClick={() => onEdit(user)}
                     className="text-sm text-primary transition-colors hover:text-primary/80"
                   >
-                    {UI_COPY.editUser}
+                    {t('auth:editUser')}
                   </button>
                   <button
                     onClick={() => onChangePassword(user)}
                     className="text-sm text-primary transition-colors hover:text-primary/80"
                   >
-                    {UI_COPY.changePassword}
+                    {t('auth:changePassword')}
                   </button>
                   <button
                     onClick={() => onDelete(user)}
                     disabled={user.id === currentUserId || (user.role === 'admin' && adminCount === 1)}
                     className="text-sm text-error transition-colors hover:text-error/80 disabled:text-base-content/40 disabled:cursor-not-allowed"
                   >
-                    {UI_COPY.delete}
+                    {t('common:delete')}
                   </button>
                 </td>
               </tr>
@@ -91,14 +92,14 @@ export function UserTable({
             <div className="space-y-3">
               <div>
                 <p className="text-xs text-base-content/60 uppercase tracking-wider">
-                  {UI_COPY.usernameLabel}
+                  {t('auth:usernameLabel')}
                 </p>
                 <p className="text-base font-medium text-base-content">{user.username}</p>
               </div>
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-base-content/60 uppercase tracking-wider">
-                    {UI_COPY.roleLabel}
+                    {t('auth:roleLabel')}
                   </p>
                   <span
                     className={`inline-block rounded-full px-2 py-1 text-xs ${
@@ -112,7 +113,7 @@ export function UserTable({
                 </div>
                 <div>
                   <p className="text-xs text-base-content/60 uppercase tracking-wider">
-                    {UI_COPY.createdLabel}
+                    {t('auth:createdLabel')}
                   </p>
                   <p className="text-sm text-base-content/60">
                     {new Date(user.createdAt).toLocaleDateString()}
@@ -124,20 +125,20 @@ export function UserTable({
                   onClick={() => onEdit(user)}
                   className="flex-1 text-sm text-primary transition-colors hover:text-primary/80"
                 >
-                  {UI_COPY.editUser}
+                  {t('auth:editUser')}
                 </button>
                 <button
                   onClick={() => onChangePassword(user)}
                   className="flex-1 text-sm text-primary transition-colors hover:text-primary/80"
                 >
-                  {UI_COPY.changePassword}
+                  {t('auth:changePassword')}
                 </button>
                 <button
                   onClick={() => onDelete(user)}
                   disabled={user.id === currentUserId || (user.role === 'admin' && adminCount === 1)}
                   className="flex-1 text-sm text-error transition-colors hover:text-error/80 disabled:text-base-content/40 disabled:cursor-not-allowed"
                 >
-                  {UI_COPY.delete}
+                  {t('common:delete')}
                 </button>
               </div>
             </div>

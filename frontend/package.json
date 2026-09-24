@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "packageManager": "pnpm@11.12.0",
+  "packageManager": "pnpm@11.12.0+sha512.820a6fbd0d9f04c226638002aead1e45340a9139dd5dc077c1d83ef44aa2481c8eb6637b4c9aa696a3c7e35ba818e49cf27213e5f2b91138d09b7a3e26e898ba",
   "engines": {
     "pnpm": ">=11.12.0 <12"
   },
@@ -18,6 +18,8 @@
     "test:e2e": "playwright test",
     "test:e2e:stack": "playwright test --config playwright.stack.config.ts",
     "typecheck": "tsc --noEmit",
+    "i18n:check": "node scripts/check-no-hardcoded-i18n.mjs",
+    "i18n:coverage": "node scripts/i18n-coverage.mjs",
     "gen:api": "openapi-typescript ../docs/openapi.yaml -o src/shared/api/schema.ts"
   },
   "dependencies": {
@@ -26,10 +28,13 @@
     "axios": "^1.20.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "i18next": "^26.4.2",
+    "i18next-browser-languagedetector": "^8.2.1",
     "lucide-react": "^1.46.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-hook-form": "^7.87.0",
+    "react-i18next": "^17.0.15",
     "react-router-dom": "^7.18.3",
     "recharts": "^3.10.1",
     "sonner": "^2.0.8",
