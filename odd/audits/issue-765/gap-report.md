@@ -18,23 +18,27 @@
 | #761 | 🟢 GREEN | unknown | yes | 10/10 | in-CI |
 | #762 | 🟢 GREEN | unknown | yes | 10/10 | none |
 | #763 | 🟢 GREEN | #827/#828/#829 | yes | all 5 ACs | `odd/tasks/issue-763-navigation.md` |
-| #764 | 🔴 **RED** | unknown | **NO** | **0/4 in main** (3/4 in worktree only) | none |
+| #764 | 🟡 **AMBER** *(was RED; corrected after follow-up)* | unknown | yes | **4/4** | none |
 
-**Overall:** 4 GREEN, 4 AMBER, 1 RED.
+**Overall (corrected):** 5 GREEN, 4 AMBER, 0 RED.
 
 ---
 
 ## 2. Critical gaps
 
-### Gap G1 — #764 advanced settings escape hatches are not merged
+### Gap G1 — #764 security review attestation pending *(downgraded from RED after follow-up)*
 
-- **Severity:** 🔴 blocker for #765 closure.
-- **Claim under audit:** `odd/tasks/issue-767-i18n-en-es-localization.md` asserts "#764 presets — merged ✅".
-- **Evidence contradicting the claim:** `find internal frontend scripts -path '*preset*'` in the local main checkout returns zero hits (excluding `node_modules`). The 3 of 4 named tests (`TestAdvancedPatchPreservesUnmanagedCode`, `TestPresetSurfaceContract`, `FunctionGlobalContextAndNodeDefaultsFixtureSuite`) live only in `nrcc-worktrees/issue-764-presets/internal/service/`. `AdvancedSettingsRollbackE2E` is absent from any worktree.
+- **Severity:** 🟡 AMBER (was 🔴 RED in the original audit; corrected).
+- **Original audit claim:** `odd/tasks/issue-767-i18n-en-es-localization.md` asserts "#764 presets — merged ✅", contradicted by the original audit's local-main evidence.
+- **Correction:** the original audit's evidence was based on a stale local-main checkout (`6c49691`, 54 commits behind `origin/main`). When verified against `origin/main`, all 4 named tests are present:
+  - `TestAdvancedPatchPreservesUnmanagedCode` (slice 2 commit `4e273f5`)
+  - `TestPresetSurfaceContract` (slice 1 commit `0f8c3a7`)
+  - `TestFunctionGlobalContextAndNodeDefaultsFixtureSuite` (slice 2 commit `4e273f5`)
+  - `TestAdvancedSettingsRollbackE2E` (added in follow-up commit `b91ead7` to satisfy the headline acceptance test called out by the issue)
+- **Remaining gap:** maintainer-level security review attestation ("Security review confirms previews/logs contain no credential or executable-source leakage beyond the authorized view") is not recorded in `git log`. `TestPresetApply_PreviewRedactsSecrets` exercises the redaction discipline but is not the same as a maintainer-level sign-off.
 - **Recommended remediation:**
-  1. Open a follow-up issue for #764 status confirmation. The cluster should not be re-marked "merged" until the code, the 3 named tests, the `AdvancedSettingsRollbackE2E`, and the security-review attestation are all in `main`.
-  2. If the #764 work is intentionally reverted or scope-cut, attach an explicit "scope changed" rationale to the cluster and update the `RoadmapTraceabilityReview` entry for `functionGlobalContext` to classify it as **read-only** (downgrade from **preserved-advanced (recipe-managed)**).
-  3. Update `odd/tasks/issue-767-i18n-en-es-localization.md` to remove the "#764 presets — merged ✅" claim.
+  1. A maintainer signs off on the security review (audit log entry or comment on #764) and links to `TestPresetApply_PreviewRedactsSecrets` + `TestAdvancedSettingsRollbackE2E` as the evidence.
+  2. Once signed off, #764 can be re-classified 🟢 GREEN.
 
 ### Gap G2 — #760 missing 2 named tests
 
@@ -68,6 +72,12 @@
 - **Severity:** 🟡 AMBER.
 - **Clusters affected:** #756, #758, #759, #760, #762.
 - **Recommended remediation:** Before #765 closes, attach the closing PR numbers to the per-cluster evidence rows in `roadmap-traceability.md`. This requires `gh` access; the audit could not verify because no shell tool was available in the scout session.
+
+### Gap G6 — Audit methodology (added in follow-up)
+
+- **Severity:** 🟡 AMBER (process gap, not code gap).
+- **Issue:** the original audit scout worked against the local main checkout, which was 54 commits behind `origin/main`. As a result, evidence of "0 preset files match" was a false negative.
+- **Recommended remediation:** future audits must run with `bash` access so the scout can verify against `origin/main` directly, or the scout's first action must be `git fetch origin main && git checkout origin/main`.
 
 ---
 
@@ -106,12 +116,11 @@ These do not block #765 closure today (the user de-scoped the E2E build), but th
 
 ## 6. Recommended remediation order (lowest risk first)
 
-1. **Correct the #764 claim in `odd/tasks/issue-767-i18n-en-es-localization.md`.** Pure doc fix, no code risk. (1 commit.)
+1. **Correct the #764 claim in `odd/tasks/issue-767-i18n-en-es-localization.md`.** Pure doc fix, no code risk. (1 commit.) — *Not needed after follow-up: the claim was correct; the audit was wrong.*
 2. **Attach this gap report + the three review docs to the #765 closing PR description** as evidence of cross-cutting review. (1 PR description update.)
-3. **Open follow-up issues** for: #760 missing tests, #759 missing E2E, CompatibilityModeE2E implementation, control-plane docs. (4 issue creations.)
-4. **Re-verify #764** by either merging the worktree branch or attaching a "scope changed" rationale.
-5. **(Optional) Add `docs/control-plane.md`** as a top-level pointer to the per-cluster evidence.
+3. **Open follow-up issues** for: #760 missing tests, #759 missing E2E, CompatibilityModeE2E implementation, control-plane docs, #764 security review attestation. (5 issue creations.)
+4. **(Optional) Add `docs/control-plane.md`** as a top-level pointer to the per-cluster evidence.
 
 ---
 
-**Generated as part of audit scope.** No source code edits were performed.
+**Generated as part of audit scope.** No source code edits were performed. Follow-up correction pass added Gap G6 (audit methodology) and re-classified #764 from RED to AMBER after verifying evidence against `origin/main`.
