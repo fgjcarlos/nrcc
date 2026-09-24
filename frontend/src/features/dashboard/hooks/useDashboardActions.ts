@@ -5,6 +5,7 @@ import { dashboardService } from '../services';
 
 import { queryKeys } from '@/shared/lib/queryKeys';
 import { useT } from '@/i18n';
+
 interface UseDashboardActionsOptions {
   uiPort?: number;
 }
@@ -118,12 +119,14 @@ export function useDashboardActions({ uiPort }: UseDashboardActionsOptions) {
   };
 
   const handleOpenNodeRed = () => {
-    const url = new URL(window.location.href);
-    url.port = String(uiPort || 1880);
-    url.pathname = '/';
-    url.search = '';
-    url.hash = '';
-    window.open(url.toString(), '_blank', 'noopener,noreferrer');
+    // Validate uiPort is a positive integer in the valid TCP port range
+    // before constructing the loopback URL. Defends against misconfigured
+    // backend responses or env injection. Mirrors the same guard used by
+    // the Open Node-RED Editor command in CommandPalette so the two entry
+    // points cannot drift apart.
+    const parsed = Number.parseInt(String(uiPort), 10);
+    const safePort = Number.isInteger(parsed) && parsed >= 1 && parsed <= 65535 ? parsed : 1880;
+    window.open(`http://localhost:${safePort}`, '_blank', 'noopener,noreferrer');
   };
 
   return {
