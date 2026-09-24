@@ -20,6 +20,15 @@ jobs:
         # actions/checkout v7.0.0
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
+      # corepack must run BEFORE actions/setup-node with cache: pnpm so the
+      # cache lookup finds pnpm on PATH. Mirrors the pattern in pr.yml so the
+      # two workflows cannot drift apart.
+      - name: Setup pnpm via corepack
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.12.0 --activate
+          pnpm --version
+
       - name: Set up Node.js
         # actions/setup-node v7.0.0
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
@@ -27,11 +36,6 @@ jobs:
           node-version: "22"
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
-
-      - name: Set up pnpm via corepack
-        run: |
-          corepack enable
-          corepack prepare pnpm@11.12.0 --activate
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -50,6 +54,15 @@ jobs:
         # actions/checkout v7.0.0
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
+      # corepack must run BEFORE actions/setup-node with cache: pnpm so the
+      # cache lookup finds pnpm on PATH. Mirrors the pattern in pr.yml so the
+      # two workflows cannot drift apart.
+      - name: Setup pnpm via corepack
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.12.0 --activate
+          pnpm --version
+
       - name: Set up Node.js
         # actions/setup-node v7.0.0
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
@@ -57,11 +70,6 @@ jobs:
           node-version: "22"
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
-
-      - name: Set up pnpm via corepack
-        run: |
-          corepack enable
-          corepack prepare pnpm@11.12.0 --activate
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
