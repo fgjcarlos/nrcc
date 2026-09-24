@@ -51,5 +51,11 @@
   "liveTelemetry": "Telemetría en vivo",
   "systemHealth": "Salud del sistema",
   "environmentOk": "Entorno OK",
-  "checkEnvironment": "Revisa el entorno por problemas"
+  "checkEnvironment": "Revisa el entorno por problemas",
+  "runtimeCard": {
+    "title": "Runtime",
+    "restartButton": "Reiniciar",
+    "restartingButton": "Reiniciando…",
+    "openButton": "Abrir"
+  }
 }

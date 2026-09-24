@@ -51,5 +51,11 @@
   "liveTelemetry": "Live telemetry",
   "systemHealth": "System Health",
   "environmentOk": "Environment OK",
-  "checkEnvironment": "Check environment for issues"
+  "checkEnvironment": "Check environment for issues",
+  "runtimeCard": {
+    "title": "Runtime",
+    "restartButton": "Restart",
+    "restartingButton": "Restarting…",
+    "openButton": "Open"
+  }
 }

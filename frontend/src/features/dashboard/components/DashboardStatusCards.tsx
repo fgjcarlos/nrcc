@@ -7,6 +7,7 @@ import { getDeploymentLabel } from '../lib';
 import { useSystemHistory } from '../hooks/useSystemHistory';
 import { LazyMetricsChart as MetricsChart } from './LazyMetricsChart';
 import { cn } from '@/shared/lib';
+import { useT } from '@/i18n';
 
 interface DashboardStatusCardsProps {
   container?: DashboardContainerStatus | null;
@@ -35,13 +36,14 @@ function RuntimeCard({
   DashboardStatusCardsProps,
   'container' | 'host' | 'runtime' | 'inDocker' | 'isRestarting' | 'onRequestRestart' | 'onOpenNodeRed'
 >) {
+  const { t } = useT();
   const runtimeStatus = runtime?.status ?? (host?.nodeRed.running ? 'running' : 'unknown');
 
   return (
     <div className="p-6 border card surface-card border-border">
       <div className="flex items-center gap-3">
         <Server className="w-5 h-5 text-body-secondary" />
-        <span className="text-sm font-medium">Runtime</span>
+        <span className="text-sm font-medium">{t('dashboard:runtimeCard.title')}</span>
       </div>
       {inDocker ? (
         <>
@@ -68,7 +70,9 @@ function RuntimeCard({
             <RefreshCw className={cn('w-4 h-4', isRestarting && 'animate-spin')} />
           </div>
           <span className="text-base font-medium">
-            {isRestarting ? 'Reiniciando…' : 'Reiniciar'}
+            {isRestarting
+              ? t('dashboard:runtimeCard.restartingButton')
+              : t('dashboard:runtimeCard.restartButton')}
           </span>
         </button>
         <button
@@ -78,7 +82,7 @@ function RuntimeCard({
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-info/10 text-info transition-colors group-hover:bg-info/20">
             <ExternalLink className="w-4 h-4" />
           </div>
-          <span className="text-base font-medium">Abrir</span>
+          <span className="text-base font-medium">{t('dashboard:runtimeCard.openButton')}</span>
         </button>
       </div>
     </div>
