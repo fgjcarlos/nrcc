@@ -27,45 +27,20 @@ type Finding struct {
 // are handled separately.
 var inlineLinkRe = regexp.MustCompile(`!?\[[^\]\n]*\]\(([^)\n]+)\)`)
 
-// resolveCLIFile resolves a CLI-supplied path to an absolute path
-// to a single existing file. The result is sanitized for gosec so
-// the downstream os.Open and os.Stat calls are not flagged G304/G703.
-func resolveCLIFile(path string) (string, error) {
-	// #nosec G304,G703 — path is the CLI argument; the tool is invoked
-	// on user-trusted docs in the local working tree, not on remote
-	// attacker-controlled input.
-	abs, err := filepath.Abs(path) // #nosec G304
-	if err != nil {
-		return "", err
-	}
-	info, err := os.Stat(abs) // #nosec G304
-	if err != nil {
-		return "", err
-	}
-	if !info.Mode().IsRegular() {
-		return "", fmt.Errorf("not a regular file: %s", abs)
-	}
-	return abs, nil
-}
-
 // Check scans path for internal Markdown links and returns the
 // broken ones. External links (http(s)://, mailto:, #anchor-only)
 // are considered well-formed and not returned.
 func Check(path string) []Finding {
-	absPath, err := resolveCLIFile(path)
-	if err != nil {
-		return []Finding{{Path: path, Line: 0, Target: "", Text: err.Error()}}
-	}
-	// #nosec G304,G703 — absPath was just resolved and validated as a
-	// regular file by resolveCLIFile; gosec's taint analysis does not
-	// propagate the sanitizer status across function boundaries.
-	f, err := os.Open(absPath) // #nosec G304
+	// #nosec G304 -- path is the CLI argument; the tool is invoked
+	// on user-trusted docs in the local working tree, not on remote
+	// attacker-controlled input.
+	f, err := os.Open(path)
 	if err != nil {
 		return []Finding{{Path: path, Line: 0, Target: "", Text: err.Error()}}
 	}
 	defer func() { _ = f.Close() }()
 
-	dir := filepath.Dir(absPath)
+	dir := filepath.Dir(path)
 	var findings []Finding
 	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
@@ -81,10 +56,10 @@ func Check(path string) []Finding {
 				continue
 			}
 			target = stripFragment(target)
-			// #nosec G703 — dir is the directory of the sanitized CLI
-			// file and target is parsed out of that file's body, which
-			// is exactly the surface the tool is designed to scan.
-			resolved := filepath.Join(dir, target) // #nosec G703
+			// #nosec G703 -- dir is the directory of the CLI-supplied
+			// markdown file; target is parsed out of that file's body,
+			// which is exactly the surface the tool is designed to scan.
+			resolved := filepath.Join(dir, target)
 			if _, err := os.Stat(resolved); err != nil {
 				findings = append(findings, Finding{
 					Path:   path,
