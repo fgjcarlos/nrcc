@@ -31,11 +31,14 @@ var inlineLinkRe = regexp.MustCompile(`!?\[[^\]\n]*\]\(([^)\n]+)\)`)
 // to a single existing file. The result is sanitized for gosec so
 // the downstream os.Open and os.Stat calls are not flagged G304/G703.
 func resolveCLIFile(path string) (string, error) {
-	abs, err := filepath.Abs(path)
+	// #nosec G304,G703 — path is the CLI argument; the tool is invoked
+	// on user-trusted docs in the local working tree, not on remote
+	// attacker-controlled input.
+	abs, err := filepath.Abs(path) // #nosec G304
 	if err != nil {
 		return "", err
 	}
-	info, err := os.Stat(abs)
+	info, err := os.Stat(abs) // #nosec G304
 	if err != nil {
 		return "", err
 	}
@@ -53,10 +56,10 @@ func Check(path string) []Finding {
 	if err != nil {
 		return []Finding{{Path: path, Line: 0, Target: "", Text: err.Error()}}
 	}
-	// #nosec G304 — absPath was just resolved and validated as a regular
-	// file by resolveCLIFile; gosec's taint analysis does not propagate
-	// the sanitizer status across function boundaries.
-	f, err := os.Open(absPath)
+	// #nosec G304,G703 — absPath was just resolved and validated as a
+	// regular file by resolveCLIFile; gosec's taint analysis does not
+	// propagate the sanitizer status across function boundaries.
+	f, err := os.Open(absPath) // #nosec G304
 	if err != nil {
 		return []Finding{{Path: path, Line: 0, Target: "", Text: err.Error()}}
 	}
@@ -78,10 +81,10 @@ func Check(path string) []Finding {
 				continue
 			}
 			target = stripFragment(target)
-			// #nosec G703 — dir is the directory of the sanitized CLI file
-			// and target is parsed out of that file's body, which is
-			// exactly the surface the tool is designed to scan.
-			resolved := filepath.Join(dir, target)
+			// #nosec G703 — dir is the directory of the sanitized CLI
+			// file and target is parsed out of that file's body, which
+			// is exactly the surface the tool is designed to scan.
+			resolved := filepath.Join(dir, target) // #nosec G703
 			if _, err := os.Stat(resolved); err != nil {
 				findings = append(findings, Finding{
 					Path:   path,
