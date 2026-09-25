@@ -1206,3 +1206,24 @@ aside.bg-base-100 {
   padding: 0.75rem 1rem;
   color: var(--ds-text-primary);
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   FOCUS RING — Issue #766 slice B
+   Reusable ds-focus-ring utility. Combines a 2px surface-coloured
+   halo with a 4px accent ring, satisfying WCAG 2.1 SC 2.4.7
+   "Focus Visible" with ≥3:1 contrast against any neighbour. The
+   box-shadow token is defined alongside the colour palette in
+   tailwind.config.js so dark and light themes resolve through the
+   same utility.
+   ═══════════════════════════════════════════════════════════════ */
+
+.ds-focus-ring:focus-visible,
+.ds-focus-ring:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--ds-bg-base, #07090d), 0 0 0 4px var(--ds-accent-primary, #0089b4);
+}
+
+[data-theme="corporateLight"] .ds-focus-ring:focus-visible,
+[data-theme="corporateLight"] .ds-focus-ring:focus {
+  box-shadow: 0 0 0 2px var(--ds-bg-base, #f6f7f9), 0 0 0 4px var(--ds-accent-primary, #007aa0);
+}
