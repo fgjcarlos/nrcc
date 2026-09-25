@@ -25,7 +25,27 @@ function mockAuth(overrides: Parameters<typeof buildAuthMock>[0]) {
 }
 
 describe('navigation redirects', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // jsdom does not implement window.matchMedia. The ThemeToggle
+    // component (partially mocked above to return null) still runs a
+    // useEffect that queries window.matchMedia when @/shared/components
+    // is loaded for the partial mock — the real module is loaded
+    // transiently through vi.importActual and ThemeToggle's body executes
+    // once before the mock applies. Stub matchMedia so the effect
+    // completes without throwing. Mirrors the setup in
+    // App.sidebar.test.tsx, LayoutShell.test.tsx, and LandingView.test.tsx.
+    window.matchMedia = vi.fn().mockImplementation((query) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+  });
 
   it.each([
     ['fresh server', false, false, 'Setup page'],
