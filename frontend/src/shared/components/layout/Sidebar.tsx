@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
-  Blocks,
-  Box,
   ChevronLeft,
   ChevronRight,
   DatabaseBackup,
@@ -18,6 +16,7 @@ import {
 import { cn } from '@/shared/lib/utils';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useT } from '@/i18n';
+import { NrccMark } from '@/shared/components';
 import { UserMenu } from './UserMenu';
 
 const navItems = [
@@ -94,9 +93,7 @@ export function Sidebar() {
         )}>
           {(!collapsed || isMobile) && (
             <div className="flex min-w-0 items-center gap-3">
-              <div className="sidebar-brand-mark grid h-11 w-11 shrink-0 place-items-center rounded-xl border text-primary">
-                <Blocks className="w-5 h-5" />
-              </div>
+              <NrccMark tone="primary" size="md" />
               <div className="min-w-0">
                 <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-base-content/50">Orchestrator</p>
                 <h1 className="truncate text-lg font-bold leading-tight text-base-content">Node-RED</h1>
@@ -105,9 +102,7 @@ export function Sidebar() {
             </div>
           )}
           {collapsed && !isMobile && (
-            <div className="sidebar-brand-mark grid h-10 w-10 place-items-center rounded-xl border text-primary">
-              <Box className="w-5 h-5" />
-            </div>
+            <NrccMark tone="primary" size="sm" />
           )}
           {!isMobile && (
             <button

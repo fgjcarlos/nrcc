@@ -1,5 +1,5 @@
-import { Menu, RadioTower } from 'lucide-react';
-import { ThemeToggle } from '@/shared/components';
+import { Menu } from 'lucide-react';
+import { ThemeToggle, NrccMark } from '@/shared/components';
 import { UpdateNotificationChip } from '@/features/updates/components/UpdateNotificationChip';
 import { CommandPalette } from '@/shared/components/command-palette';
 import { LocaleSwitcher, useT } from '@/i18n';
@@ -24,9 +24,7 @@ export function Header() {
             <Menu className="w-5 h-5" />
           </label>
           <div className="flex min-w-0 items-center gap-3">
-            <div className="topbar-signal-icon flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border text-accent">
-              <RadioTower className="h-5 w-5 stroke-[1.8]" />
-            </div>
+            <NrccMark tone="accent" size="md" />
             <div className="min-w-0 leading-tight">
               <span className="block text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-base-content/55">{t('common:productShortName')}</span>
               <span className="block truncate text-sm font-semibold text-base-content sm:text-base">{t('common:productFullName')}</span>
