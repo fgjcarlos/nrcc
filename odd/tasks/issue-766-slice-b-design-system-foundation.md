@@ -71,8 +71,8 @@ feat/issue-766-slice-b-design-system
 - [x] Slice B: implementation complete (W1..W5 work-unit commits).
 - [x] Slice B: tests pass; typecheck parity with main; no new failures vs origin/main.
 - [x] Slice B: documentation updated.
-- [ ] Slice B: PR open and CI green.
-- [ ] Slice B: merged.
+- [x] Slice B: PR open and CI green (PR #838, run 36187956756 — 13/13).
+- [x] Slice B: merged (commit 385ea33 on main, squash-merge of W1..W5 + W6 docs + ci fix).
 
 ## Slice B commit log (work-unit)
 
