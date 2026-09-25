@@ -640,6 +640,8 @@ export interface SystemInfo {
   uptime: number;
   platform: string;
   hostname: string;
+  /** Detected Node-RED version (for example, "5.0.7"). Optional: older backends omit it. */
+  nodeRedVersion?: string;
   /** Whether NRCC runs in edge mode (EDGE_MODE). Optional: older backends omit it. */
   edgeMode?: boolean;
 }
