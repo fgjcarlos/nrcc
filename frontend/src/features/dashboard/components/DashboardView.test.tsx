@@ -116,7 +116,11 @@ describe('DashboardView', () => {
     // Default-locale EN copy from the dashboard catalog (issue #767/#832).
     expect(screen.getByText('Docker container is not running correctly. Some features may not work.')).toBeInTheDocument()
     expect(screen.getByText('Node.js is not installed. Node-RED has not been detected yet. nrcc cannot write to settings.js.')).toBeInTheDocument()
-    expect(screen.getByText('Check environment for issues')).toBeInTheDocument()
+    // Slice D replaces the SystemHealthCard's "Check environment for
+    // issues" subtitle with the three operational tiles — security
+    // posture (danger), Node-RED health (danger), backup health.
+    expect(screen.getByTestId('overview-security-posture-tile')).toBeInTheDocument()
+    expect(screen.getByTestId('overview-node-red-health-tile')).toBeInTheDocument()
   })
 
   it('renders fallback telemetry placeholders when dashboard data is missing', () => {

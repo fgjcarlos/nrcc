@@ -56,6 +56,30 @@ describe('SecurityPostureTile', () => {
     expect(screen.getByTestId('overview-security-requireHttps').className).toMatch(/bg-ds-success/);
   });
 
+  it('renders the overall danger chip when no surface is enabled', () => {
+    renderTile({
+      adminAuth: false,
+      httpNodeAuth: false,
+      httpStaticAuth: false,
+      requireHttps: false,
+    });
+    const tile = screen.getByTestId('overview-security-posture-tile');
+    const overallChip = tile.querySelector('[role="status"]');
+    expect(overallChip?.className).toMatch(/bg-ds-danger/);
+  });
+
+  it('renders the overall success chip when every surface is enabled', () => {
+    renderTile({
+      adminAuth: true,
+      httpNodeAuth: true,
+      httpStaticAuth: true,
+      requireHttps: true,
+    });
+    const tile = screen.getByTestId('overview-security-posture-tile');
+    const overallChip = tile.querySelector('[role="status"]');
+    expect(overallChip?.className).toMatch(/bg-ds-success/);
+  });
+
   it('exposes a deep link to /security', () => {
     renderTile({
       adminAuth: true,
