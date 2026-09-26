@@ -1,4 +1,35 @@
 {
   "title": "Security",
-  "subtitle": "Authentication surfaces and dashboard access for this Node-RED instance."
+  "subtitle": "Authentication surfaces and dashboard access for this Node-RED instance.",
+  "adminAuthBoundary": {
+    "title": "Node-RED admin auth",
+    "subtitle": "Credentials, session expiry, and the read-only migration flow",
+    "statusOn": "On",
+    "statusOff": "Off",
+    "statusAria": "Node-RED admin auth: {{state}}",
+    "readOnly": "Editing is disabled. The detected runtime configuration is not editable.",
+    "usersLabel": "Users",
+    "addUser": "Add user",
+    "removeUser": "Remove {{username}}",
+    "remove": "Remove",
+    "sessionExpiry": "Session expiry (seconds)",
+    "sessionExpiryLabel": "Session expiry seconds",
+    "username": "Username",
+    "permission": "Permission",
+    "permissionFor": "Permission for {{username}}",
+    "permissionForIndex": "Permission for user {{index}}",
+    "fullAccess": "Full access",
+    "readOnlyPermission": "Read-only",
+    "newPassword": "New password (bcrypt hash)",
+    "noUsers": "No users configured yet.",
+    "save": "Save admin auth",
+    "saving": "Saving…",
+    "applied": "Admin auth applied.",
+    "appliedLabel": "Apply succeeded.",
+    "legacyTitle": "Legacy authentication detected",
+    "legacyBody": "These aliases live outside the canonical surfaces: {{aliases}}. Migration confirmation is required before applying.",
+    "migrationTitle": "Apply authentication migration",
+    "migrationDescription": "Canonical targets: {{aliases}}. Before: legacy aliases with redacted credentials. After: canonical surfaces with redacted credentials.",
+    "migrationAck": "I understand that this explicitly migrates the legacy authentication aliases."
+  }
 }
