@@ -145,3 +145,4 @@ if the resource panels weren't inline-JSX).
 - Slice F — Configuration six-element header pattern + safe-apply.
 - Slice G — a11y + 320 px responsive hardening.
 - Cleanup of legacy `runtimeCard` / `diskUsage` / `localBackups` / `systemHealth` i18n keys once no consumer references them.
+
