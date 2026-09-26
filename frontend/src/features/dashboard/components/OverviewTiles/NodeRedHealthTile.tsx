@@ -125,7 +125,14 @@ export function NodeRedHealthTile({
         </ul>
       )}
 
-      <div className="mt-5 grid grid-cols-3 gap-3" data-testid="overview-node-red-resources">
+      <div
+        className="mt-5"
+        data-testid="resource-metrics"
+      >
+        <p className="text-xs font-medium uppercase tracking-wide text-base-content/65">
+          {scopeLabel(system?.resourceScope, t)}
+        </p>
+        <div className="mt-2 grid grid-cols-3 gap-3" data-testid="overview-node-red-resources">
         <div className="rounded-xl border border-border/60 bg-base-200/30 px-3 py-3 text-xs">
           <div className="flex items-center gap-1.5 text-base-content/45 uppercase tracking-[0.18em]">
             <Cpu className="h-3 w-3" aria-hidden="true" />
@@ -166,6 +173,7 @@ export function NodeRedHealthTile({
               ? `${formatBytes(system.disk.used)} / ${formatBytes(system.disk.total)}`
               : scopeLabel(system?.resourceScope, t)}
           </p>
+        </div>
         </div>
       </div>
 
