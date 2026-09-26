@@ -119,8 +119,8 @@ Each work-unit commit keeps its diff under the < 400 authored-lines PR-review bu
 - [x] Slice C: planning complete.
 - [x] Slice C: implementation complete (4 work-unit commits).
 - [x] Slice C: tests pass; typecheck parity.
-- [ ] Slice C: PR open and CI green.
-- [ ] Slice C: merged.
+- [x] Slice C: PR open and CI green.
+- [x] Slice C: merged.
 
 ## Slice C commit log (work-unit)
 
