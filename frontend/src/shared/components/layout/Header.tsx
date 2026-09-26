@@ -1,13 +1,39 @@
 import { Menu } from 'lucide-react';
-import { ThemeToggle, NrccMark } from '@/shared/components';
+import { StatusChip, ThemeToggle, NrccMark } from '@/shared/components';
 import { UpdateNotificationChip } from '@/features/updates/components/UpdateNotificationChip';
 import { CommandPalette } from '@/shared/components/command-palette';
+import { useAppChrome } from '@/features/system/hooks/useAppChrome';
+import { NodeRedVersionChip } from '@/features/system/components/NodeRedVersionChip';
+import { CompatModeChip } from '@/features/system/components/CompatModeChip';
 import { LocaleSwitcher, useT } from '@/i18n';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
+/**
+ * Header — issue #766 slice C
+ *
+ * The persistent topbar. Slice C turns the right-hand control strip
+ * into a coherent "runtime context" panel: detected Node-RED version,
+ * configuration mode (editable/read-only), edge deployment flag, and
+ * the API base URL. Every chip is built on the StatusChip surface
+ * landed in slice B; nothing in this file invents a new visual
+ * primitive.
+ *
+ * The chips are read from useAppChrome(), which refetches
+ * /api/system/info and /api/bootstrap/status at the dashboard's own
+ * cadence (10s and 30s respectively). Fields that have not yet
+ * resolved render their neutral "loading" state.
+ */
 export function Header() {
   const { t } = useT();
+  const chrome = useAppChrome();
+  const apiHost = (() => {
+    try {
+      return new URL(API_URL).host || API_URL;
+    } catch {
+      return API_URL;
+    }
+  })();
 
   return (
     <header
@@ -33,13 +59,47 @@ export function Header() {
         </div>
 
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          {/* Runtime context chips — slice C */}
+          <div
+            className="hidden items-center gap-1.5 md:flex"
+            data-testid="app-runtime-context"
+            aria-label={t('common:appChrome.nodeRedVersionLabel')}
+          >
+            <NodeRedVersionChip version={chrome.nodeRedVersion} />
+            <CompatModeChip
+              editable={chrome.configurationEditable}
+              mode={chrome.configurationMode}
+              runtimeVersion={chrome.configurationRuntimeVersion ?? chrome.nodeRedVersion}
+              reason={chrome.configurationReason}
+            />
+            <StatusChip
+              variant={chrome.edgeMode ? 'info' : 'neutral'}
+              size="sm"
+              ariaLabel={t('common:appChrome.edgeModeAria', {
+                state: chrome.edgeMode ? 'on' : 'off',
+              })}
+              data-testid="edge-mode-chip"
+            >
+              {chrome.edgeMode
+                ? t('common:appChrome.edgeModeEnabled')
+                : t('common:appChrome.edgeModeDisabled')}
+            </StatusChip>
+            <StatusChip
+              variant="neutral"
+              size="sm"
+              ariaLabel={t('common:appChrome.apiBaseAria', { url: apiHost })}
+              data-testid="api-base-chip"
+              className="hidden xl:inline-flex"
+            >
+              {t('common:appChrome.apiBaseLabel')}: {apiHost}
+            </StatusChip>
+          </div>
+
+          {/* Application chrome — existing controls */}
           <CommandPalette />
           <UpdateNotificationChip />
           <LocaleSwitcher />
           <ThemeToggle />
-          <span className="api-status-chip hidden max-w-[18rem] truncate rounded-xl border px-3 py-2 text-xs font-medium text-base-content/70 xl:inline-flex">
-            API: {API_URL}
-          </span>
         </div>
       </div>
     </header>

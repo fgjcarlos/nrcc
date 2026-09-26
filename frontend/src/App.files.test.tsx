@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { buildAuthMock } from '@/features/auth/__test-utils__/authMock';
@@ -19,6 +20,17 @@ vi.mock('@/shared/components', async () => ({
 }));
 vi.mock('@/features/updates/components/UpdateNotificationChip', () => ({ UpdateNotificationChip: () => null }));
 vi.mock('@/shared/components/command-palette', () => ({ CommandPalette: () => null }));
+
+// Issue #766 slice C: Header now reads /api/system/info and
+// /api/bootstrap/status via useAppChrome, which calls useQuery.
+// Production wraps <App /> in <QueryClientProvider>; the test needs
+// the same wrapper or React Query throws 'No QueryClient set'.
+const renderWithProviders = (element: React.ReactElement) => {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(<QueryClientProvider client={queryClient}>{element}</QueryClientProvider>);
+};
 
 function mockAuth(overrides: Parameters<typeof buildAuthMock>[0]) {
   vi.mocked(useAuth).mockReturnValue(buildAuthMock(overrides));
@@ -56,7 +68,7 @@ describe('navigation redirects', () => {
     vi.mocked(authService.getStatus).mockResolvedValue({ initialized });
     mockAuth({ isInitialized: true, isAuthenticated, isLoading: false, user: isAuthenticated ? undefined : null });
 
-    render(<App />);
+    renderWithProviders(<App />);
 
     expect(await screen.findByText(expectedPage)).toBeInTheDocument();
     expect(authService.getStatus).toHaveBeenCalledTimes(1);
@@ -67,7 +79,7 @@ describe('navigation redirects', () => {
     vi.mocked(authService.getStatus).mockRejectedValue(new Error('status unavailable'));
     mockAuth({ isInitialized: true, isAuthenticated: false, isLoading: false, user: null });
 
-    render(<App />);
+    renderWithProviders(<App />);
 
     expect(await screen.findByText('Login page')).toBeInTheDocument();
   });
@@ -89,7 +101,7 @@ describe('navigation redirects', () => {
       user: { id: 'admin', username: 'admin', role: 'admin', createdAt: '2024-01-01T00:00:00Z' },
     });
 
-    render(<App />);
+    renderWithProviders(<App />);
 
     expect(await screen.findByText(expectedPage)).toBeInTheDocument();
   });
@@ -103,7 +115,7 @@ describe('navigation redirects', () => {
       user: { id: 'viewer', username: 'viewer', role: 'viewer', createdAt: '2024-01-01T00:00:00Z' },
     });
 
-    render(<App />);
+    renderWithProviders(<App />);
 
     await waitFor(() => expect(screen.getByText('Overview page')).toBeInTheDocument());
   });

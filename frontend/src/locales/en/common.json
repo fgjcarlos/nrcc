@@ -52,5 +52,20 @@
   "commandPaletteShortcut": "⌘/Ctrl K",
   "searchCommands": "Search commands",
   "noMatchingCommands": "No matching commands",
-  "maintenanceLabel": "Maintenance"
+  "maintenanceLabel": "Maintenance",
+  "appChrome": {
+    "nodeRedVersionLabel": "Node-RED",
+    "nodeRedVersionUnknown": "unknown",
+    "nodeRedVersionAria": "Detected Node-RED version {{version}}",
+    "compatModeEditable": "Editable",
+    "compatModeReadOnly": "Read-only",
+    "compatModeUnknown": "Mode pending",
+    "compatModeAria": "Configuration mode: {{state}}",
+    "compatModeAriaWithReason": "Configuration mode: {{state}}. {{reason}}",
+    "edgeModeEnabled": "Edge mode: on",
+    "edgeModeDisabled": "Edge mode: off",
+    "edgeModeAria": "Edge deployment mode {{state}}",
+    "apiBaseLabel": "API",
+    "apiBaseAria": "API base URL {{url}}"
+  }
 }

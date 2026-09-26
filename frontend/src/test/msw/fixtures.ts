@@ -101,6 +101,9 @@ export const systemInfo: SystemInfo = {
   uptime: 3600,
   platform: 'linux',
   hostname: 'nrcc-smoke-host',
+  // Issue #766 slice C: surface the runtime context on every page.
+  nodeRedVersion: '5.0.7',
+  edgeMode: false,
 }
 
 export const backupSchedulerStatus: BackupSchedulerStatus = {
