@@ -106,6 +106,9 @@ describe('SecurityView (slice E composition)', () => {
     await waitFor(() =>
       expect(screen.getByTestId('boundary-admin-auth')).toBeInTheDocument(),
     );
+    // Save stays disabled until the operator has touched a field.
+    await user.clear(screen.getByTestId('boundary-admin-auth-expiry'));
+    await user.type(screen.getByTestId('boundary-admin-auth-expiry'), '7200');
     await user.click(screen.getByTestId('boundary-admin-auth-save'));
     await waitFor(() =>
       expect(screen.getByTestId('boundary-admin-auth-applied')).toBeInTheDocument(),

@@ -149,6 +149,10 @@ describe('HttpBasicAuthBoundaryCard — httpStaticAuth', () => {
     const card = screen.getByTestId('boundary-httpStaticAuth');
     const chip = card.querySelector('[role="status"]');
     expect(chip?.className).toMatch(/bg-ds-success/);
+    // Save stays disabled until the operator has touched a field.
+    const userInput = screen.getByTestId('boundary-httpStaticAuth-user');
+    await user.clear(userInput);
+    await user.type(userInput, 'static');
     await user.click(screen.getByTestId('boundary-httpStaticAuth-save'));
     await waitFor(() => expect(onApplied).toHaveBeenCalled());
   });

@@ -87,10 +87,13 @@ describe('Security Center — rewired against SecurityView (issue #766 slice E)'
     expect(screen.getByTestId('boundary-httpStaticAuth')).toBeInTheDocument();
 
     // Session expiry exists inside AdminAuthBoundaryCard with the
-    // same accessible label as before.
-    expect(
-      screen.getByLabelText('Session expiry seconds'),
-    ).toHaveValue(3600);
+    // same accessible label as before. The value arrives after the
+    // useConfigurationData query resolves, so use waitFor.
+    await waitFor(() =>
+      expect(
+        screen.getByLabelText('Session expiry seconds'),
+      ).toHaveValue(3600),
+    );
 
     // Operator permission dropdowns survive on the per-user row.
     const permissionComboboxes = screen.getAllByRole('combobox');
@@ -179,6 +182,11 @@ describe('Security Center — rewired against SecurityView (issue #766 slice E)'
     setupApp();
     await waitFor(() =>
       expect(screen.getByTestId('boundary-admin-auth')).toBeInTheDocument(),
+    );
+    // The user rows land after the config query resolves; wait for
+    // them so the username edit doesn't race with the initial render.
+    await waitFor(() =>
+      expect(screen.getAllByTestId('boundary-admin-auth-username').length).toBeGreaterThan(0),
     );
 
     // Update the first username; only adminAuth should hit the API.
