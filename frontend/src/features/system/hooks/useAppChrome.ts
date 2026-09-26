@@ -1,25 +1,31 @@
-import { useQuery } from '@tanstack/react-query';
-import { systemService } from '@/features/dashboard/services/systemService';
-import { bootstrapService } from '@/features/bootstrap/services/bootstrapService';
+import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/shared/lib/queryKeys';
+import type { SystemInfo, HostStatus } from '@/shared/types';
 
 /**
  * useAppChrome — issue #766 slice C
  *
  * Returns the runtime context the persistent header needs:
- * - `nodeRedVersion` from `/api/system/info` (Node-RED detected version)
- * - `edgeMode` from `/api/system/info` (NRCC edge deployment flag)
- * - `configuration` from `/api/bootstrap/status` (ConfigurationCapabilities)
- *   carries `editable`, `mode`, `runtimeVersion`, and a `reason` that
- *   the compat chip surfaces as its accessible description.
+ * - `nodeRedVersion` from /api/system/info (Node-RED detected version)
+ * - `edgeMode` from /api/system/info (NRCC edge deployment flag)
+ * - `configuration` from /api/bootstrap/status (ConfigurationCapabilities)
  *
- * Refetch cadence matches the dashboard's own hooks (systemInfo 10s,
- * bootstrap 30s) so the header chip strip stays in sync without
- * adding new polling traffic. Each field is `undefined` until its
- * respective query resolves; chips render the neutral "loading"
- * palette during the brief window.
+ * Implementation note (re: PR #839 follow-up): reading via
+ * `queryClient.getQueryData` instead of `useQuery` subscriptions avoids
+ * introducing a third parallel subscription for keys that are already
+ * managed by useDashboardData (Overview) and useConfigurationData
+ * (Settings + Security). Three useQuery calls sharing the same keys
+ * raced with Playwright's page.route override (one of the three would
+ * fire before the route registered and pre-populate the cache with the
+ * default mock, freezing editable=false on Settings/Security). Reading
+ * from the cache means whichever hook first populates the key wins —
+ * and Header stays in sync via queryClient's existing subscription
+ * notifications without adding a third subscription.
+ *
+ * Fields are `undefined` until the dashboard or settings page populates
+ * the shared cache. Chips render the neutral loading palette during
+ * that window, which is fine for an authenticated operator navigation.
  */
-
 export interface AppChromeData {
   nodeRedVersion: string | undefined;
   edgeMode: boolean | undefined;
@@ -29,21 +35,16 @@ export interface AppChromeData {
   configurationRuntimeVersion: string | undefined;
 }
 
+type SystemInfoCached = { data?: { data?: SystemInfo } };
+type HostStatusCached = { data?: { data?: HostStatus } };
+
 export function useAppChrome(): AppChromeData {
-  const systemQuery = useQuery({
-    queryKey: queryKeys.system.info,
-    queryFn: () => systemService.getInfo(),
-    refetchInterval: 10_000,
-  });
+  const queryClient = useQueryClient();
+  const systemCached = queryClient.getQueryData(queryKeys.system.info) as SystemInfoCached | undefined;
+  const hostCached = queryClient.getQueryData(queryKeys.bootstrap.status) as HostStatusCached | undefined;
 
-  const bootstrapQuery = useQuery({
-    queryKey: queryKeys.bootstrap.status,
-    queryFn: () => bootstrapService.getStatus(),
-    refetchInterval: 30_000,
-  });
-
-  const systemInfo = systemQuery.data?.data?.data;
-  const hostStatus = bootstrapQuery.data?.data?.data;
+  const systemInfo = systemCached?.data?.data;
+  const hostStatus = hostCached?.data?.data;
 
   return {
     nodeRedVersion: systemInfo?.nodeRedVersion,
