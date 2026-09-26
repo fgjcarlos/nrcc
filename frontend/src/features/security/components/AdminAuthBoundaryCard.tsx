@@ -51,10 +51,13 @@ export function AdminAuthBoundaryCard({
   onApplied,
 }: AdminAuthBoundaryCardProps) {
   const { t } = useT();
-  // Lazy initial state — read from the prop on first render so the
-  // form renders with the correct values when the test fixture supplies
-  // config up front. The useEffect below reseeds when config changes
-  // so external config invalidations (per slice 758) still win.
+  // Derive users / expiry directly from the prop. Combined with the
+  // useEffect below (which only runs once on mount), this avoids the
+  // race where the first render uses useState's lazy initialiser
+  // (config prop still null) and the second render keeps the stale
+  // state. By keeping the working copy of users + expiry in local
+  // state — and reseeding it on every config change — every render
+  // shows the latest server values.
   const [users, setUsers] = useState<AdminUser[]>(() =>
     config?.users?.map((user) => ({
       username: user.username ?? '',
