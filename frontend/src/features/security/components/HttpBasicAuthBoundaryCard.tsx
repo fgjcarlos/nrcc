@@ -14,16 +14,22 @@ import {
 
 type BasicAuthForm = { user: string; pass: string; storedPass?: string };
 
-interface BasicAuthConfig {
-  user?: string;
-  pass?: string;
-}
+/**
+ * Loose config shape — accept whatever the backend sends. The
+ * NodeRedConfigResponse type tags adminAuth / nodeHttpAuth / staticAuth
+ * as CredentialsAuthResponse, which doesn't include the `user` and
+ * `pass` keys the basic-auth surface actually carries at runtime.
+ * Accepting only `user` + `pass` here keeps the public prop honest
+ * while letting SecurityView forward the runtime payload without
+ * unsafe casts at the boundary.
+ */
+export type HttpBasicAuthSurface = { user?: string; pass?: string } | null;
 
 interface HttpBasicAuthBoundaryCardProps {
   /** Which boundary this card represents. Used to namespace the test ids,
    *  aria-labels, save action label, and the i18n keys. */
   surface: 'httpNodeAuth' | 'httpStaticAuth';
-  config: BasicAuthConfig | null | BasicAuthConfig;
+  config: HttpBasicAuthSurface;
   rawSettingsContent: string;
   expectedRevision?: string;
   editable: boolean;

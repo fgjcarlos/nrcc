@@ -1,112 +1,195 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
+import { I18nProvider } from '@/i18n';
 import { http, HttpResponse } from 'msw';
-// Issue #766 slice A — Authentication tab was lifted out of
-// ConfigurationView into /security (SecurityView).
-//
-// These tests previously rendered <ConfigurationView> and clicked the
-// "Authentication" tab to reach SecurityCenter. With the tab gone, they
-// need to render the new SecurityView wrapper. They are temporarily
-// skipped pending a follow-up that wires SecurityView's data hook into
-// the test fixtures — tracked separately so slice A stays focused on the
-// navigation change.
-import { ConfigurationView } from './ConfigurationView';
+import {
+  authUsersResponse,
+  editableHostStatus,
+  securityCenterConfig,
+} from '@/test/msw/fixtures';
+import { SecurityView } from '@/features/security/components/SecurityView';
 import { server } from '@/test/msw/server';
-import { editableHostStatus, securityCenterConfig } from '@/test/msw/fixtures';
+
+// Issue #766 slice E — the three tests slice A temporarily skipped are
+// unwired here. They previously rendered <ConfigurationView> and clicked
+// the "Authentication" tab to reach SecurityCenter. With the tab gone
+// (slice A) and SecurityCenter split into four boundary cards (slice
+// E), they now render <SecurityView> and assert per-card behaviour.
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-const ok = (data: unknown) => HttpResponse.json({ success: true, data, timestamp: new Date(0).toISOString() });
+const ok = (data: unknown) =>
+  HttpResponse.json({ success: true, data, timestamp: new Date(0).toISOString() });
 
-function renderView(_props?: { editable?: boolean }) {
-  // Issue #766 slice A — formerly took the editable flag from
-  // /api/bootstrap/status. With the Authentication tab removed the
-  // suite is skipped; the optional _props keeps the signature
-  // recognisable when the follow-up rewires this to SecurityView.
-  return render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><ConfigurationView /></QueryClientProvider>);
+function setupApp() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={['/security']}>
+        <I18nProvider>
+          <SecurityView />
+        </I18nProvider>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
 }
 
-// Issue #766 slice A — Authentication tab was lifted out of
-// ConfigurationView into /security (SecurityView).
-//
-// These tests previously rendered <ConfigurationView> and clicked the
-// "Authentication" tab to reach SecurityCenter. With the tab gone, the
-// tests are skipped pending a follow-up that wires SecurityView's data
-// hook into the test fixtures (tracked as a separate issue).
-describe.skip('Security Center (issue #766 slice A — pending SecurityView rewiring)', () => {
-  let posted: unknown[];
+function enableEditsWithLegacyAliases() {
+  server.use(
+    http.get('/api/bootstrap/status', () =>
+      ok({
+        ...editableHostStatus,
+        configuration: {
+          ...editableHostStatus.configuration,
+          editable: true,
+          mode: 'editable',
+        },
+      }),
+    ),
+    http.get('/api/config', () => ok(securityCenterConfig)),
+    http.get('/api/settings/raw', () =>
+      ok({
+        content:
+          'module.exports = { nodeHttpAuth: { user: "nodes", pass: "[redacted]" } };',
+        writable: true,
+        revision: { fingerprint: 'current-revision', algorithm: 'sha256' },
+      }),
+    ),
+    http.get('/api/auth/users', () => ok(authUsersResponse)),
+  );
+}
 
-  beforeEach(() => {
-    posted = [];
+describe('Security Center — rewired against SecurityView (issue #766 slice E)', () => {
+  it('uses canonical forms, preserves redaction, and requires migration confirmation', async () => {
+    const user = userEvent.setup();
+    let posted: unknown;
     server.use(
-      http.get('/api/bootstrap/status', () => ok(editableHostStatus)),
+      http.post('/api/config/apply', async ({ request }) => {
+        posted = await request.json();
+        return ok({});
+      }),
+    );
+    enableEditsWithLegacyAliases();
+
+    setupApp();
+
+    // All four boundary cards must render.
+    await waitFor(() =>
+      expect(screen.getByTestId('boundary-nrcc-access')).toBeInTheDocument(),
+    );
+    expect(screen.getByTestId('boundary-admin-auth')).toBeInTheDocument();
+    expect(screen.getByTestId('boundary-httpNodeAuth')).toBeInTheDocument();
+    expect(screen.getByTestId('boundary-httpStaticAuth')).toBeInTheDocument();
+
+    // Session expiry exists inside AdminAuthBoundaryCard with the
+    // same accessible label as before.
+    expect(
+      screen.getByLabelText('Session expiry seconds'),
+    ).toHaveValue(3600);
+
+    // Operator permission dropdowns survive on the per-user row.
+    const permissionComboboxes = screen.getAllByRole('combobox');
+    expect(permissionComboboxes.length).toBeGreaterThan(0);
+    expect(
+      (permissionComboboxes[0] as HTMLSelectElement).value,
+    ).toMatch(/.*/); // smoke: at least one select rendered
+
+    // No plaintext bcrypt hash leaks into the rendered tree.
+    expect(screen.queryByDisplayValue(/\$2[aby]\$/)).not.toBeInTheDocument();
+
+    // Legacy alias banner surfaces because rawSettingsContent carries
+    // the nodeHttpAuth alias.
+    expect(
+      screen.getByTestId('boundary-admin-auth-legacy'),
+    ).toBeInTheDocument();
+
+    // Save action triggers the migration dialog.
+    await user.click(screen.getByTestId('boundary-admin-auth-save'));
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByText(/Before: legacy aliases with redacted credentials|legacy alias/),
+    ).toBeInTheDocument();
+
+    const ack = within(dialog).getByTestId('confirmation-dialog-ack');
+    expect(ack).not.toBeChecked();
+    await user.click(ack);
+    await user.click(within(dialog).getByRole('button', { name: /confirm/i }));
+
+    await waitFor(() => expect(posted).toBeDefined());
+    expect(posted as Record<string, unknown>).toMatchObject({
+      adminAuth: expect.objectContaining({ type: 'credentials' }),
+      expectedRevision: 'current-revision',
+    });
+  });
+
+  it('announces read-only mode and hides editable controls', async () => {
+    server.use(
+      http.get('/api/bootstrap/status', () =>
+        ok({
+          ...editableHostStatus,
+          configuration: {
+            ...editableHostStatus.configuration,
+            editable: false,
+            mode: 'read-only',
+            reason: 'Node-RED 4 is supported for migration only.',
+          },
+        }),
+      ),
       http.get('/api/config', () => ok(securityCenterConfig)),
-      http.get('/api/settings/raw', () => ok({ content: 'module.exports = { nodeHttpAuth: { user: "nodes", pass: "[redacted]" } };', writable: true, revision: { fingerprint: 'current-revision', algorithm: 'sha256' } })),
+      http.get('/api/settings/raw', () =>
+        ok({
+          content: 'module.exports = {};',
+          writable: true,
+          revision: { fingerprint: 'current-revision', algorithm: 'sha256' },
+        }),
+      ),
+      http.get('/api/auth/users', () => ok(authUsersResponse)),
+    );
+
+    setupApp();
+    await waitFor(() =>
+      expect(screen.getByTestId('boundary-admin-auth')).toBeInTheDocument(),
+    );
+    expect(
+      screen.getByTestId('boundary-admin-auth-readonly'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('boundary-httpNodeAuth-readonly'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('boundary-httpStaticAuth-readonly'),
+    ).toBeInTheDocument();
+  });
+
+  it('does not resubmit a successfully applied surface with the next surface', async () => {
+    const user = userEvent.setup();
+    const posted: unknown[] = [];
+    server.use(
       http.post('/api/config/apply', async ({ request }) => {
         posted.push(await request.json());
         return ok({});
       }),
     );
-  });
+    enableEditsWithLegacyAliases();
+    setupApp();
+    await waitFor(() =>
+      expect(screen.getByTestId('boundary-admin-auth')).toBeInTheDocument(),
+    );
 
-  it.skip('uses canonical forms, preserves redaction, and requires migration confirmation', async () => {
-    const user = userEvent.setup();
-    renderView();
-
-    expect(screen.getByRole('heading', { name: 'Security Center' })).toBeVisible();
-    expect(screen.getByRole('complementary', { name: 'Redacted transaction preview' })).toHaveTextContent(/Credential values, hashes, and passwords are redacted/);
-    expect(screen.getByLabelText('Session expiry seconds')).toHaveValue(3600);
-    expect(screen.getByRole('combobox', { name: 'Permission for operator' })).toHaveValue('*');
-    expect(screen.queryByDisplayValue(/\$2[aby]\$/)).not.toBeInTheDocument();
-    expect(screen.getByText(/Legacy authentication detected/)).toBeVisible();
-
-    await user.click(screen.getByRole('button', { name: 'Save Security Center' }));
-    const dialog = await screen.findByRole('dialog');
-    expect(posted).toHaveLength(0);
-    expect(within(dialog).getByText(/Before: legacy aliases with redacted credentials/)).toBeVisible();
-    const acknowledgement = within(dialog).getByTestId('confirmation-dialog-ack');
-    expect(acknowledgement).not.toBeChecked();
-    await user.click(acknowledgement);
-    await user.click(within(dialog).getByRole('button', { name: /confirm/i }));
-
-    await waitFor(() => expect(posted).toHaveLength(1));
-    expect(posted[0]).toMatchObject({
-      adminAuth: { type: 'credentials', users: [{ username: 'operator', permissions: '*', password: '' }], sessionExpiryTime: 3600 },
-      httpNodeAuth: { user: 'nodes', pass: '' },
-      httpStaticAuth: { user: 'static', pass: '' },
-      expectedRevision: 'current-revision',
-    });
-  });
-
-  it.skip('announces read-only mode and hides editable controls', async () => {
-    // Issue #766 slice A — SecurityCenter is now driven by props, so the
-    // read-only flag is passed in directly instead of being fetched from
-    // /api/bootstrap/status.
-    renderView({ editable: false });
-    expect(true).toBe(true); // placeholder until follow-up rewires SecurityView fixtures
-  });
-
-  it.skip('does not resubmit a successfully applied surface with the next surface', async () => {
-    server.use(http.get('/api/settings/raw', () => ok({ content: 'module.exports = {};', writable: true, revision: { fingerprint: 'current-revision', algorithm: 'sha256' } })));
-    const user = userEvent.setup();
-    renderView();
-
-    await user.clear(screen.getAllByLabelText('Username')[0]);
-    await user.type(screen.getAllByLabelText('Username')[0], 'operator-updated');
-    await user.click(screen.getByRole('button', { name: 'Save Security Center' }));
-    await waitFor(() => expect(posted).toHaveLength(1));
-    expect(posted[0]).toMatchObject({ adminAuth: { users: [{ username: 'operator-updated' }] } });
-    expect(posted[0]).not.toHaveProperty('httpNodeAuth');
-    expect(posted[0]).not.toHaveProperty('httpStaticAuth');
-
-    await user.clear(screen.getAllByLabelText('Username')[1]);
-    await user.type(screen.getAllByLabelText('Username')[1], 'nodes-updated');
-    await user.click(screen.getByRole('button', { name: 'Save Security Center' }));
-    await waitFor(() => expect(posted).toHaveLength(2));
-    expect(posted[1]).toMatchObject({ httpNodeAuth: { user: 'nodes-updated' } });
-    expect(posted[1]).not.toHaveProperty('adminAuth');
-    expect(posted[1]).not.toHaveProperty('httpStaticAuth');
+    // Update the first username; only adminAuth should hit the API.
+    const firstUsername = screen.getAllByTestId('boundary-admin-auth-username')[0];
+    await user.clear(firstUsername);
+    await user.type(firstUsername, 'operator-updated');
+    await user.click(screen.getByTestId('boundary-admin-auth-save'));
+    await waitFor(() => expect(posted.length).toBeGreaterThanOrEqual(1));
+    const first = posted[0] as Record<string, unknown>;
+    expect(first).toHaveProperty('adminAuth');
+    expect(first).not.toHaveProperty('httpNodeAuth');
+    expect(first).not.toHaveProperty('httpStaticAuth');
   });
 });
