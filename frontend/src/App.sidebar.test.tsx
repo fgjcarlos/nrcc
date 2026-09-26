@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { buildAuthMock } from '@/features/auth/__test-utils__/authMock';
@@ -8,6 +9,20 @@ import { buildAuthMock } from '@/features/auth/__test-utils__/authMock';
 vi.mock('@/features/auth/hooks/useAuth', () => ({
   useAuth: vi.fn(),
 }));
+
+// Issue #766 slice C: Header.tsx reads /api/system/info and
+// /api/bootstrap/status via useAppChrome (useQuery). Production
+// wraps the app in QueryClientProvider; the test must do the same.
+const renderWithProviders = (element: React.ReactElement) => {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      {element}
+    </QueryClientProvider>,
+  );
+};
 
 // Mock every lazy-loaded view with a stable sentinel so we can assert
 // which view rendered without exercising the real views' data flows.
@@ -143,7 +158,7 @@ describe('sidebar navigation (#365)', () => {
 
   it('updates the main content area when the user clicks a sidebar link', async () => {
     mockAuthenticated();
-    render(<App />);
+    renderWithProviders(<App />);
 
 
     expect(await screen.findByText('Overview page')).toBeInTheDocument();
@@ -160,7 +175,7 @@ describe('sidebar navigation (#365)', () => {
 
   it('does not show links to legacy public pages', async () => {
     mockAuthenticated();
-    render(<App />);
+    renderWithProviders(<App />);
 
     expect(await screen.findByText('Overview page')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /^Logs$/ })).not.toBeInTheDocument();
@@ -174,7 +189,7 @@ describe('sidebar navigation (#365)', () => {
   it('navigates Configuration -> Overview -> Configuration without showing a stale view', async () => {
     mockAuthenticated();
     window.history.pushState({}, '', '/configuration');
-    render(<App />);
+    renderWithProviders(<App />);
 
     expect(await screen.findByText('Configuration page')).toBeInTheDocument();
 
@@ -194,7 +209,7 @@ describe('sidebar navigation (#365)', () => {
   it('also routes through the admin Users link', async () => {
     mockAuthenticated({ role: 'admin' });
     window.history.pushState({}, '', '/overview');
-    render(<App />);
+    renderWithProviders(<App />);
 
     expect(await screen.findByText('Overview page')).toBeInTheDocument();
 
