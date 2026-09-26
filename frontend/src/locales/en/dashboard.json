@@ -78,6 +78,28 @@
         "warning": "Partial",
         "danger": "Exposed"
       }
+    },
+    "backupHealth": {
+      "title": "Backup health",
+      "subtitleActive": "Scheduler active",
+      "subtitleInactive": "Scheduler inactive",
+      "nextRun": "next run",
+      "lastBackup": "Last backup",
+      "lastAutomatic": "Last automatic",
+      "storageUsed": "Storage used",
+      "never": "Never",
+      "noSnapshotsYet": "No snapshots yet",
+      "noAutomaticRuns": "No automatic runs yet",
+      "unknownDate": "—",
+      "backupIdPrefix": "id",
+      "countSuffix": "backups",
+      "cta": "Open Recovery",
+      "statusAria": "Backup status: {{state}}",
+      "statuses": {
+        "scheduled": "Scheduled",
+        "withAlerts": "Needs attention",
+        "notScheduled": "Not scheduled"
+      }
     }
   },
   "hostWarning": {

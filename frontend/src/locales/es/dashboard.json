@@ -78,6 +78,28 @@
         "warning": "Parcial",
         "danger": "Expuesto"
       }
+    },
+    "backupHealth": {
+      "title": "Salud de backups",
+      "subtitleActive": "Scheduler activo",
+      "subtitleInactive": "Scheduler inactivo",
+      "nextRun": "próxima ejecución",
+      "lastBackup": "Último backup",
+      "lastAutomatic": "Último automático",
+      "storageUsed": "Almacenamiento",
+      "never": "Nunca",
+      "noSnapshotsYet": "Aún no hay snapshots",
+      "noAutomaticRuns": "Sin ejecuciones automáticas",
+      "unknownDate": "—",
+      "backupIdPrefix": "id",
+      "countSuffix": "backups",
+      "cta": "Abrir Recuperación",
+      "statusAria": "Estado del backup: {{state}}",
+      "statuses": {
+        "scheduled": "Programado",
+        "withAlerts": "Necesita atención",
+        "notScheduled": "No programado"
+      }
     }
   },
   "hostWarning": {
