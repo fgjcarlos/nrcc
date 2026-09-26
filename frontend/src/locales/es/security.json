@@ -75,5 +75,19 @@
     "migrationTitle": "Aplicar migración de autenticación",
     "migrationDescription": "Alias heredado: {{alias}}. La aplicación canonicalizará la superficie y redactará credenciales.",
     "migrationAck": "Entiendo que esto migra explícitamente el alias de autenticación heredado."
+  },
+  "nrccAccessBoundary": {
+    "title": "Acceso de operadores a NRCC",
+    "subtitle": "Usuarios, roles y MFA registrados en el plano de control de NRCC",
+    "statusOn": "{{count}} configurados",
+    "statusOff": "Sin usuarios",
+    "statusAria": "Acceso NRCC: {{state}}",
+    "total": "Usuarios",
+    "totalHint": "Cada usuario tiene un rol y puede registrar MFA.",
+    "roleDistribution": "Distribución de roles",
+    "admins": "admins",
+    "viewers": "viewers",
+    "roleDistributionHint": "Los admins son dueños del path de aplicación de settings.js.",
+    "cta": "Gestionar usuarios"
   }
 }

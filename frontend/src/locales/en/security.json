@@ -75,5 +75,19 @@
     "migrationTitle": "Apply authentication migration",
     "migrationDescription": "Legacy alias: {{alias}}. Apply will canonicalize the surface and redact credentials.",
     "migrationAck": "I understand that this explicitly migrates the legacy authentication alias."
+  },
+  "nrccAccessBoundary": {
+    "title": "NRCC operator access",
+    "subtitle": "Users, roles, and MFA enrolled on the NRCC control plane",
+    "statusOn": "{{count}} configured",
+    "statusOff": "No users",
+    "statusAria": "NRCC access: {{state}}",
+    "total": "Users",
+    "totalHint": "Each user owns one role and may enroll in MFA.",
+    "roleDistribution": "Role distribution",
+    "admins": "admins",
+    "viewers": "viewers",
+    "roleDistributionHint": "Admins own the settings.js apply path.",
+    "cta": "Manage users"
   }
 }
