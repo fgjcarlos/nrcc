@@ -130,11 +130,19 @@ describe('AdminAuthBoundaryCard', () => {
       editable: true,
       onApplied,
     });
+    // The save button stays disabled until the operator has touched the
+    // form; mark the session expiry field dirty so click() fires apply().
+    await user.clear(screen.getByTestId('boundary-admin-auth-expiry'));
+    await user.type(screen.getByTestId('boundary-admin-auth-expiry'), '7200');
     await user.click(screen.getByTestId('boundary-admin-auth-save'));
     await waitFor(() => expect(onApplied).toHaveBeenCalled());
-    const payload = (posted as { adminAuth?: { type: string; users?: Array<{ username: string }> } }).adminAuth;
+    const payload = (posted as { adminAuth?: { type: string; users?: Array<{ username: string; password?: string }> } }).adminAuth;
     expect(payload?.type).toBe('credentials');
     expect(payload?.users?.[0]?.username).toBe('admin');
+    // The password stays empty when the operator didn't retype it —
+    // confirming slice E only re-sends the surface that was actually
+    // edited.
+    expect(payload?.users?.[0]?.password).toBe('');
   });
 
   it('surfaces an apply error when /api/config/apply returns a conflict', async () => {
@@ -158,6 +166,10 @@ describe('AdminAuthBoundaryCard', () => {
       editable: true,
       onApplied: vi.fn(),
     });
+    // Mark the form dirty so save fires apply (the button stays
+    // disabled while the operator hasn't touched anything).
+    await user.clear(screen.getByTestId('boundary-admin-auth-expiry'));
+    await user.type(screen.getByTestId('boundary-admin-auth-expiry'), '1800');
     await user.click(screen.getByTestId('boundary-admin-auth-save'));
     await waitFor(() =>
       expect(screen.getByTestId('boundary-admin-auth-error')).toBeInTheDocument(),
@@ -192,6 +204,9 @@ describe('AdminAuthBoundaryCard', () => {
       editable: true,
       onApplied: vi.fn(),
     });
+    // Same dirty-trick as the conflict-error test above.
+    await user.clear(screen.getByTestId('boundary-admin-auth-expiry'));
+    await user.type(screen.getByTestId('boundary-admin-auth-expiry'), '1800');
     await user.click(screen.getByTestId('boundary-admin-auth-save'));
     await waitFor(() =>
       expect(screen.getByTestId('boundary-admin-auth-error')).toBeInTheDocument(),
