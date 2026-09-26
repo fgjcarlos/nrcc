@@ -14,16 +14,6 @@ vi.mock('../hooks/useSystemHistory', () => ({
   useSystemHistory: vi.fn().mockReturnValue({ data: [], isLoading: false, isError: false }),
 }))
 
-vi.mock('recharts', () => ({
-  ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  AreaChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  Area: () => null,
-  XAxis: () => null,
-  YAxis: () => null,
-  CartesianGrid: () => null,
-  Tooltip: () => null,
-}))
-
 const renderDashboard = () =>
   render(
     <MemoryRouter>
@@ -44,6 +34,54 @@ describe('DashboardView', () => {
       handleStopNodeRed: vi.fn(),
       handleOpenNodeRed: vi.fn(),
     })
+  })
+
+  it('renders the three operational tiles in the documented order', () => {
+    vi.mocked(dashboardHooks.useDashboardData).mockReturnValue({
+      container: { inDocker: true, status: 'running', image: 'nodered:latest' },
+      system: {
+        resourceScope: 'host',
+        cpu: { usage: 14, cores: 4, available: true },
+        memory: { total: 8_589_934_592, used: 2_147_483_648, free: 6_442_450_944, usagePercent: 25, available: true },
+        disk: { total: 107_374_182_400, used: 21_474_836_480, free: 85_899_345_920, usagePercent: 20, available: true },
+        uptime: 3600,
+        platform: 'linux',
+        hostname: 'nrcc-smoke-host',
+        nodeRedVersion: '5.0.6',
+        edgeMode: false,
+      },
+      config: { adminAuth: { user: 'admin', password: 'x' }, requireHttps: true },
+      host: {
+        platform: 'linux',
+        ready: true,
+        interactive: false,
+        nodejs: { name: 'node', installed: true, version: 'v22.0.0', command: 'node' },
+        npm: { name: 'npm', installed: true, version: '11.0.0', command: 'npm' },
+        nodeRedBinary: { name: 'node-red', installed: true, version: '5.0.6', command: 'node-red' },
+        docker: { name: 'docker', installed: false },
+        dockerCompose: { name: 'docker compose', installed: false },
+        nodeRed: { detected: true, mode: 'native', managedByNrcc: true, running: true, version: '5.0.6', executable: '/usr/bin/node-red', userDir: '/tmp/nrcc-smoke', settingsPath: '/tmp/nrcc-smoke/settings.js' },
+        settings: { path: '/tmp/nrcc-smoke/settings.js', source: 'disk', writable: true },
+        configuration: { runtimeVersion: '5.0.6', adapter: 'nodered-5', catalogVersion: '5.0.6', source: 'disk', mode: 'editable', editable: true },
+        recommendations: [],
+      },
+      runtime: { status: 'running', uptime: 3600 },
+      backups: {
+        scheduler: { enabled: true, scheduled: true, schedule: 'daily', customSchedule: '', activeSpec: '0 2 * * *', nextRunAt: '2026-01-02T02:00:00.000Z', lastRunAt: '2026-01-01T02:00:00.000Z', lastSuccessAt: '2026-01-01T02:00:00.000Z', lastBackupId: 'backup-001' },
+        storage: { totalBackups: 12, totalSize: 8_589_934_592, manualCount: 4, autoCount: 8, preRestoreCount: 0 },
+        recentEvents: [],
+      },
+      dockerSuccess: true,
+      dockerLoading: false,
+      dockerError: false,
+    })
+
+    renderDashboard()
+
+    expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument()
+    expect(screen.getByTestId('overview-security-posture-tile')).toBeInTheDocument()
+    expect(screen.getByTestId('overview-node-red-health-tile')).toBeInTheDocument()
+    expect(screen.getByTestId('overview-backup-health-tile')).toBeInTheDocument()
   })
 
   it('shows warning surfaces when docker is unhealthy and host setup has issues', () => {
@@ -78,7 +116,11 @@ describe('DashboardView', () => {
     // Default-locale EN copy from the dashboard catalog (issue #767/#832).
     expect(screen.getByText('Docker container is not running correctly. Some features may not work.')).toBeInTheDocument()
     expect(screen.getByText('Node.js is not installed. Node-RED has not been detected yet. nrcc cannot write to settings.js.')).toBeInTheDocument()
-    expect(screen.getByText('Check environment for issues')).toBeInTheDocument()
+    // Slice D replaces the SystemHealthCard's "Check environment for
+    // issues" subtitle with the three operational tiles — security
+    // posture (danger), Node-RED health (danger), backup health.
+    expect(screen.getByTestId('overview-security-posture-tile')).toBeInTheDocument()
+    expect(screen.getByTestId('overview-node-red-health-tile')).toBeInTheDocument()
   })
 
   it('renders fallback telemetry placeholders when dashboard data is missing', () => {
@@ -97,14 +139,13 @@ describe('DashboardView', () => {
     renderDashboard()
 
     expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument()
-    expect(screen.getByText('Disk Usage')).toBeInTheDocument()
-    // Runtime card promoted to the top row (issue #676 item 1) carries the
-    // Restart + Open actions; QuickActionsCard was removed from this row.
-    expect(screen.getByRole('button', { name: 'Restart' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Open' })).toBeInTheDocument()
-    // Default-locale EN copy from the dashboard catalog (issue #767/#832).
-    expect(screen.getByText('Not detected')).toBeInTheDocument()
-    expect(screen.getByText('No backups')).toBeInTheDocument()
-    expect(screen.getByText('Loading observability')).toBeInTheDocument()
+    // The three new tiles still mount; each renders its loading
+    // state when the corresponding data is missing.
+    expect(screen.getByTestId('overview-security-posture-tile')).toBeInTheDocument();
+    expect(screen.getByTestId('overview-node-red-health-tile')).toBeInTheDocument();
+    expect(screen.getByTestId('overview-backup-health-tile')).toBeInTheDocument();
+    // NodeRedHealthTile still surfaces the restart/open actions.
+    expect(screen.getByRole('button', { name: 'Restart' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open' })).toBeInTheDocument();
   })
-})
+});
