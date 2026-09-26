@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
@@ -107,8 +107,11 @@ describe('SecurityView (slice E composition)', () => {
       expect(screen.getByTestId('boundary-admin-auth')).toBeInTheDocument(),
     );
     // Save stays disabled until the operator has touched a field.
-    await user.clear(screen.getByTestId('boundary-admin-auth-expiry'));
-    await user.type(screen.getByTestId('boundary-admin-auth-expiry'), '7200');
+    // user-event's `clear()` doesn't work on number inputs in this
+    // version; use fireEvent.change to bump the expiry value
+    // and reach apply() through the markDirty() handler.
+    const expiryInput = screen.getByTestId('boundary-admin-auth-expiry');
+    fireEvent.change(expiryInput, { target: { value: '7200' } });
     await user.click(screen.getByTestId('boundary-admin-auth-save'));
     await waitFor(() =>
       expect(screen.getByTestId('boundary-admin-auth-applied')).toBeInTheDocument(),
