@@ -51,8 +51,18 @@ export function AdminAuthBoundaryCard({
   onApplied,
 }: AdminAuthBoundaryCardProps) {
   const { t } = useT();
-  const [users, setUsers] = useState<AdminUser[]>([]);
-  const [expiry, setExpiry] = useState<number>(0);
+  // Lazy initial state — read from the prop on first render so the
+  // form renders with the correct values when the test fixture supplies
+  // config up front. The useEffect below reseeds when config changes
+  // so external config invalidations (per slice 758) still win.
+  const [users, setUsers] = useState<AdminUser[]>(() =>
+    config?.users?.map((user) => ({
+      username: user.username ?? '',
+      permissions: user.permissions ?? '*',
+      password: '',
+    })) ?? [],
+  );
+  const [expiry, setExpiry] = useState<number>(() => config?.sessionExpiryTime ?? 0);
   const [saving, setSaving] = useState(false);
   const [confirmMigration, setConfirmMigration] = useState(false);
   const [appliedAt, setAppliedAt] = useState<number | null>(null);
