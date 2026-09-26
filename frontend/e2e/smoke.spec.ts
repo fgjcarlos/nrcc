@@ -16,11 +16,18 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
 
   test('login flow opens the dashboard with representative status responses', async ({ page }) => {
     await login(page)
-    await expect(page.getByText('System Health')).toBeVisible()
+    // Slice D replaces the SystemHealthCard heading with the three
+    // operational tiles (Security posture, Node-RED health, Backup
+    // health). Asserting the new tile headlines keeps the spirit of
+    // "representative status responses on /overview".
+    await expect(page.getByText('Security posture')).toBeVisible()
+    await expect(page.getByText('Node-RED health')).toBeVisible()
+    await expect(page.getByText('Backup health')).toBeVisible()
     // Issue #676 promoted the Runtime card (with Restart/Open actions) out of
     // the metric row; QuickActionsCard was removed in favor of those buttons.
+    // Slice D moved the same Restart/Open actions into NodeRedHealthTile.
     await expect(page.getByRole('button', { name: 'Restart' })).toBeVisible()
-    // exact:true disambiguates the RuntimeCard Open button from the
+    // exact:true disambiguates the NodeRedHealthTile Open button from the
     // user-menu trigger (whose aria-label contains 'open user menu').
     await expect(page.getByRole('button', { name: 'Open', exact: true })).toBeVisible()
   })
@@ -37,8 +44,10 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
   test('backup creation uses fixture responses', async ({ page }) => {
     await login(page)
     // Issue #763 renamed the sidebar label to "Recovery" (/backups keeps
-    // the "Backups" page heading).
-    await page.getByRole('link', { name: /Recovery/ }).click()
+    // the "Backups" page heading). Slice D adds an "Open Recovery" CTA
+    // on BackupHealthTile too — scope to the sidebar so Playwright's
+    // strict-mode locators resolve to a single element.
+    await page.getByTestId('app-sidebar').getByRole('link', { name: /Recovery/ }).click()
     await expect(page.getByRole('heading', { name: 'Backups', exact: true })).toBeVisible()
     await page.getByRole('button', { name: /Create backup now/ }).first().click()
     await expect(page.getByRole('button', { name: 'Manual smoke backup' })).toBeVisible()

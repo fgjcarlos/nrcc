@@ -58,6 +58,67 @@
     "restartingButton": "Restarting…",
     "openButton": "Open"
   },
+  "overviewTiles": {
+    "securityPosture": {
+      "title": "Security posture",
+      "subtitle": "Authentication + transport surfaces configured on Node-RED",
+      "cta": "Open Security",
+      "surfaces": {
+        "adminAuth": "Admin auth",
+        "httpNodeAuth": "Node HTTP auth",
+        "httpStaticAuth": "Static auth",
+        "requireHttps": "HTTPS enforced"
+      },
+      "states": {
+        "enabled": "On",
+        "disabled": "Off"
+      },
+      "overall": {
+        "success": "Locked down",
+        "warning": "Partial",
+        "danger": "Exposed"
+      }
+    },
+    "backupHealth": {
+      "title": "Backup health",
+      "subtitleActive": "Scheduler active",
+      "subtitleInactive": "Scheduler inactive",
+      "nextRun": "next run",
+      "lastBackup": "Last backup",
+      "lastAutomatic": "Last automatic",
+      "storageUsed": "Storage used",
+      "never": "Never",
+      "noSnapshotsYet": "No snapshots yet",
+      "noAutomaticRuns": "No automatic runs yet",
+      "unknownDate": "—",
+      "backupIdPrefix": "id",
+      "countSuffix": "backups",
+      "cta": "Open Recovery",
+      "statusAria": "Backup status: {{state}}",
+      "statuses": {
+        "scheduled": "Scheduled",
+        "withAlerts": "Needs attention",
+        "notScheduled": "Not scheduled"
+      }
+    },
+    "nodeRedHealth": {
+      "title": "Node-RED health",
+      "subtitleRuntime": "Runtime",
+      "cta": "Open Configuration",
+      "statusAria": "Node-RED status: {{state}}",
+      "cpu": "CPU",
+      "memory": "Memory",
+      "disk": "Disk",
+      "cores": "cores",
+      "scopeContainer": "Container scope",
+      "scopeHost": "Host scope",
+      "scopeUnavailable": "Resource metrics unavailable",
+      "deploymentNative": "Native deployment",
+      "deploymentDocker": "Docker deployment",
+      "deploymentNone": "Not installed",
+      "deploymentUnknown": "Unknown deployment"
+    }
+  },
   "hostWarning": {
     "nodejsMissing": "Node.js is not installed.",
     "nodeRedNotDetected": "Node-RED has not been detected yet.",
