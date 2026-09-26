@@ -122,11 +122,14 @@ export function SecurityPostureTile({
           return (
             <li
               key={row.key}
-              data-testid={`overview-security-${row.key}`}
               className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-base-200/30 px-3 py-2"
             >
               <span className="text-sm text-base-content">{t(row.labelKey)}</span>
-              <StatusChip variant={variant} size="sm">
+              <StatusChip
+                variant={variant}
+                size="sm"
+                data-testid={`overview-security-${row.key}`}
+              >
                 {t(enabled ? row.enabledKey : row.disabledKey)}
               </StatusChip>
             </li>
