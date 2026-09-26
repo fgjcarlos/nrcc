@@ -39,7 +39,7 @@ jobs:
 
       - name: Post advisory comment on PR
         if: github.event_name == 'pull_request'
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b  # pin to commit (v7.1.0)
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # pin to commit (v7.1.0)
         env:
           FINDINGS: ${{ steps.scan.outputs.findings }}
         with:
