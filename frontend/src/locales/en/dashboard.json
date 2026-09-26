@@ -100,6 +100,23 @@
         "withAlerts": "Needs attention",
         "notScheduled": "Not scheduled"
       }
+    },
+    "nodeRedHealth": {
+      "title": "Node-RED health",
+      "subtitleRuntime": "Runtime",
+      "cta": "Open Configuration",
+      "statusAria": "Node-RED status: {{state}}",
+      "cpu": "CPU",
+      "memory": "Memory",
+      "disk": "Disk",
+      "cores": "cores",
+      "scopeContainer": "Container scope",
+      "scopeHost": "Host scope",
+      "scopeUnavailable": "Resource metrics unavailable",
+      "deploymentNative": "Native deployment",
+      "deploymentDocker": "Docker deployment",
+      "deploymentNone": "Not installed",
+      "deploymentUnknown": "Unknown deployment"
     }
   },
   "hostWarning": {

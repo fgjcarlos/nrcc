@@ -100,6 +100,23 @@
         "withAlerts": "Necesita atención",
         "notScheduled": "No programado"
       }
+    },
+    "nodeRedHealth": {
+      "title": "Salud de Node-RED",
+      "subtitleRuntime": "Runtime",
+      "cta": "Abrir Configuración",
+      "statusAria": "Estado de Node-RED: {{state}}",
+      "cpu": "CPU",
+      "memory": "Memoria",
+      "disk": "Disco",
+      "cores": "núcleos",
+      "scopeContainer": "Alcance contenedor",
+      "scopeHost": "Alcance host",
+      "scopeUnavailable": "Métricas no disponibles",
+      "deploymentNative": "Despliegue nativo",
+      "deploymentDocker": "Despliegue Docker",
+      "deploymentNone": "No instalado",
+      "deploymentUnknown": "Despliegue desconocido"
     }
   },
   "hostWarning": {
