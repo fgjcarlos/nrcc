@@ -50,7 +50,7 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
     await page.getByTestId('app-sidebar').getByRole('link', { name: /Recovery/ }).click()
     await expect(page.getByRole('heading', { name: 'Backups', exact: true })).toBeVisible()
     await page.getByRole('button', { name: /Create backup now/ }).first().click()
-    await expect(page.getByRole('button', { name: 'Manual smoke backup' })).toBeInTheDocument()
+    await expect(page.getByRole('button', { name: 'Manual smoke backup' })).toBeVisible()
   })
 
   test('restore dry path requires confirmation and triggers a real restore', async ({ page }) => {
