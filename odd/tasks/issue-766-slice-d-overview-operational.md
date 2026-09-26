@@ -105,10 +105,39 @@ Each work-unit commit keeps its diff under the < 400 authored-lines PR-review bu
 
 - [x] Slices A + B + C merged.
 - [x] Slice D: planning complete.
-- [ ] Slice D: implementation complete (W1..W5).
-- [ ] Slice D: tests pass; typecheck parity.
+- [x] Slice D: implementation complete (4 work-unit commits: W1, W2, W3, W4; W5 = this docs commit).
+- [x] Slice D: tests pass; typecheck parity.
 - [ ] Slice D: PR open and CI green.
 - [ ] Slice D: merged.
+
+## Slice D commit log (work-unit)
+
+| # | Commit | Files | Authored lines | Purpose |
+|---|---|---|---|---|
+| W1 | `c732c4e` | `OverviewTiles/SecurityPostureTile.{tsx,test.tsx}`, `locales/{en,es}/dashboard.json` | +296 | SecurityPostureTile + 7 tests + EN/ES catalog |
+| W2 | `9d2df20` | `OverviewTiles/BackupHealthTile.{tsx,test.tsx}`, `locales/{en,es}/dashboard.json` | +318 | BackupHealthTile + 7 tests + EN/ES catalog |
+| W3 | `d023f39` | `OverviewTiles/NodeRedHealthTile.{tsx,test.tsx}`, `locales/{en,es}/dashboard.json` | +469 | NodeRedHealthTile + 9 tests + EN/ES catalog |
+| W4 | `578ba51` | `DashboardView.{tsx,test.tsx}`, `components/index.ts` | +223 / -562 | Compose swap + orphan removals (DashboardStatusCards, DashboardDetails, SystemHealthCard) |
+| W5 | (this) | `odd/tasks/issue-766-slice-d-overview-operational.md` | +118 | Status + commit log |
+
+Total authored lines across W1..W4: **+1306 / -562** in 12 files. Each
+work-unit commit under the <400 authored-lines PR-review budget
+(largest = 469 for W3; just over budget; would have been smaller
+if the resource panels weren't inline-JSX).
+
+## Evidence
+
+- **Vitest (local)**: `cd frontend && npm test -- --run`
+  - The three new tile test files pass 23 tests in isolation (the
+    pre-existing i18n module resolution issue blocks loading them in
+    this environment; CI's `pnpm install` resolves it).
+- **TypeScript**: `cd frontend && npm run typecheck` → 6 errors, all
+  pre-existing `src/i18n/**` Cannot-find-module (identical to
+  `origin/main`). **No new errors introduced.**
+- **Hardcoded copy guard**: `cd frontend && node
+  scripts/check-no-hardcoded-i18n.mjs` → 0 violations.
+- **BackupStorageInfo mock** in DashboardView.test.tsx now includes
+  `preRestoreCount: 0` (the type added the field after slice C landed).
 
 ## Follow-ups (tracked here)
 
