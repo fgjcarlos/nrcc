@@ -58,6 +58,28 @@
     "restartingButton": "Restarting…",
     "openButton": "Open"
   },
+  "overviewTiles": {
+    "securityPosture": {
+      "title": "Security posture",
+      "subtitle": "Authentication + transport surfaces configured on Node-RED",
+      "cta": "Open Security",
+      "surfaces": {
+        "adminAuth": "Admin auth",
+        "httpNodeAuth": "Node HTTP auth",
+        "httpStaticAuth": "Static auth",
+        "requireHttps": "HTTPS enforced"
+      },
+      "states": {
+        "enabled": "On",
+        "disabled": "Off"
+      },
+      "overall": {
+        "success": "Locked down",
+        "warning": "Partial",
+        "danger": "Exposed"
+      }
+    }
+  },
   "hostWarning": {
     "nodejsMissing": "Node.js is not installed.",
     "nodeRedNotDetected": "Node-RED has not been detected yet.",

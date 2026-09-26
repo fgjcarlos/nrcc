@@ -58,6 +58,28 @@
     "restartingButton": "Reiniciando…",
     "openButton": "Abrir"
   },
+  "overviewTiles": {
+    "securityPosture": {
+      "title": "Postura de seguridad",
+      "subtitle": "Superficies de autenticación + transporte configuradas en Node-RED",
+      "cta": "Abrir Seguridad",
+      "surfaces": {
+        "adminAuth": "Auth admin",
+        "httpNodeAuth": "Auth HTTP de nodos",
+        "httpStaticAuth": "Auth estática",
+        "requireHttps": "HTTPS forzado"
+      },
+      "states": {
+        "enabled": "Activado",
+        "disabled": "Desactivado"
+      },
+      "overall": {
+        "success": "Asegurado",
+        "warning": "Parcial",
+        "danger": "Expuesto"
+      }
+    }
+  },
   "hostWarning": {
     "nodejsMissing": "Node.js no está instalado.",
     "nodeRedNotDetected": "Node-RED aún no fue detectado.",
