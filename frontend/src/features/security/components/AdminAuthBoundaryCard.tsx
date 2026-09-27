@@ -105,13 +105,6 @@ export function AdminAuthBoundaryCard({
   ];
   const displayExpiry = edits.expiry ?? config?.sessionExpiryTime ?? 0;
 
-  const isDirty =
-    edits.usernames.size > 0 ||
-    edits.permissions.size > 0 ||
-    edits.passwords.size > 0 ||
-    edits.added.length > 0 ||
-    edits.expiry !== undefined;
-
   const surfacesConfigured = serverUsers.length > 0;
   const variant: 'success' | 'warning' | 'neutral' = !editable
     ? 'neutral'
@@ -442,7 +435,7 @@ export function AdminAuthBoundaryCard({
           type="button"
           className="action-btn-primary flex items-center gap-2"
           onClick={save}
-          disabled={disabled || !isDirty}
+          disabled={disabled}
           data-testid="boundary-admin-auth-save"
         >
           <Plus className="h-4 w-4" aria-hidden="true" />
