@@ -41,6 +41,8 @@ interface UserEdits {
   passwords: Map<number, string>;
   /** Rows the operator added locally (not yet on the server). */
   added: AdminUser[];
+  /** Server-user indices the operator has marked for deletion. */
+  removed: Set<number>;
   /** Expiry override (when operator typed a new value). */
   expiry?: number;
 }
@@ -72,6 +74,7 @@ export function AdminAuthBoundaryCard({
     permissions: new Map(),
     passwords: new Map(),
     added: [],
+    removed: new Set(),
   });
   const [saving, setSaving] = useState(false);
   const [confirmMigration, setConfirmMigration] = useState(false);
@@ -82,18 +85,22 @@ export function AdminAuthBoundaryCard({
   // Server-authoritative user list (drives row count + base values).
   const serverUsers = config?.users ?? [];
 
-  // Derived display values: server rows with edit overrides + locally
-  // added rows appended after.
+  // Derived display values: server rows (minus any the operator marked
+  // for deletion) with edit overrides applied + locally added rows
+  // appended after.
   const displayUsers: AdminUser[] = [
-    ...serverUsers.map((serverUser, index) => {
-      const overrideUser: AdminUser = {
-        username: edits.usernames.get(index) ?? serverUser.username ?? '',
-        permissions:
-          edits.permissions.get(index) ?? serverUser.permissions ?? '*',
-        password: edits.passwords.get(index) ?? '',
-      };
-      return overrideUser;
-    }),
+    ...serverUsers
+      .map((serverUser, index) => {
+        if (edits.removed.has(index)) return null;
+        const overrideUser: AdminUser = {
+          username: edits.usernames.get(index) ?? serverUser.username ?? '',
+          permissions:
+            edits.permissions.get(index) ?? serverUser.permissions ?? '*',
+          password: edits.passwords.get(index) ?? '',
+        };
+        return overrideUser;
+      })
+      .filter((u): u is AdminUser => u !== null),
     ...edits.added,
   ];
   const displayExpiry = edits.expiry ?? config?.sessionExpiryTime ?? 0;
@@ -153,16 +160,24 @@ export function AdminAuthBoundaryCard({
   };
 
   const removeUser = (index: number) => {
-    // Remove either an edited server user (shift edits > index down
-    // by one) or a locally-added row (drop the matching index from
-    // edits.added). The two paths split cleanly on the server row count.
+    // Remove either an edited server user (mark the index as removed
+    // + shift edits > index down by one so the remaining rows keep
+    // their edits) or a locally-added row (drop the matching index
+    // from edits.added). The two paths split cleanly on the server
+    // row count.
     setEdits((current) => {
       const serverCount = serverUsers.length;
       if (index >= serverCount) {
         const addedIndex = index - serverCount;
+        const newRemoved = new Set(current.removed);
+        if (addedIndex < 0) {
+          // Mark the corresponding server row as removed.
+          newRemoved.add(index);
+        }
         return {
           ...current,
           added: current.added.filter((_, i) => i !== addedIndex),
+          removed: newRemoved,
         };
       }
       const shiftMap = <Value,>(src: Map<number, Value>) => {
@@ -173,11 +188,18 @@ export function AdminAuthBoundaryCard({
         }
         return out;
       };
+      const newRemoved = new Set<number>();
+      for (const r of current.removed) {
+        if (r === index) continue;
+        newRemoved.add(r < index ? r : r - 1);
+      }
+      newRemoved.add(index);
       return {
         ...current,
         usernames: shiftMap(current.usernames),
         permissions: shiftMap(current.permissions),
         passwords: shiftMap(current.passwords),
+        removed: newRemoved,
       };
     });
     setError(undefined);
@@ -209,6 +231,7 @@ export function AdminAuthBoundaryCard({
         permissions: new Map(),
         passwords: new Map(),
         added: [],
+        removed: new Set(),
       });
       // The lint rule flags Date.now() as impure; this call runs from
       // the Save button click handler (an event), not from render, so
