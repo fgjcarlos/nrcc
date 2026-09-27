@@ -103,19 +103,16 @@ test.describe('Security Center transactional apply (issue #766 slice E — per-s
     // First click hits the revision-conflict branch (409 → SETTINGS_REVISION_CONFLICT).
     await page.getByTestId('boundary-admin-auth-username').first().fill('operator-updated')
     await page.getByTestId('boundary-admin-auth-save').click()
-    await expect(
-      page.getByText(
-        'Settings changed elsewhere. Refresh, review the redacted preview, then retry.',
-        { exact: false },
-      ),
-    ).toBeVisible()
+    // Scope the assertion to the boundary card's error banner via its
+    // testid; the same text is rendered inside the sonner toast which
+    // would otherwise trigger Playwright's strict-mode locator violation.
+    await expect(page.getByTestId('boundary-admin-auth-error')).toContainText(
+      'Settings changed elsewhere. Refresh, review the redacted preview, then retry.',
+    )
     // Second click hits the readiness-failure branch (500 → APPLY_ERROR).
     await page.getByTestId('boundary-admin-auth-save').click()
-    await expect(
-      page.getByText(
-        'The transaction did not complete. Any failed readiness check is rolled back; review runtime readiness, then retry.',
-        { exact: false },
-      ),
-    ).toBeVisible()
+    await expect(page.getByTestId('boundary-admin-auth-error')).toContainText(
+      'The transaction did not complete. Any failed readiness check is rolled back; review runtime readiness, then retry.',
+    )
   })
 })
