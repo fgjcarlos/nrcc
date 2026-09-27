@@ -145,11 +145,15 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
 
   test('Security Center exposes the canonical authentication surface in read-only mode', async ({ page }) => {
     await login(page)
-    // Issue #766 slice A — Authentication tab lifted out of
-    // /configuration into the dedicated /security section.
+    // Issue #766 slice E — SecurityView now renders 4 independent
+    // boundary cards (Nrcc access + Node-RED admin auth + Node HTTP
+    // auth + Static auth). Assert one of the boundaries surfaces the
+    // read-only state instead of the old combined "Security Center"
+    // heading.
     await page.goto('/security')
-    await expect(page.getByRole('heading', { name: 'Security Center' })).toBeVisible()
-    await expect(page.getByText('Security Center is read-only because this runtime configuration is not editable.', { exact: true })).toContainText('read-only')
-    await expect(page.getByRole('button', { name: 'Save Security Center' })).not.toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Node-RED admin auth' })).toBeVisible()
+    // Read-only mode keeps the Save button mounted but disabled so
+    // the operator still sees the action affordance.
+    await expect(page.getByRole('button', { name: 'Save admin auth' })).toBeDisabled()
   })
 })
