@@ -30,16 +30,16 @@
     "clsx": "^2.1.1",
     "i18next": "^26.4.2",
     "i18next-browser-languagedetector": "^8.2.1",
-    "lucide-react": "^1.46.0",
+    "lucide-react": "^1.47.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-hook-form": "^7.87.0",
     "react-i18next": "^17.0.15",
-    "react-router-dom": "^7.18.3",
+    "react-router-dom": "^7.18.4",
     "recharts": "^3.10.1",
     "sonner": "^2.0.8",
     "tailwind-merge": "^3.6.0",
-    "zod": "^4.4.3"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -47,7 +47,7 @@
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.1",
-    "@types/node": "^26.4.0",
+    "@types/node": "^26.6.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
@@ -66,7 +66,7 @@
     "serve": "^14.2.6",
     "tailwindcss": "^3.4.19",
     "typescript": "~6.0.3",
-    "typescript-eslint": "^8.70.0",
+    "typescript-eslint": "^8.70.1",
     "vite": "^8.3.0",
     "vitest": "^4.1.6"
   }
