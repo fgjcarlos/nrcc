@@ -106,10 +106,17 @@ describe('SecurityView (slice E composition)', () => {
     await waitFor(() =>
       expect(screen.getByTestId('boundary-admin-auth')).toBeInTheDocument(),
     );
-    // Save stays disabled until the operator has touched a field.
+    // Wait for the user rows to render so adminAuth.users is populated
+    // when apply() builds the patch; otherwise apply sends
+    // { adminAuth: null } and the backend rejects it.
+    await waitFor(() =>
+      expect(
+        screen.getAllByTestId('boundary-admin-auth-username').length,
+      ).toBeGreaterThan(0),
+    );
     // user-event's `clear()` doesn't work on number inputs in this
-    // version; use fireEvent.change to bump the expiry value
-    // and reach apply() through the markDirty() handler.
+    // version; use fireEvent.change to bump the expiry value so the
+    // payload differs from the server snapshot.
     const expiryInput = screen.getByTestId('boundary-admin-auth-expiry');
     fireEvent.change(expiryInput, { target: { value: '7200' } });
     await user.click(screen.getByTestId('boundary-admin-auth-save'));

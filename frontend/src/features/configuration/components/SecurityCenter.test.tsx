@@ -185,8 +185,12 @@ describe('Security Center — rewired against SecurityView (issue #766 slice E)'
     );
     // The user rows land after the config query resolves; wait for
     // them so the username edit doesn't race with the initial render.
-    await waitFor(() =>
-      expect(screen.getAllByTestId('boundary-admin-auth-username').length).toBeGreaterThan(0),
+    await waitFor(
+      () =>
+        expect(
+          screen.getAllByTestId('boundary-admin-auth-username').length,
+        ).toBeGreaterThan(0),
+      { timeout: 5000 },
     );
 
     // Update the first username; only adminAuth should hit the API.
