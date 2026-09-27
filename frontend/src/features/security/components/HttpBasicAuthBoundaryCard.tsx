@@ -108,7 +108,13 @@ export function HttpBasicAuthBoundaryCard({
     const result = await applySecurityPatch(patch, expectedRevision);
     setSaving(false);
     if (result.status === 'applied') {
-      setAppliedAt(Date.now());
+      // The lint rule flags Date.now() as impure; this call runs from
+      // the Save button click handler (an event), not from render, so
+      // purity is preserved. Capture once to keep the call out of
+      // the setState callback.
+      // eslint-disable-next-line react-hooks/purity
+      const ts = Date.now();
+      setAppliedAt(ts);
       reportApplySuccess(t(i18n('applied')));
       onApplied();
     } else {

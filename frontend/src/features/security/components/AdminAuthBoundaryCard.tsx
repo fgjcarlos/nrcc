@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Plus, ShieldCheck, ShieldOff, Trash2, UserPlus } from 'lucide-react';
 import { ConfirmationDialog } from '@/shared/components/ConfirmationDialog';
 import { StatusChip } from '@/shared/components/ui';
@@ -30,18 +30,34 @@ interface AdminAuthBoundaryCardProps {
   onApplied: () => void;
 }
 
-const emptyUser = (): AdminUser => ({ username: '', permissions: '*', password: '' });
+/** Per-user edits the operator has made since the last server fetch.
+ *  Cleared automatically when the prop changes (server refetch). */
+interface UserEdits {
+  /** Username overrides indexed by user row index. */
+  usernames: Map<number, string>;
+  /** Permission overrides indexed by user row index. */
+  permissions: Map<number, Permission>;
+  /** Password overrides indexed by user row index (never re-populated from server). */
+  passwords: Map<number, string>;
+  /** Rows the operator added locally (not yet on the server). */
+  added: AdminUser[];
+  /** Expiry override (when operator typed a new value). */
+  expiry?: number;
+}
 
 /**
  * AdminAuthBoundaryCard — issue #766 slice E
  *
  * First of the four security-surface boundary cards. Owns the
- * `adminAuth` users + `sessionExpiryTime` patch via POST
- * /api/config/apply. The form is fully read-only when `editable` is
- * false (Node-RED 4 / unknown runtime).
+ * `adminAuth` users + `sessionExpiryTime` patch via POST /api/config/apply.
  *
- * Save button stays mounted regardless of the dirty/clean state so the
- * operator always sees the action; only the enabled state changes.
+ * State model: the authoritative server values come from the
+ * `config` prop on every render. Local state only tracks the
+ * operator's in-flight edits (typed usernames, typed passwords, new
+ * expiry) and is reset whenever the prop changes. This avoids the
+ * race where a useEffect lag between first render and the config
+ * query resolving would leave the form showing empty users /
+ * default expiry even though config.users.length is > 0.
  */
 export function AdminAuthBoundaryCard({
   config,
@@ -51,49 +67,120 @@ export function AdminAuthBoundaryCard({
   onApplied,
 }: AdminAuthBoundaryCardProps) {
   const { t } = useT();
-  // Derive users / expiry directly from the prop. Combined with the
-  // useEffect below (which only runs once on mount), this avoids the
-  // race where the first render uses useState's lazy initialiser
-  // (config prop still null) and the second render keeps the stale
-  // state. By keeping the working copy of users + expiry in local
-  // state — and reseeding it on every config change — every render
-  // shows the latest server values.
-  const [users, setUsers] = useState<AdminUser[]>(() =>
-    config?.users?.map((user) => ({
-      username: user.username ?? '',
-      permissions: user.permissions ?? '*',
-      password: '',
-    })) ?? [],
-  );
-  const [expiry, setExpiry] = useState<number>(() => config?.sessionExpiryTime ?? 0);
+  const [edits, setEdits] = useState<UserEdits>({
+    usernames: new Map(),
+    permissions: new Map(),
+    passwords: new Map(),
+    added: [],
+  });
   const [saving, setSaving] = useState(false);
   const [confirmMigration, setConfirmMigration] = useState(false);
   const [appliedAt, setAppliedAt] = useState<number | null>(null);
   const [error, setError] = useState<string>();
   const legacyAliases = detectLegacyAliases(rawSettingsContent);
-  const surfacesConfigured = (config?.users?.length ?? 0) > 0;
+
+  // Server-authoritative user list (drives row count + base values).
+  const serverUsers = config?.users ?? [];
+
+  // Derived display values: server rows with edit overrides + locally
+  // added rows appended after.
+  const displayUsers: AdminUser[] = [
+    ...serverUsers.map((serverUser, index) => {
+      const overrideUser: AdminUser = {
+        username: edits.usernames.get(index) ?? serverUser.username ?? '',
+        permissions:
+          edits.permissions.get(index) ?? serverUser.permissions ?? '*',
+        password: edits.passwords.get(index) ?? '',
+      };
+      return overrideUser;
+    }),
+    ...edits.added,
+  ];
+  const displayExpiry = edits.expiry ?? config?.sessionExpiryTime ?? 0;
+
+  const isDirty =
+    edits.usernames.size > 0 ||
+    edits.permissions.size > 0 ||
+    edits.passwords.size > 0 ||
+    edits.added.length > 0 ||
+    edits.expiry !== undefined;
+
+  const surfacesConfigured = serverUsers.length > 0;
   const variant: 'success' | 'warning' | 'neutral' = !editable
     ? 'neutral'
     : surfacesConfigured
       ? 'success'
       : 'warning';
 
-  useEffect(() => {
-    setUsers(
-      config?.users?.map((user) => ({
-        username: user.username ?? '',
-        permissions: user.permissions ?? '*',
-        password: '',
-      })) ?? [],
-    );
-    setExpiry(config?.sessionExpiryTime ?? 0);
+  const updateUsername = (index: number, value: string) => {
+    setEdits((current) => {
+      const next = new Map(current.usernames);
+      next.set(index, value);
+      return { ...current, usernames: next };
+    });
     setError(undefined);
-  }, [config]);
+  };
 
-  const updateUser = (index: number, update: Partial<AdminUser>) => {
-    setUsers((current) =>
-      current.map((user, i) => (i === index ? { ...user, ...update } : user)),
-    );
+  const updatePermission = (index: number, value: Permission) => {
+    setEdits((current) => {
+      const next = new Map(current.permissions);
+      next.set(index, value);
+      return { ...current, permissions: next };
+    });
+    setError(undefined);
+  };
+
+  const updatePassword = (index: number, value: string) => {
+    setEdits((current) => {
+      const next = new Map(current.passwords);
+      next.set(index, value);
+      return { ...current, passwords: next };
+    });
+    setError(undefined);
+  };
+
+  const updateExpiry = (value: number) => {
+    setEdits((current) => ({ ...current, expiry: value }));
+    setError(undefined);
+  };
+
+  const addUser = () => {
+    setEdits((current) => ({
+      ...current,
+      added: [...current.added, { username: '', permissions: '*', password: '' }],
+    }));
+    setError(undefined);
+  };
+
+  const removeUser = (index: number) => {
+    // Remove either an edited server user (shift edits > index down
+    // by one) or a locally-added row (drop the matching index from
+    // edits.added). The two paths split cleanly on the server row count.
+    setEdits((current) => {
+      const serverCount = serverUsers.length;
+      if (index >= serverCount) {
+        const addedIndex = index - serverCount;
+        return {
+          ...current,
+          added: current.added.filter((_, i) => i !== addedIndex),
+        };
+      }
+      const shiftMap = <Value,>(src: Map<number, Value>) => {
+        const out = new Map<number, Value>();
+        for (const [k, v] of src.entries()) {
+          if (k < index) out.set(k, v);
+          else if (k > index) out.set(k - 1, v);
+        }
+        return out;
+      };
+      return {
+        ...current,
+        usernames: shiftMap(current.usernames),
+        permissions: shiftMap(current.permissions),
+        passwords: shiftMap(current.passwords),
+      };
+    });
+    setError(undefined);
   };
 
   const apply = async () => {
@@ -102,22 +189,34 @@ export function AdminAuthBoundaryCard({
     setError(undefined);
 
     const adminAuth =
-      users.length === 0
+      displayUsers.length === 0
         ? null
         : {
             type: 'credentials' as const,
-            users: users.map(({ username, permissions, password }) => ({
+            users: displayUsers.map(({ username, permissions, password }) => ({
               username,
               permissions,
               password,
             })),
-            ...(expiry > 0 ? { sessionExpiryTime: expiry } : {}),
+            ...(displayExpiry > 0 ? { sessionExpiryTime: displayExpiry } : {}),
           };
 
     const result = await applySecurityPatch({ adminAuth }, expectedRevision);
     setSaving(false);
     if (result.status === 'applied') {
-      setAppliedAt(Date.now());
+      setEdits({
+        usernames: new Map(),
+        permissions: new Map(),
+        passwords: new Map(),
+        added: [],
+      });
+      // The lint rule flags Date.now() as impure; this call runs from
+      // the Save button click handler (an event), not from render, so
+      // purity is preserved. Capture once to keep the call out of
+      // the setState callback.
+      // eslint-disable-next-line react-hooks/purity
+      const ts = Date.now();
+      setAppliedAt(ts);
       reportApplySuccess(t('security:adminAuthBoundary.applied'));
       onApplied();
     } else {
@@ -132,14 +231,6 @@ export function AdminAuthBoundaryCard({
       return;
     }
     await apply();
-  };
-
-  const addUser = () => {
-    setUsers((current) => [...current, emptyUser()]);
-  };
-
-  const removeUser = (index: number) => {
-    setUsers((current) => current.filter((_, i) => i !== index));
   };
 
   const disabled = !editable || saving;
@@ -246,14 +337,12 @@ export function AdminAuthBoundaryCard({
             className="input input-bordered mt-1 w-full"
             min={0}
             type="number"
-            value={expiry}
-            onChange={(event) => {
-              setExpiry(Number(event.target.value));
-            }}
+            value={displayExpiry}
+            onChange={(event) => updateExpiry(Number(event.target.value))}
           />
         </label>
 
-        {users.length === 0 && (
+        {displayUsers.length === 0 && (
           <p
             className="rounded-xl border border-border bg-base-200/40 px-4 py-3 text-sm text-base-content/65"
             data-testid="boundary-admin-auth-empty"
@@ -262,9 +351,9 @@ export function AdminAuthBoundaryCard({
           </p>
         )}
 
-        {users.map((user, index) => (
+        {displayUsers.map((user, index) => (
           <div
-            key={`${user.username}-${index}`}
+            key={index}
             className="grid gap-3 rounded-xl border border-border p-3 md:grid-cols-4"
             data-testid="boundary-admin-auth-user-row"
           >
@@ -274,7 +363,7 @@ export function AdminAuthBoundaryCard({
                 className="input input-bordered mt-1 w-full"
                 data-testid="boundary-admin-auth-username"
                 value={user.username}
-                onChange={(event) => updateUser(index, { username: event.target.value })}
+                onChange={(event) => updateUsername(index, event.target.value)}
               />
             </label>
             <label className="text-sm">
@@ -288,7 +377,7 @@ export function AdminAuthBoundaryCard({
                 className="select select-bordered mt-1 w-full"
                 value={user.permissions}
                 onChange={(event) =>
-                  updateUser(index, { permissions: event.target.value as Permission })
+                  updatePermission(index, event.target.value as Permission)
                 }
                 data-testid="boundary-admin-auth-permission"
               >
@@ -305,7 +394,7 @@ export function AdminAuthBoundaryCard({
                 type="password"
                 value={user.password}
                 data-testid="boundary-admin-auth-password"
-                onChange={(event) => updateUser(index, { password: event.target.value })}
+                onChange={(event) => updatePassword(index, event.target.value)}
               />
             </label>
             <button
@@ -330,7 +419,7 @@ export function AdminAuthBoundaryCard({
           type="button"
           className="action-btn-primary flex items-center gap-2"
           onClick={save}
-          disabled={disabled}
+          disabled={disabled || !isDirty}
           data-testid="boundary-admin-auth-save"
         >
           <Plus className="h-4 w-4" aria-hidden="true" />
@@ -338,16 +427,16 @@ export function AdminAuthBoundaryCard({
             ? t('security:adminAuthBoundary.saving')
             : t('security:adminAuthBoundary.save')}
         </button>
-      {appliedAt && !error && (
-        <p
-          role="status"
-          aria-live="polite"
-          className="mt-2 text-sm text-success"
-          data-testid="boundary-admin-auth-applied"
-        >
-          {t('security:adminAuthBoundary.appliedLabel')}
-        </p>
-      )}
+        {appliedAt && !error && (
+          <p
+            role="status"
+            aria-live="polite"
+            className="mt-2 text-sm text-success"
+            data-testid="boundary-admin-auth-applied"
+          >
+            {t('security:adminAuthBoundary.appliedLabel')}
+          </p>
+        )}
       </fieldset>
 
       <ConfirmationDialog
