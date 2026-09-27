@@ -59,7 +59,6 @@ export function HttpBasicAuthBoundaryCard({
   const [confirmMigration, setConfirmMigration] = useState(false);
   const [error, setError] = useState<string>();
   const [appliedAt, setAppliedAt] = useState<number | null>(null);
-  const [dirty, setDirty] = useState(false);
 
   const surfaceConfigured = Boolean(config?.user);
   const legacyAliases = detectLegacyAliases(rawSettingsContent);
@@ -86,16 +85,10 @@ export function HttpBasicAuthBoundaryCard({
       pass: '',
       storedPass: config?.pass,
     });
-    setDirty(false);
     setError(undefined);
   }, [config]);
 
   const i18n = (suffix: string) => `security:${surface}.${suffix}`;
-
-  const markDirty = () => {
-    setDirty(true);
-    setError(undefined);
-  };
 
   const apply = async () => {
     setConfirmMigration(false);
@@ -115,7 +108,6 @@ export function HttpBasicAuthBoundaryCard({
     const result = await applySecurityPatch(patch, expectedRevision);
     setSaving(false);
     if (result.status === 'applied') {
-      setDirty(false);
       setAppliedAt(Date.now());
       reportApplySuccess(t(i18n('applied')));
       onApplied();
@@ -232,7 +224,6 @@ export function HttpBasicAuthBoundaryCard({
             data-testid={`boundary-${surface}-user`}
             value={value.user}
             onChange={(event) => {
-              markDirty();
               setValue((current) => ({ ...current, user: event.target.value }));
             }}
           />
@@ -245,7 +236,6 @@ export function HttpBasicAuthBoundaryCard({
             type="password"
             value={value.pass}
             onChange={(event) => {
-              markDirty();
               setValue((current) => ({ ...current, pass: event.target.value }));
             }}
           />
@@ -266,9 +256,7 @@ export function HttpBasicAuthBoundaryCard({
           type="button"
           className="action-btn-primary flex items-center gap-2"
           onClick={save}
-          disabled={
-            !editable || saving || (!dirty && !isLegacySurface)
-          }
+          disabled={!editable || saving}
           data-testid={`boundary-${surface}-save`}
         >
           <Check className="h-4 w-4" aria-hidden="true" />

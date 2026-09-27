@@ -70,7 +70,6 @@ export function AdminAuthBoundaryCard({
   const [confirmMigration, setConfirmMigration] = useState(false);
   const [appliedAt, setAppliedAt] = useState<number | null>(null);
   const [error, setError] = useState<string>();
-  const [dirty, setDirty] = useState(false);
   const legacyAliases = detectLegacyAliases(rawSettingsContent);
   const surfacesConfigured = (config?.users?.length ?? 0) > 0;
   const variant: 'success' | 'warning' | 'neutral' = !editable
@@ -88,17 +87,10 @@ export function AdminAuthBoundaryCard({
       })) ?? [],
     );
     setExpiry(config?.sessionExpiryTime ?? 0);
-    setDirty(false);
     setError(undefined);
   }, [config]);
 
-  const markDirty = () => {
-    setDirty(true);
-    setError(undefined);
-  };
-
   const updateUser = (index: number, update: Partial<AdminUser>) => {
-    markDirty();
     setUsers((current) =>
       current.map((user, i) => (i === index ? { ...user, ...update } : user)),
     );
@@ -125,7 +117,6 @@ export function AdminAuthBoundaryCard({
     const result = await applySecurityPatch({ adminAuth }, expectedRevision);
     setSaving(false);
     if (result.status === 'applied') {
-      setDirty(false);
       setAppliedAt(Date.now());
       reportApplySuccess(t('security:adminAuthBoundary.applied'));
       onApplied();
@@ -144,12 +135,10 @@ export function AdminAuthBoundaryCard({
   };
 
   const addUser = () => {
-    markDirty();
     setUsers((current) => [...current, emptyUser()]);
   };
 
   const removeUser = (index: number) => {
-    markDirty();
     setUsers((current) => current.filter((_, i) => i !== index));
   };
 
@@ -259,7 +248,6 @@ export function AdminAuthBoundaryCard({
             type="number"
             value={expiry}
             onChange={(event) => {
-              markDirty();
               setExpiry(Number(event.target.value));
             }}
           />
@@ -342,7 +330,7 @@ export function AdminAuthBoundaryCard({
           type="button"
           className="action-btn-primary flex items-center gap-2"
           onClick={save}
-          disabled={disabled || (!dirty && legacyAliases.length === 0)}
+          disabled={disabled}
           data-testid="boundary-admin-auth-save"
         >
           <Plus className="h-4 w-4" aria-hidden="true" />
