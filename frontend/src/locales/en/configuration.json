@@ -173,6 +173,8 @@
     "groupHardRestart": "Hard restart ({{count}})",
     "groupSoftRestart": "Flow redeploy ({{count}})",
     "groupNone": "Other ({{count}})",
+    "configuredLabel": "Current",
+    "newLabel": "New",
     "apply": "Apply",
     "cancel": "Cancel",
     "applying": "Applying…",

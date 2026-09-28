@@ -173,6 +173,8 @@
     "groupHardRestart": "Reinicio completo ({{count}})",
     "groupSoftRestart": "Redespliegue de flows ({{count}})",
     "groupNone": "Otros ({{count}})",
+    "configuredLabel": "Actual",
+    "newLabel": "Nuevo",
     "apply": "Aplicar",
     "cancel": "Cancelar",
     "applying": "Aplicando…",
