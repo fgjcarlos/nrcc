@@ -1,6 +1,7 @@
 {
   "title": "Seguridad",
   "subtitle": "Superficies de autenticación y acceso al dashboard para esta instancia de Node-RED.",
+  "topologyAriaLabel": "Topología de seguridad: NRCC edita settings.js, Node-RED lo lee al (re)iniciar.",
   "adminAuthBoundary": {
     "title": "Auth admin de Node-RED",
     "subtitle": "Credenciales, expiración de sesión y el flujo de migración sólo-lectura",

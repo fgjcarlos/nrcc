@@ -11,8 +11,9 @@ import {
   AIProviderSettings,
 } from '.';
 import { AdvancedSettings } from './AdvancedSettings';
+import { ConfigurationHeader } from './ConfigurationHeader';
 import {
-  Settings, Server, Shield, Activity, Palette,
+  Server, Shield, Activity, Palette,
   Save, LockOpen, AlertTriangle, Bot
 } from 'lucide-react';
 import { useConfigurationData, useConfigurationActions, useConfigurationDiff, useConfigurationSave, fieldValidationMap } from '../hooks';
@@ -270,35 +271,29 @@ export function ConfigurationView() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">Settings</p>
-          <h1 className="flex items-center gap-3 text-2xl font-bold text-base-content">
-            <Settings className="h-6 w-6" />
-            {t('configuration:pageTitle')}
-          </h1>
-        </div>
-        <div className="flex items-center gap-2">
-          {hasChanges && (
-            <button
-              type="button"
-              onClick={handleReset}
-              className="px-4 py-2 text-sm font-medium text-base-content/60 transition-colors hover:text-base-content"
-            >
-              {t('configuration:discardChanges')}
-            </button>
-          )}
+      {/* Header (slice F W3) — page title + topology diagram */}
+      <ConfigurationHeader />
+      {/* Save / discard controls live next to the header but are not
+          part of it so the topology diagram keeps a tidy column. */}
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {hasChanges && (
           <button
             type="button"
-            onClick={handleSave}
-            disabled={!diff.canSave || isSaving}
-            className="action-btn-primary"
+            onClick={handleReset}
+            className="px-4 py-2 text-sm font-medium text-base-content/60 transition-colors hover:text-base-content"
           >
-            <Save className="w-4 h-4" />
-            {actions.saveConfigMutation.isPending ? t('common:saving') + '...' : t('common:save')}
+            {t('configuration:discardChanges')}
           </button>
-        </div>
+        )}
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={!diff.canSave || isSaving}
+          className="action-btn-primary"
+        >
+          <Save className="w-4 h-4" />
+          {actions.saveConfigMutation.isPending ? t('common:saving') + '...' : t('common:save')}
+        </button>
       </div>
 
       {/* Host Status Info */}
