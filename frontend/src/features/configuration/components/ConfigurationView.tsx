@@ -12,6 +12,7 @@ import {
 } from '.';
 import { AdvancedSettings } from './AdvancedSettings';
 import { ConfigurationHeader } from './ConfigurationHeader';
+import { ReviewChangesPanel } from './ReviewChangesPanel';
 import {
   Server, Shield, Activity, Palette,
   Save, LockOpen, AlertTriangle, Bot
@@ -149,6 +150,12 @@ export function ConfigurationView() {
   // gates when the operator typed a non-empty secret).
   const [rotationDialogOpen, setRotationDialogOpen] = useState(false);
 
+  // Issue #766 slice F (W4) — reviewable safe-apply panel. Opens when
+  // the operator clicks the global Save button. The actual save still
+  // goes through `handleSave` so the credentialSecret rotation dialog
+  // and the raw-settings unlock flow remain the single source of truth.
+  const [reviewPanelOpen, setReviewPanelOpen] = useState(false);
+
   // Data and actions hooks
   const { t } = useT();
 
@@ -193,20 +200,32 @@ export function ConfigurationView() {
   };
 
   const handleSave = async () => {
+    // Issue #766 slice F (W4) — reviewable safe-apply flow. Open the
+    // review panel first; the panel's Apply button drives the actual
+    // save via `handleApplyFromPanel` so the credentialSecret rotation
+    // dialog and the raw-settings unlock flow remain the single source
+    // of truth.
+    setReviewPanelOpen(true);
+  };
+
+  const handleApplyFromPanel = async () => {
     // Issue #762 — rotation confirmation gates the save on a new
     // credentialSecret.
     if (formData.credentialSecret) {
+      setReviewPanelOpen(false);
       setRotationDialogOpen(true);
       return;
     }
     const outcome = await save.save();
     if (outcome.ok) {
       setHasChanges(false);
+      setReviewPanelOpen(false);
     } else if (outcome.reason === 'validation-errors') {
       toast.error(`Fix ${Object.keys(outcome.errors).length} field${Object.keys(outcome.errors).length === 1 ? '' : 's'} before saving`);
     } else if (outcome.reason === 'no-pending-changes') {
       // Operator clicked Save without changing anything; treat as a
       // soft no-op.
+      setReviewPanelOpen(false);
     } else if (outcome.reason === 'read-only') {
       toast.error('Configuration is read-only on this host');
     }
@@ -292,7 +311,7 @@ export function ConfigurationView() {
           className="action-btn-primary"
         >
           <Save className="w-4 h-4" />
-          {actions.saveConfigMutation.isPending ? t('common:saving') + '...' : t('common:save')}
+          {actions.saveConfigMutation.isPending ? t('common:saving') + '...' : t('configuration:reviewPanel.openButton')}
         </button>
       </div>
 
@@ -471,6 +490,17 @@ export function ConfigurationView() {
         acknowledgement={t('configuration:rotateSecretAcknowledgement')}
         onCancel={handleCancelRotation}
         onConfirm={handleConfirmRotation}
+      />
+
+      {/* Issue #766 slice F (W4) — reviewable safe-apply drawer. */}
+      <ReviewChangesPanel
+        isOpen={reviewPanelOpen}
+        fields={diff.fields}
+        pendingCount={diff.pendingCount}
+        target="settings.js"
+        isPending={actions.saveConfigMutation.isPending}
+        onApply={handleApplyFromPanel}
+        onCancel={() => setReviewPanelOpen(false)}
       />
     </div>
   );

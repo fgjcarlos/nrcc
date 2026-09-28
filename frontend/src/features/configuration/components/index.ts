@@ -10,3 +10,4 @@ export { ConfigurationFieldStatusRow } from './ConfigurationFieldStatusRow';
 export { FieldStatusChip } from './FieldStatusChip';
 export { NrccTopologyDiagram } from './NrccTopologyDiagram';
 export { ConfigurationHeader } from './ConfigurationHeader';
+export { ReviewChangesPanel } from './ReviewChangesPanel';
