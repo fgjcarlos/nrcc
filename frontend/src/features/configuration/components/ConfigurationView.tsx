@@ -311,7 +311,7 @@ export function ConfigurationView() {
           className="action-btn-primary"
         >
           <Save className="w-4 h-4" />
-          {actions.saveConfigMutation.isPending ? t('common:saving') + '...' : t('configuration:reviewPanel.openButton')}
+          {actions.saveConfigMutation.isPending ? t('common:saving') + '...' : t('common:save')}
         </button>
       </div>
 

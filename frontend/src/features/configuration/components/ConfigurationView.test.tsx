@@ -289,9 +289,12 @@ describe('ConfigurationView (issue #762 — Security tab for credentialSecret / 
     const secretInput = screen.getByLabelText('Credential Secret') as HTMLInputElement;
     await user.type(secretInput, 'new-rotation-passphrase');
 
-    // Save click triggers the rotation warning dialog. Confirm is gated
-    // behind an acknowledgement checkbox.
+    // Issue #766 slice F (W4) — Save opens the review panel first;
+    // the rotation dialog is gated by clicking Apply inside the panel.
     await user.click(screen.getByText('Save', { selector: 'button' }));
+    const reviewPanel = await screen.findByTestId('review-changes-panel');
+    await user.click(within(reviewPanel).getByTestId('review-changes-panel-apply'));
+
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByTestId('confirmation-dialog-ack')).not.toBeChecked();
     expect(within(dialog).getByRole('button', { name: /confirm/i })).toBeDisabled();
@@ -304,6 +307,8 @@ describe('ConfigurationView (issue #762 — Security tab for credentialSecret / 
     // Re-enter and confirm: the value sticks after acknowledgement.
     await user.type(secretInput, 'final-rotation-passphrase');
     await user.click(screen.getByText('Save', { selector: 'button' }));
+    const secondReview = await screen.findByTestId('review-changes-panel');
+    await user.click(within(secondReview).getByTestId('review-changes-panel-apply'));
     const secondDialog = await screen.findByRole('dialog');
     await user.click(within(secondDialog).getByTestId('confirmation-dialog-ack'));
     await user.click(within(secondDialog).getByRole('button', { name: /confirm/i }));
@@ -323,7 +328,11 @@ describe('ConfigurationView (issue #762 — Security tab for credentialSecret / 
     await user.click(await screen.findByRole('button', { name: /^TLS & Secrets$/ }));
     await user.click(findToggleButton(/^Require HTTPS$/));
     await user.type(screen.getByLabelText('Private Key Path'), '/etc/node-red/key.pem');
+    // Issue #766 slice F (W4) — Save opens the review panel first;
+    // the actual save dispatches when the operator clicks Apply.
     await user.click(screen.getByText('Save', { selector: 'button' }));
+    const reviewPanel = await screen.findByTestId('review-changes-panel');
+    await user.click(within(reviewPanel).getByTestId('review-changes-panel-apply'));
 
     await waitFor(() => expect(updateSpy).toHaveBeenCalled());
     const payload = updateSpy.mock.calls[0][0] as Record<string, unknown>;
