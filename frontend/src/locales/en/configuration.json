@@ -183,7 +183,9 @@
     "title": "Configuration topology",
     "subtitle": "NRCC edits settings.js; Node-RED reads it on (re)start.",
     "nodeNrcc": "NRCC",
+    "nodeNrccSubtitle": "control plane",
     "nodeSettings": "settings.js",
+    "nodeSettingsSubtitle": "source of truth",
     "nodeRed": "Node-RED + Dashboard",
     "arrowNrccSettings": "edits",
     "arrowSettingsNodeRed": "loads"

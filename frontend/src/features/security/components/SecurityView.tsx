@@ -1,5 +1,6 @@
 import { Shield } from 'lucide-react';
 import { useT } from '@/i18n';
+import { NrccTopologyDiagram } from '@/features/configuration/components/NrccTopologyDiagram';
 import { useConfigurationData } from '@/features/configuration/hooks/useConfigurationData';
 import { useUsersData } from '@/features/auth/hooks/useUsersData';
 import type { NodeRedConfigResponse } from '@/features/configuration/lib/configTransformers';
@@ -62,14 +63,17 @@ export function SecurityView() {
       className="space-y-6"
       aria-labelledby="security-view-title"
     >
-      <header className="flex items-center gap-3 border-b border-border pb-4">
-        <Shield className="h-6 w-6 stroke-[1.6] text-base-content/70" aria-hidden="true" />
-        <div className="min-w-0">
-          <h1 id="security-view-title" className="text-xl font-semibold text-base-content">
-            {t('security:title')}
-          </h1>
-          <p className="text-sm text-base-content/65">{t('security:subtitle')}</p>
+      <header className="flex flex-col gap-4 border-b border-border pb-6">
+        <div className="flex items-center gap-3">
+          <Shield className="h-6 w-6 stroke-[1.6] text-base-content/70" aria-hidden="true" />
+          <div className="min-w-0">
+            <h1 id="security-view-title" className="text-xl font-semibold text-base-content">
+              {t('security:title')}
+            </h1>
+            <p className="text-sm text-base-content/65">{t('security:subtitle')}</p>
+          </div>
         </div>
+        <NrccTopologyDiagram ariaLabel={t('security:topologyAriaLabel')} />
       </header>
 
       <NrccAccessBoundaryCard users={users} />
