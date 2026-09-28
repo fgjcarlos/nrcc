@@ -274,7 +274,7 @@ into W1a/W1b before opening the PR.
 | # | Commit | Files | Authored lines | Purpose |
 |---|---|---|---|---|
 | W1 | `5eedaec` | 9 | 930 | `useConfigurationDiff` + `ConfigurationFieldStatusRow` + tests + i18n keys. **Documented exception**: 930 LOC > 400 budget; cohesive chunk that does not split cleanly. **RDD native review: APPROVED** (lineage `review-9d88bf5ab65a970b`, lens `review-reliability`, tier `medium`; one informational WARNING R3-001 at `validateConfigurationField.ts:129` — non-blocking). |
-| W2 | TBD | TBD | TBD | `validateConfigurationField` + per-field StatusChip wiring + tests |
+| W2 | `6b9b3c2` | 14 | 811 | `useConfigurationSave` save gate with `SaveOutcome` + `FieldStatusChip` + per-field chip wiring in Basic + Security settings + i18n. **Documented exception**: 811 LOC > 400 budget; cohesive wiring that does not split cleanly. **RDD native review: APPROVED** (lineage `review-3b9c5d9c2dcda059`, lens `review-reliability`, tier `medium`; one informational WARNING R3-001 at `FieldStatusChip.tsx:50` — non-blocking). **PR #852 opened**. |
 | W3 | TBD | TBD | TBD | `NrccTopologyDiagram` + header swap + tests |
 | W4 | TBD | TBD | TBD | `ReviewChangesPanel` + save flow integration + i18n |
 | W5 | (this) | `odd/tasks/issue-766-slice-f-configuration-safe-apply.md` | TBD | Status + commit log |
@@ -304,7 +304,30 @@ into W1a/W1b before opening the PR.
   (R3-001 at `validateConfigurationField.ts:129` — the unused `_key`
   parameter that was renamed from `key` to satisfy `noUnusedParameters`).
 
-### W2–W4 — TBD
+### W2 — `6b9b3c2` (verified locally; PR #852 opened)
+
+- `useConfigurationSave.test.ts`: 4/4 tests passing.
+- `FieldStatusChip.test.tsx`: 4/4 tests passing (with `vi.mock('@/i18n', ...)`).
+- `useConfigurationDiff.test.ts`: 11/11 tests passing (added null-host test).
+- `ConfigurationFieldStatusRow.test.tsx`: 4/4 tests passing (W1, unchanged).
+- `tsc --noEmit -p frontend/tsconfig.json`: 0 new errors vs `origin/main`.
+  **Baseline 4 errors** in `src/i18n/**` (down from W1's 6 baseline, because
+  fewer `@/i18n` consumers now that the ConfigurationView's `I18nProvider`
+  wrapper is replaced by `useT` calls inside FieldStatusChip). Identical
+  baseline reported by the merge base.
+- `node scripts/check-no-hardcoded-i18n.mjs`: 0 violations (full repo
+  scan, not just W2 files).
+- Full repo Vitest run: **214/214 tests passing** in the suite that runs
+  locally (out-of-scope slice A–E `@/i18n` suites fail with the same
+  pre-existing `react-i18next` resolution issue; CI resolves them).
+- **RDD native review (gentle_review lineage `review-3b9c5d9c2dcda059`)**:
+  state `approved`, store_revision `sha256:0cddba2626c3f61b75dc5d76564e3d268ebf6ab624f9efda864d9adc4a3ff8d7`,
+  authority burned via `acknowledge-approved`, delivery reverted to
+  ordinary-repository-policy. One non-blocking informational WARNING
+  (R3-001 at `FieldStatusChip.tsx:50` — minor stylistic note; same
+  category as W1's R3-001).
+
+### W3–W4 — TBD
 
 ### W5 — final
 

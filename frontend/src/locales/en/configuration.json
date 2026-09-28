@@ -135,6 +135,34 @@
       "hard": "Restart required",
       "soft": "Redeploy flows",
       "none": "—"
+    },
+    "invalid": {
+      "uiPort": "Port out of range",
+      "uiHost": "Host is required",
+      "httpAdminRoot": "Must start with /",
+      "httpNodeRoot": "Must start with /",
+      "disableEditor": "Invalid editor toggle",
+      "credentialSecret": "Secret is too short",
+      "requireHttps": "Invalid HTTPS toggle",
+      "httpsKey": "Path is required",
+      "httpsCert": "Path is required",
+      "httpsCA": "Path is required",
+      "httpsPort": "Port out of range",
+      "httpsPassphrase": "Passphrase is too short"
+    },
+    "queued": {
+      "uiPort": "Port pending",
+      "uiHost": "Host pending",
+      "httpAdminRoot": "Admin root pending",
+      "httpNodeRoot": "Node root pending",
+      "disableEditor": "Editor toggle pending",
+      "credentialSecret": "Secret rotation pending",
+      "requireHttps": "HTTPS redirect pending",
+      "httpsKey": "TLS key path pending",
+      "httpsCert": "TLS cert path pending",
+      "httpsCA": "TLS CA path pending",
+      "httpsPort": "TLS port pending",
+      "httpsPassphrase": "TLS passphrase pending"
     }
   },
   "reviewPanel": {

@@ -149,4 +149,15 @@ describe('computeConfigurationDiff', () => {
     // effectiveValue should fall back to the form value itself.
     expect(diff.fields.uiPort.effectiveValue).toBe(INITIAL_FORM_DATA.uiPort);
   });
+
+  it('treats a null host status as read-only (canSave=false) even with pending changes', () => {
+    // Slice F W2 — the bootstrap query can still be in-flight when the
+    // configuration view first renders. The diff must stay safe by
+    // treating null as read-only until the bootstrap resolves.
+    const form = baseForm();
+    form.uiPort = 2000; // dirty
+    const diff = computeConfigurationDiff(form, loadedConfig(), null, '');
+    expect(diff.pendingCount).toBeGreaterThan(0);
+    expect(diff.canSave).toBe(false);
+  });
 });
