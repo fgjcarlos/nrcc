@@ -6,3 +6,4 @@ export { EditorThemeSettings } from './EditorThemeSettings';
 export { AIProviderSettings } from './AIProviderSettings';
 export { ImageUpload } from './ImageUpload';
 export { InputField, ToggleField, SelectField, LOGGING_LEVELS } from './FormFields';
+export { ConfigurationFieldStatusRow } from './ConfigurationFieldStatusRow';

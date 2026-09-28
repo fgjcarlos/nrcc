@@ -108,5 +108,56 @@
     "applying": "Aplicando…",
     "apply": "Aplicar acceso al dashboard",
     "absent": "ausente"
+  },
+  "fieldStatus": {
+    "header": {
+      "field": "Campo",
+      "configured": "Valor configurado",
+      "effective": "Valor efectivo",
+      "source": "Origen",
+      "validation": "Validación",
+      "pending": "Pendiente",
+      "restart": "Reinicio"
+    },
+    "source": {
+      "settingsJs": "settings.js",
+      "formDefault": "predeterminado del formulario"
+    },
+    "validation": {
+      "valid": "Válido",
+      "pending": "Pendiente",
+      "invalid": "Inválido"
+    },
+    "pending": {
+      "changed": "Cambiado"
+    },
+    "restart": {
+      "hard": "Requiere reinicio",
+      "soft": "Redesplegar flows",
+      "none": "—"
+    }
+  },
+  "reviewPanel": {
+    "title": "Revisar cambios",
+    "subtitle": "Aplicar las ediciones siguientes a {{target}}.",
+    "openButton": "Revisar cambios",
+    "noChanges": "No hay cambios pendientes.",
+    "groupHardRestart": "Reinicio completo ({{count}})",
+    "groupSoftRestart": "Redespliegue de flows ({{count}})",
+    "groupNone": "Otros ({{count}})",
+    "apply": "Aplicar",
+    "cancel": "Cancelar",
+    "applying": "Aplicando…",
+    "applied": "Aplicado correctamente.",
+    "appliedError": "Error al aplicar: {{message}}"
+  },
+  "topology": {
+    "title": "Topología de configuración",
+    "subtitle": "NRCC edita settings.js; Node-RED lo lee al (re)iniciar.",
+    "nodeNrcc": "NRCC",
+    "nodeSettings": "settings.js",
+    "nodeRed": "Node-RED + Dashboard",
+    "arrowNrccSettings": "edita",
+    "arrowSettingsNodeRed": "carga"
   }
 }
