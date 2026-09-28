@@ -373,6 +373,19 @@ into W1a/W1b before opening the PR.
   6 baseline `src/i18n/**` errors unchanged (was 4 in W3 — LocaleSwitcher
   was always there; my prior note was missing it).
 - `node scripts/check-no-hardcoded-i18n.mjs`: 0 violations.
+- **CI fix `f750bd3`**: first PR push (commit `c424364`) failed
+  `Frontend (Node 22)` with three `ConfigurationView.test.tsx` tests
+  failing because the Save button label was changed to
+  `configuration:reviewPanel.openButton` ("Review changes") but
+  existing tests target the button by visible `Save` text. The label
+  is the operator's mental anchor for the safe-apply action; the
+  panel is an intermediate confirmation, not a separate step. Fix
+  reverts the label to `t('common:save')` and updates the two issue
+  #762 tests (credentialSecret rotation + blank rotation payload) to
+  follow the new flow: Save → review panel → Apply → rotation dialog.
+  The #366 toggle-persistence test passes unchanged because it only
+  asserts the toggle survives the click, not that the mutation
+  dispatches.
 
 ### W5 — final
 
