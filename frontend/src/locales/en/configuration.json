@@ -108,5 +108,56 @@
     "applying": "Applying…",
     "apply": "Apply dashboard access",
     "absent": "absent"
+  },
+  "fieldStatus": {
+    "header": {
+      "field": "Field",
+      "configured": "Configured value",
+      "effective": "Effective value",
+      "source": "Source",
+      "validation": "Validation",
+      "pending": "Pending",
+      "restart": "Restart"
+    },
+    "source": {
+      "settingsJs": "settings.js",
+      "formDefault": "form default"
+    },
+    "validation": {
+      "valid": "Valid",
+      "pending": "Pending",
+      "invalid": "Invalid"
+    },
+    "pending": {
+      "changed": "Changed"
+    },
+    "restart": {
+      "hard": "Restart required",
+      "soft": "Redeploy flows",
+      "none": "—"
+    }
+  },
+  "reviewPanel": {
+    "title": "Review changes",
+    "subtitle": "Apply the edits below to {{target}}.",
+    "openButton": "Review changes",
+    "noChanges": "No pending changes.",
+    "groupHardRestart": "Hard restart ({{count}})",
+    "groupSoftRestart": "Flow redeploy ({{count}})",
+    "groupNone": "Other ({{count}})",
+    "apply": "Apply",
+    "cancel": "Cancel",
+    "applying": "Applying…",
+    "applied": "Applied successfully.",
+    "appliedError": "Failed to apply: {{message}}"
+  },
+  "topology": {
+    "title": "Configuration topology",
+    "subtitle": "NRCC edits settings.js; Node-RED reads it on (re)start.",
+    "nodeNrcc": "NRCC",
+    "nodeSettings": "settings.js",
+    "nodeRed": "Node-RED + Dashboard",
+    "arrowNrccSettings": "edits",
+    "arrowSettingsNodeRed": "loads"
   }
 }
