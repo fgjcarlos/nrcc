@@ -218,7 +218,7 @@ drawer + integration).
       the Basic tab; existing tab navigation unchanged.
 - [x] `NrccTopologyDiagram.tsx` renders three nodes (NRCC, settings.js,
       Node-RED + Dashboard) with arrows; theme-aware.
-- [ ] `<ReviewChangesPanel>` drawer opens on Save click; renders the
+- [x] `<ReviewChangesPanel>` drawer opens on Save click; renders the
       diff table grouped by `restart`; applies via the existing
       `useConfigurationActions.handleSave` path; the existing
       `ConfirmationDialog` chain (credentialSecret rotation, raw
@@ -276,7 +276,7 @@ into W1a/W1b before opening the PR.
 | W1 | `5eedaec` | 9 | 930 | `useConfigurationDiff` + `ConfigurationFieldStatusRow` + tests + i18n keys. **Documented exception**: 930 LOC > 400 budget; cohesive chunk that does not split cleanly. **RDD native review: APPROVED** (lineage `review-9d88bf5ab65a970b`, lens `review-reliability`, tier `medium`; one informational WARNING R3-001 at `validateConfigurationField.ts:129` — non-blocking). |
 | W2 | `6b9b3c2` | 14 | 811 | `useConfigurationSave` save gate with `SaveOutcome` + `FieldStatusChip` + per-field chip wiring in Basic + Security settings + i18n. **Documented exception**: 811 LOC > 400 budget; cohesive wiring that does not split cleanly. **RDD native review: APPROVED** (lineage `review-3b9c5d9c2dcda059`, lens `review-reliability`, tier `medium`; one informational WARNING R3-001 at `FieldStatusChip.tsx:50` — non-blocking). **PR #852 merged** (merge commit `4e66275` on `origin/main`). |
 | W3 | `d0d3d60` | 11 | 370 | `NrccTopologyDiagram` (inline SVG: NRCC → settings.js → Node-RED + Dashboard) + `ConfigurationHeader` (extracted from ConfigurationView, embeds the diagram) + `SecurityView` header embeds the diagram with `security:topologyAriaLabel` + i18n (`configuration:topology.node{Nrcc,Settings}Subtitle`, `security:topologyAriaLabel`). **370 LOC < 400 budget**. **RDD native review: BLOCKED by tooling** (lineage `review-288425c2bb914ec6`, tier `high`, 4 lenses: risk/resilience/readability/reliability; `rctx2 repository-context expired between status and capture-result` — facade rejected `capture-group-rejected: collectBindings are unknown, expired, or belong to different session routes`). User authorized delivery under ordinary-repository-policy without RDD acknowledge. |
-| W4 | TBD | TBD | TBD | `ReviewChangesPanel` + save flow integration + i18n |
+| W4 | `c424364` | 7 | 580 | `ReviewChangesPanel` (portal'd slide-in drawer: a11y role=dialog + aria-modal + focus trap + Esc cancels, grouped by restart severity hard > soft > none, StatusChip per row showing pending/invalid) + `fieldLabels.ts` (flat readable labels for every form field) + `ConfigurationView` wires the drawer (Save opens it, Apply runs the existing save flow so credentialSecret rotation + raw-settings unlock stay as single source of truth) + i18n (`configuration:reviewPanel.configuredLabel`, `configuration:reviewPanel.newLabel`). **Documented exception**: 580 LOC > 400 budget; cohesive UI surface that does not split cleanly (drawer + label map + wiring + tests). |
 | W5 | (this) | `odd/tasks/issue-766-slice-f-configuration-safe-apply.md` | TBD | Status + commit log |
 
 ## Acceptance evidence
@@ -360,7 +360,19 @@ into W1a/W1b before opening the PR.
   ordinary-repository-policy (the native review is informational and
   does not authorize delivery).
 
-### W4 — TBD
+### W4 — `c424364` (verified locally)
+
+- `ReviewChangesPanel.test.tsx`: **6/6 tests passing** (with
+  `vi.mock('@/i18n', ...)` — closed, empty state, grouping order,
+  Apply handler, Esc cancel, Esc blocked while pending).
+- Full repo Vitest run: **227/227 tests passing** in the locally-runnable
+  suite (up from W3's 221; +6 new tests). The 46 test files that fail
+  are unchanged from W1/W2/W3 — pre-existing `react-i18next` resolution
+  issue; CI resolves them.
+- `tsc --noEmit -p frontend/tsconfig.json`: 0 new errors vs `origin/main`.
+  6 baseline `src/i18n/**` errors unchanged (was 4 in W3 — LocaleSwitcher
+  was always there; my prior note was missing it).
+- `node scripts/check-no-hardcoded-i18n.mjs`: 0 violations.
 
 ### W5 — final
 
