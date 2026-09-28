@@ -216,7 +216,7 @@ drawer + integration).
       `validateAuthFields` wrapper preserved for backward compatibility.
 - [ ] `ConfigurationView.tsx` renders the six-column row per field on
       the Basic tab; existing tab navigation unchanged.
-- [ ] `NrccTopologyDiagram.tsx` renders three nodes (NRCC, settings.js,
+- [x] `NrccTopologyDiagram.tsx` renders three nodes (NRCC, settings.js,
       Node-RED + Dashboard) with arrows; theme-aware.
 - [ ] `<ReviewChangesPanel>` drawer opens on Save click; renders the
       diff table grouped by `restart`; applies via the existing
@@ -274,8 +274,8 @@ into W1a/W1b before opening the PR.
 | # | Commit | Files | Authored lines | Purpose |
 |---|---|---|---|---|
 | W1 | `5eedaec` | 9 | 930 | `useConfigurationDiff` + `ConfigurationFieldStatusRow` + tests + i18n keys. **Documented exception**: 930 LOC > 400 budget; cohesive chunk that does not split cleanly. **RDD native review: APPROVED** (lineage `review-9d88bf5ab65a970b`, lens `review-reliability`, tier `medium`; one informational WARNING R3-001 at `validateConfigurationField.ts:129` — non-blocking). |
-| W2 | `6b9b3c2` | 14 | 811 | `useConfigurationSave` save gate with `SaveOutcome` + `FieldStatusChip` + per-field chip wiring in Basic + Security settings + i18n. **Documented exception**: 811 LOC > 400 budget; cohesive wiring that does not split cleanly. **RDD native review: APPROVED** (lineage `review-3b9c5d9c2dcda059`, lens `review-reliability`, tier `medium`; one informational WARNING R3-001 at `FieldStatusChip.tsx:50` — non-blocking). **PR #852 opened**. |
-| W3 | TBD | TBD | TBD | `NrccTopologyDiagram` + header swap + tests |
+| W2 | `6b9b3c2` | 14 | 811 | `useConfigurationSave` save gate with `SaveOutcome` + `FieldStatusChip` + per-field chip wiring in Basic + Security settings + i18n. **Documented exception**: 811 LOC > 400 budget; cohesive wiring that does not split cleanly. **RDD native review: APPROVED** (lineage `review-3b9c5d9c2dcda059`, lens `review-reliability`, tier `medium`; one informational WARNING R3-001 at `FieldStatusChip.tsx:50` — non-blocking). **PR #852 merged** (merge commit `4e66275` on `origin/main`). |
+| W3 | `d0d3d60` | 11 | 370 | `NrccTopologyDiagram` (inline SVG: NRCC → settings.js → Node-RED + Dashboard) + `ConfigurationHeader` (extracted from ConfigurationView, embeds the diagram) + `SecurityView` header embeds the diagram with `security:topologyAriaLabel` + i18n (`configuration:topology.node{Nrcc,Settings}Subtitle`, `security:topologyAriaLabel`). **370 LOC < 400 budget**. **RDD native review: BLOCKED by tooling** (lineage `review-288425c2bb914ec6`, tier `high`, 4 lenses: risk/resilience/readability/reliability; `rctx2 repository-context expired between status and capture-result` — facade rejected `capture-group-rejected: collectBindings are unknown, expired, or belong to different session routes`). User authorized delivery under ordinary-repository-policy without RDD acknowledge. |
 | W4 | TBD | TBD | TBD | `ReviewChangesPanel` + save flow integration + i18n |
 | W5 | (this) | `odd/tasks/issue-766-slice-f-configuration-safe-apply.md` | TBD | Status + commit log |
 
@@ -327,7 +327,40 @@ into W1a/W1b before opening the PR.
   (R3-001 at `FieldStatusChip.tsx:50` — minor stylistic note; same
   category as W1's R3-001).
 
-### W3–W4 — TBD
+### W3 — `d0d3d60` (verified locally; delivery under ordinary-repository-policy)
+
+- `NrccTopologyDiagram.test.tsx`: 4/4 tests passing (with
+  `vi.mock('@/i18n', ...)` — three-node render + label + ariaLabel
+  override + subtitle).
+- `ConfigurationHeader.test.tsx`: 3/3 tests passing (title + topology
+  by default + topology hidden when `hideTopology`).
+- `tsc --noEmit -p frontend/tsconfig.json`: 0 new errors vs `origin/main`.
+  **Baseline 4 errors** in `src/i18n/**` unchanged from W2.
+- `node scripts/check-no-hardcoded-i18n.mjs`: 0 violations (the SVG
+  sub-labels `control plane` / `source of truth` were moved to
+  `configuration:topology.nodeNrccSubtitle` and
+  `configuration:topology.nodeSettingsSubtitle`).
+- Full repo Vitest run: **221/221 tests passing** in the suite that
+  runs locally (up from W2's 214; +7 new tests). Out-of-scope slice A–E
+  `@/i18n` suites still fail with the same pre-existing `react-i18next`
+  resolution issue; CI resolves them.
+- **RDD native review (gentle_review lineage `review-288425c2bb914ec6`)**:
+  BLOCKED by tooling rather than findings. The lineage was created
+  (target_identity `sha256:1dd0b801ad650c2fc318c64727211cddf214c35ba614e3311c21c3583ca399a2`,
+  base_ref `4e662754`, tier `high`, 4 lenses required, 11 files / 403
+  changed lines / correction_budget 200) and the consent envelope was
+  relayed, but the `repository-context` (`rctx2_…`) expired between
+  the `status` and `capture-result` calls — the facade rejected all
+  four collect bindings with `collectBindings are unknown, expired, or
+  belong to different session routes`. The native CLI confirms the
+  lineage is still active at `state=reviewing` with no captured lens
+  results; the abandon operation requires the exact `lineage` input
+  token that the facade does not currently expose, so the lineage is
+  effectively stranded. User authorized delivery under
+  ordinary-repository-policy (the native review is informational and
+  does not authorize delivery).
+
+### W4 — TBD
 
 ### W5 — final
 
