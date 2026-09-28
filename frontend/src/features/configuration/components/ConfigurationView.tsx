@@ -15,7 +15,7 @@ import {
   Settings, Server, Shield, Activity, Palette,
   Save, LockOpen, AlertTriangle, Bot
 } from 'lucide-react';
-import { useConfigurationData, useConfigurationActions } from '../hooks';
+import { useConfigurationData, useConfigurationActions, useConfigurationDiff, useConfigurationSave, fieldValidationMap } from '../hooks';
 import { useT } from '@/i18n';
 import { ConfirmationDialog } from '@/shared/components/ConfirmationDialog';
 
@@ -154,6 +154,19 @@ export function ConfigurationView() {
   const data = useConfigurationData();
   const actions = useConfigurationActions();
 
+  // Issue #766 slice F — derive per-field diff once, share with the
+  // save gate and the per-field `FieldStatusChip` widgets inside the
+  // active section component.
+  const loadedConfig = data.config;
+  const hostStatus = data.hostStatus ?? null;
+  const diff = useConfigurationDiff(
+    formData,
+    loadedConfig,
+    hostStatus,
+    data.rawSettingsContent,
+  );
+  const save = useConfigurationSave({ formData, diff });
+
   // Sync loaded config to form
   useEffect(() => {
     if (data.initialFormData) {
@@ -185,14 +198,29 @@ export function ConfigurationView() {
       setRotationDialogOpen(true);
       return;
     }
-    await actions.handleSave(formData);
-    setHasChanges(false);
+    const outcome = await save.save();
+    if (outcome.ok) {
+      setHasChanges(false);
+    } else if (outcome.reason === 'validation-errors') {
+      toast.error(`Fix ${Object.keys(outcome.errors).length} field${Object.keys(outcome.errors).length === 1 ? '' : 's'} before saving`);
+    } else if (outcome.reason === 'no-pending-changes') {
+      // Operator clicked Save without changing anything; treat as a
+      // soft no-op.
+    } else if (outcome.reason === 'read-only') {
+      toast.error('Configuration is read-only on this host');
+    }
   };
 
   const handleConfirmRotation = async () => {
     setRotationDialogOpen(false);
-    await actions.handleSave(formData);
-    setHasChanges(false);
+    const outcome = await save.save();
+    if (outcome.ok) {
+      setHasChanges(false);
+    } else if (outcome.reason === 'validation-errors') {
+      toast.error(`Fix ${Object.keys(outcome.errors).length} field${Object.keys(outcome.errors).length === 1 ? '' : 's'} before saving`);
+    } else if (outcome.reason === 'read-only') {
+      toast.error('Configuration is read-only on this host');
+    }
   };
 
   const handleCancelRotation = () => {
@@ -264,7 +292,7 @@ export function ConfigurationView() {
           <button
             type="button"
             onClick={handleSave}
-            disabled={!hasChanges || isSaving || data.hostStatus?.configuration?.editable === false}
+            disabled={!diff.canSave || isSaving}
             className="action-btn-primary"
           >
             <Save className="w-4 h-4" />
@@ -331,7 +359,7 @@ export function ConfigurationView() {
            <div className="rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm text-warning" role="status">
              {t('configuration:controlsUnavailable')}
            </div>
-          ) : activeTab === 'ai' ? <AIProviderSettings /> : <ActiveComponent settings={formData} onUpdate={handleUpdateField} disabled={isSaving} />}
+          ) : activeTab === 'ai' ? <AIProviderSettings /> : <ActiveComponent settings={formData} onUpdate={handleUpdateField} disabled={isSaving} fieldErrors={fieldValidationMap(diff.fields)} />}
        </div>
 
 

@@ -3,7 +3,6 @@ import { toast } from 'sonner';
 import { configService, settingsService } from '../services';
 import type { NodeRedConfigFormData } from '@/shared/types';
 import { formDataToConfigPayload } from '../lib/configTransformers';
-
 import { errorMessage } from '@/shared/lib/errorMessage';
 import { queryKeys } from '@/shared/lib/queryKeys';
 export function useConfigurationActions() {
@@ -36,66 +35,15 @@ export function useConfigurationActions() {
   });
 
   /**
-   * Validate authentication fields
-   * Returns false if validation fails (toast error already shown)
-   */
-  const validateAuthFields = (formData: NodeRedConfigFormData): boolean => {
-    if (formData.authEnabled) {
-      if (!formData.authAdminUser) {
-        toast.error('Admin username is required');
-        return false;
-      }
-      if (formData.authAdminUser.length < 3) {
-        toast.error('Username must be at least 3 characters');
-        return false;
-      }
-      if (formData.authAdminPassword && formData.authAdminPassword.length < 6) {
-        toast.error('Password must be at least 6 characters');
-        return false;
-      }
-    }
-
-    if (formData.authNodeHttpEnabled) {
-      if (!formData.authNodeHttpUser || !formData.authNodeHttpPassword) {
-        toast.error('Node HTTP username and password are required');
-        return false;
-      }
-      if (formData.authNodeHttpUser.length < 3) {
-        toast.error('Node HTTP username must be at least 3 characters');
-        return false;
-      }
-      if (formData.authNodeHttpPassword.length < 6) {
-        toast.error('Node HTTP password must be at least 6 characters');
-        return false;
-      }
-    }
-
-    if (formData.authStaticEnabled) {
-      if (!formData.authStaticUser || !formData.authStaticPassword) {
-        toast.error('Static username and password are required');
-        return false;
-      }
-      if (formData.authStaticUser.length < 3) {
-        toast.error('Static username must be at least 3 characters');
-        return false;
-      }
-      if (formData.authStaticPassword.length < 6) {
-        toast.error('Static password must be at least 6 characters');
-        return false;
-      }
-    }
-
-    return true;
-  };
-
-  /**
    * Handle save with validation
+   *
+   * The pre-existing `validateAuthFields` aggregate was removed in
+   * slice F W2 (issue #766). Per-field validation now flows through
+   * `useConfigurationDiff` + `useConfigurationSave` so each
+   * `InputField` shows its own `FieldStatusChip` while the operator
+   * types instead of getting a single toast on Save.
    */
   const handleSave = async (formData: NodeRedConfigFormData) => {
-    if (!validateAuthFields(formData)) {
-      return;
-    }
-
     const payload = formDataToConfigPayload(formData);
     try {
       await saveConfigMutation.mutateAsync(payload);
@@ -119,6 +67,5 @@ export function useConfigurationActions() {
     // Handlers
     handleSave,
     handleSaveRawSettings,
-    validateAuthFields,
   };
 }

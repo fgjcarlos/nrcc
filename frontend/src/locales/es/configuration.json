@@ -135,6 +135,34 @@
       "hard": "Requiere reinicio",
       "soft": "Redesplegar flows",
       "none": "—"
+    },
+    "invalid": {
+      "uiPort": "Puerto fuera de rango",
+      "uiHost": "El host es obligatorio",
+      "httpAdminRoot": "Debe comenzar con /",
+      "httpNodeRoot": "Debe comenzar con /",
+      "disableEditor": "Conmutador de editor inválido",
+      "credentialSecret": "El secreto es demasiado corto",
+      "requireHttps": "Conmutador HTTPS inválido",
+      "httpsKey": "La ruta es obligatoria",
+      "httpsCert": "La ruta es obligatoria",
+      "httpsCA": "La ruta es obligatoria",
+      "httpsPort": "Puerto fuera de rango",
+      "httpsPassphrase": "La frase de paso es demasiado corta"
+    },
+    "queued": {
+      "uiPort": "Puerto pendiente",
+      "uiHost": "Host pendiente",
+      "httpAdminRoot": "Admin root pendiente",
+      "httpNodeRoot": "Node root pendiente",
+      "disableEditor": "Conmutador de editor pendiente",
+      "credentialSecret": "Rotación de secreto pendiente",
+      "requireHttps": "Redirección HTTPS pendiente",
+      "httpsKey": "Ruta de clave TLS pendiente",
+      "httpsCert": "Ruta de certificado TLS pendiente",
+      "httpsCA": "Ruta de CA TLS pendiente",
+      "httpsPort": "Puerto TLS pendiente",
+      "httpsPassphrase": "Frase de paso TLS pendiente"
     }
   },
   "reviewPanel": {

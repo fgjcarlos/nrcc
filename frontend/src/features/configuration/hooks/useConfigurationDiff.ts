@@ -201,7 +201,7 @@ function equalValues(a: unknown, b: unknown): boolean {
 export function computeConfigurationDiff(
   formData: NodeRedConfigFormData,
   loadedConfig: NodeRedConfigResponse | null,
-  hostStatus: HostStatus,
+  hostStatus: HostStatus | null,
   rawSettingsContent: string
 ): ConfigurationDiffSummary {
   // configuredValue = effectiveValue on first render = what NRCC has
@@ -244,10 +244,13 @@ export function computeConfigurationDiff(
   }
 
   // canSave requires pending changes AND no validation errors AND the
-  // backend must not be in read-only mode.
+  // backend must not be in read-only mode. A null host status (the
+  // bootstrap query has not yet resolved) is treated as read-only so
+  // we never dispatch a save before we know the operator has rights.
   const canSave =
     pendingCount > 0 &&
     Object.keys(validationErrors).length === 0 &&
+    hostStatus !== null &&
     hostStatus.configuration.editable !== false;
 
   // Reference hostStatus so the linter recognises it as part of the
@@ -266,15 +269,39 @@ export function computeConfigurationDiff(
 /**
  * Hook wrapper. Memoises on the four inputs so the result is stable
  * across renders unless something changed.
+ *
+ * `hostStatus` is `HostStatus | null` because the bootstrap query may
+ * still be in-flight when the configuration view first renders. A
+ * null host status is treated as read-only with no special
+ * capabilities, which makes the diff safe to compute even before the
+ * bootstrap resolves.
  */
 export function useConfigurationDiff(
   formData: NodeRedConfigFormData,
   loadedConfig: NodeRedConfigResponse | null,
-  hostStatus: HostStatus,
+  hostStatus: HostStatus | null,
   rawSettingsContent: string
 ): ConfigurationDiffSummary {
   return useMemo(
     () => computeConfigurationDiff(formData, loadedConfig, hostStatus, rawSettingsContent),
     [formData, loadedConfig, hostStatus, rawSettingsContent]
   );
+}
+
+/**
+ * Map a `ConfigurationDiff` (the full per-field record) to the
+ * `Partial<Record<keyof NodeRedConfigFormData, FieldDiff['validation']>>`
+ * shape consumed by `BasicSettings`, `SecuritySettings`, and friends
+ * for their inline `FieldStatusChip`. Keys the form does not touch
+ * stay undefined so each setting component can decide which subset to
+ * show.
+ */
+export function fieldValidationMap(
+  fields: ConfigurationDiff
+): Partial<Record<keyof NodeRedConfigFormData, FieldDiff['validation']>> {
+  const out: Partial<Record<keyof NodeRedConfigFormData, FieldDiff['validation']>> = {};
+  for (const key of Object.keys(fields) as Array<keyof NodeRedConfigFormData>) {
+    out[key] = fields[key].validation;
+  }
+  return out;
 }
