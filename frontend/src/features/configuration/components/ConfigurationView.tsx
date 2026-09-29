@@ -20,6 +20,7 @@ import {
 import { useConfigurationData, useConfigurationActions, useConfigurationDiff, useConfigurationSave, fieldValidationMap } from '../hooks';
 import { useT } from '@/i18n';
 import { ConfirmationDialog } from '@/shared/components/ConfirmationDialog';
+import { LoadingBoundary } from '@/shared/components/feedback';
 
 // ============================================
 // Sections Configuration
@@ -277,16 +278,21 @@ export function ConfigurationView() {
 
   // Derived state
   const ActiveComponent = SECTIONS.find(s => s.id === activeTab)?.component || BasicSettings;
-  const isLoading = data.configLoading;
   const isSaving = actions.saveConfigMutation.isPending;
+  const configViewState = data.configLoading
+    ? { status: 'pending' as const }
+    : data.configError
+      ? {
+          status: 'error' as const,
+          error: data.configError,
+          onRetry: () => {
+            void data.refetchConfig();
+          },
+        }
+      : { status: 'success' as const };
 
-  if (isLoading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+  return (
+    <LoadingBoundary state={configViewState}>
 
   return (
     <div className="space-y-6">
@@ -503,5 +509,6 @@ export function ConfigurationView() {
         onCancel={() => setReviewPanelOpen(false)}
       />
     </div>
+    </LoadingBoundary>
   );
 }

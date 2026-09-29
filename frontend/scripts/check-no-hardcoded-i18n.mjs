@@ -43,7 +43,13 @@ function extractJsxText(source) {
 
 function isCodeLike(literal) {
   return /[`;]/.test(literal) || /\.[cm]?[jt]sx?\b/.test(literal) ||
-    /\b\w+\s*\{/.test(literal) || /\b\w+\([^)]*\)/.test(literal);
+    /\b\w+\s*\{/.test(literal) || /\b\w+\([^)]*\)/.test(literal) ||
+    // Match JS control-flow keywords whose captured form sits between
+    // a closing '>' (e.g. a wrapping <div>) and the next '<' opening
+    // tag. Without this rule, "return (" (the JSX-return keyword) is
+    // captured verbatim when a component renders <Foo>{ ... return
+    // ( ... ) } and surfaces as a false positive in the i18n guard.
+    /^\s*(?:return|throw|new)\b/.test(literal);
 }
 
 function isTypeIdentifier(literal) {

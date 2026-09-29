@@ -37,6 +37,7 @@ export function Header() {
 
   return (
     <header
+      role="banner"
       data-testid="app-topbar"
       className="app-topbar-shell sticky top-0 z-40 border-b px-3 py-3 sm:px-5"
     >
