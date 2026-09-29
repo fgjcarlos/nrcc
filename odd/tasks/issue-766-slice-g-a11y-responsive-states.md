@@ -152,7 +152,7 @@ feat/issue-766-slice-g-a11y-responsive-states
 - [x] Slices A + B + C + D + E + F merged.
 - [x] Slice G: planning complete.
 - [x] Slice G: W1 — feedback primitives (commit `cda616c`).
-- [ ] Slice G: W2 — skip link, landmarks, 320 px utility.
+- [x] Slice G: W2 — skip link, landmarks, 320 px utility.
 - [ ] Slice G: W3 — loading / empty / error pass.
 - [ ] Slice G: W4 — reduced motion + contrast audit + axe-core.
 - [ ] Slice G: W5 — docs + status + acceptance evidence.
@@ -166,6 +166,7 @@ feat/issue-766-slice-g-a11y-responsive-states
 | # | Commit | Files | Authored lines | Purpose |
 |---|---|---|---|---|
 | W1 | `cda616c` | `frontend/src/shared/components/feedback/{Skeleton,EmptyState,ErrorState,LoadingBoundary,loadingBoundaryHelpers,index}.{tsx,ts}` + 4 test files | +443 / -0 (5 components, 25 tests, 0 new deps) | Feedback primitives + tests; pre-existing i18n keys reused |
+| W2 | `b3d729c` | `frontend/src/shared/components/a11y/{SkipLink,index}.{tsx,ts}` + test, `layout/{Layout,Header}.tsx`, `configuration/components/ReviewChangesPanel.tsx`, locales en/es | +111 / -4 (1 component, 3 tests, 2 i18n keys, 0 new deps) | Skip link, main landmark, drawer → bottom sheet |
 | W2 | (TBD) | `shared/components/layout/SkipLink*`, `features/security/components/SecurityView.tsx`, `tailwind.config.js`, `index.css` | (TBD) | Skip link + landmarks + 320 px utility |
 | W3 | (TBD) | five view files + new tests | (TBD) | LoadingBoundary on every authenticated view |
 | W4 | (TBD) | `index.css`, `scripts/check-contrast-tokens.mjs`, `e2e/a11y.spec.ts`, `playwright.config.ts`, `package.json` | (TBD) | Reduced motion + contrast audit + axe-core |
@@ -183,6 +184,25 @@ feat/issue-766-slice-g-a11y-responsive-states
 - **ESLint**: `cd frontend && npx eslint src/shared/components/feedback/` → **0 errors / 0 warnings**. The fast-refresh lint warning that initially fired on `LoadingBoundary.tsx` was resolved by extracting `useEmptyState` + `describeError` into `loadingBoundaryHelpers.ts` (mirrors the `securityCenterHelpers.ts` pattern from slice E).
 - **Hardcoded copy guard**: `cd frontend && node scripts/check-no-hardcoded-i18n.mjs` → **0 violations**. The four new components reuse existing `common:loading`, `common:errorOccurred`, `common:tryAgain` keys; no new catalog entries needed.
 - **Authored lines (W1)**: +443 / -0 across 10 files (5 components + 4 test files + 1 barrel + 1 helpers module).
+
+### W2 evidence (commit `b3d729c`)
+
+- **TypeScript**: `cd frontend && npm run typecheck` → **0 errors**.
+- **Vitest (new tests)**: `cd frontend && npm test -- --run src/shared/components/a11y/` → **3 passed**.
+- **Vitest (full suite)**: `cd frontend && npm test -- --run` → **575 passed / 2 skipped (84 files)**. No regressions; the +3 vs W1 (572) is exactly the SkipLink tests.
+- **ESLint**: 0 errors / 0 warnings on touched paths (`a11y/`, `layout/`, `ReviewChangesPanel.tsx`, `feedback/`).
+- **Hardcoded copy guard**: `cd frontend && node scripts/check-no-hardcoded-i18n.mjs` → **0 violations**.
+- **i18n coverage**: `cd frontend && pnpm i18n:coverage` → **100% ES coverage (851/851)**. W2 added `common:layout.skipToContent` in both EN and ES with a localised string; no key parity drift.
+- **Authored lines (W2)**: +111 / -4 across 8 files (1 new component + 1 test + 1 barrel + 4 layout/drawer edits + 2 locale updates).
+- **Dependencies**: **0 new**. Reused `lucide-react`, `react-router-dom`, `@/i18n`.
+
+#### W2 audit findings (carried into scope)
+
+- **`<main>` already existed** in `Layout.tsx`; only the `id` + `tabindex={-1}` were missing. SkipLink + `<main id="main-content" tabindex={-1}">` are the canonical a11y pairing; the `tabindex` is required so the browser moves focus to the landmark, not just scrolls.
+- **`<header>` already existed** with implicit `role="banner"` semantics (HTML5 maps it inside `<body>`). The explicit `role="banner"` was added for testability and to survive any future DOM restructuring.
+- **`ReviewChangesPanel` used a fixed `max-w-xl` drawer**; the slice F impl assumed ≥ 768 px. The bottom-sheet collapse at `< sm` (640 px) keeps the desktop drawer intact and only restyles below the breakpoint.
+- **The Header's runtime-context chips already collapse via `hidden md:flex`** (slice C). Slice G does not introduce a `<details>` disclosure in W2; that refactor is deferred to W3 when call sites move to `LoadingBoundary` and the chips become data-driven.
+- **No `ds-compact-collapse` token needed.** Tailwind's default mobile-first breakpoints cover 320–639 px via the unprefixed utility space; the W2 changes use `sm:` and the negation pattern, not a new token name.
 
 ## Follow-ups (tracked here)
 
