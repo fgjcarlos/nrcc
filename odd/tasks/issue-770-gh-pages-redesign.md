@@ -165,7 +165,7 @@ Single PR from `docs/issue-770-gh-pages-redesign` -> `main`. Closes #770.
 | W1 | Design system mirror + NRCC mark | ✅ `793a8b6` |
 | W2 | Content rewrite (Overview / Configuration / Security / Recovery) | ✅ `db33dba` |
 | W3 | Quick start / Roadmap / Limitations | ✅ `e621aab` |
-| W4 | Freshness checker CI + placeholders | ⏳ |
+| W4 | Freshness checker CI + placeholders | ✅ `b94fe37` |
 
 ## What this issue does NOT do
 
@@ -185,3 +185,39 @@ Single PR from `docs/issue-770-gh-pages-redesign` -> `main`. Closes #770.
 - If the freshness checker fails to parse a release tag from `gh`, log
   a warning instead of failing the workflow (we do not want CI to be
   gated on GitHub API rate limits).
+
+## Acceptance evidence (per requirement)
+
+| # | Issue body requirement | Evidence |
+|---|------------------------|----------|
+| 1 | Replace the "beta" landing page with the approved control-plane product direction | docs/index.html hero + overview (W1 `793a8b6`) |
+| 2 | Apply the graphite/cyan design system with an NRCC mark | `ds-*` Tailwind tokens mirror `frontend/tailwind.config.js`; `docs/assets/nrcc-mark.svg` (W1) |
+| 3 | Present verified screenshots of Overview / Configuration / Security | 3 placeholder figures with `data-freshness-stamp="slice-h"`; honesty policy in `docs/sections/screenshots.md` (W4 `b94fe37`) |
+| 4 | Compatibility matrix | `docs/sections/compatibility.md` + inline `<ul>` (W1) |
+| 5 | Docker-first quick start | `docs/sections/quick-start.md` + inline three-step recipe (W3 `e621aab`) |
+| 6 | Security model | `docs/sections/security.md` + inline `Security` card (W2 `db33dba`) |
+| 7 | Roadmap status | `docs/sections/roadmap.md` mirroring `docs/control-plane.md` exactly (cross-checked by `docs/sections/index.test.mjs`) (W3) |
+| 8 | Limitations | `docs/sections/limitations.md` + inline section (W3) |
+| 9 | Publication/check workflow | `.github/workflows/pages-freshness.yml` + `scripts/check-pages-links.mjs` (W2, W4) |
+
+## Pre-PR checks observed locally
+
+| Check | Command | Result |
+|-------|---------|--------|
+| Forbidden tokens absent | grep -RIn 'sp-\|Beta \xc2\xb7\|hardening phase\|no production guarantees\|API keys may change\|Vitest suites on every PR' docs/ | 0 matches |
+| `docs/index.html` size | `wc -l docs/index.html` | 435 lines (< 450 stop condition) |
+| NRCC mark present + canonical tokens | `node docs/assets/nrcc-mark.test.mjs` | 11/11 |
+| Section sources cover all 9 topics | `node docs/sections/index.test.mjs` | 24/24 |
+| Freshness stamp policy valid | `node docs/sections/freshness-stamp.test.mjs` | 16/16 |
+| Link integrity | `node scripts/check-pages-links.mjs` | 31 links, 0 failures |
+
+## Commits (8 total: 4 feat + 4 docs)
+
+- `793a8b6` feat(docs) W1 design system + hero + NRCC mark
+- `a05258b` docs(odd) W1 evidence
+- `db33dba` feat(docs) W2 sections + link integrity
+- `e584e81` docs(odd) W2 evidence
+- `e621aab` feat(docs) W3 quick-start / roadmap / limitations
+- `4d26745` docs(odd) W3 evidence
+- `b94fe37` feat(docs) W4 freshness workflow + placeholders
+- `TBD`    docs(odd) W4 evidence + final acceptance table
