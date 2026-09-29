@@ -97,8 +97,8 @@ Single PR from `docs/issue-771-handbook` → `main`. Closes #771.
 
 | W | Title | Status |
 |---|-------|--------|
-| W1 | Handbook shell + index + glossary skeleton | ✅ _TBD_ |
-| W2 | Setting catalog + sync test | ⏳ |
+| W1 | Handbook shell + index + glossary skeleton | ✅ `8369274` |
+| W2 | Setting catalog + sync test | ✅ `8035f3a` |
 | W3 | Authentication surfaces separation | ⏳ |
 | W4 | Apply pipeline (source-preserving) | ⏳ |
 | W5 | Architecture + contributor guide + fixtures | ⏳ |
