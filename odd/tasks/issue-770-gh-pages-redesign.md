@@ -162,7 +162,7 @@ Single PR from `docs/issue-770-gh-pages-redesign` -> `main`. Closes #770.
 
 | W | Title | Status |
 |---|-------|--------|
-| W1 | Design system mirror + NRCC mark | ⏳ |
+| W1 | Design system mirror + NRCC mark | ✅ `793a8b6` |
 | W2 | Content rewrite (Overview / Configuration / Security / Recovery) | ⏳ |
 | W3 | Quick start / Roadmap / Limitations | ⏳ |
 | W4 | Freshness checker CI + placeholders | ⏳ |
