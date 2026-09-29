@@ -72,7 +72,7 @@ export function SecurityView() {
     <LoadingBoundary state={securityViewState}>
     <section
       data-testid="security-view"
-      className="space-y-6"
+      className="space-y-4 sm:space-y-6"
       aria-labelledby="security-view-title"
     >
       <header className="flex flex-col gap-4 border-b border-border pb-6">
