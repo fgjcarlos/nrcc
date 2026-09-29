@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="NRCC mark">
+  <!--
+    NRCC mark — cyan on graphite. Mirrors the Signal Prime cyan accent
+    (#0089b4) used in frontend/tailwind.config.js so the public site
+    and the application share one visual identity. The glyph is a
+    "two-host bridge": an operator node (left circle) and a Node-RED
+    instance (right circle) joined by a switching plane (centre diamond
+    with a notch), capturing the product mission in one mark.
+  -->
+  <rect width="64" height="64" rx="14" fill="#07090d"/>
+  <g fill="none" stroke="#0089b4" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="16" cy="32" r="6"/>
+    <circle cx="48" cy="32" r="6"/>
+    <path d="M32 22 L40 32 L32 42 L24 32 Z"/>
+    <path d="M22 32 H24"/>
+    <path d="M40 32 H42"/>
+  </g>
+</svg>

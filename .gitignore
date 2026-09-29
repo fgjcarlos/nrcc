@@ -16,6 +16,11 @@ frontend/dist/
 nrcc
 nrcc.exe
 nrcc-*
+# Allow the docs-site brand assets (NRCC mark + favicon + a11y test) that
+# legitimately use the `nrcc-` prefix as a semantic name. Anything that
+# remains caught above is a stray build artifact.
+!docs/assets/nrcc-mark.svg
+!docs/assets/nrcc-mark.test.mjs
 
 # npm lockfiles are banned — pnpm-only policy (pnpm-lock.yaml is the source of truth)
 package-lock.json

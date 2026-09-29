@@ -1,0 +1,110 @@
+name: Pages freshness checker
+
+on:
+  # Run on every PR or push that touches docs/. This is the primary
+  # gate: the workflow must be green before a release can ship.
+  pull_request:
+    paths:
+      - 'docs/**'
+      - '.github/workflows/pages-freshness.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - '.github/workflows/pages-freshness.yml'
+  # Weekly cron on Mondays 06:00 UTC. The freshness stamps and the
+  # roadmap mirror must keep up with the canonical sources.
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  freshness:
+    name: Pages content + link integrity
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # pin to commit (v7.0.0)
+
+      - name: Set up Node
+        uses: actions/setup-node@1e60f620b9541d16bece96c5465dc8ee9832be0b  # pin to commit (v6.4.0)
+        with:
+          node-version: '22'
+
+      - name: Forbidden-token scan
+        run: |
+          set -euo pipefail
+          echo "::group::forbidden-token scan"
+          if [ ! -f docs/index.html ]; then
+            echo "::error::docs/index.html missing"
+            exit 1
+          fi
+          # These tokens were removed in slice G/issue #770 and must not
+          # reappear in the public landing page. The list mirrors the
+          # contract documented in odd/tasks/issue-770-gh-pages-redesign.md.
+          patterns=(
+            'sp-(bg|text|border|brand|accent)-'   # legacy Signal Prime palette
+            'Beta \xc2\xb7'                       # "Beta ·" middle dot
+            'hardening phase'
+            'no production guarantees'
+            'API keys may change'
+            'Vitest suites on every PR'
+          )
+          status=0
+          for pattern in "${patterns[@]}"; do
+            if grep -RInE --include='*.html' --include='*.md' "$pattern" docs/ ; then
+              echo "::error::forbidden token re-introduced: $pattern"
+              status=1
+            fi
+          done
+          echo "::endgroup::"
+          exit "$status"
+
+      - name: Freshness stamp scan
+        run: |
+          set -euo pipefail
+          echo "::group::freshness stamp scan"
+          # Every <figure data-freshness-stamp="..."> must be assigned a
+          # named release marker, not "TBD" or "WIP". The list is the
+          # canonical roadmap of upcoming slices. To unblock a release
+          # add a new slice name here AND a matching placeholder policy
+          # in docs/sections/screenshots.md.
+          allowed_stamps="slice-h"
+          if grep -RIn 'data-freshness-stamp="' docs/index.html | grep -vE "data-freshness-stamp=\"(${allowed_stamps})\"" ; then
+            echo "::error::unknown data-freshness-stamp marker found in docs/index.html"
+            exit 1
+          fi
+          # No leftover TBD/WIP placeholder marker may survive.
+          if grep -RInE 'data-freshness-stamp="(TBD|WIP|tbd|wip)"' docs/ ; then
+            echo "::error::stale TBD/WIP freshness stamp"
+            exit 1
+          fi
+          echo "::endgroup::"
+
+      - name: Link integrity
+        run: node scripts/check-pages-links.mjs
+
+      - name: Section source tests
+        run: |
+          node docs/assets/nrcc-mark.test.mjs
+          node docs/sections/index.test.mjs
+          node docs/sections/freshness-stamp.test.mjs
+
+      - name: Roadmap mirror check
+        run: |
+          set -euo pipefail
+          # The roadmap table in docs/index.html must mirror
+          # docs/control-plane.md. The test in docs/sections/index.test.mjs
+          # already cross-checks docs/sections/roadmap.md; this step
+          # adds a textual check on the index.html inline rendering.
+          cp_rows=$(grep -cE 'href="https://github.com/fgjcarlos/nrcc/issues/75[6-9]"|href="https://github.com/fgjcarlos/nrcc/issues/76[0-4]"' docs/index.html || true)
+          if [ "$cp_rows" -ne 9 ]; then
+            echo "::error::docs/index.html roadmap expects 9 cluster links, got $cp_rows"
+            exit 1
+          fi
+          echo "roadmap mirror OK: $cp_rows cluster links"
