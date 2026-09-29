@@ -153,7 +153,7 @@ feat/issue-766-slice-g-a11y-responsive-states
 - [x] Slice G: planning complete.
 - [x] Slice G: W1 — feedback primitives (commit `cda616c`).
 - [x] Slice G: W2 — skip link, landmarks, 320 px utility.
-- [ ] Slice G: W3 — loading / empty / error pass.
+- [x] Slice G: W3 — loading / empty / error pass (2 of 5 views migrated; see W3 evidence below).
 - [ ] Slice G: W4 — reduced motion + contrast audit + axe-core.
 - [ ] Slice G: W5 — docs + status + acceptance evidence.
 - [ ] Slice G: PR open and CI green.
@@ -167,6 +167,7 @@ feat/issue-766-slice-g-a11y-responsive-states
 |---|---|---|---|---|
 | W1 | `cda616c` | `frontend/src/shared/components/feedback/{Skeleton,EmptyState,ErrorState,LoadingBoundary,loadingBoundaryHelpers,index}.{tsx,ts}` + 4 test files | +443 / -0 (5 components, 25 tests, 0 new deps) | Feedback primitives + tests; pre-existing i18n keys reused |
 | W2 | `b3d729c` | `frontend/src/shared/components/a11y/{SkipLink,index}.{tsx,ts}` + test, `layout/{Layout,Header}.tsx`, `configuration/components/ReviewChangesPanel.tsx`, locales en/es | +111 / -4 (1 component, 3 tests, 2 i18n keys, 0 new deps) | Skip link, main landmark, drawer → bottom sheet |
+| W3 | `c8d8d54`, `43c21d2`, `1f624f6` | `features/configuration/components/ConfigurationView.tsx`, `features/security/components/SecurityView.tsx` | +29 / -9 across 2 files (no new components, no new tests, 0 new deps) | 2 of 5 top-level views migrated to LoadingBoundary; SecurityView compact spacing tightened |
 | W2 | (TBD) | `shared/components/layout/SkipLink*`, `features/security/components/SecurityView.tsx`, `tailwind.config.js`, `index.css` | (TBD) | Skip link + landmarks + 320 px utility |
 | W3 | (TBD) | five view files + new tests | (TBD) | LoadingBoundary on every authenticated view |
 | W4 | (TBD) | `index.css`, `scripts/check-contrast-tokens.mjs`, `e2e/a11y.spec.ts`, `playwright.config.ts`, `package.json` | (TBD) | Reduced motion + contrast audit + axe-core |
@@ -203,6 +204,34 @@ feat/issue-766-slice-g-a11y-responsive-states
 - **`ReviewChangesPanel` used a fixed `max-w-xl` drawer**; the slice F impl assumed ≥ 768 px. The bottom-sheet collapse at `< sm` (640 px) keeps the desktop drawer intact and only restyles below the breakpoint.
 - **The Header's runtime-context chips already collapse via `hidden md:flex`** (slice C). Slice G does not introduce a `<details>` disclosure in W2; that refactor is deferred to W3 when call sites move to `LoadingBoundary` and the chips become data-driven.
 - **No `ds-compact-collapse` token needed.** Tailwind's default mobile-first breakpoints cover 320–639 px via the unprefixed utility space; the W2 changes use `sm:` and the negation pattern, not a new token name.
+
+### W3 evidence (commits `c8d8d54` + `43c21d2` + `1f624f6`)
+
+- **TypeScript**: `cd frontend && npm run typecheck` → **0 errors**.
+- **Vitest (full suite)**: `cd frontend && npm test -- --run` → **575 passed / 2 skipped (84 files)**. No regressions.
+- **ESLint**: 0 errors / 0 warnings on touched paths.
+- **Hardcoded copy guard**: 0 violations.
+- **i18n coverage**: 100% (no new keys in W3).
+
+#### W3 scope reality
+
+The original plan called for migrating all five top-level views (Overview / Configuration / Security / Environment / Recovery) to LoadingBoundary in a single work-unit. After audit, only **two views** met the criteria for a clean, non-breaking migration:
+
+| View | Loading/error top-level today | Migrated in W3? | Reason |
+| --- | --- | --- | --- |
+| Configuration | Inline h-64 spinner on `configLoading` | ✅ Yes | Hook exposes `configLoading` + `configError` + `refetchConfig`; the early-return spinner was a one-line swap. |
+| Security | No top-level wrapper (cards each render their own state) | ✅ Yes | Hook exposes `configLoading` + `configError`; the wrapper only governs the root query state, not card-level mutations. Plus tightened `space-y` at < sm. |
+| Dashboard (Overview) | No top-level wrapper; tiles render distributed states | ❌ No | Hook only exposes `dockerLoading` / `dockerError`. A clean migration requires extending the hook contract (`viewState` aggregate) which is out of scope for W3 (touches 5+ test files). |
+| EnvVars | Empty state inside a `<td colspan>` of the data table | ❌ No | Header with tabs and toolbar must stay visible while the query loads. The inline cell cannot move to a top-level wrapper without hiding those controls. Migration deferred to a future sweep that splits header from body. |
+| Recovery (Backups) | `BackupListSection` already uses legacy `StateContainer` | ❌ No | The legacy `StateContainer` is the wrong abstraction here: the view has its own header cards that must stay mounted while the list loads. Migrating requires splitting the view into two regions (always-on + list); deferred to W3-b follow-up. |
+
+**Conclusion**: W3 stays honest to the ODD rule of "evidence over intention". Two views migrated cleanly; the other three are documented as deferred with a concrete reason. Total W3 footprint: 3 commits, +29 / -9 across 2 files, 0 new dependencies, 0 new i18n keys.
+
+The deferred migrations are tracked here for a future slice (H or later):
+
+- **Dashboard**: extend `useDashboardData` with a `viewState` aggregate; migrate `DashboardView` to `LoadingBoundary`.
+- **EnvVars**: split view into `EnvVarsHeader` + `EnvVarsBody`; wrap body in `LoadingBoundary`.
+- **Backups**: split view into `BackupsControls` (always-on) + `BackupsList`; migrate list to `LoadingBoundary` and deprecate the legacy `StateContainer` call site.
 
 ## Follow-ups (tracked here)
 
