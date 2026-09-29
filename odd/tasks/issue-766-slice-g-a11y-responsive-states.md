@@ -154,6 +154,7 @@ feat/issue-766-slice-g-a11y-responsive-states
 - [x] Slice G: W1 — feedback primitives (commit `cda616c`).
 - [x] Slice G: W2 — skip link, landmarks, 320 px utility.
 - [x] Slice G: W3 — loading / empty / error pass (2 of 5 views migrated; see W3 evidence below).
+- [x] Slice G: W4 — reduced-motion + contrast audit + axe-core CI (2 commits, see W4 evidence below).
 - [ ] Slice G: W4 — reduced motion + contrast audit + axe-core.
 - [ ] Slice G: W5 — docs + status + acceptance evidence.
 - [ ] Slice G: PR open and CI green.
@@ -168,6 +169,8 @@ feat/issue-766-slice-g-a11y-responsive-states
 | W1 | `cda616c` | `frontend/src/shared/components/feedback/{Skeleton,EmptyState,ErrorState,LoadingBoundary,loadingBoundaryHelpers,index}.{tsx,ts}` + 4 test files | +443 / -0 (5 components, 25 tests, 0 new deps) | Feedback primitives + tests; pre-existing i18n keys reused |
 | W2 | `b3d729c` | `frontend/src/shared/components/a11y/{SkipLink,index}.{tsx,ts}` + test, `layout/{Layout,Header}.tsx`, `configuration/components/ReviewChangesPanel.tsx`, locales en/es | +111 / -4 (1 component, 3 tests, 2 i18n keys, 0 new deps) | Skip link, main landmark, drawer → bottom sheet |
 | W3 | `c8d8d54`, `43c21d2`, `1f624f6` | `features/configuration/components/ConfigurationView.tsx`, `features/security/components/SecurityView.tsx` | +29 / -9 across 2 files (no new components, no new tests, 0 new deps) | 2 of 5 top-level views migrated to LoadingBoundary; SecurityView compact spacing tightened |
+| W4-a | `f2b4842` | `src/index.css`, `scripts/check-contrast-tokens.{mjs,test.mjs}`, `package.json`, `vitest.config.ts` | +463 / -1 (1 CSS rule, 1 auditor, 1 auditor test, 2 npm scripts, 0 new runtime deps) | prefers-reduced-motion global rule + WCAG 2.1 SC 1.4.3 contrast auditor with --strict gate |
+| W4-b | `24ffcf7` | `e2e/a11y.spec.ts`, `src/shared/components/layout/Layout.tsx`, `src/locales/{en,es}/common.json`, `package.json`, `pnpm-lock.yaml`, `docs/i18n-coverage.md` | +171 / -20 (1 e2e spec, 1 a11y fix, 2 i18n keys, 1 dev dep, coverage regen) | @axe-core/playwright AA gate on Login/Overview/Configuration/Security + sidebar overlay ARIA fix |
 | W2 | (TBD) | `shared/components/layout/SkipLink*`, `features/security/components/SecurityView.tsx`, `tailwind.config.js`, `index.css` | (TBD) | Skip link + landmarks + 320 px utility |
 | W3 | (TBD) | five view files + new tests | (TBD) | LoadingBoundary on every authenticated view |
 | W4 | (TBD) | `index.css`, `scripts/check-contrast-tokens.mjs`, `e2e/a11y.spec.ts`, `playwright.config.ts`, `package.json` | (TBD) | Reduced motion + contrast audit + axe-core |
@@ -232,6 +235,33 @@ The deferred migrations are tracked here for a future slice (H or later):
 - **Dashboard**: extend `useDashboardData` with a `viewState` aggregate; migrate `DashboardView` to `LoadingBoundary`.
 - **EnvVars**: split view into `EnvVarsHeader` + `EnvVarsBody`; wrap body in `LoadingBoundary`.
 - **Backups**: split view into `BackupsControls` (always-on) + `BackupsList`; migrate list to `LoadingBoundary` and deprecate the legacy `StateContainer` call site.
+
+### W4 evidence (commits `f2b4842` + `24ffcf7`)
+
+- **TypeScript**: `cd frontend && npm run typecheck` → **0 errors**.
+- **Vitest (full suite)**: `cd frontend && npm test -- --run` → **575 passed / 2 skipped (84 files)**. No regressions from W3.
+- **Contrast auditor unit test**: `node scripts/check-contrast-tokens.test.mjs` → **7/7 assertions pass** (happy path AA, drift in report-only, drift in --strict exits 1, missing token exits 2, calculator identity check).
+- **i18n coverage**: 100% (852/852 EN keys, +1 over W2 baseline of 851 — the `common:layout.closeSidebar` key).
+- **Axe-core gate (browser-level)**: authored in `e2e/a11y.spec.ts`; the `prefers-reduced-motion` test was verified locally to pass when the vite dev server was reused from the prior session. The four full-page axe tests run on `/login`, `/overview`, `/configuration`, `/security` and will execute under GitHub Actions CI on this PR.
+
+#### Pre-existing contrast drift surfaced by the new auditor
+
+The auditor caught one pre-existing AA drift that does NOT block this slice but is documented for the design backlog:
+
+```
+✗ corporateLight  muted text on base
+  ds-text-muted(#6f7d90) on base-100(#f6f7f9) → 3.91:1  (need ≥ 4.5:1 for body)
+```
+
+`ds-text-muted` is used extensively as `text-muted-foreground` in `FlowVersionsView` (table headers, version hashes at `text-xs`, captions). In the corporateLight theme it sits at 3.91:1 against `base-100`, below the WCAG 2.1 SC 1.4.3 body threshold. In corporateDark the same token clears at 4.76:1. Recommended fix (not part of W4 scope): either bump `ds-text-muted` to a darker hue in corporateLight (e.g. `#5a6577`, which reaches 5.5:1) or audit each usage site and apply the `text-xs`/label role with the 3:1 large-text threshold explicitly.
+
+#### Pre-existing a11y issue fixed opportunistically
+
+The first run of the axe gate surfaced one serious violation on every authenticated page: `<label for="sidebar-drawer" aria-label="close sidebar" class="drawer-overlay">`. ARIA forbids `aria-label` on a `<label>` with no explicit role. W4-b fixes this with a screen-reader-only `<span>` inside the label, the canonical pattern. The new i18n key `common:layout.closeSidebar` ships in EN + ES to keep the i18n coverage rule.
+
+#### New dev dependencies (justified)
+
+- `@axe-core/playwright ^4.13.0` — devDependency only, required for the AA gate in the e2e suite. Zero runtime bundle impact. The package is the only maintained axe integration for Playwright; rolling our own would duplicate ~3 kLOC of rule definitions that ship with the package.
 
 ## Follow-ups (tracked here)
 
