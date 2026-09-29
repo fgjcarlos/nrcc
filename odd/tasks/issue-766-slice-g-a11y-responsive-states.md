@@ -156,6 +156,7 @@ feat/issue-766-slice-g-a11y-responsive-states
 - [x] Slice G: W3 — loading / empty / error pass (2 of 5 views migrated; see W3 evidence below).
 - [x] Slice G: W4 — reduced-motion + contrast audit + axe-core CI (2 commits, see W4 evidence below).
 - [x] Slice G: W5 — docs + acceptance evidence final (1 commit, see Closing evidence section).
+- [x] Slice G: CI follow-up — axe contrast on LocaleSwitcher, fast-uri audit, i18n guard regression (commit `59fa441`).
 - [ ] Slice G: W4 — reduced motion + contrast audit + axe-core.
 - [ ] Slice G: W5 — docs + status + acceptance evidence.
 - [ ] Slice G: PR open and CI green.
@@ -321,3 +322,16 @@ cda616c feat(ui): #766 slice G W1 — feedback primitives (Skeleton, EmptyState,
 ```
 
 Total: 7 feature commits, 5 docs commits. Branch is clean (no working-tree drift).
+
+## CI follow-up (commit `59fa441`)
+
+The first CI run on PR #855 surfaced three distinct failures. Each one is fixed in the commit above so the slice G acceptance contract holds end-to-end:
+
+1. **axe-core color-contrast on /configuration and /security** — the LocaleSwitcher's active button used `bg-accent text-accent-content` (`#0089b4` on `#f5f7fa` = 3.73:1). Switched to `bg-accent-dim` (`#075a73` on `#f5f7fa` = 7.20:1, AAA), with a `ring-1 ring-accent-content/40` to keep the visual cue. The token exists; no new design tokens introduced.
+2. **pnpm audit (high + critical)** — `fast-uri@4.1.3` (transitively via `ajv` via `@hookform/resolvers` and `serve`) picked up two newly-published high advisories (`GHSA-qw65-cvwx-89v3`, `GHSA-58mr-gqgx-xq4g`) since the last audit on main. Bumped the existing `pnpm-workspace.yaml` override from `>=4.1.3` to `>=4.2.1`. The lockfile picks up the new resolution; six moderate findings remain (postcss, fflate, vitest, undici, js-yaml) which the CI gate at `--audit-level high` does not block.
+3. **Hardcoded copy guard** — two new false positives introduced by W2 and W3:
+   - `ConfigurationView.tsx:295` captured the literal `return (` between the `<LoadingBoundary>` wrapper and the JSX return.
+   - `Layout.tsx:15` captured `landmark where * views are rendered via` from a JSDoc that includes a literal `<main>...</main>` markup reference.
+   The first is fixed in the guard itself (`isCodeLike` now recognises `return|throw|new` at the start of a captured literal); the second is fixed in the source (the comment no longer contains angle-bracket markup that the regex can capture between). A small `.test.mjs` covers the new classifier behaviour (3/3 assertions).
+
+Verification (local, observed before the commit): `pnpm audit --audit-level high` → exit 0, 0 high; i18n guard → `[]`; i18n guard test → 3/3; tsc → 0; vitest → 575/577. The axe gate cannot be exercised locally (sandbox process limit); CI re-runs the full Playwright suite.
