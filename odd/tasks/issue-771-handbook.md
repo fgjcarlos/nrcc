@@ -181,3 +181,31 @@ Single PR from `docs/issue-771-handbook` → `main`. Closes #771.
 - `72d7186` feat(docs): #771 W6b — support matrix + ownership governance
 - `3acc133` docs(odd): #771 W6 evidence — tracker rows closed, work-units landed
 - `5794aea` fix(docs): #771 — align cross-link anchors with GitHub slugifier
+
+## PR #857 fix-up
+
+PR #857 opened against origin/main failed three CI checks the
+local scan missed:
+
+1. **Pages content + link integrity** (freshness gate from #770,
+   merged in #856 while #857 was open). The gate greps 6 patterns
+   across every `docs/**/*.md` and `docs/**/*.html`. Two handbook
+   pages mentioned the literal tokens to describe the policy.
+   Resolution: move the enumeration to `odd/handbook/forbidden-tokens.md`
+   (outside `docs/`) and reword the handbook mentions to describe
+   the categories without listing the literals.
+2. **Lint (golangci-lint)**: 3 issues in `catalog_doc_sync_test.go`
+   (errcheck on `f.Close`, two G304 gosec warnings). Resolution:
+   `// #nosec G304 -- path is derived from runtime.Caller(0)+filepath.Join(...)`
+   with rationale, and `defer func() { _ = f.Close() }()`.
+3. **pnpm audit**: pre-existing 2 high-severity advisories in the
+   frontend dependencies; not related to this PR (the diff has zero
+   frontend changes). Follow-up tracked separately.
+
+After fix commit `4c79a23`:
+- forbidden-token scan: 0 hits in `docs/`
+- golangci-lint: 0 issues on `internal/service/...`
+- catalog sync test: still PASS
+
+PR rebased onto origin/main (which now includes #856) via merge
+commit `13706c6`.
