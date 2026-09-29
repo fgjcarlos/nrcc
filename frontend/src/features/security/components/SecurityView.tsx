@@ -3,6 +3,7 @@ import { useT } from '@/i18n';
 import { NrccTopologyDiagram } from '@/features/configuration/components/NrccTopologyDiagram';
 import { useConfigurationData } from '@/features/configuration/hooks/useConfigurationData';
 import { useUsersData } from '@/features/auth/hooks/useUsersData';
+import { LoadingBoundary } from '@/shared/components/feedback';
 import type { NodeRedConfigResponse } from '@/features/configuration/lib/configTransformers';
 import type { HttpBasicAuthSurface } from './HttpBasicAuthBoundaryCard';
 import { AdminAuthBoundaryCard } from './AdminAuthBoundaryCard';
@@ -57,7 +58,18 @@ export function SecurityView() {
   const httpNodeConfig = (config?.nodeHttpAuth ?? null) as HttpBasicAuthSurface;
   const httpStaticConfig = (config?.staticAuth ?? null) as HttpBasicAuthSurface;
 
+  const securityViewState = data.configLoading || data.settingsLoading
+    ? { status: 'pending' as const }
+    : data.configError
+      ? {
+          status: 'error' as const,
+          error: data.configError,
+          onRetry: refetch,
+        }
+      : { status: 'success' as const };
+
   return (
+    <LoadingBoundary state={securityViewState}>
     <section
       data-testid="security-view"
       className="space-y-6"
@@ -112,5 +124,6 @@ export function SecurityView() {
         onApplied={refetch}
       />
     </section>
+    </LoadingBoundary>
   );
 }
