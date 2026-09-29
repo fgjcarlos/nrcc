@@ -11,13 +11,16 @@ import {
   AIProviderSettings,
 } from '.';
 import { AdvancedSettings } from './AdvancedSettings';
+import { ConfigurationHeader } from './ConfigurationHeader';
+import { ReviewChangesPanel } from './ReviewChangesPanel';
 import {
-  Settings, Server, Shield, Activity, Palette,
+  Server, Shield, Activity, Palette,
   Save, LockOpen, AlertTriangle, Bot
 } from 'lucide-react';
-import { useConfigurationData, useConfigurationActions } from '../hooks';
+import { useConfigurationData, useConfigurationActions, useConfigurationDiff, useConfigurationSave, fieldValidationMap } from '../hooks';
 import { useT } from '@/i18n';
 import { ConfirmationDialog } from '@/shared/components/ConfirmationDialog';
+import { LoadingBoundary } from '@/shared/components/feedback';
 
 // ============================================
 // Sections Configuration
@@ -148,11 +151,30 @@ export function ConfigurationView() {
   // gates when the operator typed a non-empty secret).
   const [rotationDialogOpen, setRotationDialogOpen] = useState(false);
 
+  // Issue #766 slice F (W4) — reviewable safe-apply panel. Opens when
+  // the operator clicks the global Save button. The actual save still
+  // goes through `handleSave` so the credentialSecret rotation dialog
+  // and the raw-settings unlock flow remain the single source of truth.
+  const [reviewPanelOpen, setReviewPanelOpen] = useState(false);
+
   // Data and actions hooks
   const { t } = useT();
 
   const data = useConfigurationData();
   const actions = useConfigurationActions();
+
+  // Issue #766 slice F — derive per-field diff once, share with the
+  // save gate and the per-field `FieldStatusChip` widgets inside the
+  // active section component.
+  const loadedConfig = data.config;
+  const hostStatus = data.hostStatus ?? null;
+  const diff = useConfigurationDiff(
+    formData,
+    loadedConfig,
+    hostStatus,
+    data.rawSettingsContent,
+  );
+  const save = useConfigurationSave({ formData, diff });
 
   // Sync loaded config to form
   useEffect(() => {
@@ -179,20 +201,47 @@ export function ConfigurationView() {
   };
 
   const handleSave = async () => {
+    // Issue #766 slice F (W4) — reviewable safe-apply flow. Open the
+    // review panel first; the panel's Apply button drives the actual
+    // save via `handleApplyFromPanel` so the credentialSecret rotation
+    // dialog and the raw-settings unlock flow remain the single source
+    // of truth.
+    setReviewPanelOpen(true);
+  };
+
+  const handleApplyFromPanel = async () => {
     // Issue #762 — rotation confirmation gates the save on a new
     // credentialSecret.
     if (formData.credentialSecret) {
+      setReviewPanelOpen(false);
       setRotationDialogOpen(true);
       return;
     }
-    await actions.handleSave(formData);
-    setHasChanges(false);
+    const outcome = await save.save();
+    if (outcome.ok) {
+      setHasChanges(false);
+      setReviewPanelOpen(false);
+    } else if (outcome.reason === 'validation-errors') {
+      toast.error(`Fix ${Object.keys(outcome.errors).length} field${Object.keys(outcome.errors).length === 1 ? '' : 's'} before saving`);
+    } else if (outcome.reason === 'no-pending-changes') {
+      // Operator clicked Save without changing anything; treat as a
+      // soft no-op.
+      setReviewPanelOpen(false);
+    } else if (outcome.reason === 'read-only') {
+      toast.error('Configuration is read-only on this host');
+    }
   };
 
   const handleConfirmRotation = async () => {
     setRotationDialogOpen(false);
-    await actions.handleSave(formData);
-    setHasChanges(false);
+    const outcome = await save.save();
+    if (outcome.ok) {
+      setHasChanges(false);
+    } else if (outcome.reason === 'validation-errors') {
+      toast.error(`Fix ${Object.keys(outcome.errors).length} field${Object.keys(outcome.errors).length === 1 ? '' : 's'} before saving`);
+    } else if (outcome.reason === 'read-only') {
+      toast.error('Configuration is read-only on this host');
+    }
   };
 
   const handleCancelRotation = () => {
@@ -229,48 +278,47 @@ export function ConfigurationView() {
 
   // Derived state
   const ActiveComponent = SECTIONS.find(s => s.id === activeTab)?.component || BasicSettings;
-  const isLoading = data.configLoading;
   const isSaving = actions.saveConfigMutation.isPending;
+  const configViewState = data.configLoading
+    ? { status: 'pending' as const }
+    : data.configError
+      ? {
+          status: 'error' as const,
+          error: data.configError,
+          onRetry: () => {
+            void data.refetchConfig();
+          },
+        }
+      : { status: 'success' as const };
 
-  if (isLoading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+  return (
+    <LoadingBoundary state={configViewState}>
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">Settings</p>
-          <h1 className="flex items-center gap-3 text-2xl font-bold text-base-content">
-            <Settings className="h-6 w-6" />
-            {t('configuration:pageTitle')}
-          </h1>
-        </div>
-        <div className="flex items-center gap-2">
-          {hasChanges && (
-            <button
-              type="button"
-              onClick={handleReset}
-              className="px-4 py-2 text-sm font-medium text-base-content/60 transition-colors hover:text-base-content"
-            >
-              {t('configuration:discardChanges')}
-            </button>
-          )}
+      {/* Header (slice F W3) — page title + topology diagram */}
+      <ConfigurationHeader />
+      {/* Save / discard controls live next to the header but are not
+          part of it so the topology diagram keeps a tidy column. */}
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {hasChanges && (
           <button
             type="button"
-            onClick={handleSave}
-            disabled={!hasChanges || isSaving || data.hostStatus?.configuration?.editable === false}
-            className="action-btn-primary"
+            onClick={handleReset}
+            className="px-4 py-2 text-sm font-medium text-base-content/60 transition-colors hover:text-base-content"
           >
-            <Save className="w-4 h-4" />
-            {actions.saveConfigMutation.isPending ? t('common:saving') + '...' : t('common:save')}
+            {t('configuration:discardChanges')}
           </button>
-        </div>
+        )}
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={!diff.canSave || isSaving}
+          className="action-btn-primary"
+        >
+          <Save className="w-4 h-4" />
+          {actions.saveConfigMutation.isPending ? t('common:saving') + '...' : t('common:save')}
+        </button>
       </div>
 
       {/* Host Status Info */}
@@ -331,7 +379,7 @@ export function ConfigurationView() {
            <div className="rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm text-warning" role="status">
              {t('configuration:controlsUnavailable')}
            </div>
-          ) : activeTab === 'ai' ? <AIProviderSettings /> : <ActiveComponent settings={formData} onUpdate={handleUpdateField} disabled={isSaving} />}
+          ) : activeTab === 'ai' ? <AIProviderSettings /> : <ActiveComponent settings={formData} onUpdate={handleUpdateField} disabled={isSaving} fieldErrors={fieldValidationMap(diff.fields)} />}
        </div>
 
 
@@ -449,6 +497,18 @@ export function ConfigurationView() {
         onCancel={handleCancelRotation}
         onConfirm={handleConfirmRotation}
       />
+
+      {/* Issue #766 slice F (W4) — reviewable safe-apply drawer. */}
+      <ReviewChangesPanel
+        isOpen={reviewPanelOpen}
+        fields={diff.fields}
+        pendingCount={diff.pendingCount}
+        target="settings.js"
+        isPending={actions.saveConfigMutation.isPending}
+        onApply={handleApplyFromPanel}
+        onCancel={() => setReviewPanelOpen(false)}
+      />
     </div>
+    </LoadingBoundary>
   );
 }

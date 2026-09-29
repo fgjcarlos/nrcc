@@ -9,6 +9,10 @@
   "tryAgainLater": "Please try again later",
   "noItemsYet": "No items yet",
   "noDataYet": "No data yet",
+  "layout": {
+    "skipToContent": "Skip to main content",
+    "closeSidebar": "Close sidebar"
+  },
   "delete": "Delete",
   "add": "Add",
   "saving": "Saving...",

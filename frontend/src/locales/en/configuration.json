@@ -108,5 +108,88 @@
     "applying": "Applying…",
     "apply": "Apply dashboard access",
     "absent": "absent"
+  },
+  "fieldStatus": {
+    "header": {
+      "field": "Field",
+      "configured": "Configured value",
+      "effective": "Effective value",
+      "source": "Source",
+      "validation": "Validation",
+      "pending": "Pending",
+      "restart": "Restart"
+    },
+    "source": {
+      "settingsJs": "settings.js",
+      "formDefault": "form default"
+    },
+    "validation": {
+      "valid": "Valid",
+      "pending": "Pending",
+      "invalid": "Invalid"
+    },
+    "pending": {
+      "changed": "Changed"
+    },
+    "restart": {
+      "hard": "Restart required",
+      "soft": "Redeploy flows",
+      "none": "—"
+    },
+    "invalid": {
+      "uiPort": "Port out of range",
+      "uiHost": "Host is required",
+      "httpAdminRoot": "Must start with /",
+      "httpNodeRoot": "Must start with /",
+      "disableEditor": "Invalid editor toggle",
+      "credentialSecret": "Secret is too short",
+      "requireHttps": "Invalid HTTPS toggle",
+      "httpsKey": "Path is required",
+      "httpsCert": "Path is required",
+      "httpsCA": "Path is required",
+      "httpsPort": "Port out of range",
+      "httpsPassphrase": "Passphrase is too short"
+    },
+    "queued": {
+      "uiPort": "Port pending",
+      "uiHost": "Host pending",
+      "httpAdminRoot": "Admin root pending",
+      "httpNodeRoot": "Node root pending",
+      "disableEditor": "Editor toggle pending",
+      "credentialSecret": "Secret rotation pending",
+      "requireHttps": "HTTPS redirect pending",
+      "httpsKey": "TLS key path pending",
+      "httpsCert": "TLS cert path pending",
+      "httpsCA": "TLS CA path pending",
+      "httpsPort": "TLS port pending",
+      "httpsPassphrase": "TLS passphrase pending"
+    }
+  },
+  "reviewPanel": {
+    "title": "Review changes",
+    "subtitle": "Apply the edits below to {{target}}.",
+    "openButton": "Review changes",
+    "noChanges": "No pending changes.",
+    "groupHardRestart": "Hard restart ({{count}})",
+    "groupSoftRestart": "Flow redeploy ({{count}})",
+    "groupNone": "Other ({{count}})",
+    "configuredLabel": "Current",
+    "newLabel": "New",
+    "apply": "Apply",
+    "cancel": "Cancel",
+    "applying": "Applying…",
+    "applied": "Applied successfully.",
+    "appliedError": "Failed to apply: {{message}}"
+  },
+  "topology": {
+    "title": "Configuration topology",
+    "subtitle": "NRCC edits settings.js; Node-RED reads it on (re)start.",
+    "nodeNrcc": "NRCC",
+    "nodeNrccSubtitle": "control plane",
+    "nodeSettings": "settings.js",
+    "nodeSettingsSubtitle": "source of truth",
+    "nodeRed": "Node-RED + Dashboard",
+    "arrowNrccSettings": "edits",
+    "arrowSettingsNodeRed": "loads"
   }
 }

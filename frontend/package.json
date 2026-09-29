@@ -20,6 +20,8 @@
     "typecheck": "tsc --noEmit",
     "i18n:check": "node scripts/check-no-hardcoded-i18n.mjs",
     "i18n:coverage": "node scripts/i18n-coverage.mjs",
+    "check:contrast": "node scripts/check-contrast-tokens.mjs",
+    "check:contrast:strict": "node scripts/check-contrast-tokens.mjs --strict",
     "gen:api": "openapi-typescript ../docs/openapi.yaml -o src/shared/api/schema.ts"
   },
   "dependencies": {
@@ -42,6 +44,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.63.0",
     "@testing-library/jest-dom": "^7.0.1",

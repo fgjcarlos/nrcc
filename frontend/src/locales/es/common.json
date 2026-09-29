@@ -9,6 +9,10 @@
   "tryAgainLater": "Inténtalo de nuevo más tarde",
   "noItemsYet": "Aún no hay elementos",
   "noDataYet": "Sin datos",
+  "layout": {
+    "skipToContent": "Saltar al contenido principal",
+    "closeSidebar": "Cerrar barra lateral"
+  },
   "delete": "Eliminar",
   "add": "Añadir",
   "saving": "Guardando...",

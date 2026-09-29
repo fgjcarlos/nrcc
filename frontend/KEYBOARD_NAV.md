@@ -252,6 +252,105 @@ If focus does not trap as expected:
 
 ---
 
+## Slice G additions (issue #766)
+
+Slice G lands the cross-cutting accessibility / responsive / loading-state
+sweep. The pieces that touched keyboard semantics are documented below;
+every other slice G change is colour, motion or contract (no new
+keyboard surface).
+
+### Skip link — first focusable element on every authenticated page
+
+`SkipLink` is rendered as the first focusable child of `<Layout>`. On a
+fresh `Tab` press from a cold page load the link is the first stop in the
+tab order; activating it (Enter) moves focus to `<main id="main-content"
+tabindex="-1">` and scrolls the main landmark into view. The link is
+visually hidden with `sr-only` until focused, then revealed with
+`focus:not-sr-only`, `z-200`, and a 2 px surface-coloured halo plus 4 px
+accent ring (`ds-focus-ring`). The label resolves through
+`common:layout.skipToContent` so both EN and ES locales ship.
+
+| Key | Action | Conditions |
+|-----|--------|-----------|
+| **Tab** (cold) | Reveal skip link and focus it | Page just loaded and no element is focused |
+| **Enter** | Move focus + scroll to `<main id="main-content">` | Skip link is focused |
+| **Tab** (warm) | Move focus to the next interactive element | Skip link has already been revealed this session |
+
+### Drawer → bottom sheet collapse (compact viewports)
+
+The `<ReviewChangesPanel>` rendered on the configuration surface stays as
+a centered modal at `≥ sm` (640 px) and collapses to a bottom sheet
+anchored to the bottom edge below that breakpoint:
+
+- `items-end` + `rounded-t-2xl` + `max-h-[85vh]` below `sm`.
+- Focus trap and Escape behaviour are unchanged.
+- Keyboard users on a 320 px viewport get the same Escape / Tab
+  semantics inside the sheet as on the desktop modal. The sheet is
+  scrollable so long diff lists remain reachable.
+
+### Sidebar drawer overlay
+
+The sidebar drawer overlay shipped with an `<label aria-label="...">`
+which axe flagged as an ARIA prohibited-attribute combination (the
+`<label>` element already carries an implicit accessible name from its
+`for` attribute; ARIA forbids layering an additional `aria-label` on a
+generic `<label>`). The fix replaces the aria-label with a
+`<span class="sr-only">` child carrying the new i18n key
+`common:layout.closeSidebar`. Keyboard behaviour is unchanged: clicking
+or pressing Enter while the label is focused still untoggles the
+drawer's hidden checkbox and closes the sidebar.
+
+### prefers-reduced-motion (W4-a)
+
+A global `@media (prefers-reduced-motion: reduce)` block at the bottom
+of `src/index.css` collapses every Tailwind transition-* utility and
+animate-* utility to a 0.001ms sentinel, plus kills the custom
+`spin-smooth` keyframes via `animation-name: none`. This applies to:
+
+- the `Skeleton` component's pulse (W1);
+- the `LoadingBoundary` pending state (W1);
+- the confirmation dialog's colour transition;
+- any per-component `motion-reduce:animate-none` utility (defensive).
+
+When a user has prefers-reduced-motion: reduce set, the loading
+indicators stop pulsing but remain visible, focus rings stay at full
+contrast, and screen-reader announcements stay intact. The
+`prefers-reduced-motion` browser test in `e2e/a11y.spec.ts` verifies
+the gate end-to-end.
+
+### Contrast auditor (W4-a)
+
+`scripts/check-contrast-tokens.mjs` reads the colour tokens declared in
+`tailwind.config.js` and `src/index.css`, computes the WCAG 2.1
+relative-luminance ratio for every documented foreground / background
+pair in both themes, and fails when any pair drops below the AA
+threshold (4.5:1 for body text, 3:1 for UI components). It runs in two
+modes:
+
+- `pnpm check:contrast` — report-only, exits 0 even on drift; intended
+  for local development.
+- `pnpm check:contrast:strict` — exits 1 on AA drift; intended for CI
+  once the pre-existing design drift in corporateLight muted text is
+  fixed (see the W4 evidence section in the ODD task).
+
+The auditor's unit test lives in
+`scripts/check-contrast-tokens.test.mjs` and covers the happy path,
+report-only drift, `--strict` drift, missing-token resolution, and a
+calculator identity check.
+
+### axe-core browser gate (W4-b)
+
+`e2e/a11y.spec.ts` runs `@axe-core/playwright` with the default AA
+rule set (`wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`) on the four most
+trafficked surfaces — `/login`, `/overview`, `/configuration`,
+`/security` — and fails when any violation carries `critical` or
+`serious` impact. The first run of the gate surfaced the sidebar
+overlay aria-label issue documented above; W4-b fixes it. A future
+slice can layer in the best-practice / WCAG 2.2 rule set once the open
+design backlog items are addressed.
+
+---
+
 ## Changelog
 
 | Date | Change | Phase |
@@ -260,6 +359,7 @@ If focus does not trap as expected:
 | 2026-05-19 | ConfirmationDialog keyboard patterns documented | Phase 6 |
 | 2026-05-19 | UserMenu keyboard patterns documented | Phase 6 |
 | 2026-05-19 | Focus trap and restoration documented | Phase 6 |
+| (slice G) | Skip link, drawer to bottom sheet, sidebar overlay a11y fix, prefers-reduced-motion gate, contrast auditor, axe-core browser gate | issue #766 slice G |
 
 ---
 
