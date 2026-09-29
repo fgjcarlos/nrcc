@@ -46,7 +46,9 @@ export function Layout() {
       </div>
 
       <div className="drawer-side z-50">
-        <label htmlFor="sidebar-drawer" aria-label="close sidebar" className="drawer-overlay"></label>
+        <label htmlFor="sidebar-drawer" className="drawer-overlay">
+          <span className="sr-only">{t('common:layout.closeSidebar')}</span>
+        </label>
         <Sidebar />
       </div>
     </div>
