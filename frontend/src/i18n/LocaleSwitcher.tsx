@@ -32,7 +32,7 @@ export function LocaleSwitcher() {
             className={
               'px-2 py-1 font-semibold uppercase tracking-wider transition ' +
               (isActive
-                ? 'bg-accent text-accent-content'
+                ? 'bg-accent-dim text-accent-content ring-1 ring-accent-content/40'
                 : 'text-base-content/70 hover:bg-base-300')
             }
           >

@@ -12,13 +12,13 @@ import { useT } from '@/i18n';
  *    viewports.
  *  - Header (slice C) carrying the runtime-context chips and
  *    application chrome (command palette, locale, theme).
- *  - A single <main id="main-content" tabindex={-1}> landmark where
- *    views are rendered via <Outlet />.
+ *  - A single main landmark with id "main-content" and tabindex=-1
+ *    where views are rendered via Outlet.
  *
  * Issue #766 slice G W2 adds the SkipLink as the first focusable
  * element so the first Tab press exposes it, then jumps the keyboard
- * user straight to the main content. `<main tabindex={-1}>` makes the
- * jump target focusable so the browser scrolls and moves focus to the
+ * user straight to the main content. The main landmark carries an
+ * explicit tabindex=-1 so the browser scrolls and moves focus to the
  * landmark rather than only scrolling.
  */
 export function Layout() {
