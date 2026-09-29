@@ -100,7 +100,7 @@ Single PR from `docs/issue-771-handbook` → `main`. Closes #771.
 | W1 | Handbook shell + index + glossary skeleton | ✅ `8369274` |
 | W2 | Setting catalog + sync test | ✅ `8035f3a` |
 | W3 | Authentication surfaces separation | ✅ `b394137` |
-| W4 | Apply pipeline (source-preserving) | ⏳ |
+| W4 | Apply pipeline (source-preserving) | ✅ `ca2fca7` |
 | W5 | Architecture + contributor guide + fixtures | ⏳ |
 | W6 | Operator playbook + troubleshooting + support matrix + ownership | ⏳ |
 
