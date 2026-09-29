@@ -98,10 +98,13 @@ handbook/
   same commit.
 - **ADR links**. When the handbook explains a "why", it cites an ADR
   by number, not by reproducing the rationale.
-- **Forbidden tokens**. The same freshness gate from #770 forbids
-  legacy tokens (`sp-*`, `Beta ·`, `hardening phase`, `no
-  production guarantees`, `API keys may change`, `Vitest suites on
-  every PR`). They must not appear in any handbook page either.
+- **Forbidden tokens**. The freshness gate from #770 forbids a list
+  of legacy and "stale beta" copy tokens. The full enumeration lives
+  in `odd/handbook/forbidden-tokens.md`; the rule here is shorter:
+  every legacy token that the gate forbids for the public site is
+  also forbidden in any handbook page. If you need to *describe* a
+  forbidden token (for example, in a changelog or a contributor
+  guide), do it in a file outside `docs/`, never inside it.
 
 ## Maintenance
 

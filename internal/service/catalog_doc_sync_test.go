@@ -77,7 +77,7 @@ func TestCatalogDocSync(t *testing.T) {
 	// same "5.0.6" (or whatever nodeRED5CatalogVersion holds). This
 	// catches the operator-visible "we changed the catalog version
 	// without bumping the docs" mistake.
-	raw, err := os.ReadFile(docPath)
+	raw, err := os.ReadFile(docPath) // #nosec G304 -- docPath is derived from runtime.Caller(0)+filepath.Join("docs/handbook/..."), not from user input.
 	if err != nil {
 		t.Fatalf("read %s: %v", docPath, err)
 	}
@@ -129,15 +129,15 @@ func assertCatalogRow(t *testing.T, e SettingCatalogEntry, r catalogRow) {
 // followed by a markdown separator line and then `| <key> | ...
 // | <✓| > | <✓| > | <✓| > |` rows in any order.
 //
-// The parser does NOT handle inline pipes inside cells; the table
-// has none today. If a future entry needs them, prefer a separate
-// "Notes" column or escape the pipe (`\|`).
+// The parser tolerates inline pipes that are escaped with a backslash
+// (e.g. `process.env.PORT \| 1880`); splitMarkdownRow consumes `\|` as
+// a literal `|` before splitting the row on raw `|`.
 func parseCatalogTable(path string) ([]catalogRow, error) {
-	f, err := os.Open(path)
+	f, err := os.Open(path) // #nosec G304 -- path is derived from runtime.Caller(0)+filepath.Join("docs/handbook/..."), not from user input.
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	const wantHeader = "| Key | Shape | Default | Validation | Secret | RestartRequired | UIEditable |"
 

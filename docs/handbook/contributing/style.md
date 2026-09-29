@@ -50,17 +50,26 @@
 
 ## Forbidden tokens
 
-The freshness gate from #770 forbids these tokens in any tracked
-file:
+The freshness gate from #770 forbids a list of legacy and stale
+beta-era copy tokens in every tracked `*.md` and `*.html` file
+under `docs/`. The full enumeration is curated in
+[`odd/handbook/forbidden-tokens.md`](../../../odd/handbook/forbidden-tokens.md)
+so the handbook itself can stay compliant.
 
-- `sp-*` (Signal Prime leftover; the design system is `ds-*`).
-- `Beta ·`, `hardening phase`, `no production guarantees`,
-  `API keys may change` (stale "beta" copy).
-- `Vitest suites on every PR` (incorrect promise; the catalog
-  policy is one Vitest run per PR).
+When you need to *describe* a forbidden token in writing (changelog,
+contributor guide, or migration note), put that description outside
+`docs/` — the gate does not scan the rest of the repository.
 
-A scan runs in `pages-freshness.yml` (PR + weekly cron). When the
-scan fails, fix the token — do not silence the gate.
+The categories covered are:
+
+- Legacy Signal Prime palette tokens (the design system is `ds-*`).
+- Stale beta-era copy phrases (the project ships a 5.x catalog; the
+  era when those phrases were accurate is closed).
+- Incorrect promise copy that no longer matches the actual policy
+  (catalog coverage gates, security scans, etc.).
+
+The scan runs in `pages-freshness.yml` (PR + weekly cron). When it
+fails, fix the token — do not silence the gate.
 
 ## Go conventions
 
