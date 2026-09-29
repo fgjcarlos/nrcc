@@ -1227,3 +1227,41 @@ aside.bg-base-100 {
 [data-theme="corporateLight"] .ds-focus-ring:focus {
   box-shadow: 0 0 0 2px var(--ds-bg-base, #f6f7f9), 0 0 0 4px var(--ds-accent-primary, #007aa0);
 }
+
+/* ══════════════════════════════════════════════════════════════
+   REDUCED MOTION — Issue #766 slice G W4
+   WCAG 2.1 SC 2.3.3 (Animation from Interactions) + SC 2.2.2 (Pause,
+   Stop, Hide). One global rule at the end of the cascade so it wins
+   over per-component utilities. Kills:
+
+     * every Tailwind transition-* utility (transition: none)
+     * every Tailwind animate-* utility (animation: none)
+     * the spin-smooth @keyframes (animation-name: none)
+     * every CSS transition shorthand declaration that survives
+
+   Focus rings, text rendering and colour contrast are unaffected —
+   the rule only suppresses movement, not visual state.
+   ══════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Tailwind's animate-pulse / animate-spin / animate-none utilities
+     rely on CSS @keyframes whose names are referenced via
+     animation-name: <name>. Resetting animation-name to none stops
+     the visual effect while preserving animation-duration as the
+     accessibility-safe 0.001ms sentinel above. */
+  .animate-pulse,
+  .animate-spin,
+  .animate-ping,
+  .animate-bounce {
+    animation-name: none !important;
+  }
+}

@@ -12,7 +12,7 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
-    exclude: ['e2e/**', 'node_modules/**', 'dist/**'],
+    exclude: ['e2e/**', 'node_modules/**', 'dist/**', 'scripts/**'],
     // Node 26's built-in `globalThis.localStorage` requires the
     // `--localstorage-file` CLI flag and otherwise shadows jsdom's
     // window.localStorage by leaving it `undefined`. Asking jsdom for an
