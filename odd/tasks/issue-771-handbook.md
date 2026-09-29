@@ -101,7 +101,7 @@ Single PR from `docs/issue-771-handbook` → `main`. Closes #771.
 | W2 | Setting catalog + sync test | ✅ `8035f3a` |
 | W3 | Authentication surfaces separation | ✅ `b394137` |
 | W4 | Apply pipeline (source-preserving) | ✅ `ca2fca7` |
-| W5 | Architecture + contributor guide + fixtures | ⏳ |
+| W5 | Architecture + contributor guide + fixtures | ✅ `101c6a6` |
 | W6 | Operator playbook + troubleshooting + support matrix + ownership | ⏳ |
 
 ## What this issue does NOT do
