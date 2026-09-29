@@ -102,7 +102,7 @@ Single PR from `docs/issue-771-handbook` → `main`. Closes #771.
 | W3 | Authentication surfaces separation | ✅ `b394137` |
 | W4 | Apply pipeline (source-preserving) | ✅ `ca2fca7` |
 | W5 | Architecture + contributor guide + fixtures | ✅ `101c6a6` |
-| W6 | Operator playbook + troubleshooting + support matrix + ownership | ⏳ |
+| W6 | Operator playbook + troubleshooting + support matrix + ownership | ✅ `0a51fb2` (a) + `72d7186` (b) |
 
 ## What this issue does NOT do
 
