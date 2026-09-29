@@ -28,7 +28,7 @@ test.describe('Issue #766 slice G W4 — WCAG 2.1 AA gate', () => {
     )
     if (blocking.length > 0) {
       // Print every blocker so the CI log shows the offending nodes.
-      // eslint-disable-next-line no-console
+
       console.error(JSON.stringify(blocking, null, 2))
     }
     expect(blocking, 'login axe blockers').toHaveLength(0)
@@ -45,7 +45,7 @@ test.describe('Issue #766 slice G W4 — WCAG 2.1 AA gate', () => {
       (v) => v.impact === 'critical' || v.impact === 'serious',
     )
     if (blocking.length > 0) {
-      // eslint-disable-next-line no-console
+
       console.error(JSON.stringify(blocking, null, 2))
     }
     expect(blocking, 'overview axe blockers').toHaveLength(0)
@@ -63,7 +63,7 @@ test.describe('Issue #766 slice G W4 — WCAG 2.1 AA gate', () => {
       (v) => v.impact === 'critical' || v.impact === 'serious',
     )
     if (blocking.length > 0) {
-      // eslint-disable-next-line no-console
+
       console.error(JSON.stringify(blocking, null, 2))
     }
     expect(blocking, 'configuration axe blockers').toHaveLength(0)
@@ -81,7 +81,7 @@ test.describe('Issue #766 slice G W4 — WCAG 2.1 AA gate', () => {
       (v) => v.impact === 'critical' || v.impact === 'serious',
     )
     if (blocking.length > 0) {
-      // eslint-disable-next-line no-console
+
       console.error(JSON.stringify(blocking, null, 2))
     }
     expect(blocking, 'security axe blockers').toHaveLength(0)
