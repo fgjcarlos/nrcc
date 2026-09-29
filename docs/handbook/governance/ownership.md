@@ -126,7 +126,7 @@ state transition. The audit log:
   cites audit event IDs).
 - Is rotated by the periodic snapshot loop. The rotation policy
   is documented in
-  [`../operator/troubleshooting.md § scenario 5`](../operator/troubleshooting.md#scenario-5--audit-log-fills-the-disk).
+  [`../operator/troubleshooting.md § scenario 5`](../operator/playbook.md#scenario-5-audit-log-fills-the-disk).
 
 ## Handbook change policy
 

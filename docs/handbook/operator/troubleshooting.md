@@ -50,12 +50,12 @@ poll (typically 5 seconds).
 ### The structured UI shows "Audit log full"
 
 **Diagnosis.** Same as
-[playbook scenario 5](playbook.md#scenario-5--audit-log-fills-the-disk).
+[playbook scenario 5](playbook.md#scenario-5-audit-log-fills-the-disk).
 
 ### A typed form field is missing
 
 **Diagnosis.** The field is unmanaged. See
-[`playbook § scenario 8`](playbook.md#scenario-8--operator-cannot-find-a-settingsjs-field).
+[`playbook § scenario 8`](playbook.md#scenario-8-operator-cannot-find-a-settingsjs-field).
 
 ## NRCC-layer symptoms
 
@@ -72,7 +72,7 @@ See
 [`../configuration/apply-pipeline.md § failure modes`](../configuration/apply-pipeline.md#failure-modes-and-what-the-operator-sees).
 
 **Fix.** Per
-[`playbook § scenario 2`](playbook.md#scenario-2--apply-pipeline-refuses-with-failure_stagevalidate).
+[`playbook § scenario 2`](playbook.md#scenario-2-apply-pipeline-refuses-with-failure_stagevalidate).
 
 ### The audit log shows `apply.failure` with `failure_stage=backup`
 
@@ -98,9 +98,9 @@ disk-full or permission error.
 audit log itself).
 
 **Fix.** Per
-[`playbook § scenario 5`](playbook.md#scenario-5--audit-log-fills-the-disk)
+[`playbook § scenario 5`](playbook.md#scenario-5-audit-log-fills-the-disk)
 and
-[`playbook § scenario 7`](playbook.md#scenario-7--applysuccess-is-missing-from-the-audit-log).
+[`playbook § scenario 7`](playbook.md#scenario-7-applysuccess-is-missing-from-the-audit-log).
 
 ### NRCC returns `503 Service Unavailable` for every endpoint
 
@@ -125,7 +125,7 @@ or `adminAuth` was removed and the default open-editor state
 takes over (which would be `200 OK`, not `401`).
 
 **Fix.** Per
-[`playbook § scenario 1`](playbook.md#scenario-1--locked-out-of-the-editor-after-a-adminauth-edit).
+[`playbook § scenario 1`](playbook.md#scenario-1-locked-out-of-the-editor-after-a-adminauth-edit).
 
 ### The editor returns `404 Not Found`
 
@@ -174,7 +174,7 @@ Common causes:
   `credentials.json`.
 
 **Fix.** Per
-[`playbook § scenario 3`](playbook.md#scenario-3--node-red-does-not-come-back-after-a-restart).
+[`playbook § scenario 3`](playbook.md#scenario-3-node-red-does-not-come-back-after-a-restart).
 
 ## Cross-layer symptoms
 

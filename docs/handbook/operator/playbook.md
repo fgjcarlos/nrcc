@@ -20,7 +20,7 @@ Every scenario follows the same shape:
 The postmortem is short on purpose. If the fix does not stick,
 open an issue and link the audit event ID.
 
-## Scenario 1 — Locked out of the editor after a `adminAuth` edit
+## Scenario 1: Locked out of the editor after a `adminAuth` edit
 
 **Symptom.** The Node-RED editor at `http://<host>:1880/` returns
 `401 Unauthorized` for every operator, including the one whose
@@ -54,7 +54,7 @@ the audit log captures the operator identity:
 the hash is incompatible with Node-RED. See
 [`../security/auth-surfaces.md § adminAuth`](../security/auth-surfaces.md#adminauth-node-red-editor).
 
-## Scenario 2 — Apply pipeline refuses with `failure_stage=validate`
+## Scenario 2: Apply pipeline refuses with `failure_stage=validate`
 
 **Symptom.** The structured UI shows "Apply rejected" with a
 redacted error from the parser.
@@ -88,7 +88,7 @@ docker exec -it <nrcc> tail -f /data/audit.jsonl | grep apply.
 **Postmortem.** If the parser repeatedly refuses a valid file,
 open an issue with the parser error and the offending file.
 
-## Scenario 3 — Node-RED does not come back after a restart
+## Scenario 3: Node-RED does not come back after a restart
 
 **Symptom.** The NRCC readiness probe shows "Node-RED
 unreachable" for more than 60 seconds.
@@ -124,7 +124,7 @@ audit log to see which apply caused the breakage; the operator
 identity is in the audit record. See
 [`troubleshooting.md`](troubleshooting.md).
 
-## Scenario 4 — Dashboard returns 404 after a `httpStatic` change
+## Scenario 4: Dashboard returns 404 after a `httpStatic` change
 
 **Symptom.** The FlowFuse Dashboard was working yesterday;
 today every URL returns 404.
@@ -147,7 +147,7 @@ curl -sI http://<host>:1880/<httpStaticPath>/ | head -1
 **Postmortem.** See
 [`../security/auth-surfaces.md § Dashboard boundary`](../security/auth-surfaces.md#dashboard-boundary).
 
-## Scenario 5 — Audit log fills the disk
+## Scenario 5: Audit log fills the disk
 
 **Symptom.** Apply transactions return `apply.failure` with
 `failure_stage=audit` and a `disk full` error.
@@ -174,7 +174,7 @@ this does not recur. The audit log is rotated automatically by
 the periodic snapshot loop, but only when the snapshot loop is
 healthy.
 
-## Scenario 6 — JWT cookie rejected after a stack restart
+## Scenario 6: JWT cookie rejected after a stack restart
 
 **Symptom.** Every browser refresh logs the operator out, even
 within the cookie expiry window.
@@ -201,7 +201,7 @@ being logged out.
 [`troubleshooting.md § secret rotation`](troubleshooting.md#secret-rotation)
 for the rotation policy.
 
-## Scenario 7 — `apply.success` is missing from the audit log
+## Scenario 7: `apply.success` is missing from the audit log
 
 **Symptom.** The structured UI shows the transaction succeeded,
 but `tail /data/audit.jsonl` does not contain a matching
@@ -228,7 +228,7 @@ close-out failed.
 `apply.start` → `apply.backup` → `apply.write` → `apply.success`
 in order.
 
-## Scenario 8 — Operator cannot find a `settings.js` field
+## Scenario 8: Operator cannot find a `settings.js` field
 
 **Symptom.** The structured UI does not expose a field the
 operator needs (e.g. a custom `functionGlobalContext` key).
