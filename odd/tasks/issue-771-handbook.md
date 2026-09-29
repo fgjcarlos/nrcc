@@ -150,3 +150,34 @@ Single PR from `docs/issue-771-handbook` → `main`. Closes #771.
   `slice-h` markers do not regress)
 - `pages-freshness.yml` (in `gh pr checks`) green
 - `wc -l docs/handbook/index.md` ≤ 400
+
+## Final acceptance (final pass)
+
+| # | Check | Result |
+|---|-------|--------|
+| 1 | `go test ./internal/service/ -run TestCatalogDocSync -count=1` | PASS |
+| 2 | `go test ./internal/service/ -count=1` (full service suite) | PASS (251s) |
+| 3 | Forbidden-token scan on `docs/handbook/` (excluding the canonical allowlist files `style.md` + `index.md` that document the list) | 0 matches |
+| 4 | Handbook cross-link integrity (custom slugifier matching GitHub algorithm) | 0 anchor errors across 13 .md files |
+| 5 | `wc -l docs/handbook/index.md` ≤ 400 | 111 lines |
+| 6 | `internal/service/catalog_doc_sync_test.go` row-count vs `nodeRED5Catalog` | 21/21 set equality |
+| 7 | `internal/service/catalog_doc_sync_test.go` per-field equality (Shape/Default/Validation/Secret/RestartRequired/UIEditable) | PASS |
+| 8 | `internal/service/catalog_doc_sync_test.go` pinned-version note | PASS (`nodeRED5CatalogVersion = "5.0.6"` present in prose) |
+| 9 | `go build ./...` | only pre-existing `frontend/dist embed` error (unrelated) |
+
+## Commits
+
+- `8369274` feat(docs): #771 W1 — handbook shell + index + glossary + stub pages
+- `df51333` docs(odd): #771 W1 evidence — tracker row closed, work-unit landed
+- `8035f3a` feat(docs): #771 W2 — setting catalog (21 entries) + sync test
+- `b5024df` docs(odd): #771 W2 evidence — tracker row closed, work-unit landed
+- `b394137` feat(docs): #771 W3 — authentication surfaces separation
+- `2590cca` docs(odd): #771 W3 evidence — tracker row closed, work-unit landed
+- `ca2fca7` feat(docs): #771 W4 — apply pipeline (source-preserving)
+- `3416e18` docs(odd): #771 W4 evidence — tracker row closed, work-unit landed
+- `101c6a6` feat(docs): #771 W5 — architecture + parser/renderer + fixtures + style
+- `7c58424` docs(odd): #771 W5 evidence — tracker row closed, work-unit landed
+- `0a51fb2` feat(docs): #771 W6a — operator playbook + troubleshooting
+- `72d7186` feat(docs): #771 W6b — support matrix + ownership governance
+- `3acc133` docs(odd): #771 W6 evidence — tracker rows closed, work-units landed
+- `5794aea` fix(docs): #771 — align cross-link anchors with GitHub slugifier
