@@ -107,8 +107,8 @@ Each work-unit commit keeps its diff under the < 400 authored-lines PR-review bu
 - [x] Slice D: planning complete.
 - [x] Slice D: implementation complete (4 work-unit commits: W1, W2, W3, W4; W5 = this docs commit).
 - [x] Slice D: tests pass; typecheck parity.
-- [ ] Slice D: PR open and CI green.
-- [ ] Slice D: merged.
+- [x] Slice D: PR open and CI green.
+- [x] Slice D: merged (PR #840 → commit fe56192).
 
 ## Slice D commit log (work-unit)
 
