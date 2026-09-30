@@ -209,3 +209,13 @@ After fix commit `4c79a23`:
 
 PR rebased onto origin/main (which now includes #856) via merge
 commit `13706c6`.
+
+## CI final state (PR #857 — after fix-up)
+
+- 13/14 PASS.
+- 1/14 FAIL: `pnpm audit` — undici < 7.29.1 transitivo (jsdom > undici).
+  Advisory publicada DESPUÉS del merge de #856 (cuando el CI
+  corrió PASS para #856, esa fecha no existía todavía). El lockfile
+  del frontend en main y HEAD son idénticos, el issue es data
+  externa al PR. Recomendación: bump `undici` o `jsdom` en un
+  commit aparte. Sin relación con #771.
