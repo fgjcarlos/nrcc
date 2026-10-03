@@ -7,7 +7,7 @@ version detection, preserve sessions on reload, and expose truthful update
 capabilities/feedback. Implementation authorized after the repository audit.
 
 - Tracker branch: `fix/nrcc-stabilization` (baseline; do not merge automatically).
-- Current child: `fix/nrcc-stabilization-version`, based on the tracker.
+- Current child: `fix/nrcc-stabilization-session`, based on the version child.
 - Baseline: `a3e7382d8a1cb814cebcc5881fda75edabfbff42`.
 - User explicitly authorized one local commit per verified unit with tests/docs.
   Push, pull requests, merge, and publishing remain **not authorized**.
@@ -38,13 +38,14 @@ Delivery strategy: `auto-chain`; user chose `feature-branch-chain`. Local branch
 order: tracker → version → session → updates. First future PR targets tracker,
 later slices target the preceding child. This plan does not authorize PR creation.
 Each unit needs its own authorized Conventional Commit; uncommitted or
-partially verified work stays unchecked. Actual S1 diff: 158 additions and 12
-deletions (170 authored lines), including 87 new-file lines; committed count zero.
+partially verified work stays unchecked. S1 committed: 285 additions and 12
+deletions (297 authored lines), including 170 behavior/test/doc lines and 127
+tracking lines. Running committed count: 297; generated files excluded.
 
 ## S1 — Normalize managed Node-RED versions
 
-- [ ] Complete verification and authorized work-unit commit.
-- Status: **in progress — verified; preparing authorized local commit**.
+- [x] Complete verification and authorized work-unit commit.
+- Status: **done — verified and committed on the version child**.
 - Acceptance: consistent bare version for native/Docker/update callers; Node-RED
   5 editable through unchanged compatibility policy; invalid or Node.js-only
   output fails closed; prerelease/build metadata retained; generic tools unchanged.
@@ -71,24 +72,84 @@ deletions (170 authored lines), including 87 new-file lines; committed count zer
   include this intended feature document if its work-unit commit is authorized.
 - Worker: `musesdzt-e-e4hi`; verifier: `musf5ava-f-wvt7`.
 - Rollback boundary: helper/callers/tests/release note only.
-- Commit: authorized; prepare `fix(runtime): normalize Node-RED version detection`.
-  Do not start S2 until this verified unit is committed.
+- Commit: `353049834b691e2f748a927824726e489ab69aa4`
+  (`fix(runtime): normalize Node-RED version detection`).
+- Slice: `fix/nrcc-stabilization-version` against tracker baseline; 297 lines.
 
 ## S2 — Coalesce refresh during session rehydration
 
 - [ ] Complete behavior, checks, and authorized work-unit commit.
-- Status: **pending**.
+- Status: **in progress — fully verified; local commit pending**.
 - Acceptance: bootstrap/interceptor share in-flight refresh; concurrent mounts
   issue one request, sequential attempts work, failures release coordination,
   reload retains authentication. Preserve logout/bootstrap gates/backend rotation.
-- Planned surfaces: actual shared API/auth hook and corresponding tests under
-  `frontend/src/shared/lib/` and `frontend/src/features/auth/hooks/`, plus
-  `CHANGELOG.md`. Resolve exact files before dispatch, no unused re-export.
+- Allowed surfaces:
+  - `frontend/src/shared/lib/api.ts`
+  - `frontend/src/shared/lib/api.test.ts`
+  - `frontend/src/shared/lib/index.ts` (re-export only if used)
+  - `frontend/src/features/auth/hooks/useAuth.ts`
+  - `frontend/src/features/auth/hooks/useAuth.test.ts`
+  - `CHANGELOG.md`
+- Foreground checks in a synchronized temporary source snapshot: Corepack pnpm
+  focused Vitest for both test files, full frontend tests, frontend build, and
+  repository diff check. No generated files or dependency installs in worktree.
 - Test-first: concurrent callers/mounts, sequential calls, error retry, stale
   session. Checks: focused/full Vitest and canonical frontend build in a snapshot
   synchronized from working sources; real browser login/reload/request count.
+- Implemented: bootstrap and API 401 recovery share `refreshAuthToken`.
+- RED: caller regression observed three refresh requests instead of one.
+- GREEN: 84 frontend files, 577 tests passed, two skipped; build and diff check
+  passed. Independent focused run: two files, ten tests passed; full suite and
+  build passed again. CSS minification warnings match the baseline.
+  The declared pnpm test invocation ran the full suite rather than filtering.
+- Candidate: 97 additions and 17 deletions (114 authored lines), excluding
+  parent tracking changes; snapshot `/tmp/nrcc-audit-DRYCSyHs/s2-writer-bNHSCz`.
+- Assessment: unassessable due untracked declaration; high-path independent
+  automated checks, three authenticated reloads, and corrected cold logout passed.
+- Previous verifier finished **partial**: wrong-cwd pnpm commands created root
+  `pnpm-lock.yaml`, root `node_modules/`, and `frontend/node_modules/`.
+  No Docker/browser checks ran. Direct filesystem evidence corrected the scout's
+  absent-directory claims; all three artifacts had matching incident timestamps.
+- Incident recovered: three generated paths reversibly moved to
+  `/tmp/nrcc-audit-DRYCSyHs/s2-quarantine-iNnCh4/repository`, preserving layout.
+  Nothing deleted; tracked diff hash identical before/after; `.codegraph/`
+  untouched. Original generated paths absent; snapshot source hashes match.
+- Independent evidence: `/tmp/nrcc-audit-DRYCSyHs/s2-checks-QhhbDg`.
+- Worker: `musj8xqf-g-e8zr`; verifier: `musjiiq4-h-sm37` (both finished).
+- Read-only incident diagnosis: `muskaari-j-ulto`, finished.
+- First runtime verifier: `muski9ld-k-rf5n`, finished partial after building from
+  the repository instead of the verified snapshot. No container/browser started;
+  image `nrcc-s2-acceptance:s2-runtime-FAsdzt` retained, not acceptance evidence.
+- Resumed verifier: `musknust-l-0sxh`, finished. Correct absolute snapshot build;
+  three real reloads each made one successful refresh, retained authenticated
+  `/configuration`, and had no 401/429. Node-RED `5.0.7`, editable/writable true,
+  NRCC and Node-RED HTTP 200; no settings saved. Own container stopped.
+- Runtime evidence: `/tmp/nrcc-audit-DRYCSyHs/s2-runtime-5VPTzl`; image
+  `nrcc-s2-acceptance:s2-runtime-5VPTzl` retained. Working sources unchanged.
+- Later logout follow-up reached `/login` but included two refresh 429s and
+  protected update API 401s outside the measured reload batches. Causality and
+  cookie-clear acceptance need clarification before closing this unit.
+- Read-only challenge `musl473r-m-3vhr` finished: refresh limiter counts failed
+  attempts (six per 15 minutes), persists per IP, resets on success. Backend is
+  unchanged, but incomplete traffic history does not prove 429 causality.
+- Cold verifier `musl6l6d-n-206k` stopped pending exact command authorization;
+  no runtime mutation. Resumed `musld72k-o-kqol` completed a fresh cold cycle:
+  setup 201, reload refresh 200, logout 200, protected route `/login`, cookie
+  absent afterward, no resurrection or 429. Own container stopped.
+- Cold evidence: `/tmp/nrcc-audit-DRYCSyHs/s2-logout-musl6l6d`.
+  Immediate cookie-clear result is inconclusive: harness did not await completed
+  logout before sampling cookies and used incomplete response-header access.
+  Its refresh assertion also counted expected anonymous 401s outside reload.
+- Corrected verifier `muslm80n-p-9mde` passed: one reload refresh 200; logout 200,
+  clear-header true, cookie absent after response completion, protected `/login`,
+  no resurrection or 429. Anonymous 401s are expected, not failed reloads.
+  Playwright `headers()` omits cookie headers; `headerValues()` and response
+  completion resolved the earlier measurement gap without product changes.
+- Final evidence: `/tmp/nrcc-audit-DRYCSyHs/s2-logout-confirm-musld72k`.
+  Both health probes 200, source hashes unchanged, accidental paths absent;
+  own container exited 0, volumes/images/evidence retained.
 - Rollback boundary: client refresh coordination/tests/release note only.
-- Evidence/assessment/commit: pending.
+- Commit: pending verification; authorized locally, parent owns the commit.
 
 ## S3 — Expose truthful update capabilities
 
@@ -120,8 +181,9 @@ Build/test from current working source, including intended new parser files,
 not stale HEAD. No production access. New verifier owns separate labeled runtime
 resources and must stop only its own container after checks.
 
-Next: commit verified S1 on the version child branch, record its identity, then
-create the session child from that boundary and start S2 with regression tests.
+Next: create the authorized local S2 commit, then the updates child and bounded
+S3 implementation. Corrected cold verification passed; no product logout changes
+were required. No dependency commands run in the worktree.
 No further commit/delivery permission prompt is needed within the selected scope.
 Full settings persistence/rollback and complete backup recovery remain unverified
 and outside this stabilization phase.

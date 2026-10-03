@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Coalesce session refreshes during authentication bootstrap and API 401 recovery,
+  preventing concurrent refresh-cookie rotation from signing users out on reload.
 - Normalize Node-RED CLI version output so version detection and the existing
   configuration compatibility gate recognize Node-RED 5 runtimes.
 - Harden authentication setup with an atomic one-time recovery token,
