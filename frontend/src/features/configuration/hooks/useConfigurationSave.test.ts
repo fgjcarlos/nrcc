@@ -39,7 +39,6 @@ import { useConfigurationSave } from './useConfigurationSave';
 
 function makeWrapper() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return ({ children }: any) =>
     React.createElement(QueryClientProvider, { client: queryClient }, children);
 }

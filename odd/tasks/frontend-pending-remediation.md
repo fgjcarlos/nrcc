@@ -38,8 +38,8 @@
 
 ### P1 — Remove all five moderate package records
 
-- [ ] Verified fixes and local work-unit commit.
-- Status: in progress; all targeted checks verified, local commit pending.
+- [x] Verified fixes and local work-unit commit.
+- Status: done; verified and committed locally, no publication.
 - Route: delegated writer (four non-trivial source surfaces); native ASSESS
   after writer, independent verifier if high/unassessable under RDD off.
 - Source scope: `frontend/package.json`, `frontend/pnpm-workspace.yaml`,
@@ -82,12 +82,16 @@
   no Update Now/npm notices. `runtime-recheck.json` preserves sanitized proof.
 - Owned container/image/label inspected, container stopped/exited; resources and
   failed-probe evidence retained. Final source/protected hashes unchanged.
-- Commit: pending; target unit verified, global merge still blocked by P2/P3.
+- Commit: `7df214b1a64dfa717535fbcca8adb521e34391e4`
+  (`fix(security): clear frontend moderate advisories`), 374 total diff lines.
+  Completion identity is unstaged bookkeeping; global merge remains blocked.
 
 ### P2 — Remove five lint warnings without changing behavior
 
 - [ ] Verified cleanup and local work-unit commit.
-- Status: pending; seven-file read-only scope mapped, no helper extraction needed.
+- Status: in progress; writer and independent checks passed, local commit pending.
+- Route: delegated writer (seven existing source/test files), lint RED/GREEN;
+  native ASSESS after writer and follow its independent-verification plan.
 - Remove two unused disable directives and three unconsumed value exports,
   updating two barrels; preserve validation, CVA behavior and type-only exports.
 - Scope: `useConfigurationSave.test.ts`, `AdminAuthBoundaryCard.tsx`,
@@ -98,7 +102,25 @@
   in a guarded isolated snapshot. Inline replacements count as two diff lines.
 - Acceptance: lint zero warnings/errors; relevant tests plus full fresh suite,
   types and build pass. Preserve P1 audit outcome, parser patch and UI behavior.
-- Branch/commit/evidence: pending, child of verified P1.
+- Branch: `fix/nrcc-frontend-lint`, child of verified P1 `7df214b`.
+- Writer `mut10vd1-1g-6dgi`: seven source files, three additions/ten deletions.
+  Strict lint RED exit 1/five warnings/zero errors, GREEN exit 0/zero warnings.
+  Focused 44 passed; full 581 passed/two skipped; types/locales/build passed.
+  Audit exit 1/only braces high; existing malformed CSS warnings remain for P3.
+  Evidence: `/tmp/nrcc-audit-DRYCSyHs/p2-writer-iJduqRk2/evidence/logs/`.
+- Parent readback: only unused exports/imports/directives removed; CVA expressions,
+  component/type exports and existing test assertions unchanged.
+- ASSESS: unassessable (untracked declaration), RDD off; independent check required.
+- Independent `mut1eti8-1h-3two`: fresh frozen install, strict lint five-to-zero,
+  44 focused/581 full passed/two skipped, types/locales 858/858/build passed.
+  Audit exit 1/only braces high; source/snapshot identities and protected inputs
+  unchanged, no worktree install artifacts. No source changes by the verifier.
+- Evidence: `/tmp/nrcc-audit-DRYCSyHs/p2-verify-WhmEPvhz/evidence/`.
+- Not rerun: Go, Docker, generator, browser/e2e and runtime. This unit changes
+  only unused exports/imports/directives, not render logic, styles or dependency
+  inputs; focused/full frontend checks cover the affected component contracts.
+  P1 checks are not represented as fresh P2 verification; P3 requires new proof.
+- Commit: pending; targeted unit verified, global merge remains blocked.
 
 ### P3 — Align Tailwind 4 and daisyUI 5; close braces and CSS defects
 

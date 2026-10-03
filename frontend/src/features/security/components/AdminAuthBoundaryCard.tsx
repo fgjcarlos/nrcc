@@ -8,7 +8,6 @@ import {
   applySecurityPatch,
   detectLegacyAliases,
   humanizeApplyError,
-  isBcryptOrEmpty,
   reportApplyError,
   reportApplySuccess,
 } from './securityCenterHelpers';
@@ -471,6 +470,3 @@ export function AdminAuthBoundaryCard({
     </article>
   );
 }
-
-/** Helper kept exported so the test can exercise the bcrypt check. */
-export { isBcryptOrEmpty as _isBcryptOrEmpty };
