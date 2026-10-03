@@ -987,6 +987,21 @@ func TestParseCriticalCount(t *testing.T) {
 	}
 }
 
+func TestGetInstalledVersion_ParsesCanonicalNodeREDOutput(t *testing.T) {
+	svc := NewUpdateService(t.TempDir())
+	pm, _ := imageLocalProcessManager(t)
+	svc.SetProcessManager(pm)
+	svc.runner = &mockRunner{output: []byte("Node-RED v5.0.7\nNode.js v24.20.0\nLinux\n")}
+
+	version, err := svc.getInstalledVersionInternal(context.Background())
+	if err != nil {
+		t.Fatalf("getInstalledVersionInternal returned an error: %v", err)
+	}
+	if version != "5.0.7" {
+		t.Fatalf("installed Node-RED version = %q, want 5.0.7", version)
+	}
+}
+
 func TestGetInstalledVersion_PrefersManagedExecutable(t *testing.T) {
 	svc := NewUpdateService(t.TempDir())
 	pm, executable := imageLocalProcessManager(t)

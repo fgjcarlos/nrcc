@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Normalize Node-RED CLI version output so version detection and the existing
+  configuration compatibility gate recognize Node-RED 5 runtimes.
 - Harden authentication setup with an atomic one-time recovery token,
   guarded re-bootstrap, normalized throttling, and TLS-aware cookies.
 - **Security — refresh tokens (#669):** `sessions.json` no longer stores

@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -645,8 +644,6 @@ func (s *UpdateService) sanitizeErrorMessage(err error) string {
 	return "Unable to check for updates at this time."
 }
 
-var nodeRedVersionPattern = regexp.MustCompile(`^v?([0-9]+\.[0-9]+\.[0-9]+)`)
-
 func (s *UpdateService) getInstalledVersionInternal(ctx context.Context) (string, error) {
 	managed := s.managedRuntime()
 	version, err := s.versionFromExecutable(ctx, managed)
@@ -693,11 +690,11 @@ func (s *UpdateService) versionFromExecutable(ctx context.Context, managed Manag
 	if err != nil {
 		return "", err
 	}
-	match := nodeRedVersionPattern.FindStringSubmatch(strings.TrimSpace(string(output)))
-	if len(match) != 2 {
+	version := nodeREDVersionFromOutput(string(output))
+	if version == "" {
 		return "", ErrVersionUndetectable
 	}
-	return match[1], nil
+	return version, nil
 }
 
 func (s *UpdateService) getLatestVersionInternal(ctx context.Context) (string, error) {
