@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Security — frontend dependencies:** updated PostCSS, fflate, Vitest and
+  @vitest/mocker, and js-yaml to patched releases for five moderate package
+  records. The separate HIGH advisory affecting `braces` remains unresolved.
 - **Security — frontend dependencies:** raised the `undici` and
   `brace-expansion` override floors to address four HIGH advisories.
   The separate HIGH advisory affecting `braces` remains unresolved.
