@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Security — frontend dependencies:** raised the `undici` and
+  `brace-expansion` override floors to address four HIGH advisories.
+  The separate HIGH advisory affecting `braces` remains unresolved.
 - Derive update capability from the managed Node-RED runtime, fail closed for
   unknown versions and unsupported installations, and explain image redeploys
   without suggesting npm as a whole-product upgrade.
