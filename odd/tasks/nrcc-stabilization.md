@@ -7,7 +7,7 @@ version detection, preserve sessions on reload, and expose truthful update
 capabilities/feedback. Implementation authorized after the repository audit.
 
 - Tracker branch: `fix/nrcc-stabilization` (baseline; do not merge automatically).
-- Current child: `fix/nrcc-stabilization-session`, based on the version child.
+- Current child: `fix/nrcc-stabilization-updates`, based on the session child.
 - Baseline: `a3e7382d8a1cb814cebcc5881fda75edabfbff42`.
 - User explicitly authorized one local commit per verified unit with tests/docs.
   Push, pull requests, merge, and publishing remain **not authorized**.
@@ -40,7 +40,9 @@ later slices target the preceding child. This plan does not authorize PR creatio
 Each unit needs its own authorized Conventional Commit; uncommitted or
 partially verified work stays unchecked. S1 committed: 285 additions and 12
 deletions (297 authored lines), including 170 behavior/test/doc lines and 127
-tracking lines. Running committed count: 297; generated files excluded.
+tracking lines. S2 committed: 173 additions and 31 deletions (204 authored
+lines), including 114 behavior/test/doc and 90 tracking diff lines. Running
+committed count: 501; generated files excluded.
 
 ## S1 — Normalize managed Node-RED versions
 
@@ -78,8 +80,8 @@ tracking lines. Running committed count: 297; generated files excluded.
 
 ## S2 — Coalesce refresh during session rehydration
 
-- [ ] Complete behavior, checks, and authorized work-unit commit.
-- Status: **in progress — fully verified; local commit pending**.
+- [x] Complete behavior, checks, and authorized work-unit commit.
+- Status: **done — verified and committed on the session child**.
 - Acceptance: bootstrap/interceptor share in-flight refresh; concurrent mounts
   issue one request, sequential attempts work, failures release coordination,
   reload retains authentication. Preserve logout/bootstrap gates/backend rotation.
@@ -126,9 +128,10 @@ tracking lines. Running committed count: 297; generated files excluded.
   NRCC and Node-RED HTTP 200; no settings saved. Own container stopped.
 - Runtime evidence: `/tmp/nrcc-audit-DRYCSyHs/s2-runtime-5VPTzl`; image
   `nrcc-s2-acceptance:s2-runtime-5VPTzl` retained. Working sources unchanged.
-- Later logout follow-up reached `/login` but included two refresh 429s and
-  protected update API 401s outside the measured reload batches. Causality and
-  cookie-clear acceptance need clarification before closing this unit.
+- Earlier supplemental logout traffic reached `/login` but included two refresh
+  429s and protected update API 401s outside the measured reload batches.
+  Neither cold cycle reproduced 429; missing earlier traffic prevents exact
+  attribution. Cookie-clear acceptance was resolved by the corrected harness.
 - Read-only challenge `musl473r-m-3vhr` finished: refresh limiter counts failed
   attempts (six per 15 minutes), persists per IP, resets on success. Backend is
   unchanged, but incomplete traffic history does not prove 429 causality.
@@ -149,27 +152,73 @@ tracking lines. Running committed count: 297; generated files excluded.
   Both health probes 200, source hashes unchanged, accidental paths absent;
   own container exited 0, volumes/images/evidence retained.
 - Rollback boundary: client refresh coordination/tests/release note only.
-- Commit: pending verification; authorized locally, parent owns the commit.
+- Commit: `b318778dd589a19cac165409d8306687be4a162b`
+  (`fix(auth): coalesce session refresh during reload`).
+- Slice: `fix/nrcc-stabilization-session` against the version child; 204 lines.
 
 ## S3 — Expose truthful update capabilities
 
 - [ ] Complete behavior, checks, and authorized work-unit commit.
-- Status: **pending**.
+- Status: **verified — local commit pending; merge blocked by audit highs**.
 - Acceptance: server-derived image/external/unknown capabilities fail safely;
   no impossible Update Now action; unknown versions do not imply an upgrade;
   actionable image replacement guidance and distinct async acceptance/completion;
   preserve supported npm-managed path and backend guards.
 - Design: reuse status endpoint, not new endpoint/client strategy guesses. Check
   cache migration semantics and actual locale/model paths before implementation.
-- Planned surfaces: update model/service/handler tests, update client/view/tests,
-  English/Spanish update locales, `docs/openapi.yaml`, generated
-  `frontend/src/shared/api/schema.ts`, and `CHANGELOG.md`; narrow before dispatch.
+- Allowed surfaces: `internal/model/update.go`, `internal/service/update.go`,
+  `internal/service/update_test.go`, `internal/handler/updates_test.go`,
+  `internal/handler/config_test.go` (normalized-version expectation only),
+  `frontend/src/features/updates/services/updateService.ts`,
+  `frontend/src/features/updates/components/UpdatesView.tsx`,
+  `frontend/src/features/updates/components/UpdatesView.test.tsx`,
+  `frontend/src/locales/en/updates.json`, `frontend/src/locales/es/updates.json`,
+  `docs/openapi.yaml`, regenerated `frontend/src/shared/api/schema.ts`,
+  `frontend/pnpm-workspace.yaml` (patch registration; preserve overrides),
+  `frontend/package.json` (patch registration only if required by pnpm),
+  regenerated `frontend/pnpm-lock.yaml`,
+  `frontend/patches/*openapi-core*1.34.15*.patch`,
+  `Dockerfile` (separate patch COPY before frontend frozen install only),
+  and `CHANGELOG.md`.
+- Derive strategy/capability on status reads, including old caches and ownership
+  changes; avoid model-to-service imports and cached capability persistence.
+  Emit explicit false capability; frontend missing fields fail closed.
+- Reuse flow error reason codes with localized client guidance; avoid duplicate
+  backend hint fields/prose. Preserve async acceptance, guards, supported npm.
 - Test-first: unsupported/supported/absent fields, unknown version, cached status,
   direct-apply guard and UI feedback. Checks: focused Go/Vitest, schema generation,
   locale checks, build and final full suites; real image status/UI without npm
   upgrade, both processes healthy. Regenerate generated code, never edit by hand.
-- Rollback boundary: status/feedback contract, consumers/tests/schema/docs only.
-- Evidence/assessment/commit: pending.
+- Implemented: read-time capabilities, validated availability, fail-closed UI,
+  pre-attempt image guidance/localized failures. Caller RED/GREEN observed.
+- [x] Generator/schema: retain 7.13.0/Redocly 1.34.15/security overrides; durable
+  js-yaml 5 tag patch, frozen install, idempotent generation/parser assertions.
+  Patch SHA256 `85f418c4bfa1e9c310704724f90ae8f91a1ab41b2d9abecb017797c96d8aad71`.
+- [x] Stale fixture corrected only: raw `v5.0.6`, expected `5.0.6`, editable
+  assertion and product parser retained. Extra patch copy reversibly quarantined
+  at `/tmp/nrcc-audit-DRYCSyHs/s3-patch-quarantine-VD2orQ`; canonical intact.
+- [x] Docker: actual missing-patch RED before separate COPY; default final GREEN.
+  Independent pre-cleanup snapshot `/tmp/nrcc-audit-DRYCSyHs/s3-green-R8M2pL`:
+  581 frontend passes/two skips, focused 28, typecheck/locale858/build/fullGo1.26
+  and service/handler race passed. Baseline CSS warnings; source receipts match.
+  Same-generator baseline: S3 only 6 additions/1 deletion; other drift pre-exists.
+- Pre-cleanup runtime: image-local/explicit capability false/guidance/no apply;
+  login/reload one refresh200, both probes200/config5.0.7 editable/writable.
+  Own container stopped/retained; direct apply skipped, no settings/npm upgrade.
+- [x] Latest caller/cache RED/GREEN; four existing service skips observed by writer
+  (not independently enumerated); RED output observed, no saved RED log.
+  Final independent full Go1.26/race/default build/API/UI passed, code hashes match.
+  Evidence: `/tmp/nrcc-audit-DRYCSyHs/s3-final-N6qW3j` and sibling logs/runtime.
+  Latest/current exactly 5.0.7, no notices; image-local/capability false/guidance,
+  reload one refresh200/config writable/both probes200. Owned runtime stopped.
+  Frontend results reused only after source/manifest/schema/patch hash equality.
+  Strict three-component parser rejects shorthand; cache clone/errors preserved.
+- Audit FAILED: five high/11 moderate/three low, identical IDs/ranges/routes
+  before/after. Frontend tooling routes only, not Node-RED production audit.
+  SECURITY/CI blocks merge; no waiver/gate changes/security-scope expansion.
+- Assessment unassessable (untracked declaration): high independent plan, RDD off.
+  Final authored diff <=400 including tracker/patch/lock/Dockerfile; schema exempt.
+  Local work-unit commit pending; final tracking identity recorded afterward.
 
 ## Recovery and next step
 
@@ -181,9 +230,8 @@ Build/test from current working source, including intended new parser files,
 not stale HEAD. No production access. New verifier owns separate labeled runtime
 resources and must stop only its own container after checks.
 
-Next: create the authorized local S2 commit, then the updates child and bounded
-S3 implementation. Corrected cold verification passed; no product logout changes
-were required. No dependency commands run in the worktree.
+Next: independent final revalidation/local S3 commit; audit highs still block merge.
+S1/S2 closed. No dependencies or installs in worktree.
 No further commit/delivery permission prompt is needed within the selected scope.
 Full settings persistence/rollback and complete backup recovery remain unverified
 and outside this stabilization phase.

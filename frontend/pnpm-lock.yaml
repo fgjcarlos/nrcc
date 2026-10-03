@@ -13,6 +13,9 @@ overrides:
   undici: ^7.29.0
   nanoid: '>=3.3.17'
 
+patchedDependencies:
+  '@redocly/openapi-core@1.34.15': 85f418c4bfa1e9c310704724f90ae8f91a1ab41b2d9abecb017797c96d8aad71
+
 importers:
 
   .:
@@ -3259,7 +3262,7 @@ snapshots:
 
   '@redocly/config@0.22.0': {}
 
-  '@redocly/openapi-core@1.34.15(supports-color@10.2.2)':
+  '@redocly/openapi-core@1.34.15(patch_hash=85f418c4bfa1e9c310704724f90ae8f91a1ab41b2d9abecb017797c96d8aad71)(supports-color@10.2.2)':
     dependencies:
       '@redocly/ajv': 8.11.2
       '@redocly/config': 0.22.0
@@ -4565,7 +4568,7 @@ snapshots:
 
   openapi-typescript@7.13.0(typescript@6.0.3):
     dependencies:
-      '@redocly/openapi-core': 1.34.15(supports-color@10.2.2)
+      '@redocly/openapi-core': 1.34.15(patch_hash=85f418c4bfa1e9c310704724f90ae8f91a1ab41b2d9abecb017797c96d8aad71)(supports-color@10.2.2)
       ansi-colors: 4.1.3
       change-case: 5.4.4
       parse-json: 8.3.0

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Derive update capability from the managed Node-RED runtime, fail closed for
+  unknown versions and unsupported installations, and explain image redeploys
+  without suggesting npm as a whole-product upgrade.
 - Coalesce session refreshes during authentication bootstrap and API 401 recovery,
   preventing concurrent refresh-cookie rotation from signing users out on reload.
 - Normalize Node-RED CLI version output so version detection and the existing

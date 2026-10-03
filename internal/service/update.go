@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -237,8 +238,8 @@ func (s *UpdateService) performCheckInternal(ctx context.Context) model.UpdateCa
 	entry.LatestVersion = latestVersion
 	entry.Error = ""
 
-	// Compare versions
-	if s.compareVersions(currentVersion, latestVersion) < 0 {
+	// Compare only validated Node-RED versions; unknown values must fail closed.
+	if validatedNodeREDVersion(currentVersion) != "" && validatedNodeREDVersion(latestVersion) != "" && s.compareVersions(currentVersion, latestVersion) < 0 {
 		entry.UpdateAvailable = true
 	}
 
@@ -248,8 +249,19 @@ func (s *UpdateService) performCheckInternal(ctx context.Context) model.UpdateCa
 // GetCachedStatus returns the in-memory cache (zero-alloc hot path)
 func (s *UpdateService) GetCachedStatus() model.UpdateCacheEntry {
 	s.cacheMu.RLock()
-	defer s.cacheMu.RUnlock()
-	return s.cache
+	status := s.cache
+	s.cacheMu.RUnlock()
+
+	currentValid := validatedNodeREDVersion(status.CurrentVersion) != ""
+	latestValid := validatedNodeREDVersion(status.LatestVersion) != ""
+	if !latestValid {
+		status.LatestVersion = ""
+	}
+	status.UpdateAvailable = status.UpdateAvailable && currentValid && latestValid
+	managed := s.managedRuntime()
+	status.Strategy = string(managed.Strategy)
+	status.CanInplaceApply = managed.Strategy == StrategyNpmGlobal && currentValid
+	return status
 }
 
 // ForceCheck runs an immediate npm check, updates the cache, and returns the result.
@@ -283,7 +295,7 @@ func (s *UpdateService) ForceCheck(ctx context.Context) (model.UpdateCacheEntry,
 		fmt.Printf("warning: failed to write cache to disk: %v\n", err)
 	}
 
-	return entry, nil
+	return s.GetCachedStatus(), nil
 }
 
 // GetFlowState returns a deep copy of the current update flow state.
@@ -487,9 +499,16 @@ func (s *UpdateService) ApplyUpdateWithBackup(ctx context.Context) error {
 	// async caller uses context.Background().
 	err = s.ApplyUpdate(ctx)
 	if err != nil {
+		reason := "update_failed"
+		switch {
+		case errors.Is(err, ErrUpdateUnsupportedForImage):
+			reason = "image_unsupported"
+		case errors.Is(err, ErrExternalRuntimeUnmanaged):
+			reason = "external_unsupported"
+		}
 		s.setFlowState(model.UpdateFlowState{
 			State:    model.StateFailed,
-			Error:    "update_failed",
+			Error:    reason,
 			Phase:    "applying",
 			BackupID: backupEntry.ID,
 		})
@@ -703,9 +722,24 @@ func (s *UpdateService) getLatestVersionInternal(ctx context.Context) (string, e
 		return "", err
 	}
 
-	version := strings.TrimSpace(string(output))
-	version = strings.Trim(version, "\n\"")
-
+	var versionLine string
+	for _, line := range strings.Split(strings.ReplaceAll(string(output), "\r\n", "\n"), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || line == "npm notice" || strings.HasPrefix(line, "npm notice ") {
+			continue
+		}
+		if versionLine != "" {
+			return "", ErrVersionUndetectable
+		}
+		versionLine = line
+	}
+	if len(versionLine) >= 2 && versionLine[0] == '"' && versionLine[len(versionLine)-1] == '"' {
+		versionLine = versionLine[1 : len(versionLine)-1]
+	}
+	version := validatedNodeREDVersion(versionLine)
+	if version == "" {
+		return "", ErrVersionUndetectable
+	}
 	return version, nil
 }
 

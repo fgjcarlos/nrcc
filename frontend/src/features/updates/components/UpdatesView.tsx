@@ -6,6 +6,8 @@ import { useUpdatesActions } from '@/features/updates/hooks/useUpdatesActions';
 import { formatCheckedAt } from '@/features/updates/lib/updatesFormatters';
 import { useT } from '@/i18n';
 
+const knownVersionPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+
 export function UpdatesView() {
   const [checkingNow, setCheckingNow] = useState(false);
   const { t } = useT();
@@ -57,6 +59,17 @@ export function UpdatesView() {
   const isChecking = checkingNow || checkMutation.isPending;
   const hasError = status?.error;
   const hasUpdate = status?.updateAvailable && !hasError;
+  const hasKnownVersions = [status?.currentVersion, status?.latestVersion].every(
+    (version) => !!version && knownVersionPattern.test(version),
+  );
+  const canApplyUpdate = status?.strategy === 'npm-global' && status.canInplaceApply === true && hasKnownVersions && !!hasUpdate;
+  const updateGuidance = status?.strategy === 'image-local'
+    ? t('updates:imageGuidance')
+    : status?.strategy === 'external'
+      ? t('updates:externalGuidance')
+      : status?.strategy === 'npm-global' && status.canInplaceApply === true
+        ? t('updates:npmGuidance')
+        : t('updates:unknownGuidance');
 
   const isUpdateActive = flowState?.state && ['BackingUp', 'Applying'].includes(flowState.state);
   const isUpdateCompleted = flowState?.state === 'Completed';
@@ -133,6 +146,8 @@ export function UpdatesView() {
                 </span>
               )}
             </div>
+
+            <p className="text-sm text-base-content/70" role="note">{updateGuidance}</p>
 
             {/* Error message */}
             {hasError && (
@@ -231,7 +246,11 @@ export function UpdatesView() {
                   <div>
                     <p className="font-medium text-error-content">{t('updates:updateFailed')}</p>
                     <p className="text-sm text-error-content/80 mt-1">
-                      {flowState?.error || t('updates:failedDetail')}
+                      {flowState?.error === 'image_unsupported'
+                        ? t('updates:image_unsupported')
+                        : flowState?.error === 'external_unsupported'
+                          ? t('updates:external_unsupported')
+                          : t('updates:failedDetail')}
                     </p>
                   </div>
                 </div>
@@ -249,7 +268,7 @@ export function UpdatesView() {
                 {isChecking && <Loader2 className="w-4 h-4 animate-spin" />}
                 {t('updates:checkNow')}
               </button>
-              {hasUpdate && !isUpdateActive && (
+              {canApplyUpdate && !isUpdateActive && (
                 <button
                   onClick={handleApplyUpdate}
                   disabled={applyMutation.isPending || isChecking || isUpdateActive}
