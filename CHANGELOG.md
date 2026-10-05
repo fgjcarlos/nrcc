@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Align the frontend on Tailwind CSS 4 with its Vite integration and daisyUI 5,
+  preserving the corporate themes and setting the styling browser floor to Safari
+  16.4, Chrome 111, and Firefox 128. The Tailwind 3 braces advisory route is removed.
 - **Security — frontend dependencies:** updated PostCSS, fflate, Vitest and
   @vitest/mocker, and js-yaml to patched releases for five moderate package
   records. The separate HIGH advisory affecting `braces` remains unresolved.
