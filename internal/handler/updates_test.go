@@ -53,6 +53,7 @@ func TestUpdateHandler_GetStatus_EmptyCache(t *testing.T) {
 	tmpDir := t.TempDir()
 	installFakeNPM(t)
 	svc := service.NewUpdateService(tmpDir)
+	svc.SetProcessManager(service.NewProcessManager(filepath.Join(tmpDir, "external-node-red"), tmpDir))
 	handler := NewUpdateHandler(svc)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/updates/status", nil)
@@ -60,7 +61,7 @@ func TestUpdateHandler_GetStatus_EmptyCache(t *testing.T) {
 
 	handler.GetStatus(w, req)
 
-	// Should still return 200 with empty/zero-value entry
+	// Should still return 200 with a fail-closed capability for an external runtime.
 	if w.Code != http.StatusOK {
 		t.Errorf("Expected status 200, got %d", w.Code)
 	}
@@ -76,6 +77,15 @@ func TestUpdateHandler_GetStatus_EmptyCache(t *testing.T) {
 	}
 	if entry.UpdateAvailable {
 		t.Error("Expected UpdateAvailable to be false")
+	}
+	var response struct {
+		Data map[string]json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if string(response.Data["canInplaceApply"]) != "false" {
+		t.Fatalf("canInplaceApply must be explicitly false: %s", w.Body.Bytes())
 	}
 }
 

@@ -2,6 +2,7 @@ package service
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -51,10 +52,10 @@ func TestHelperProcess(t *testing.T) {
 		os.Exit(0)
 	}
 	if len(cmdArgs) >= 4 && cmdArgs[1] == "uninstall" && cmdArgs[3] == "portless" {
-	if marker := os.Getenv("NRCC_TEST_PORTLESS_UNINSTALLED"); marker != "" {
-		// #nosec G703 -- marker is set by the test runner via env var; not request-derived.
-		_ = os.WriteFile(marker, []byte("1"), 0600)
-	}
+		if marker := os.Getenv("NRCC_TEST_PORTLESS_UNINSTALLED"); marker != "" {
+			// #nosec G703 -- marker is set by the test runner via env var; not request-derived.
+			_ = os.WriteFile(marker, []byte("1"), 0600)
+		}
 	}
 	os.Exit(0)
 }
@@ -303,6 +304,46 @@ func TestHostService_InspectCommand_WithVersion(t *testing.T) {
 	}
 	// Version might be empty depending on system
 	_ = status.Version
+}
+
+func TestHostService_InspectNodeREDVersionOutput(t *testing.T) {
+	oldCommand, oldLookPath := execCommand, execLookPath
+	t.Cleanup(func() { execCommand, execLookPath = oldCommand, oldLookPath })
+	execLookPath = func(name string) (string, error) { return "/usr/bin/" + name, nil }
+	output := "Node-RED v5.0.7\nNode.js v24.20.0\nLinux\n"
+	execCommand = func(string, ...string) *exec.Cmd {
+		return exec.Command("printf", "%s", output)
+	}
+
+	dep := NewHostService(t.TempDir()).inspectCommand("node-red", "--version")
+	if dep.Version != "5.0.7" {
+		t.Fatalf("Node-RED version = %q, want 5.0.7", dep.Version)
+	}
+	capabilities := ResolveConfigurationCapabilities(dep.Version, model.SettingsDocument{Writable: true})
+	if !capabilities.Editable {
+		t.Fatalf("Node-RED 5.0.7 must use the editable compatibility adapter: %+v", capabilities)
+	}
+
+	output = "npm 10.2.0\n"
+	if got := NewHostService(t.TempDir()).inspectCommand("npm", "--version").Version; got != "npm 10.2.0" {
+		t.Fatalf("generic npm version = %q, want unchanged CLI output", got)
+	}
+}
+
+func TestHostService_InspectDockerContainerNodeREDVersion(t *testing.T) {
+	oldCommand := execCommand
+	t.Cleanup(func() { execCommand = oldCommand })
+	execCommand = func(_ string, args ...string) *exec.Cmd {
+		output := "/data => /data\n"
+		if len(args) > 0 && args[0] == "exec" {
+			output = "Node-RED v5.0.7\nNode.js v24.20.0\nLinux\n"
+		}
+		return exec.Command("printf", "%s", output)
+	}
+	version, _, _ := NewHostService(t.TempDir()).inspectDockerContainer("container-id")
+	if version != "5.0.7" {
+		t.Fatalf("Docker-inspected Node-RED version = %q, want 5.0.7", version)
+	}
 }
 
 func TestHostService_InspectCommand_NotFound(t *testing.T) {

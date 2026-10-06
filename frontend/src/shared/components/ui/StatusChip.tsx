@@ -15,7 +15,7 @@ import { cn } from '@/shared/lib/utils';
  * tailwind.config.js — no new colours are introduced.
  */
 
-export const statusChipVariants = cva(
+const statusChipVariants = cva(
   'inline-flex items-center gap-1.5 rounded-full font-medium transition-colors ' +
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 ' +
     'focus-visible:ring-offset-base-100 focus-visible:ring-ds-accent-primary',

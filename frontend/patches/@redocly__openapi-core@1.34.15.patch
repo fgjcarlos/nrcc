@@ -1,0 +1,22 @@
+diff --git a/lib/js-yaml/index.js b/lib/js-yaml/index.js
+index 00988f22e02017be0cae16387b2354288948f414..94331ddbf3dac812c801ca6a08f08da2f4490cd4 100644
+--- a/lib/js-yaml/index.js
++++ b/lib/js-yaml/index.js
+@@ -5,10 +5,13 @@ exports.stringifyYaml = exports.parseYaml = void 0;
+ // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+ // @ts-ignore
+ const js_yaml_1 = require("js-yaml");
+-const DEFAULT_SCHEMA_WITHOUT_TIMESTAMP = js_yaml_1.JSON_SCHEMA.extend({
+-    implicit: [js_yaml_1.types.merge],
+-    explicit: [js_yaml_1.types.binary, js_yaml_1.types.omap, js_yaml_1.types.pairs, js_yaml_1.types.set],
+-});
++const DEFAULT_SCHEMA_WITHOUT_TIMESTAMP = js_yaml_1.JSON_SCHEMA.withTags(
++    js_yaml_1.mergeTag,
++    js_yaml_1.binaryTag,
++    js_yaml_1.omapTag,
++    js_yaml_1.pairsTag,
++    js_yaml_1.setTag
++);
+ const parseYaml = (str, opts) => (0, js_yaml_1.load)(str, { schema: DEFAULT_SCHEMA_WITHOUT_TIMESTAMP, ...opts });
+ exports.parseYaml = parseYaml;
+ const stringifyYaml = (obj, opts) => (0, js_yaml_1.dump)(obj, opts);

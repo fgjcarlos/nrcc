@@ -1758,7 +1758,8 @@ paths:
       description: |
         Returns the last known update status from cache (in-memory + persisted to
         `data/update_cache.json`). This is a fast, non-blocking read — no npm call
-        is made.
+        is made. Runtime strategy and in-place capability are derived on each
+        read; cached capability fields are not authoritative.
       security:
         - bearerAuth: []
       responses:
@@ -3682,7 +3683,7 @@ components:
 
     UpdateCacheEntry:
       type: object
-      required: [currentVersion, latestVersion, updateAvailable, checkedAt]
+      required: [currentVersion, latestVersion, updateAvailable, strategy, canInplaceApply, checkedAt]
       properties:
         currentVersion:
           type: string
@@ -3692,6 +3693,12 @@ components:
           example: 4.0.2
         updateAvailable:
           type: boolean
+        strategy:
+          type: string
+          description: Server-derived runtime update strategy (image-local, npm-global, or external).
+        canInplaceApply:
+          type: boolean
+          description: True only when the current known runtime supports in-place npm updates.
         checkedAt:
           type: string
           format: date-time
