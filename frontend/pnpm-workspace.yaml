@@ -17,5 +17,7 @@ overrides:
   browserslist: '>=4.28.7'
   undici: '^7.29.1'
   nanoid: '>=3.3.17'
+  source-map-js: '^1.2.2'
+  compression: '^1.8.2'
 patchedDependencies:
   '@redocly/openapi-core@1.34.15': patches/@redocly__openapi-core@1.34.15.patch

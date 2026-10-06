@@ -1,6 +1,9 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../tailwind.config.js";
+@source inline("action-btn-danger");
+@plugin "daisyui" {
+  themes: false;
+}
 
 /* ═══════════════════════════════════════════════════════════════
    BASE LAYER
@@ -253,7 +256,6 @@
     background: linear-gradient(180deg, var(--ds-bg-elevated), var(--ds-bg-surface));
     border: 1px solid var(--ds-border-default);
     backdrop-filter: blur(18px) saturate(140%);
-    -webkit-backdrop-filter: blur(18px) saturate(140%);
   }
 
   [data-theme="corporateLight"] .glass-panel {
@@ -261,7 +263,6 @@
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(249, 250, 251, 0.92));
     border: 1px solid var(--ds-border-default);
     backdrop-filter: blur(14px) saturate(140%);
-    -webkit-backdrop-filter: blur(14px) saturate(140%);
   }
 
   /* ── Surface Panel ──────────────────────────────────────── */
@@ -334,8 +335,30 @@
   }
 
   /* ── Action Buttons — glass-panel with theme-adaptive borders/hovers ── */
+  [data-theme="corporateDark"] .action-btn-primary,
+  [data-theme="corporateDark"] .action-btn-secondary,
+  [data-theme="corporateDark"] .action-btn-danger,
+  [data-theme="corporateDark"] .action-btn-ghost {
+    background: linear-gradient(180deg, var(--ds-bg-elevated), var(--ds-bg-surface));
+    backdrop-filter: blur(18px) saturate(140%);
+  }
+
+  .action-btn-primary,
+  .action-btn-secondary,
+  .action-btn-danger,
+  .action-btn-ghost {
+    cursor: pointer;
+  }
+
+  .action-btn-primary:disabled,
+  .action-btn-secondary:disabled,
+  .action-btn-danger:disabled,
+  .action-btn-ghost:disabled {
+    cursor: default;
+  }
+
   .action-btn-primary {
-    @apply glass-panel flex items-center gap-2 rounded-lg px-4 py-2 font-medium text-primary transition-colors disabled:opacity-50;
+    @apply shadow-glow flex items-center gap-2 rounded-lg px-4 py-2 font-medium text-primary transition-colors disabled:opacity-50;
   }
 
   [data-theme="corporateDark"] .action-btn-primary {
@@ -355,7 +378,7 @@
   }
 
   .action-btn-secondary {
-    @apply glass-panel rounded-lg px-4 py-2 text-base-content transition-colors disabled:opacity-50;
+    @apply shadow-glow rounded-lg px-4 py-2 text-base-content transition-colors disabled:opacity-50;
   }
 
   [data-theme="corporateDark"] .action-btn-secondary {
@@ -375,7 +398,7 @@
   }
 
   .action-btn-danger {
-    @apply glass-panel flex items-center gap-2 rounded-lg px-4 py-2 font-medium text-error transition-colors disabled:opacity-50;
+    @apply shadow-glow flex items-center gap-2 rounded-lg px-4 py-2 font-medium text-error transition-colors disabled:opacity-50;
   }
 
   [data-theme="corporateDark"] .action-btn-danger {
@@ -395,7 +418,16 @@
   }
 
   .action-btn-ghost {
-    @apply glass-panel rounded-lg px-3 py-2 text-base-content transition-colors disabled:opacity-50;
+    @apply shadow-glow rounded-lg px-3 py-2 text-base-content transition-colors disabled:opacity-50;
+  }
+
+  [data-theme="corporateLight"] .action-btn-primary,
+  [data-theme="corporateLight"] .action-btn-secondary,
+  [data-theme="corporateLight"] .action-btn-danger,
+  [data-theme="corporateLight"] .action-btn-ghost {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(249, 250, 251, 0.92));
+    box-shadow: 0 24px 48px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(15, 23, 42, 0.04);
+    backdrop-filter: blur(14px) saturate(140%);
   }
 
   [data-theme="corporateDark"] .action-btn-ghost {

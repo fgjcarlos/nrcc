@@ -6,7 +6,7 @@ import (
 )
 
 var (
-	ansiSequencePattern    = regexp.MustCompile("\\x1b\\[[0-?]*[ -/]*[@-~]")
+	ansiSequencePattern    = regexp.MustCompile(`\x1b\[[0-?]*[ -/]*[@-~]`)
 	nodeREDLabelPattern    = regexp.MustCompile(`(?i)^\s*Node-RED\s+(.*?)\s*$`)
 	semanticVersionPattern = regexp.MustCompile(`^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$`)
 )
