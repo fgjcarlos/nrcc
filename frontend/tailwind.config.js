@@ -1,5 +1,3 @@
-import daisyui from 'daisyui'
-
 /** @type {import('tailwindcss').Config} */
 export default {
   darkMode: ['class', '[data-theme]'],
@@ -80,72 +78,5 @@ export default {
          'ds-focus-ring': '0 0 0 2px var(--ds-bg-base, #07090d), 0 0 0 4px var(--ds-accent-primary, #0089b4)',
        },
     },
-  },
-  plugins: [daisyui],
-  daisyui: {
-    themes: [
-      {
-        // ══════════════════════════════════════════════════════════
-        // DARK MODE — "Signal Prime Dark" (dark-first operations UI)
-        // ══════════════════════════════════════════════════════════
-        corporateDark: {
-          "primary": "#d4472b",
-          "primary-content": "#ffffff",
-
-          "secondary": "#141b23",
-          "secondary-content": "#d8dee8",
-
-          "accent": "#0089b4",
-          "accent-content": "#f5f7fa",
-
-          "neutral": "#1a2332",
-          "neutral-content": "#f5f7fa",
-
-          "base-100": "#07090d",
-          "base-200": "#0f1419",
-          "base-300": "#141b23",
-          "base-content": "#f5f7fa",
-
-          "info": "#2c9edb",
-          "info-content": "#ffffff",
-          "success": "#16a36a",
-          "success-content": "#ffffff",
-          "warning": "#e8a811",
-          "warning-content": "#07090d",
-          "error": "#e54233",
-          "error-content": "#ffffff",
-        },
-        // ══════════════════════════════════════════════════════════
-        // LIGHT MODE — "Signal Prime Light"
-        // ══════════════════════════════════════════════════════════
-        corporateLight: {
-          "primary": "#bd3f27",
-          "primary-content": "#ffffff",
-
-          "secondary": "#eef3f7",
-          "secondary-content": "#263241",
-
-          "accent": "#007aa0",
-          "accent-content": "#ffffff",
-
-          "neutral": "#536173",
-          "neutral-content": "#f6f7f9",
-
-          "base-100": "#f6f7f9",
-          "base-200": "#edf1f5",
-          "base-300": "#ffffff",
-          "base-content": "#10151c",
-
-          "info": "#1679b7",
-          "info-content": "#ffffff",
-          "success": "#0f8f5f",
-          "success-content": "#ffffff",
-          "warning": "#c98905",
-          "warning-content": "#10151c",
-          "error": "#c93429",
-          "error-content": "#ffffff",
-        },
-      },
-    ],
   },
 }

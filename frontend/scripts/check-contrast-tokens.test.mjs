@@ -167,6 +167,9 @@ function assert(cond, label) {
     const twPath = join(workdir, 'tailwind.config.js');
     const tw = readFileSync(twPath, 'utf8');
     writeFileSync(twPath, tw.replace('"primary-content": "#ffffff"', '"primary-contentx": "#ffffff"'), 'utf8');
+    const cssPath = join(workdir, 'src/index.css');
+    const css = readFileSync(cssPath, 'utf8');
+    writeFileSync(cssPath, css.replaceAll('--color-primary-content:', '--color-primary-contentx:'), 'utf8');
     const { status } = runScript(workdir, ['--strict']);
     assert(status === 2, 'missing token → exits 2 regardless of --strict');
   } finally {
@@ -182,6 +185,20 @@ function assert(cond, label) {
     const { stdout } = runScript(workdir);
     // base-content (#f5f7fa) on base-100 (#07090d) in corporateDark
     assert(stdout.includes('18.57:1'), 'calculator reports 18.57:1 for body on base (dark)');
+  } finally {
+    rmSync(workdir, { recursive: true, force: true });
+  }
+}
+
+// ── Fixture 5: DaisyUI v5 CSS variable names are authoritative ────
+{
+  const workdir = mkdtempSync(join(tmpdir(), 'contrast-test-'));
+  try {
+    writeFixture(workdir, { darkMuted: '#6f7d90', lightMuted: '#5a6577' });
+    writeFileSync(join(workdir, 'tailwind.config.js'), 'export default {};', 'utf8');
+    const { status, stdout, stderr } = runScript(workdir);
+    assert(status === 0, `CSS palette tokens resolve without legacy DaisyUI config (${stderr})`);
+    assert(stdout.includes('All 14 documented contrast pairs'), 'CSS palette resolves all documented pairs');
   } finally {
     rmSync(workdir, { recursive: true, force: true });
   }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { authService, type User } from '../services/authService';
-import { api, armAuthBootstrap, releaseAuthBootstrap } from '@/shared/lib';
+import { armAuthBootstrap, refreshAuthToken, releaseAuthBootstrap } from '@/shared/lib';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -20,8 +20,8 @@ export function useAuth() {
   const checkAuth = useCallback(async () => {
     try {
       if (!authService.getToken()) {
-        const refreshRes = await api.post<{ data: { token: string } }>('/auth/refresh', null);
-        authService.setToken(refreshRes.data.data.token);
+        const token = await refreshAuthToken();
+        if (!token) throw new Error('Session refresh failed');
       }
 
       const user = await authService.getMe();

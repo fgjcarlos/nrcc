@@ -532,7 +532,7 @@ func TestSaveConfig_WritesExplicitRuntimeSettingsAndRestarts(t *testing.T) {
 
 	configSvc := service.NewConfigService(dataDir)
 	capabilities := configSvc.ConfigurationCapabilities()
-	if capabilities.RuntimeVersion != "v5.0.6" || !capabilities.Editable {
+	if capabilities.RuntimeVersion != "5.0.6" || !capabilities.Editable {
 		t.Fatalf("configuration capabilities = %+v, want editable Node-RED 5 runtime", capabilities)
 	}
 	processManager := service.NewProcessManager(commandPath, dataDir)

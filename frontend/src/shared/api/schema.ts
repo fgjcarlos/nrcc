@@ -452,7 +452,7 @@ export interface paths {
         };
         /**
          * Get raw settings.js content
-         * @description Returns the raw text content of the Node-RED `settings.js` file.
+         * @description **Admin only.** Returns the raw text content of the Node-RED `settings.js` file. settings.js carries bcrypt hashes for `adminAuth` plus every other secret, so a viewer must never see it (MEDIUM-016).
          */
         get: operations["getSettingsRaw"];
         put?: never;
@@ -503,6 +503,30 @@ export interface paths {
          *     limits cannot be observed. Each metric has an `available` flag.
          */
         get: operations["getSystemInfo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/system/security-posture": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get security posture chips
+         * @description Admin-only. Returns the four boolean/count chips that back the
+         *     Dashboard's SecurityPostureCard. The encryptionKeyConfigured chip
+         *     surfaces the silent-degradation failure mode in issue #04:
+         *     encrypted env vars written in clear when NRCC_ENCRYPTION_KEY is
+         *     missing. Closes #676 item 2.
+         */
+        get: operations["getSecurityPosture"];
         put?: never;
         post?: never;
         delete?: never;
@@ -653,6 +677,30 @@ export interface paths {
         /**
          * Download backup archive
          * @description Streams the backup as a binary ZIP file.
+         *
+         *     The archive contains `cc-users.json` (bcrypt password hashes),
+         *     `flows_cred.json` (Node-RED credential store), `settings.js`
+         *     (which may carry the `adminAuth` block), plus the usual
+         *     `flows.json`, `config.json` and `package.json`. For that reason
+         *     the endpoint is **admin-only** (#674): a viewer token receives
+         *     403 and cannot exfiltrate the hashes or Node-RED credentials.
+         *
+         *     If an optional passphrase is supplied, the zip bytes are wrapped
+         *     with AES-256-GCM using that passphrase (Content-Type becomes
+         *     `application/octet-stream`, filename suffix becomes `.zip.enc`).
+         *     The client decrypts with the same passphrase to recover the
+         *     original archive. Use this when exporting a backup off-host so
+         *     credentials and flow secrets do not leave the network in
+         *     cleartext.
+         *
+         *     **Passing the passphrase (#670):** send it in the
+         *     `X-Backup-Password` request header. The previous `?password=…`
+         *     query-parameter form is **deprecated** and will be removed in a
+         *     future release — the URL ends up in browser history and in any
+         *     reverse-proxy access log, both of which leak the bearer secret
+         *     that unlocks the export. The query form is still accepted for
+         *     one release cycle of backwards compatibility and emits a
+         *     deprecation warning in the server log.
          */
         get: operations["downloadBackup"];
         put?: never;
@@ -678,6 +726,81 @@ export interface paths {
          *     created automatically before restoring. Returns the ID of that pre-restore backup.
          */
         post: operations["restoreBackup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/backups/provider": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the active off-host backup provider
+         * @description Returns the provider name (`restic` when NRCC_RESTIC_REPO is set, `local` otherwise).
+         */
+        get: operations["getBackupProvider"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/backups/provider/snapshots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List remote-provider snapshots
+         * @description Returns the snapshots held by the configured off-host provider
+         *     (Restic). Returns 503 when no provider is configured.
+         *
+         *     **Admin-only** (#675): the response reveals the provider name,
+         *     snapshot ids, timestamps and the remote repository layout, all of
+         *     which are deployment-fingerprintable. The neighbouring
+         *     `GET /api/backups/provider` already returns an empty body for
+         *     non-admins for the same reason. Non-admin requests receive
+         *     403 regardless of whether a provider is configured, so the
+         *     response does not leak configuration state.
+         */
+        get: operations["listProviderSnapshots"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/backups/provider/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pull a remote snapshot to a local destination
+         * @description Pulls the snapshot identified by `id` from the configured off-host
+         *     provider into `destination` (an absolute directory path). The
+         *     restored tree preserves the source path layout of the remote
+         *     snapshot; the handler does not swap files into the live runtime.
+         *     To actually swap, use the local ZIP path:
+         *     create/import a local archive from the restored files and call
+         *     `POST /api/backups/{local-id}/restore`.
+         */
+        post: operations["restoreProviderSnapshot"];
         delete?: never;
         options?: never;
         head?: never;
@@ -824,6 +947,12 @@ export interface paths {
         /**
          * Get .env file content
          * @description Returns the raw text content of the `data/.env` file.
+         *
+         *     **Admin-only** (#673): the response is unfiltered, so it
+         *     defeats the masking that `GET /api/env` applies. A viewer
+         *     token receives 403. The endpoint exists only to power
+         *     `DotenvEditor.tsx`; the structured endpoint already covers
+         *     normal env management with masking and at-rest encryption.
          */
         get: operations["getDotenv"];
         /**
@@ -1093,7 +1222,8 @@ export interface paths {
          * Get cached update status
          * @description Returns the last known update status from cache (in-memory + persisted to
          *     `data/update_cache.json`). This is a fast, non-blocking read — no npm call
-         *     is made.
+         *     is made. Runtime strategy and in-place capability are derived on each
+         *     read; cached capability fields are not authoritative.
          */
         get: operations["getUpdatesStatus"];
         put?: never;
@@ -1426,9 +1556,74 @@ export interface paths {
         put?: never;
         /**
          * Analyze a flow with AI
-         * @description AI-powered flow analysis. Not yet implemented.
+         * @description Uses the active configured provider to analyze a flow. Generated output is review-only.
          */
         post: operations["aiAnalyzeFlow"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get AI provider configuration
+         * @description Returns non-secret provider settings. API keys are write-only and never returned.
+         */
+        get: operations["getAIConfig"];
+        /**
+         * Save AI provider configuration
+         * @description **Admin only.** Saves enabled state, provider, endpoint, model, and an optional write-only API key.
+         *     Existing keys are preserved when `apiKey` is omitted or empty.
+         */
+        put: operations["putAIConfig"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/config/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test AI provider connection
+         * @description **Admin only.** Runs a bounded connection test and records a non-secret result for capability consumers.
+         */
+        post: operations["testAIConfig"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get AI capability status
+         * @description Returns the non-secret provider capability contract without initiating a connection test.
+         */
+        get: operations["getAIStatus"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1536,6 +1731,40 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+        };
+        AIConfigInput: {
+            enabled: boolean;
+            /** @enum {string} */
+            provider: "offline" | "openai";
+            /**
+             * Format: uri
+             * @description HTTPS provider endpoint. Not required for the offline provider.
+             */
+            endpoint?: string;
+            model?: string;
+            /** @description Optional write-only provider secret. Never returned by NRCC. */
+            apiKey?: string;
+        };
+        AIConfig: {
+            enabled: boolean;
+            /** @enum {string} */
+            provider: "offline" | "openai";
+            /** Format: uri */
+            endpoint?: string;
+            model?: string;
+            /** @description Indicates only whether a write-only key is configured. */
+            apiKeyConfigured: boolean;
+        };
+        AIProviderStatus: {
+            /** @enum {string} */
+            status: "disabled" | "incomplete" | "testing" | "unreachable" | "ready";
+            /** @enum {string} */
+            provider: "offline" | "openai";
+            /** Format: uri */
+            endpoint?: string;
+            model?: string;
+            /** @description User-facing, non-secret explanation when the provider is unavailable. */
+            reason?: string;
         };
         AuthResponse: {
             /** @description Short-lived JWT access token (~15 min) */
@@ -2048,6 +2277,7 @@ export interface components {
             name?: string;
             z?: string;
             wires?: string[][];
+        } & {
             [key: string]: unknown;
         };
         FlowSummary: {
@@ -2150,6 +2380,10 @@ export interface components {
             /** @example 4.0.2 */
             latestVersion: string;
             updateAvailable: boolean;
+            /** @description Server-derived runtime update strategy (image-local, npm-global, or external). */
+            strategy: string;
+            /** @description True only when the current known runtime supports in-place npm updates. */
+            canInplaceApply: boolean;
             /** Format: date-time */
             checkedAt: string;
             /** @description Last check error; empty if the check succeeded */
@@ -2207,7 +2441,7 @@ export interface components {
              * @example nrcc-node-red
              */
             name?: string;
-            /** @example nodered/node-red:4.1 */
+            /** @example nodered/node-red:5.0.1-minimal */
             image?: string;
             /** @example running */
             status: string;
@@ -2271,6 +2505,22 @@ export interface components {
             timestamp: string;
         } & {
             data?: components["schemas"]["HealthStatus"];
+        };
+        SuccessEnvelope_AIConfig: {
+            /** @enum {boolean} */
+            success: true;
+            /** Format: date-time */
+            timestamp: string;
+        } & {
+            data?: components["schemas"]["AIConfig"];
+        };
+        SuccessEnvelope_AIProviderStatus: {
+            /** @enum {boolean} */
+            success: true;
+            /** Format: date-time */
+            timestamp: string;
+        } & {
+            data?: components["schemas"]["AIProviderStatus"];
         };
         SuccessEnvelope_StatusResponse: {
             /** @enum {boolean} */
@@ -2679,6 +2929,35 @@ export interface components {
             timestamp: string;
         } & {
             data?: components["schemas"]["GenericSuccess"];
+        };
+        SecurityPosture: {
+            /**
+             * @description Whether NRCC_ENCRYPTION_KEY is set to a non-empty value. False
+             *     means env vars flagged Encrypted are persisted in clear,
+             *     which is the silent-degradation failure mode the Dashboard
+             *     security posture card surfaces. See issue #04.
+             */
+            encryptionKeyConfigured: boolean;
+            /**
+             * @description Whether GET /api/backups/{id}/download requires the admin
+             *     role. Reflected here so the dashboard flags it if the gate
+             *     is ever loosened. See issue #01.
+             */
+            backupAccessAdminGated: boolean;
+            /** @description Count of non-revoked refresh sessions whose expiry is in the future. */
+            activeRefreshSessions: number;
+            /** @description Number of users with the admin role. */
+            totalAdmins: number;
+            /** @description Subset of totalAdmins with TOTP enrolled. */
+            mfaEnrolledAdmins: number;
+        };
+        SuccessEnvelope_SecurityPosture: {
+            /** @enum {boolean} */
+            success: true;
+            /** Format: date-time */
+            timestamp: string;
+        } & {
+            data?: components["schemas"]["SecurityPosture"];
         };
     };
     responses: {
@@ -3461,6 +3740,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     postSettingsRaw: {
@@ -3530,6 +3810,28 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    getSecurityPosture: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Security posture summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope_SecurityPosture"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     getBackups: {
@@ -3759,16 +4061,18 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description ZIP archive stream */
+            /** @description ZIP archive (raw) or encrypted envelope (when `X-Backup-Password` was supplied) */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/zip": string;
+                    "application/octet-stream": string;
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -3796,6 +4100,124 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
+        };
+    };
+    getBackupProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Provider name */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        provider?: "local" | "restic";
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listProviderSnapshots: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Snapshots (newest first) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        provider?: string;
+                        snapshots?: {
+                            id?: string;
+                            /** Format: date-time */
+                            time?: string;
+                            /** Format: int64 */
+                            size?: number;
+                        }[];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            /** @description Provider call failed (network, auth, etc.) */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No remote provider configured */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    restoreProviderSnapshot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Remote snapshot id */
+                    id: string;
+                    /** @description Absolute path on the host filesystem */
+                    destination?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Restore completed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        provider?: string;
+                        id?: string;
+                        destination?: string;
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            /** @description Provider call failed */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No remote provider configured */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     postSchedulerConfig: {
@@ -4002,6 +4424,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     putDotenv: {
@@ -4687,9 +5110,16 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Flow analysis result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             401: components["responses"]["Unauthorized"];
-            /** @description Not implemented */
-            501: {
+            /** @description AI provider is disabled or not configured */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4697,6 +5127,123 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
+        };
+    };
+    getAIConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Safe AI provider configuration */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope_AIConfig"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    putAIConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AIConfigInput"];
+            };
+        };
+        responses: {
+            /** @description Saved safe AI provider configuration */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope_AIConfig"];
+                };
+            };
+            /** @description Invalid provider or endpoint */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    testAIConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Provider is reachable */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope_AIProviderStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            /** @description Provider is unreachable */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Provider connection test timed out */
+            504: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    getAIStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Provider capability status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope_AIProviderStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
         };
     };
     aiAnalyzePatterns: {
