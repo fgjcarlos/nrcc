@@ -83,12 +83,10 @@ export function registerTokenAccessors(
   tokenSetter = setter;
 }
 
-async function refreshAccessToken(): Promise<string | null> {
+async function requestAccessTokenRefresh(): Promise<string | null> {
   try {
-    // Use the shared `api` instance so the request picks up the global
-    // withCredentials + baseURL config. A previous version used a bare
-    // `axios.post` with explicit options; consolidating on `api` keeps
-    // the cookie/transport behaviour consistent across refresh paths.
+    // Use the shared `api` instance so refresh keeps cookie credentials and
+    // the configured base URL regardless of which caller needs the token.
     const response = await api.post<{ data: { token: string } }>('/auth/refresh', null);
     const token = response.data.data.token;
     tokenSetter?.(token);
@@ -96,6 +94,15 @@ async function refreshAccessToken(): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+export function refreshAuthToken(): Promise<string | null> {
+  if (!refreshPromise) {
+    refreshPromise = requestAccessTokenRefresh().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
 }
 
 api.interceptors.request.use(
@@ -148,13 +155,7 @@ api.interceptors.response.use(
 
       originalRequest._retry = true;
 
-      if (!refreshPromise) {
-        refreshPromise = refreshAccessToken().finally(() => {
-          refreshPromise = null;
-        });
-      }
-
-      const newToken = await refreshPromise;
+      const newToken = await refreshAuthToken();
       if (newToken) {
         originalRequest.headers.Authorization = `Bearer ${newToken}`;
         return api(originalRequest);

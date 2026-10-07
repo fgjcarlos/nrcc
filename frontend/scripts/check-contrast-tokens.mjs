@@ -5,7 +5,7 @@
  * Static auditor for WCAG 2.1 SC 1.4.3 (Contrast — Minimum).
  *
  * Reads the colour tokens declared in `src/index.css` for both themes
- * and the `corporateDark` / `corporateLight` palette in
+ * and supports legacy `corporateDark` / `corporateLight` palettes in
  * `tailwind.config.js`, computes the contrast ratio for every
  * documented foreground / background pair, and fails CI when any pair
  * drops below the AA threshold (4.5:1 for body text, 3:1 for large
@@ -61,10 +61,9 @@ function readIndexCssTokens() {
 }
 
 function readTailwindTokens() {
-  // The daisyUI corporateDark / corporateLight themes declare raw hex
-  // values inside tailwind.config.js. We do not parse JS; instead we
-  // import the JS file and read the exported default. The file is ESM.
-  // Use a child process to avoid polluting the parent.
+  // Retain compatibility with older configs and test fixtures. The v5
+  // source of truth is the explicit --color-* palette in index.css.
+  // Extract only literal hex values; do not evaluate JavaScript.
   const cfg = readFileSync(resolve(repoRoot, 'tailwind.config.js'), 'utf8');
   /** @type {Record<string, Record<string, string>>} */
   const out = {};
@@ -178,8 +177,9 @@ for (const pair of PAIRS) {
     errors.push(`palette missing for theme ${pair.theme}`);
     continue;
   }
-  const fg = palette[pair.fg];
-  const bg = palette[pair.bg];
+  const token = (name) => palette[name] ?? palette[`color-${name}`];
+  const fg = token(pair.fg);
+  const bg = token(pair.bg);
   if (!fg || !bg) {
     errors.push(`token missing for ${pair.theme}.${pair.fg}/${pair.bg}`);
     continue;

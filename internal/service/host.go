@@ -97,7 +97,11 @@ func (s *HostService) inspectCommand(name string, versionArg string) model.Depen
 	dep.Command = path
 	out, err := execCommand(path, versionArg).CombinedOutput()
 	if err == nil {
-		dep.Version = cleanVersionOutput(string(out))
+		if name == "node-red" {
+			dep.Version = nodeREDVersionFromOutput(string(out))
+		} else {
+			dep.Version = cleanVersionOutput(string(out))
+		}
 	}
 	return dep
 }
@@ -215,7 +219,7 @@ func (s *HostService) inspectDockerContainer(containerID string) (version, userD
 
 	versionOut, err := execCommand("docker", "exec", containerID, "node-red", "--version").CombinedOutput()
 	if err == nil {
-		version = cleanVersionOutput(string(versionOut))
+		version = nodeREDVersionFromOutput(string(versionOut))
 	}
 	return version, userDir, settingsPath
 }

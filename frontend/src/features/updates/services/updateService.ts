@@ -4,6 +4,8 @@ export interface UpdateStatus {
   currentVersion: string;
   latestVersion: string;
   updateAvailable: boolean;
+  strategy?: string;
+  canInplaceApply?: boolean;
   checkedAt: string;
   error?: string;
 }

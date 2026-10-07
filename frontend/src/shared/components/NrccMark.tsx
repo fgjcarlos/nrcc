@@ -19,7 +19,7 @@ import { cn } from '@/shared/lib/utils';
  * Header.tsx).
  */
 
-export const nrccMarkVariants = cva(
+const nrccMarkVariants = cva(
   'inline-flex shrink-0 items-center justify-center rounded-xl border ' +
     'transition-colors focus-visible:outline-none focus-visible:ring-2 ' +
     'focus-visible:ring-offset-2 focus-visible:ring-offset-base-100 ' +

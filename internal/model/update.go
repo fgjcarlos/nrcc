@@ -65,6 +65,8 @@ type UpdateCacheEntry struct {
 	CurrentVersion  string    `json:"currentVersion"`
 	LatestVersion   string    `json:"latestVersion"`
 	UpdateAvailable bool      `json:"updateAvailable"`
+	Strategy        string    `json:"strategy"`
+	CanInplaceApply bool      `json:"canInplaceApply"`
 	CheckedAt       time.Time `json:"checkedAt"`
 	Error           string    `json:"error,omitempty"` // last check error; empty if success
 }

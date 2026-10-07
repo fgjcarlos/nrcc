@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+- Align the frontend on Tailwind CSS 4 with its Vite integration and daisyUI 5,
+  preserving the corporate themes and setting the styling browser floor to Safari
+  16.4, Chrome 111, and Firefox 128. The Tailwind 3 braces advisory route is removed.
+- **Security — frontend dependencies:** updated PostCSS, fflate, Vitest and
+  @vitest/mocker, and js-yaml to patched releases for five moderate package
+  records. The separate HIGH advisory affecting `braces` remains unresolved.
+- **Security — frontend dependencies:** raised the `undici` and
+  `brace-expansion` override floors to address four HIGH advisories.
+  The separate HIGH advisory affecting `braces` remains unresolved.
+- Derive update capability from the managed Node-RED runtime, fail closed for
+  unknown versions and unsupported installations, and explain image redeploys
+  without suggesting npm as a whole-product upgrade.
+- Coalesce session refreshes during authentication bootstrap and API 401 recovery,
+  preventing concurrent refresh-cookie rotation from signing users out on reload.
+- Normalize Node-RED CLI version output so version detection and the existing
+  configuration compatibility gate recognize Node-RED 5 runtimes.
 - Harden authentication setup with an atomic one-time recovery token,
   guarded re-bootstrap, normalized throttling, and TLS-aware cookies.
 - **Security — refresh tokens (#669):** `sessions.json` no longer stores

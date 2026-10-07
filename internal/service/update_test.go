@@ -2,10 +2,12 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -133,6 +135,99 @@ func TestCompareVersions(t *testing.T) {
 		if result != tt.expected {
 			t.Errorf("%s: compareVersions(%s, %s) = %d, expected %d", tt.desc, tt.v1, tt.v2, result, tt.expected)
 		}
+	}
+}
+
+func TestForceCheckValidatesLatestNpmOutput(t *testing.T) {
+	tests := []struct {
+		name, output, want string
+	}{
+		{"clean", "5.0.7\n", "5.0.7"},
+		{"npm notices", "5.0.7\n\nnpm notice\nnpm notice New major version of npm available! 11.19.1 -> 12.2.0\n", "5.0.7"},
+		{"quoted prerelease and metadata", `"v5.0.7-rc.1+build.2"`, "5.0.7-rc.1+build.2"},
+		{"empty", "\n npm notice update\n", ""},
+		{"garbage", "version 5.0.7", ""},
+		{"multiple versions", "5.0.7\n5.0.8", ""},
+		{"unexpected noise", "5.0.7\nwarning: noisy", ""},
+		{"runner error", "5.0.7", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := NewUpdateService(t.TempDir())
+			var runnerErr error
+			if tt.name == "runner error" {
+				runnerErr = errors.New("runner failed")
+			}
+			svc.runner = &mockRunner{output: []byte(tt.output), err: runnerErr}
+			svc.getInstalledVersionFn = func(context.Context) string { return "4.0.0" }
+			got, err := svc.ForceCheck(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			invalid := tt.want == ""
+			if got.LatestVersion != tt.want || got.UpdateAvailable == invalid || (got.Error != "") != invalid {
+				t.Fatalf("ForceCheck() = %+v; want latest %q, invalid=%t", got, tt.want, invalid)
+			}
+		})
+	}
+}
+
+func TestCachedStatusSuppressesInvalidLatestVersion(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, updateCacheFile), []byte(`{"currentVersion":"4.0.0","latestVersion":"5.0.7\nnpm notice polluted","updateAvailable":true}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	status := NewUpdateService(dir).GetCachedStatus()
+	encoded, err := json.Marshal(status)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.LatestVersion != "" || status.UpdateAvailable || strings.Contains(string(encoded), "npm notice") {
+		t.Fatalf("invalid cached latest version leaked: %+v (%s)", status, encoded)
+	}
+}
+
+func TestUpdateCapabilityRejectsUnknownCurrentVersion(t *testing.T) {
+	svc := NewUpdateService(t.TempDir())
+	svc.getInstalledVersionFn = func(context.Context) string { return "unknown" }
+	svc.getLatestVersionFn = func(context.Context) (string, error) { return "5.0.0", nil }
+	entry := svc.performCheckInternal(context.Background())
+	if entry.UpdateAvailable {
+		t.Fatal("unknown installed version must not imply an available update")
+	}
+}
+
+func TestCachedStatusDerivesRuntimeCapabilityWithoutCheckingRegistry(t *testing.T) {
+	svc := NewUpdateService(t.TempDir())
+	svc.cacheMu.Lock()
+	svc.cache = model.UpdateCacheEntry{CurrentVersion: "4.0.0", LatestVersion: "5.0.0", UpdateAvailable: true, Strategy: string(StrategyNpmGlobal), CanInplaceApply: true}
+	svc.cacheMu.Unlock()
+	_, imageExecutable := imageLocalProcessManager(t)
+	_, npmExecutable := npmGlobalProcessManager(t)
+	for _, tc := range []struct {
+		executable, strategy string
+		canApply             bool
+	}{
+		{imageExecutable, string(StrategyImageLocal), false},
+		{npmExecutable, string(StrategyNpmGlobal), true},
+		{filepath.Join(t.TempDir(), "external-node-red"), string(StrategyExternal), false},
+	} {
+		svc.SetProcessManager(NewProcessManager(tc.executable, t.TempDir()))
+		status := svc.GetCachedStatus()
+		if status.Strategy != tc.strategy || status.CanInplaceApply != tc.canApply || !status.UpdateAvailable {
+			t.Fatalf("status for %s = %+v", tc.strategy, status)
+		}
+	}
+}
+
+func TestCachedStatusRejectsUnknownVersionFromOldCache(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, updateCacheFile), []byte(`{"currentVersion":"unknown","latestVersion":"5.0.0","updateAvailable":true}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	status := NewUpdateService(dir).GetCachedStatus()
+	if status.UpdateAvailable || status.CanInplaceApply {
+		t.Fatalf("old cached status must reject unknown current version: %+v", status)
 	}
 }
 
@@ -633,6 +728,23 @@ func TestApplyUpdateWithBackup_SuccessfulFlow(t *testing.T) {
 	}
 }
 
+func TestApplyUpdateWithBackupReportsImageUnsupportedCode(t *testing.T) {
+	dir := t.TempDir()
+	svc := NewUpdateService(dir)
+	_, executable := imageLocalProcessManager(t)
+	svc.SetProcessManager(NewProcessManager(executable, dir))
+	svc.SetBackupCreator(NewBackupService(dir))
+	svc.cacheMu.Lock()
+	svc.cache = model.UpdateCacheEntry{CurrentVersion: "4.0.1", LatestVersion: "4.0.2", UpdateAvailable: true}
+	svc.cacheMu.Unlock()
+	if err := svc.ApplyUpdateWithBackup(context.Background()); err == nil {
+		t.Fatal("expected image-managed update rejection")
+	}
+	if got := svc.GetFlowState().Error; got != "image_unsupported" {
+		t.Fatalf("failure code = %q, want image_unsupported", got)
+	}
+}
+
 // TestApplyUpdateWithBackup_NpmFailure tests failure during npm update phase
 func TestApplyUpdateWithBackup_NpmFailure(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -984,6 +1096,21 @@ func TestParseCriticalCount(t *testing.T) {
 				t.Fatalf("parseCriticalCount(%q) = %d, want %d", tt.in, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestGetInstalledVersion_ParsesCanonicalNodeREDOutput(t *testing.T) {
+	svc := NewUpdateService(t.TempDir())
+	pm, _ := imageLocalProcessManager(t)
+	svc.SetProcessManager(pm)
+	svc.runner = &mockRunner{output: []byte("Node-RED v5.0.7\nNode.js v24.20.0\nLinux\n")}
+
+	version, err := svc.getInstalledVersionInternal(context.Background())
+	if err != nil {
+		t.Fatalf("getInstalledVersionInternal returned an error: %v", err)
+	}
+	if version != "5.0.7" {
+		t.Fatalf("installed Node-RED version = %q, want 5.0.7", version)
 	}
 }
 
