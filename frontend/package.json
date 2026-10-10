@@ -37,7 +37,7 @@
     "lucide-react": "^1.50.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "react-hook-form": "^7.87.0",
+    "react-hook-form": "^7.89.0",
     "react-i18next": "^17.0.15",
     "react-router-dom": "^7.18.4",
     "recharts": "^3.10.1",
