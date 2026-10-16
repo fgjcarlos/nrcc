@@ -3,7 +3,6 @@ package service
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/dop251/goja"
@@ -18,6 +17,9 @@ var (
 	ErrSandboxRuntime   = errors.New("settings.js: sandbox runtime error")
 	ErrSandboxSyntax    = errors.New("settings.js: syntax error in sandbox")
 	ErrSandboxTimeout   = errors.New("settings.js: sandbox execution timed out")
+	// ErrSandboxHostAPI distinguishes source-managed Node-RED settings from
+	// inspection failures. No host API is executed or exposed to the script.
+	ErrSandboxHostAPI = errors.New("settings.js: host API unavailable in sandbox")
 )
 
 // sandboxTimeout caps how long ParseAdminAuthViaSandbox is allowed to run the
@@ -66,6 +68,12 @@ func ParseAuthenticationSurfacesViaSandbox(content string) (*model.Authenticatio
 		"var exports = module.exports;\n" +
 		content + "\n"
 
+	// Compile the entire source before inspection. A blocked host access must
+	// never hide a syntax error later in a source-managed settings document.
+	program, err := goja.Compile("settings.js", wrapped, false)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrSandboxSyntax, err)
+	}
 	rt := goja.New()
 
 	// Bound execution: a non-terminating script (while(true){}, infinite
@@ -84,28 +92,26 @@ func ParseAuthenticationSurfacesViaSandbox(content string) (*model.Authenticatio
 		rt.ClearInterrupt()
 	}()
 
-	// Block host APIs explicitly. Setting to goja.Undefined() means any
-	// access throws a TypeError when the script tries to use them.
+	// Block host APIs with a typed inspection error instead of an ambiguous
+	// TypeError. Settings may use these APIs in Node-RED, but this inspector
+	// must never call them or confuse blocked access with missing auth.
 	for _, name := range []string{
 		"require", "process", "Buffer", "globalThis", "global",
 		"setTimeout", "setInterval", "fetch",
 	} {
-		// Per goja docs Set may return an error for some value kinds; we
-		// pass goja.Undefined() which is always representable, but we still
-		// capture and surface the error if it ever happens.
-		if err := rt.Set(name, goja.Undefined()); err != nil {
+		blocked := rt.ToValue(func(goja.FunctionCall) goja.Value {
+			panic(rt.NewGoError(fmt.Errorf("%w: %s", ErrSandboxHostAPI, name)))
+		})
+		if err := rt.GlobalObject().DefineAccessorProperty(name, blocked, blocked, goja.FLAG_FALSE, goja.FLAG_FALSE); err != nil {
 			return nil, fmt.Errorf("sandbox setup: block %q: %w", name, err)
 		}
 	}
 
-	if _, err := rt.RunString(wrapped); err != nil {
+	if _, err := rt.RunProgram(program); err != nil {
 		// errors.Is walks the Unwrap chain; goja's *InterruptedError.Unwrap
 		// returns the value we passed to rt.Interrupt, which is ErrSandboxTimeout.
 		if errors.Is(err, ErrSandboxTimeout) {
 			return nil, fmt.Errorf("%w: script did not terminate within %s", ErrSandboxTimeout, timeout)
-		}
-		if isGojaSyntaxError(err) {
-			return nil, fmt.Errorf("%w: %w", ErrSandboxSyntax, err)
 		}
 		return nil, fmt.Errorf("%w: %w", ErrSandboxRuntime, err)
 	}
@@ -213,20 +219,4 @@ func readStringProp(obj *goja.Object, name string) string {
 		return ""
 	}
 	return v.String()
-}
-
-// isGojaSyntaxError reports whether err originates from a JavaScript parse
-// failure (vs a runtime TypeError or ReferenceError). goja doesn't expose a
-// dedicated error type for syntax errors, so we match on the message prefix.
-func isGojaSyntaxError(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := err.Error()
-	for _, marker := range []string{"SyntaxError", "Unexpected token", "Expected"} {
-		if strings.Contains(msg, marker) {
-			return true
-		}
-	}
-	return false
 }
