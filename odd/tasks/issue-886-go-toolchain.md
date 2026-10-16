@@ -1,5 +1,5 @@
 # Issue #886 — Patched Go toolchain and ordered integration
-Baseline: main 58d922ab; existing child 8f9c60f. Authorized: fix, commits, non-force pushes, PR publication and ordered merges only after green checks. RDD off.
+Baseline: main 58d922ab; existing child 8f9c60f. Authorized: fix, commits, non-force pushes and PR publication. The user now performs all PR merges; agent only synchronizes branches and verifies gates. RDD off.
 Delivery: focused #886 security slice first, then update the existing #893 -> #892 tracker chain. Engram mirror unavailable (no callable memory tools).
 
 ## Specs
@@ -12,9 +12,9 @@ Delivery: focused #886 security slice first, then update the existing #893 -> #8
 
 ## Tasks
 - T1 [S3,S5] inline, done: registry multiarch digest verified, contract RED observed on all six surfaces; GREEN plus existing workflow tests passed after synchronizing pins/docs. Commit: `14e6d17`.
-- T2 [S3-S6] inline checks + delegated gentle-ai-verify (risk items 2/5), in progress: local full suite/vet and CI at14e6d17 passed; independent S3-S6 verification passed with retained module advisory, not clean binary scans. Durable exposure regression integrated and focused spot check passed. PR #894 awaits final checkpoint CI and mandatory GitHub approval before merge. Implementation commit:14e6d17; evidence/probe checkpoint commit: pending.
-- T3 [S1-S2] inline, pending: update tracker/child with verified security fix without force; check exact child head and squash #893 into tracker. Integration commit: pending.
-- T4 [S1-S2] inline, pending: check resulting tracker head, mark #892 ready, squash into main and confirm final state. Integration commit: pending.
+- T2 [S3-S6] inline checks + delegated gentle-ai-verify (risk items 2/5), done: local suite/vet, independent S3-S6 verification and exact-final-head CI passed. Retained module advisory is not a clean binary scan. Implementation14e6d17; evidence/probe936ae21. User merged #894 into main as4d0991f; remote state confirmed.
+- T3 [S1-S2] inline, in progress: synchronize main security fix into tracker/child without force and verify exact heads. User performs #893 merge only after gates pass. Tracker sync53981ff; evidence/child sync and CI pending.
+- T4 [S1-S2] inline, pending: after human #893 merge, verify resulting tracker head/CI and mark #892 ready for the user's main merge. Human integration commit: pending.
 
 ## Log
 - L1 User: "Ok resuelve eso en ese orden".
@@ -32,4 +32,7 @@ Delivery: focused #886 security slice first, then update the existing #893 -> #8
 - L14 Corrected host job-20 exited0 after8m27s, Go1.26.9: go vet ./..., go test ./... -count=1 and git diff --check passed; handler235.324s, service441.361s. This completes the corrected full-suite proof; job-19's failed harness remains explicitly recorded.
 - L15 Independent verifier mvasig8m-2-2zph reported S3-S6 met/no product blockers. Reproduced candidate contract GREEN and baseline RED; baseline/candidate main dependencies byte-identical. Independently extracted cached-image binaries, both Go1.26.9, Linux/amd64, CGO0, identical SHA25680976850fc0aa451168ed00c3bedd24e4d55995c6c16c12d26337a296feb199f. Confirmed no OpenPGP package, stripped symbols and retained x/crypto v0.57.0 metadata. Disposition: GO-2026-5932 retained module advisory without demonstrated OpenPGP exposure for this artifact, NOT a green binary scan or blanket crypto exemption. Release/merge still needs final CI and required human GitHub approval.
 - L16 Integrated verifier's proposed TestDeliveredMainExcludesOpenPGP as a durable exposure-boundary regression. It invokes the public Go dependency-list interface for Linux/CGO0 main, rejects OpenPGP packages and checks crypto evidence is actually present. No new product behavior to RED: existing code already excludes OpenPGP; original compiler-pin RED remains L7. Parent spot check GOTOOLCHAIN=go1.26.9 go test ./tools/langscan/workflow -count=1 passed0.249s; diff check passed. Final checkpoint changes only evidence notes and this probe; source build/scanner evidence remains explicitly attributed to14e6d17, with fresh latest-head CI required.
+- L17 Final checkpoint936ae21 exact-head CI passed in job-26/direct read-back: Backend1.26.9, Frontend, lint, govulncheck, audit, Trivy, CodeQL and Docker acceptance. Acceptance still recorded the flaky toast annotation but concluded success. PR #894 was marked ready; no agent merge or review bypass.
+- L18 User: "Los merge los realizo yo, puedo mergear?". Overrides agent PR-merge authority: all PR merges belong to the human. Agent retains in-scope branch synchronization, non-force pushes and verification; do not merge PRs.
+- L19 User: "PR #894 mergeada". Fresh GitHub read confirms MERGED at2026-10-16T10:09:57Z, main merge commit4d0991f895d41a17871f8994aec4ea06b375c5c4. Fetch job-27 succeeded; clean tracker incorporated that main via local branch-sync merge53981ff, not a PR merge. Synchronize the child with this tracker, push both non-forced, and require fresh CI before handing #893 back to the user. Keep #892 draft until the child is integrated and the resulting tracker is verified.
 - L4 Initial RED evidence already observed remotely on both #892 and #893: govulncheck fails for ten standard-library advisories on Go1.26.8; issue886 records fixes in1.26.9. Local contract RED and actual patched-registry availability still pending. Pre-existing release cross-platform/Linux-only documentation discrepancy is out of scope; do not silently alter release targets.
