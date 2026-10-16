@@ -62,7 +62,7 @@
     "esbuild": "^0.28.2",
     "eslint": "^10.10.0",
     "eslint-plugin-react-hooks": "^7.1.1",
-    "eslint-plugin-react-refresh": "^0.5.3",
+    "eslint-plugin-react-refresh": "^0.5.7",
     "globals": "^17.9.0",
     "jsdom": "^30.0.1",
     "msw": "^2.15.0",
