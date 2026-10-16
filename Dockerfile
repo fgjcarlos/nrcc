@@ -26,10 +26,10 @@ RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
 COPY frontend/ ./
 RUN pnpm build
 
-# ref: golang:1.26-alpine — pinned to digest for supply-chain integrity.
+# ref: golang:1.26.9-alpine — pinned to digest for supply-chain integrity.
 # Dependabot (docker ecosystem, weekly) bumps the digest when upstream
 # changes. See issue #593 and auditoria/devops-security.md §2.1.
-FROM golang:1.27-alpine@sha256:4c9fe60190a2a3350ddc51de80d0224b8a6698d12bdfc999fee45ea9d6c46dbc AS go-builder
+FROM golang:1.26.9-alpine@sha256:3082400e369fa24d5fc60bca20edab3f6d604e0c5a690ec66b295eff4dd87ade AS go-builder
 WORKDIR /build
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod \
