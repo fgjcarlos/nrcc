@@ -21,7 +21,7 @@ func TestSettingsInspectionDistinguishesValidationOutcomes(t *testing.T) {
 			if !errors.Is(err, tc.want) {
 				t.Fatalf("got %v, want %v", err, tc.want)
 			}
-			if errors.Is(err, ErrSandboxHostAPI) || (tc.want != ErrSandboxSyntax && errors.Is(err, ErrSandboxSyntax)) {
+			if errors.Is(err, ErrSandboxHostAPI) || (!errors.Is(tc.want, ErrSandboxSyntax) && errors.Is(err, ErrSandboxSyntax)) {
 				t.Fatalf("inspection error misclassified: %v", err)
 			}
 		})

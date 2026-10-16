@@ -48,6 +48,7 @@ func TestApplyRawHandler_RejectsInvalidJavaScriptWithoutMutation(t *testing.T) {
 				t.Errorf("unexpected error envelope: %s", w.Body.String())
 			}
 			for path, expected := range map[string][]byte{f.settingsPath: before, configPath: configBefore} {
+				// #nosec G304 -- path is one of the isolated fixture's settings/config files.
 				after, err := os.ReadFile(path)
 				if err != nil {
 					t.Fatal(err)
