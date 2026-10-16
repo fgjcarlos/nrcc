@@ -26,6 +26,34 @@ The three AMBER items are policy/evidence gaps, not implementation gaps —
 see [`gap-report.md`](../odd/audits/issue-765/gap-report.md) for remediation
 per cluster.
 
+## Raw settings validation
+
+`POST /api/config/apply/raw` rejects malformed JavaScript with HTTP 400 and
+`error.code: VALIDATION_ERROR` before creating a backup, replacing `settings.js`,
+changing its revision, or restarting Node-RED. A rejected apply does not modify
+`config.json`. Attempt/failure audit events are still emitted.
+
+The entire source is compiled before isolated authentication inspection:
+
+| Inspection outcome | Apply behavior |
+|---|---|
+| Syntax error | Reject with a validation error, including errors after a host API reference. |
+| Successful inspection without authentication blocks | Accept; authentication is absent. |
+| Host-dependent settings (`require`, `process`, or other blocked host globals) | Preserve source-managed settings; host APIs stay blocked and authentication cannot be inspected. |
+| Other execution/inspection failure | Reject rather than silently treating it as missing authentication. |
+
+This is not a Node-RED startup guarantee. In particular, compiling host-dependent
+source does not verify required modules, environment values, certificate files,
+or authentication computed by that source. Host-dependent scripts may fail
+later in Node-RED; the inspector never exposes the filesystem, process APIs,
+network access, or timers to resolve them. Callback-based settings remain
+source-managed. Execution inside the inspector remains time-bounded.
+
+Regression coverage: `internal/handler/config_apply_validation_test.go`,
+`internal/service/settings_validation_test.go`, and the real-stack test
+`invalid raw settings are rejected without restarting healthy Node-RED` in
+`frontend/e2e/stack.spec.ts` (issue [#875](https://github.com/fgjcarlos/nrcc/issues/875)).
+
 ## Cross-cutting review documents
 
 - [`roadmap-traceability.md`](../odd/audits/issue-765/roadmap-traceability.md)
