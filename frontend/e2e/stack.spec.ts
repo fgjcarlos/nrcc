@@ -150,6 +150,60 @@ test('unknown API routes fail as JSON instead of returning the SPA', async () =>
 // component layer by `DashboardView.test.tsx`. If a future change
 // re-introduces a public Flows surface, port this test back.
 
+test('invalid raw settings are rejected without restarting healthy Node-RED', async () => {
+  const headers = await authHeaders()
+  const readDocument = async () => {
+    const response = await nrcc.get('/api/settings/raw', { headers })
+    await expect(response).toBeOK()
+    const payload = await response.json() as {
+      data: { content: string; revision: { fingerprint: string; algorithm: string } }
+    }
+    return payload.data
+  }
+  const readRuntime = async () => {
+    const response = await nrcc.get('/api/runtime/history?n=1', { headers })
+    await expect(response).toBeOK()
+    const payload = await response.json() as {
+      data: { status: { pid: number; status: string; startedAt: string; restartCount: number } }
+    }
+    const { pid, status, startedAt, restartCount } = payload.data.status
+    return { pid, status, startedAt, restartCount }
+  }
+
+  await expect.poll(async () => {
+    try {
+      return (await nodeRed.get('/flows')).ok()
+    } catch {
+      return false
+    }
+  }, { timeout: 30_000 }).toBe(true)
+  const before = await readDocument()
+  const runtime = await readRuntime()
+  expect(runtime.status).toBe('running')
+  expect(runtime.pid).toBeGreaterThan(0)
+  expect(runtime.startedAt).toBeTruthy()
+  expect(runtime.restartCount).toBeGreaterThanOrEqual(0)
+
+  const response = await nrcc.post('/api/config/apply/raw', {
+    headers,
+    data: {
+      expectedRevision: before.revision.fingerprint,
+      content: 'module.exports = { uiPort: 1880, broken: };',
+    },
+  })
+  expect(response.status()).toBe(400)
+  const failure = await response.json() as { error: { code: string; message: string } }
+  expect(failure.error.code).toBe('VALIDATION_ERROR')
+  expect(failure.error.message).toContain('syntax error')
+
+  const after = await readDocument()
+  expect(after.content).toBe(before.content)
+  expect(after.revision.fingerprint).toBe(before.revision.fingerprint)
+  expect(after.revision.algorithm).toBe(before.revision.algorithm)
+  expect(await readRuntime()).toEqual(runtime)
+  await expect(await nodeRed.get('/flows')).toBeOK()
+})
+
 test('dashboard restart changes the managed Node-RED process PID', async ({ page }) => {
   const headers = await authHeaders()
   const beforeResponse = await nrcc.get('/api/runtime/history?n=1', { headers })

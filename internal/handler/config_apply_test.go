@@ -22,13 +22,13 @@ import (
 // recorder captures the audit events the handler + coordinator
 // emit so tests can assert the failure_stage envelope.
 type applyHandlerFixture struct {
-	dir         string
-	svc         *service.ConfigService
-	apply       *service.ApplyService
-	coordinator *service.ApplyCoordinator
-	handler     *ConfigApplyHandler
+	dir          string
+	svc          *service.ConfigService
+	apply        *service.ApplyService
+	coordinator  *service.ApplyCoordinator
+	handler      *ConfigApplyHandler
 	settingsPath string
-	recorder    *applyHandlerRecorder
+	recorder     *applyHandlerRecorder
 }
 
 type applyHandlerRecorder struct {
@@ -40,6 +40,7 @@ type handlerRecordedAudit struct {
 	Action       string
 	Result       string
 	FailureStage string
+	ApplyStage   string
 }
 
 func (r *applyHandlerRecorder) Log(_ *http.Request, _, action, _, result string, meta map[string]string) {
@@ -49,6 +50,7 @@ func (r *applyHandlerRecorder) Log(_ *http.Request, _, action, _, result string,
 		Action:       action,
 		Result:       result,
 		FailureStage: meta["failure_stage"],
+		ApplyStage:   meta["apply_stage"],
 	})
 }
 
