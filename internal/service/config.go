@@ -1150,13 +1150,8 @@ func (s *ConfigService) parseConfigFromContent(content string) (model.NodeRedCon
 	cfg.Https = parseHttpsBlockFromJS(content)
 	surfaces, err := parseAuthenticationSurfacesFromJS(content)
 	if err != nil {
-		// ErrSandboxTimeout is propagated so the HTTP handler can return
-		// SETTINGS_TIMEOUT; other sandbox errors fall back to the legacy
-		// contract of "no adminAuth parsed".
-		if errors.Is(err, ErrSandboxTimeout) {
-			return cfg, err
-		}
-		return cfg, nil
+		// Inspection failures are validation failures, not missing auth.
+		return cfg, err
 	}
 	if surfaces != nil {
 		cfg.AdminAuth = surfaces.AdminAuth
@@ -1287,10 +1282,13 @@ func parseAdminAuthFromJS(content string) (*model.AdminAuth, error) {
 func parseAuthenticationSurfacesFromJS(content string) (*model.AuthenticationSurfaces, error) {
 	surfaces, err := ParseAuthenticationSurfacesViaSandbox(content)
 	if err != nil {
-		if errors.Is(err, ErrSandboxTimeout) {
-			return nil, err
+		if errors.Is(err, ErrAdminAuthMissing) || errors.Is(err, ErrSandboxHostAPI) {
+			// A successful inspection without auth and source-managed settings
+			// requiring Node-RED host APIs are distinct sandbox outcomes. The
+			// latter retain their source unchanged; auth cannot be inspected.
+			return nil, nil
 		}
-		return nil, nil
+		return nil, err
 	}
 	if surfaces.AdminAuth != nil && surfaces.AdminAuth.Type != "credentials" {
 		// Non-credential strategies can contain executable callbacks. They are
