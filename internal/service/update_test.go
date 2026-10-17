@@ -9,9 +9,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/fgjcarlos/nrcc/internal/model"
+	"github.com/fgjcarlos/nrcc/internal/store"
 )
 
 func imageLocalProcessManager(t *testing.T) (*ProcessManager, string) {
@@ -340,36 +342,91 @@ func TestCacheWritten(t *testing.T) {
 	}
 }
 
-// TestStartStop tests goroutine lifecycle
-func TestStartStop(t *testing.T) {
-	tmpDir := t.TempDir()
-	svc := NewUpdateService(tmpDir)
-
-	// Override the poll interval to be very short for testing
-	svc.pollInterval = 100 * time.Millisecond
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	// Start the polling loop
-	svc.Start(ctx)
-
-	// Give it time to run
-	time.Sleep(150 * time.Millisecond)
-
-	// Stop should not hang
-	done := make(chan struct{})
-	go func() {
-		svc.Stop()
-		close(done)
-	}()
-
-	select {
-	case <-done:
-		// Success
-	case <-time.After(2 * time.Second):
-		t.Error("Stop() took too long, possible goroutine leak")
+// newOfflinePollingService seeds the constructor cache through the normal store
+// writer, so lifecycle tests never invoke npm or the managed executable.
+func newOfflinePollingService(t *testing.T) *UpdateService {
+	t.Helper()
+	dir := t.TempDir()
+	cacheStore := store.NewJSONStore[model.UpdateCacheEntry](filepath.Join(dir, updateCacheFile))
+	if err := cacheStore.Write(model.UpdateCacheEntry{CurrentVersion: "4.0.0", LatestVersion: "4.0.0"}); err != nil {
+		t.Fatal(err)
 	}
+	svc := NewUpdateService(dir)
+	svc.getInstalledVersionFn = func(context.Context) string { return "4.0.0" }
+	svc.getLatestVersionFn = func(context.Context) (string, error) { return "4.1.0", nil }
+	return svc
+}
+
+func TestStartStop(t *testing.T) {
+	for _, cancelCaller := range []bool{false, true} {
+		t.Run(fmt.Sprintf("cancelCaller=%t", cancelCaller), func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				svc := newOfflinePollingService(t)
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				entered := make(chan struct{})
+				release := make(chan struct{})
+				canceled := make(chan struct{})
+				svc.getLatestVersionFn = func(checkCtx context.Context) (string, error) {
+					close(entered)
+					if cancelCaller {
+						<-checkCtx.Done()
+						close(canceled)
+					}
+					<-release
+					return "4.1.0", nil
+				}
+				svc.Start(ctx)
+				<-entered // Fake time advances to the first poll; no wall-clock sleep.
+				if cancelCaller {
+					cancel()
+					<-canceled // Caller cancellation reaches the active check.
+				}
+				stopped := make(chan struct{})
+				go func() {
+					svc.Stop()
+					close(stopped)
+				}()
+				synctest.Wait() // Stop has either returned or blocked on the active worker.
+				select {
+				case <-stopped:
+					t.Error("Stop() returned before the active polling check completed")
+				default:
+				}
+				close(release)
+				<-stopped
+
+				// Read immediately after Stop, before bubble teardown can join a
+				// leftover worker: persisted results must already be complete.
+				status := NewUpdateService(svc.dataDir).GetCachedStatus()
+				if status.CurrentVersion != "4.0.0" || status.LatestVersion != "4.1.0" || !status.UpdateAvailable || status.CheckedAt.IsZero() {
+					t.Errorf("Stop() returned before polling cache persistence: %+v", status)
+				}
+			})
+		})
+	}
+}
+
+func TestUpdateStopBeforeStart(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		svc := newOfflinePollingService(t)
+		svc.Stop() // Must return without waiting for a worker that was never started.
+	})
+}
+
+func TestUpdateStartCanceledContext(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		svc := newOfflinePollingService(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		svc.getInstalledVersionFn = func(context.Context) string {
+			t.Error("canceled idle polling must not begin a check")
+			return "4.0.0"
+		}
+		svc.Start(ctx)
+		synctest.Wait()
+		svc.Stop()
+	})
 }
 
 // TestConcurrentForceCheck tests that concurrent force checks don't run concurrently
