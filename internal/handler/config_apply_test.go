@@ -216,6 +216,14 @@ func TestApplyStructuredHandler_HappyPath(t *testing.T) {
 // the 409 SETTINGS_REVISION_CONFLICT envelope.
 func TestApplyStructuredHandler_StaleRevisionRejected(t *testing.T) {
 	f := newApplyHandlerFixture(t)
+	original := f.svc.GetDefault()
+	if err := f.svc.Save(original); err != nil {
+		t.Fatalf("seed config: %v", err)
+	}
+	before, err := os.ReadFile(filepath.Join(f.dir, "config.json"))
+	if err != nil {
+		t.Fatalf("read seeded config: %v", err)
+	}
 
 	stale := f.liveRevision(t)
 	stale.Fingerprint = strings.Repeat("a", 64)
@@ -245,6 +253,13 @@ func TestApplyStructuredHandler_StaleRevisionRejected(t *testing.T) {
 	}
 	if providedFP != stale.Fingerprint {
 		t.Errorf("envelope providedRevision = %q, want %q", providedFP, stale.Fingerprint)
+	}
+	after, err := os.ReadFile(filepath.Join(f.dir, "config.json"))
+	if err != nil {
+		t.Fatalf("read config after stale rejection: %v", err)
+	}
+	if string(after) != string(before) {
+		t.Fatal("config.json changed despite stale revision rejection")
 	}
 }
 

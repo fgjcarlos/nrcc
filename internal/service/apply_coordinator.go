@@ -62,6 +62,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"sync"
 )
@@ -165,7 +166,19 @@ func (c *ApplyCoordinator) Apply(ctx context.Context, req ApplyRequest) (ApplyRe
 	if c.resolve != nil {
 		return c.applyRuntime(ctx, req)
 	}
+	state, err := c.stageStructured(&req)
+	if err != nil {
+		return ApplyResult{}, err
+	}
 	result, err := c.apply.Apply(ctx, req)
+	if err != nil && state != nil {
+		if restoreErr := c.apply.configSvc.RestoreStructured(*state); restoreErr != nil {
+			return ApplyResult{}, &ApplyError{Stage: ApplyStageRollback, Cause: errors.Join(err, fmt.Errorf("restore structured config: %w", restoreErr)), Path: req.Path, Request: req}
+		}
+	}
+	if err == nil && state != nil {
+		result.Configuration = state.Committed
+	}
 	if err != nil {
 		// ApplyService.Apply already emitted the apply.failure
 		// audit event with its own meta (apply_stage). We do NOT
@@ -176,6 +189,20 @@ func (c *ApplyCoordinator) Apply(ctx context.Context, req ApplyRequest) (ApplyRe
 		return ApplyResult{}, err
 	}
 	return result, nil
+}
+
+func (c *ApplyCoordinator) stageStructured(req *ApplyRequest) (*StructuredApplyInput, error) {
+	if req.StructuredConfig == nil {
+		return nil, nil
+	}
+	state, err := c.apply.configSvc.CommitStructured(*req.StructuredConfig)
+	if err != nil {
+		c.apply.emit(*req, "apply.failure", ApplyStageValidate, "error", err)
+		return nil, &ApplyError{Stage: ApplyStageValidate, Cause: err, Path: req.Path, Request: *req}
+	}
+	req.Content = state.Content
+	req.BackupDir = state.BackupDir
+	return &state, nil
 }
 
 // acquire grabs the per-path slot. Returns ErrApplyInFlight if

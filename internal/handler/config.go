@@ -143,52 +143,34 @@ func (h *ConfigHandler) SaveConfig(w http.ResponseWriter, r *http.Request) {
 // expectedRevision is supplied by /api/config for backward
 // compatibility — the frontend learns the revision via GET).
 func (h *ConfigHandler) saveConfigViaApply(w http.ResponseWriter, r *http.Request, claims *model.Claims, cfg model.NodeRedConfig, capabilities model.ConfigurationCapabilities) {
-	staged, err := h.configSvc.CommitStructured(cfg)
+	live, err := h.configSvc.GetRawSettings()
 	if err != nil {
-		// Mirror the legacy SaveConfig error envelope: validation
-		// failures are 400 VALIDATION_ERROR so the operator sees the
-		// same UX they had before slice C. The apply coordinator is
-		// never invoked for invalid configs.
-		model.RespondError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+		model.RespondError(w, http.StatusInternalServerError, "SETTINGS_ERROR", err.Error())
 		return
 	}
 
 	req := service.ApplyRequest{
-		Path:         staged.Live.Path,
-		Content:      staged.Content,
-		Expected:     staged.Live.Revision,
-		BackupDir:    staged.BackupDir,
-		Actor:        claims.Username,
-		Request:      r,
-		Capabilities: capabilities,
+		Path:             live.Path,
+		Expected:         live.Revision,
+		BackupDir:        backupDirFor(h.configSvc, live.Path),
+		StructuredConfig: &cfg,
+		Actor:            claims.Username,
+		Request:          r,
+		Capabilities:     capabilities,
 	}
 	result, err := h.applyCoordinator.Apply(r.Context(), req)
 	if err != nil {
 		writeApplyError(w, err, "Failed to apply settings")
 		return
 	}
-	_ = result
-
-	// Node-RED reads settings.js only at start. Do not acknowledge the save
-	// until a managed running process has successfully reloaded it; otherwise
-	// the UI would claim success while the active runtime still used the old
-	// configuration.
-	if h.processManager != nil && !h.processManager.IsExternalMode() {
-		if status := h.processManager.Status(); status.Status == "running" {
-			if err := h.processManager.Restart(); err != nil {
-				model.RespondError(w, http.StatusInternalServerError, "CONFIG_SAVED_RESTART_FAILED", "Configuration was saved, but Node-RED could not restart: "+err.Error())
-				return
-			}
-		}
-	}
 
 	// The apply coordinator already emitted apply.success; we keep
 	// the legacy CONFIG_SAVE audit for parity with the pre-slice-C
 	// dashboards that consume the action field.
 	if h.audit != nil {
-		h.audit.Log(r, claims.Username, "CONFIG_SAVE", staged.Live.Path, "ok", compatibilityAuditMeta(capabilities))
+		h.audit.Log(r, claims.Username, "CONFIG_SAVE", live.Path, "ok", compatibilityAuditMeta(capabilities))
 	}
-	model.RespondJSON(w, http.StatusOK, staged.Committed)
+	model.RespondJSON(w, http.StatusOK, result.Configuration)
 }
 
 // saveConfigLegacy is the pre-slice-C path: it commits the JSON
@@ -233,6 +215,22 @@ func writeApplyError(w http.ResponseWriter, err error, fallback string) {
 			model.RespondError(w, http.StatusInternalServerError, "SETTINGS_BACKUP_FAILED", ae.Error())
 		case service.ApplyStageWrite:
 			model.RespondError(w, http.StatusInternalServerError, "SETTINGS_WRITE_ERROR", ae.Error())
+		case service.ApplyStageRestart:
+			var rollbackErr *service.RollbackError
+			if errors.As(ae, &rollbackErr) {
+				model.RespondError(w, http.StatusInternalServerError, "RUNTIME_RECOVERY_FAILED", "Configuration apply failed and runtime recovery was unsuccessful")
+				return
+			}
+			model.RespondError(w, http.StatusInternalServerError, "RUNTIME_RESTART_FAILED", "Configuration apply failed while restarting Node-RED")
+		case service.ApplyStageReady:
+			var rollbackErr *service.RollbackError
+			if errors.As(ae, &rollbackErr) {
+				model.RespondError(w, http.StatusInternalServerError, "RUNTIME_RECOVERY_FAILED", "Configuration apply failed and runtime recovery was unsuccessful")
+				return
+			}
+			model.RespondError(w, http.StatusInternalServerError, "RUNTIME_READINESS_FAILED", "Configuration apply failed because Node-RED did not become ready")
+		case service.ApplyStageRollback:
+			model.RespondError(w, http.StatusInternalServerError, "RUNTIME_RECOVERY_FAILED", "Configuration apply failed and authoritative state recovery was unsuccessful")
 		default:
 			model.RespondError(w, http.StatusInternalServerError, "APPLY_ERROR", ae.Error())
 		}

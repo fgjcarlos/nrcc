@@ -9,6 +9,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/fgjcarlos/nrcc/internal/model"
 )
 
 func TestRuntimeApplyNilResolverFailsClosed(t *testing.T) {
@@ -96,8 +98,152 @@ func TestRuntimeApplyFailureRestoresAndSurfacesRecoveryFailure(t *testing.T) {
 	}
 }
 
+func TestRuntimeStructuredApplyRejectionsLeaveConfigUnchanged(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		resolver ApplyAdapterResolver
+		config   model.NodeRedConfig
+		wantErr  error
+	}{
+		{name: "unsupported runtime", resolver: func(ApplyRequest) (ApplyAdapter, error) { return nil, ErrUnsupportedAdapter }, config: model.DefaultNodeRedConfig(), wantErr: ErrUnsupportedAdapter},
+		{name: "invalid config", resolver: func(ApplyRequest) (ApplyAdapter, error) { return &fakeAdapter{name: "runtime"}, nil }, config: model.NodeRedConfig{Port: 0}, wantErr: nil},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			f := newApplyCoordinatorFixture(t)
+			original := model.DefaultNodeRedConfig()
+			original.Port, original.UIPort = 1880, 1880
+			if err := f.svc.Save(original); err != nil {
+				t.Fatal(err)
+			}
+			before, err := os.ReadFile(filepath.Join(f.dir, "config.json"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			coordinator := NewRuntimeApplyCoordinator(f.apply, test.resolver)
+			candidate := test.config
+			_, err = coordinator.Apply(context.Background(), ApplyRequest{Path: f.settingsPath, Expected: f.liveRevision(t), BackupDir: filepath.Join(f.dir, "backups"), StructuredConfig: &candidate})
+			if err == nil {
+				t.Fatal("rejected structured apply returned success")
+			}
+			if test.wantErr != nil && !errors.Is(err, test.wantErr) {
+				t.Fatalf("error=%v; want %v", err, test.wantErr)
+			}
+			after, readErr := os.ReadFile(filepath.Join(f.dir, "config.json"))
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+			if string(after) != string(before) {
+				t.Fatal("config.json changed after rejected structured apply")
+			}
+		})
+	}
+}
+
+func TestRuntimeStructuredApplyRestoresConfigBeforeRecoveryRestart(t *testing.T) {
+	f := newApplyCoordinatorFixture(t)
+	original := model.DefaultNodeRedConfig()
+	original.Port = 1880
+	original.UIPort = 1880
+	original.EnvVars = []model.EnvVar{{Key: "KEEP", Value: "ciphertext", Encrypted: true}}
+	original.RuntimeState = map[string]any{"marker": "preserve"}
+	if err := f.svc.Save(original); err != nil {
+		t.Fatal(err)
+	}
+	adapter := &structuredStateAdapter{fakeAdapter: &fakeAdapter{name: "runtime"}, config: f.svc}
+	adapter.onCandidateRestart = func() error {
+		_, err := f.svc.Update(func(cfg *model.NodeRedConfig) error {
+			cfg.EnvVars = []model.EnvVar{{Key: "NEWER", Value: "new-ciphertext", Encrypted: true}}
+			return nil
+		})
+		return err
+	}
+	coordinator := NewRuntimeApplyCoordinator(f.apply, func(ApplyRequest) (ApplyAdapter, error) { return adapter, nil })
+	candidate := model.DefaultNodeRedConfig()
+	candidate.Port = 1999
+	candidate.UIPort = 1999
+	request := ApplyRequest{Path: f.settingsPath, Expected: f.liveRevision(t), BackupDir: filepath.Join(f.dir, "backups"), StructuredConfig: &candidate}
+	if _, err := coordinator.Apply(context.Background(), request); err == nil {
+		t.Fatal("readiness failure should reject structured apply")
+	}
+	if len(adapter.restartPorts) != 2 || adapter.restartPorts[0] != 1999 || adapter.restartPorts[1] != 1880 {
+		t.Fatalf("runtime restart observed config ports %v; want candidate then restored", adapter.restartPorts)
+	}
+	got, err := f.svc.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Port != 1880 || len(got.EnvVars) != 1 || got.EnvVars[0].Value != "new-ciphertext" || got.EnvVars[0].Key != "NEWER" {
+		t.Fatalf("restored config=%+v; expected original port and encrypted env state", got)
+	}
+	if got.RuntimeState.(map[string]any)["marker"] != "preserve" {
+		t.Fatal("unrelated runtime state was not retained")
+	}
+	assertApplySuccessCount(t, f.recorder.snapshot(), 0)
+}
+
+type structuredStateAdapter struct {
+	*fakeAdapter
+	config             *ConfigService
+	restartPorts       []int
+	readyCalls         int
+	onCandidateRestart func() error
+}
+
+func (a *structuredStateAdapter) Restart(ctx context.Context) error {
+	cfg, err := a.config.Get()
+	if err != nil {
+		return err
+	}
+	a.restartPorts = append(a.restartPorts, cfg.Port)
+	if len(a.restartPorts) == 1 && a.onCandidateRestart != nil {
+		if err := a.onCandidateRestart(); err != nil {
+			return err
+		}
+	}
+	return a.fakeAdapter.Restart(ctx)
+}
+func (a *structuredStateAdapter) Ready(ctx context.Context) error {
+	a.readyCalls++
+	if a.readyCalls == 1 {
+		return errors.New("candidate readiness failed")
+	}
+	return a.fakeAdapter.Ready(ctx)
+}
+
+func TestRuntimeStructuredAndRawApplyShareFlightGuard(t *testing.T) {
+	f := newApplyCoordinatorFixture(t)
+	adapter := newPhasedApplyAdapter("restart")
+	t.Cleanup(adapter.unblock)
+	coordinator := NewRuntimeApplyCoordinator(f.apply, func(ApplyRequest) (ApplyAdapter, error) { return adapter, nil })
+	candidate := model.DefaultNodeRedConfig()
+	candidate.Port, candidate.UIPort = 1998, 1998
+	request := ApplyRequest{Path: f.settingsPath, Expected: f.liveRevision(t), BackupDir: filepath.Join(f.dir, "backups"), StructuredConfig: &candidate}
+	finished := make(chan error, 1)
+	go func() { _, err := coordinator.Apply(context.Background(), request); finished <- err }()
+	select {
+	case <-adapter.entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("structured apply did not reach runtime restart")
+	}
+	_, err := coordinator.Apply(context.Background(), ApplyRequest{Path: f.settingsPath, Content: validSettingsJS(t), Expected: request.Expected, BackupDir: request.BackupDir})
+	if !errors.Is(err, ErrApplyInFlight) {
+		t.Fatalf("raw apply error=%v; want ErrApplyInFlight", err)
+	}
+	adapter.unblock()
+	if err := <-finished; err != nil {
+		t.Fatalf("structured apply failed: %v", err)
+	}
+}
+
 func TestRuntimeApplyRecoveryIgnoresCancelledRequestContext(t *testing.T) {
 	f := newApplyCoordinatorFixture(t)
+	original := model.DefaultNodeRedConfig()
+	original.Port, original.UIPort = 1880, 1880
+	if err := f.svc.Save(original); err != nil {
+		t.Fatal(err)
+	}
+	candidate := model.DefaultNodeRedConfig()
+	candidate.Port, candidate.UIPort = 1890, 1890
 	adapter := &fakeAdapter{name: "runtime", restartErr: errors.New("candidate restart failed")}
 	coordinator := NewRuntimeApplyCoordinator(f.apply, func(ApplyRequest) (ApplyAdapter, error) { return adapter, nil })
 	ctx, cancel := context.WithCancel(context.Background())
@@ -106,7 +252,7 @@ func TestRuntimeApplyRecoveryIgnoresCancelledRequestContext(t *testing.T) {
 	// The fake's first restart cancels the request after the candidate was written.
 	cancelAdapter := &cancelOnRestartAdapter{fakeAdapter: adapter, cancel: cancel}
 	coordinator = NewRuntimeApplyCoordinator(f.apply, func(ApplyRequest) (ApplyAdapter, error) { return cancelAdapter, nil })
-	_, err := coordinator.Apply(ctx, ApplyRequest{Path: f.settingsPath, Content: strings.Replace(validSettingsJS(t), "uiPort: 1880", "uiPort: 4569", 1), Expected: f.liveRevision(t), BackupDir: filepath.Join(f.dir, "backups")})
+	_, err := coordinator.Apply(ctx, ApplyRequest{Path: f.settingsPath, Expected: f.liveRevision(t), BackupDir: filepath.Join(f.dir, "backups"), StructuredConfig: &candidate})
 	if err == nil {
 		t.Fatal("cancelled apply should fail")
 	}
@@ -114,6 +260,10 @@ func TestRuntimeApplyRecoveryIgnoresCancelledRequestContext(t *testing.T) {
 		t.Fatalf("recovery context cancelled: %v", cancelAdapter.recoveryContextErr)
 	}
 	assertApplySuccessCount(t, f.recorder.snapshot(), 0)
+	got, readErr := f.svc.Get()
+	if readErr != nil || got.Port != 1880 {
+		t.Fatalf("config after cancelled apply port=%d err=%v; want restored port 1880", got.Port, readErr)
+	}
 }
 
 func TestRuntimeApplyReadinessFailureRestoresAndSurfacesRollbackRestartError(t *testing.T) {
