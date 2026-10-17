@@ -64,6 +64,7 @@ type UpdateService struct {
 	cacheMu               sync.RWMutex
 	store                 *store.JSONStore[model.UpdateCacheEntry]
 	stopChan              chan struct{}
+	pollingWG             sync.WaitGroup
 	runner                execRunner
 	pollInterval          time.Duration
 	npmTimeout            time.Duration
@@ -164,14 +165,22 @@ func NewUpdateService(dataDir string) *UpdateService {
 }
 
 // Start begins the background polling goroutine.
-// The goroutine exits when ctx is cancelled.
+// The goroutine exits when ctx is cancelled or Stop is called.
 func (s *UpdateService) Start(ctx context.Context) {
-	go s.pollingLoop(ctx)
+	s.pollingWG.Add(1)
+	go func() {
+		defer s.pollingWG.Done()
+		s.pollingLoop(ctx)
+	}()
 }
 
-// Stop cancels the polling goroutine and waits for it to exit.
+// Stop signals polling to stop and waits for it, including any active check's
+// cache write, to finish. Cancel the Start context to abort an active check;
+// otherwise it retains the existing npmTimeout. Call after Start, or without
+// starting; concurrent Start and Stop and repeated Stop calls are not supported.
 func (s *UpdateService) Stop() {
 	close(s.stopChan)
+	s.pollingWG.Wait()
 }
 
 // pollingLoop runs the background polling cycle.
