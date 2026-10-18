@@ -3,10 +3,12 @@ package service
 import (
 	"context"
 	"errors"
+	"os"
 	"os/exec"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/fgjcarlos/nrcc/internal/model"
 )
@@ -53,8 +55,8 @@ type recordingSystemdManager struct {
 	stopErr  error
 }
 
-func (m *recordingSystemdManager) IsAvailable() bool     { return true }
-func (m *recordingSystemdManager) DaemonReload() error   { return nil }
+func (m *recordingSystemdManager) IsAvailable() bool   { return true }
+func (m *recordingSystemdManager) DaemonReload() error { return nil }
 func (m *recordingSystemdManager) EnableAndStart(u string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -118,17 +120,19 @@ func execCommandRecorder(t *testing.T, wantName string, wantArgsContain string, 
 // name; any other combination must yield ErrUnsupportedAdapter.
 func TestSelectApplyAdapter_Matrix(t *testing.T) {
 	cases := []struct {
-		name        string
-		caps        model.ConfigurationCapabilities
-		nodeRed     model.NodeRedEnvironment
-		wantName    string
-		wantErrIs   error
-		wantErrSub  string
+		name          string
+		caps          model.ConfigurationCapabilities
+		nodeRed       model.NodeRedEnvironment
+		wantName      string
+		wantAuditName string
+		wantOperation string
+		wantErrIs     error
+		wantErrSub    string
 	}{
 		{
 			name:     "nativeManagedByNRCCResolvesNativeBinary",
 			caps:     model.ConfigurationCapabilities{Adapter: "nodered-5"},
-			nodeRed:  model.NodeRedEnvironment{Mode: model.InstallationModeNative, ManagedByNRCC: true},
+			nodeRed:  model.NodeRedEnvironment{Mode: model.InstallationModeNative, ManagedByNRCC: true, ReadinessURL: "http://127.0.0.1:1880/settings"},
 			wantName: AdapterNameNativeBinary,
 		},
 		{
@@ -138,16 +142,20 @@ func TestSelectApplyAdapter_Matrix(t *testing.T) {
 			wantName: AdapterNameNativeSystemd,
 		},
 		{
-			name:     "dockerManagedByNRCCResolvesDockerCompose",
-			caps:     model.ConfigurationCapabilities{Adapter: "nodered-5"},
-			nodeRed:  model.NodeRedEnvironment{Mode: model.InstallationModeDocker, ManagedByNRCC: true, ContainerName: "nrcc"},
-			wantName: AdapterNameDockerCompose,
+			name:          "dockerManagedByNRCCResolvesPinnedContainer",
+			caps:          model.ConfigurationCapabilities{Adapter: "nodered-5"},
+			nodeRed:       model.NodeRedEnvironment{Mode: model.InstallationModeDocker, ManagedByNRCC: true, ContainerName: "nrcc", ContainerID: "managed-id", ReadinessURL: "http://127.0.0.1:1880/settings"},
+			wantName:      AdapterNameDockerCustom,
+			wantAuditName: AdapterNameDockerCompose,
+			wantOperation: "docker restart",
 		},
 		{
-			name:     "dockerExternallyManagedResolvesDockerCustom",
-			caps:     model.ConfigurationCapabilities{Adapter: "nodered-5"},
-			nodeRed:  model.NodeRedEnvironment{Mode: model.InstallationModeDocker, ManagedByNRCC: false, ContainerName: "node-red-1"},
-			wantName: AdapterNameDockerCustom,
+			name:          "dockerExternallyManagedResolvesDockerCustom",
+			caps:          model.ConfigurationCapabilities{Adapter: "nodered-5"},
+			nodeRed:       model.NodeRedEnvironment{Mode: model.InstallationModeDocker, ManagedByNRCC: false, ContainerName: "node-red-1", ContainerID: "custom-id", ReadinessURL: "http://127.0.0.1:1880/settings"},
+			wantName:      AdapterNameDockerCustom,
+			wantAuditName: AdapterNameDockerCustom,
+			wantOperation: "docker restart",
 		},
 		{
 			name:       "readOnlyAdapterIsUnsupported",
@@ -202,6 +210,12 @@ func TestSelectApplyAdapter_Matrix(t *testing.T) {
 			}
 			if got := adapter.Name(); got != tc.wantName {
 				t.Errorf("adapter.Name() = %q, want %q", got, tc.wantName)
+			}
+			if tc.wantAuditName != "" && applyAuditName(adapter) != tc.wantAuditName {
+				t.Errorf("audit identity = %q, want %q", applyAuditName(adapter), tc.wantAuditName)
+			}
+			if tc.wantOperation != "" && applyOperationName(adapter) != tc.wantOperation {
+				t.Errorf("operation identity = %q, want %q", applyOperationName(adapter), tc.wantOperation)
 			}
 		})
 	}
@@ -391,6 +405,30 @@ func TestApplyAdapter_FakeHonoursContextCancellation(t *testing.T) {
 	}
 	if fa.restartCalls != 0 || fa.readyCalls != 0 {
 		t.Errorf("calls = (restart=%d, ready=%d), want (0,0)", fa.restartCalls, fa.readyCalls)
+	}
+}
+
+func TestDockerRestartCancelsAndReapsCommand(t *testing.T) {
+	if os.Getenv("NRCC_DOCKER_HELPER") == "1" {
+		select {}
+	}
+	adapter := &dockerTargetAdapter{containerID: "pinned", execCommand: func(string, ...string) *exec.Cmd {
+		cmd := exec.Command(os.Args[0], "-test.run=^TestDockerRestartCancelsAndReapsCommand$")
+		cmd.Env = append(os.Environ(), "NRCC_DOCKER_HELPER=1")
+		return cmd
+	}}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- adapter.Restart(ctx) }()
+	time.Sleep(100 * time.Millisecond)
+	cancel()
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("Restart error = %v, want context.Canceled", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Restart did not terminate and reap helper after cancellation")
 	}
 }
 

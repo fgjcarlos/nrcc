@@ -29,6 +29,7 @@ type recordedEvent struct {
 	Actor   string
 	Target  string
 	HasMeta bool
+	Meta    map[string]string
 }
 
 func (r *recordingAuditHook) Log(req *http.Request, actor, action, target, result string, meta map[string]string) {
@@ -38,10 +39,18 @@ func (r *recordingAuditHook) Log(req *http.Request, actor, action, target, resul
 		// Simulate the audit subsystem reporting degradation. ApplyService
 		// does not gate the transaction on this outcome, but we record the
 		// attempt so the test can confirm the call happened.
-		r.events = append(r.events, recordedEvent{Action: action, Stage: ApplyStageAudit, Result: "degraded", Actor: actor, Target: target, HasMeta: meta != nil})
+		r.events = append(r.events, recordedEvent{Action: action, Stage: ApplyStageAudit, Result: "degraded", Actor: actor, Target: target, HasMeta: meta != nil, Meta: cloneAuditMeta(meta)})
 		return
 	}
-	r.events = append(r.events, recordedEvent{Action: action, Stage: ApplyStageValidate, Result: result, Actor: actor, Target: target, HasMeta: meta != nil})
+	r.events = append(r.events, recordedEvent{Action: action, Stage: ApplyStageValidate, Result: result, Actor: actor, Target: target, HasMeta: meta != nil, Meta: cloneAuditMeta(meta)})
+}
+
+func cloneAuditMeta(meta map[string]string) map[string]string {
+	copy := make(map[string]string, len(meta))
+	for key, value := range meta {
+		copy[key] = value
+	}
+	return copy
 }
 
 func (r *recordingAuditHook) snapshot() []recordedEvent {

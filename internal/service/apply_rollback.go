@@ -287,7 +287,8 @@ func emitRollback(req RollbackRequest, action, result string, cause error, extra
 	meta["apply_rollback_stage"] = string(req.Stage)
 	meta["apply_rollback_adapter"] = ""
 	if req.Adapter != nil {
-		meta["apply_rollback_adapter"] = req.Adapter.Name()
+		meta["apply_rollback_adapter"] = applyAuditName(req.Adapter)
+		meta["apply_rollback_operation"] = applyOperationName(req.Adapter)
 	}
 	if req.BackupPath != "" {
 		meta["apply_rollback_backup_path"] = filepath.Base(req.BackupPath)

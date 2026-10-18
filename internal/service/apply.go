@@ -125,6 +125,7 @@ type ApplyRequest struct {
 	// single-flight and revision guards have accepted this transaction.
 	StructuredConfig *model.NodeRedConfig
 	RecoveryTimeout  time.Duration
+	runtimeAdapter   ApplyAdapter
 }
 
 // ApplyResult captures the outcome of a successful Apply. Revision is
@@ -342,6 +343,10 @@ func (s *ApplyService) emit(req ApplyRequest, action string, stage ApplyStage, r
 		return
 	}
 	meta := RedactedCapabilityMeta(req.Capabilities)
+	if req.runtimeAdapter != nil {
+		meta["apply_adapter"] = applyAuditName(req.runtimeAdapter)
+		meta["apply_operation"] = applyOperationName(req.runtimeAdapter)
+	}
 	meta["apply_stage"] = string(stage)
 	if action == "apply.success" {
 		meta["failure_stage"] = "ok"

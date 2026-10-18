@@ -26,29 +26,29 @@ import (
 
 // Server represents the HTTP server configuration
 type Server struct {
-	router           *chi.Mux
-	authSvc          *service.AuthService
-	processManager   *service.ProcessManager
-	hostSvc          *service.HostService
-	envSvc           *service.EnvService
-	updateSvc        *service.UpdateService
-	backupSvc        *service.BackupService
-	librarySvc       *service.LibraryService
-	envHandler       *handler.EnvHandler
-	dockerHandler    *handler.DockerHandler
-	configHandler    *handler.ConfigHandler
-	settingsHandler  *handler.SettingsHandler
+	router             *chi.Mux
+	authSvc            *service.AuthService
+	processManager     *service.ProcessManager
+	hostSvc            *service.HostService
+	envSvc             *service.EnvService
+	updateSvc          *service.UpdateService
+	backupSvc          *service.BackupService
+	librarySvc         *service.LibraryService
+	envHandler         *handler.EnvHandler
+	dockerHandler      *handler.DockerHandler
+	configHandler      *handler.ConfigHandler
+	settingsHandler    *handler.SettingsHandler
 	configApplyHandler *handler.ConfigApplyHandler
-	flowHandler      *handler.FlowHandler
-	systemHandler    *handler.SystemHandler
-	metricsCollector *metrics.MetricsCollector
-	metricsBuffer    *service.MetricsBuffer
-	metricsSampler   *service.MetricsSampler
-	flowVersionSvc   *service.FlowVersionService
-	httpLogger       *slog.Logger
-	ctx              context.Context
-	cancel           context.CancelFunc
-	shutdownCh       chan struct{}
+	flowHandler        *handler.FlowHandler
+	systemHandler      *handler.SystemHandler
+	metricsCollector   *metrics.MetricsCollector
+	metricsBuffer      *service.MetricsBuffer
+	metricsSampler     *service.MetricsSampler
+	flowVersionSvc     *service.FlowVersionService
+	httpLogger         *slog.Logger
+	ctx                context.Context
+	cancel             context.CancelFunc
+	shutdownCh         chan struct{}
 }
 
 func initAuditService(dataDir string, reportf func(string, ...any)) *audit.Service {
@@ -204,7 +204,13 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 		}
 	}
 	applySvc := service.NewApplyService(configSvc, applyAuditHook)
-	applyCoordinator := service.NewApplyCoordinator(applySvc)
+	var server *Server
+	applyCoordinator := service.NewRuntimeApplyCoordinator(applySvc, serverApplyResolver(hostSvc.Detect, func() *service.ProcessManager {
+		if server != nil {
+			return server.processManager
+		}
+		return nil
+	}, service.NewSystemdManager(), dockerSvc))
 	dashboardHandler.SetAccessService(service.NewDashboardAccessService(service.NewDashboardService(dataDir), configSvc, applyCoordinator))
 	configHandler.SetApplyCoordinator(applyCoordinator)
 	settingsHandler.SetApplyCoordinator(applyCoordinator)
@@ -462,7 +468,7 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 		})
 	})
 
-	server := &Server{
+	server = &Server{
 		router:             r,
 		authSvc:            authSvc,
 		hostSvc:            hostSvc,

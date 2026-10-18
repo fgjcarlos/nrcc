@@ -36,6 +36,7 @@ func (c *ApplyCoordinator) applyRuntime(ctx context.Context, req ApplyRequest) (
 		c.apply.emit(req, "apply.failure", ApplyStageValidate, "error", err)
 		return ApplyResult{}, &ApplyError{Stage: ApplyStageValidate, Cause: err, Path: req.Path, Request: req}
 	}
+	req.runtimeAdapter = adapter
 	state, err := c.stageStructured(&req)
 	if err != nil {
 		return ApplyResult{}, err
