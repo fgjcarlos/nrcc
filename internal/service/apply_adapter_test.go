@@ -413,6 +413,7 @@ func TestDockerRestartCancelsAndReapsCommand(t *testing.T) {
 		select {}
 	}
 	adapter := &dockerTargetAdapter{containerID: "pinned", execCommand: func(string, ...string) *exec.Cmd {
+		// #nosec G204,G702 -- test fixture: re-executes the test binary itself, not a tainted input.
 		cmd := exec.Command(os.Args[0], "-test.run=^TestDockerRestartCancelsAndReapsCommand$")
 		cmd.Env = append(os.Environ(), "NRCC_DOCKER_HELPER=1")
 		return cmd

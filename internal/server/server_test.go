@@ -27,7 +27,7 @@ func TestServerApplyResolverUsesLateInjectedProcessManagerForOwnedChild(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer listener.Close()
+	defer func() { _ = listener.Close() }()
 	readyServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusUnauthorized) }))
 	readyServer.Listener = listener
 	readyServer.Start()
@@ -58,7 +58,7 @@ func TestServerApplyResolverDoesNotTreatExternalProcessManagerAsOwnedChild(t *te
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer listener.Close()
+	defer func() { _ = listener.Close() }()
 	port := listener.Addr().(*net.TCPAddr).Port
 	userDir := t.TempDir()
 	settingsDir := t.TempDir()
