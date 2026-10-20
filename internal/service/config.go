@@ -612,7 +612,7 @@ func (s *ConfigService) renderSettings(cfg model.NodeRedConfig) string {
 	if path == "" {
 		path = filepath.Join(s.dataDir, "settings.js")
 	}
-	// #nosec G304 -- path is the configured settings.js path inside the dataDir; not request-derived.
+	// #nosec G304,G703 -- path is the configured settings.js path inside the dataDir; not request-derived.
 	existing, err := os.ReadFile(path)
 	if err != nil || len(strings.TrimSpace(string(existing))) == 0 {
 		return generateSettingsJS(cfg)

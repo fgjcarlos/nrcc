@@ -79,13 +79,14 @@ func TestRealAcceptanceOwnedListenerHelperProcess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("child listener: %v", err)
 	}
-	defer listener.Close()
+	defer func() { _ = listener.Close() }()
 	fmt.Println(listener.Addr().(*net.TCPAddr).Port)
 	_, _ = io.Copy(io.Discard, os.Stdin)
 }
 
 func startTestOwnedListener(t *testing.T) (int, string, func()) {
 	t.Helper()
+	// #nosec G204,G702 -- test fixture: re-executes the test binary itself, not a tainted input.
 	cmd := exec.Command(os.Args[0], "-test.run=^TestRealAcceptanceOwnedListenerHelperProcess$")
 	cmd.Env = append(os.Environ(), "NRCC_TEST_OWNED_LISTENER_HELPER=1")
 	stdout, err := cmd.StdoutPipe()
@@ -176,7 +177,7 @@ func proveOwnedListener(pid int, port string) error {
 	if err != nil {
 		return fmt.Errorf("read IPv4 TCP table: %w", err)
 	}
-	defer tcpTable.Close()
+	defer func() { _ = tcpTable.Close() }()
 	wantLocal := fmt.Sprintf("0100007F:%04X", portNumber)
 	scanner := bufio.NewScanner(tcpTable)
 	for scanner.Scan() {
@@ -249,6 +250,7 @@ func TestApplyRuntimeRealAcceptance(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolve Node-RED executable: %v", err)
 	}
+	// #nosec G204,G702 -- test prerequisite: NODE_RED_CMD or exec.LookPath resolves the operator-provided Node-RED binary, not request input.
 	version, err := exec.Command(binary, "--version").CombinedOutput()
 	if err != nil || !strings.Contains(string(version), "Node-RED v") {
 		t.Fatalf("real acceptance prerequisite unavailable: %q --version: %v (%s)", binary, err, strings.TrimSpace(string(version)))
@@ -257,6 +259,7 @@ func TestApplyRuntimeRealAcceptance(t *testing.T) {
 	if err != nil {
 		t.Fatalf("real acceptance prerequisite unavailable: resolve node from PATH: %v", err)
 	}
+	// #nosec G204,G702 -- test prerequisite: exec.LookPath resolves the operator-provided node binary, not request input.
 	nodeVersion, err := exec.Command(node, "--version").CombinedOutput()
 	if err != nil {
 		t.Fatalf("Node version probe: %v (%s)", err, strings.TrimSpace(string(nodeVersion)))
@@ -267,7 +270,9 @@ func TestApplyRuntimeRealAcceptance(t *testing.T) {
 		f := newRealAcceptanceFixture(t, binary)
 		missingKey := filepath.Join(f.root, "missing-key.pem")
 		missingCert := filepath.Join(f.root, "missing-cert.pem")
+		// #nosec G304,G703 -- test fixture: TLS material paths are built under the fixture temp root, not user input.
 		beforeKey, keyErr := os.ReadFile(missingKey)
+		// #nosec G304,G703 -- test fixture: TLS material paths are built under the fixture temp root, not user input.
 		beforeCert, certErr := os.ReadFile(missingCert)
 		if !errors.Is(keyErr, os.ErrNotExist) || !errors.Is(certErr, os.ErrNotExist) || len(beforeKey) != 0 || len(beforeCert) != 0 {
 			t.Fatalf("TLS fixture paths must start absent beneath temp root: key=%v cert=%v", keyErr, certErr)
@@ -558,6 +563,7 @@ func newRealAcceptanceFixture(t *testing.T, binary string) *realAcceptanceFixtur
 		t.Fatalf("seed isolated baseline configuration: %v", err)
 	}
 	settings := filepath.Join(userDir, "settings.js")
+	// #nosec G304,G703 -- test fixture: settings path is built under the fixture temp root, not user input.
 	baseline, err := os.ReadFile(settings)
 	if err != nil {
 		t.Fatalf("read baseline settings: %v", err)
