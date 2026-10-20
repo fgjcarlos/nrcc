@@ -168,7 +168,10 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a  # pin to commit (v9.0.0)
         with:
-          version: v2.12.2
+          # v2.14.0 is the first release whose binary is built with Go 1.27,
+          # so it can analyze a module that targets go 1.27.0. v2.12.2 is
+          # built with Go 1.26 and refuses that module outright.
+          version: v2.14.0
           # Repo-wide gate, not a ratchet: the prior ~72 findings were cleaned
           # up in #396. Keep CI exit 0 = green.
           only-new-issues: false
