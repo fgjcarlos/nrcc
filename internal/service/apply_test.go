@@ -46,11 +46,11 @@ func (r *recordingAuditHook) Log(req *http.Request, actor, action, target, resul
 }
 
 func cloneAuditMeta(meta map[string]string) map[string]string {
-	copy := make(map[string]string, len(meta))
+	cloned := make(map[string]string, len(meta))
 	for key, value := range meta {
-		copy[key] = value
+		cloned[key] = value
 	}
-	return copy
+	return cloned
 }
 
 func (r *recordingAuditHook) snapshot() []recordedEvent {

@@ -18,7 +18,8 @@ func serverApplyResolver(detect func() model.HostStatus, processManager func() *
 		nodeRed := status.NodeRed
 		pm := processManager()
 		var readinessResolver func() (string, error)
-		if pm != nil && !pm.IsExternalMode() {
+		switch {
+		case pm != nil && !pm.IsExternalMode():
 			_, err := applyCandidatePort(req)
 			if err != nil {
 				return nil, err
@@ -27,12 +28,12 @@ func serverApplyResolver(detect func() model.HostStatus, processManager func() *
 			// reads the active settings path so recovery probes restored config.
 			nodeRed = model.NodeRedEnvironment{Detected: true, Mode: model.InstallationModeNative, ManagedByNRCC: true, Running: true}
 			readinessResolver = func() (string, error) { return settingsReadinessURL(req.Path) }
-		} else if nodeRed.Mode == model.InstallationModeNative && nodeRed.ManagedByNRCC {
+		case nodeRed.Mode == model.InstallationModeNative && nodeRed.ManagedByNRCC:
 			if _, err := applyCandidatePort(req); err != nil {
 				return nil, err
 			}
 			readinessResolver = func() (string, error) { return settingsReadinessURL(req.Path) }
-		} else if nodeRed.Mode == model.InstallationModeDocker {
+		case nodeRed.Mode == model.InstallationModeDocker:
 			port, err := applyCandidatePort(req)
 			if err != nil {
 				return nil, err
@@ -51,6 +52,7 @@ func serverApplyResolver(detect func() model.HostStatus, processManager func() *
 }
 
 func settingsReadinessURL(path string) (string, error) {
+	// #nosec G304 -- path is the active settings.js path inside the operator-supplied dataDir; not request-derived.
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return "", fmt.Errorf("apply: read active settings for readiness: %w", err)
