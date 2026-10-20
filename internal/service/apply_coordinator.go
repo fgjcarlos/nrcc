@@ -237,21 +237,3 @@ func (c *ApplyCoordinator) emitFailure(req ApplyRequest, failureStage string, ca
 	}
 	c.apply.auditHook(req.Request, req.Actor, "apply.failure", req.Path, "error", meta)
 }
-
-// emitSuccess writes apply.success with failure_stage=ok so the
-// audit reader can tell a clean transaction from a start-only
-// record.
-func (c *ApplyCoordinator) emitSuccess(req ApplyRequest) {
-	if c.apply == nil || c.apply.auditHook == nil {
-		return
-	}
-	meta := RedactedCapabilityMeta(req.Capabilities)
-	meta["failure_stage"] = "ok"
-	if req.Path != "" {
-		meta["apply_path"] = filepath.Base(req.Path)
-	}
-	if req.BackupDir != "" {
-		meta["apply_backup_dir"] = filepath.Base(req.BackupDir)
-	}
-	c.apply.auditHook(req.Request, req.Actor, "apply.success", req.Path, "ok", meta)
-}
