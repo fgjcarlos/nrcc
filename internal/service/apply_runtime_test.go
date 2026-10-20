@@ -245,13 +245,12 @@ func TestRuntimeApplyRecoveryIgnoresCancelledRequestContext(t *testing.T) {
 	candidate := model.DefaultNodeRedConfig()
 	candidate.Port, candidate.UIPort = 1890, 1890
 	adapter := &fakeAdapter{name: "runtime", restartErr: errors.New("candidate restart failed")}
-	coordinator := NewRuntimeApplyCoordinator(f.apply, func(ApplyRequest) (ApplyAdapter, error) { return adapter, nil })
 	ctx, cancel := context.WithCancel(context.Background())
 	adapter.restartErr = errors.New("candidate restart failed")
 	adapter.readyErr = nil
 	// The fake's first restart cancels the request after the candidate was written.
 	cancelAdapter := &cancelOnRestartAdapter{fakeAdapter: adapter, cancel: cancel}
-	coordinator = NewRuntimeApplyCoordinator(f.apply, func(ApplyRequest) (ApplyAdapter, error) { return cancelAdapter, nil })
+	coordinator := NewRuntimeApplyCoordinator(f.apply, func(ApplyRequest) (ApplyAdapter, error) { return cancelAdapter, nil })
 	_, err := coordinator.Apply(ctx, ApplyRequest{Path: f.settingsPath, Expected: f.liveRevision(t), BackupDir: filepath.Join(f.dir, "backups"), StructuredConfig: &candidate})
 	if err == nil {
 		t.Fatal("cancelled apply should fail")
