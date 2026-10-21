@@ -3,7 +3,7 @@
 [![PR Validation](https://github.com/fgjcarlos/nrcc/actions/workflows/pr.yml/badge.svg)](https://github.com/fgjcarlos/nrcc/actions/workflows/pr.yml)
 [![Release](https://github.com/fgjcarlos/nrcc/actions/workflows/release.yml/badge.svg)](https://github.com/fgjcarlos/nrcc/actions/workflows/release.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Go 1.26+](https://img.shields.io/badge/Go-1.26%2B-00ADD8?logo=go)](go.mod)
+[![Go 1.27+](https://img.shields.io/badge/Go-1.27%2B-00ADD8?logo=go)](go.mod)
 [![Language policy (advisory)](https://github.com/fgjcarlos/nrcc/actions/workflows/language-policy.yml/badge.svg)](https://github.com/fgjcarlos/nrcc/actions/workflows/language-policy.yml)
 
 A trustworthy visual control plane for **one Node-RED 5.x instance at a time**. NRCC discovers the deployment, imports `settings.js` losslessly, walks you through edits with a diff, validates the result, snapshots a backup, applies the change, and rolls back on readiness failure — without you hand-editing JSON or shelling into the container.
@@ -157,7 +157,7 @@ Contributors should add UI copy to both catalogs and run the local i18n guards b
 
 - **Linux only** at compile time (see [ADR 0004 — Linux-only build](docs/adr/0004-linux-only-build.md)). On macOS or Windows, use the project's Docker image.
 - Docker 24+ and Docker Compose (canonical stack).
-- Go 1.26+ (to build from source).
+- Go 1.27+ (to build from source).
 - Node.js 22+ and pnpm 11+ (frontend sources and tests).
 
 ### Local development (Docker)
