@@ -86,6 +86,7 @@ type applyFlight struct {
 // stateless beyond its in-flight map.
 type ApplyCoordinator struct {
 	apply   *ApplyService
+	resolve ApplyAdapterResolver
 	mu      sync.Mutex
 	flights map[string]*applyFlight
 }
@@ -161,6 +162,9 @@ func (c *ApplyCoordinator) Apply(ctx context.Context, req ApplyRequest) (ApplyRe
 		return ApplyResult{}, ae
 	}
 
+	if c.resolve != nil {
+		return c.applyRuntime(ctx, req)
+	}
 	result, err := c.apply.Apply(ctx, req)
 	if err != nil {
 		// ApplyService.Apply already emitted the apply.failure
@@ -171,7 +175,6 @@ func (c *ApplyCoordinator) Apply(ctx context.Context, req ApplyRequest) (ApplyRe
 		// above (where ApplyService never ran).
 		return ApplyResult{}, err
 	}
-	c.emitSuccess(req)
 	return result, nil
 }
 
@@ -233,22 +236,4 @@ func (c *ApplyCoordinator) emitFailure(req ApplyRequest, failureStage string, ca
 		meta["apply_error"] = cause.Error()
 	}
 	c.apply.auditHook(req.Request, req.Actor, "apply.failure", req.Path, "error", meta)
-}
-
-// emitSuccess writes apply.success with failure_stage=ok so the
-// audit reader can tell a clean transaction from a start-only
-// record.
-func (c *ApplyCoordinator) emitSuccess(req ApplyRequest) {
-	if c.apply == nil || c.apply.auditHook == nil {
-		return
-	}
-	meta := RedactedCapabilityMeta(req.Capabilities)
-	meta["failure_stage"] = "ok"
-	if req.Path != "" {
-		meta["apply_path"] = filepath.Base(req.Path)
-	}
-	if req.BackupDir != "" {
-		meta["apply_backup_dir"] = filepath.Base(req.BackupDir)
-	}
-	c.apply.auditHook(req.Request, req.Actor, "apply.success", req.Path, "ok", meta)
 }
