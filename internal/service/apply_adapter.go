@@ -39,13 +39,16 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/fgjcarlos/nrcc/internal/model"
 )
 
-// ApplyAdapterName values are the canonical identifiers returned by
-// ApplyAdapter.Name and surfaced in audit meta. Keep them stable: the
-// observability dashboard filters restart events by adapter name.
+// ApplyAdapterName values are the canonical legacy identifiers surfaced in
+// audit meta. Keep them stable: the observability dashboard filters restart
+// events by adapter name.
+const dockerRestartTimeout = 30 * time.Second
+
 const (
 	AdapterNameNativeBinary  = "native-binary"
 	AdapterNameNativeSystemd = "native-systemd"
@@ -71,10 +74,9 @@ var ErrAdapterUnitMissing = errors.New("apply: systemd unit name is empty")
 // constructor); the heavy work happens in Restart and Ready which the
 // orchestrator invokes after a successful atomic write.
 type ApplyAdapter interface {
-	// Name returns the canonical adapter identifier, one of the
-	// AdapterName* constants. It is stable across the lifetime of the
-	// adapter instance so the orchestrator can emit a single
-	// apply.adapter meta entry per transaction.
+	// Name returns the adapter's stable canonical identifier. It is the
+	// audit identity fallback for adapters without an optional AuditName
+	// method; operation details may be provided separately.
 	Name() string
 
 	// Restart issues the platform-specific restart signal. It returns
@@ -104,10 +106,11 @@ type ApplyAdapter interface {
 // install does not need DockerService). ExecCommand defaults to
 // exec.Command via the package-level execCommand shim.
 type ApplyAdapterDeps struct {
-	ProcessManager *ProcessManager
-	SystemdManager SystemdManager
-	Docker         *DockerService
-	ExecCommand    func(name string, arg ...string) *exec.Cmd
+	ProcessManager       *ProcessManager
+	SystemdManager       SystemdManager
+	Docker               *DockerService
+	ExecCommand          func(name string, arg ...string) *exec.Cmd
+	ReadinessURLResolver func() (string, error)
 }
 
 // SelectApplyAdapter chooses the right ApplyAdapter for the runtime
@@ -120,15 +123,15 @@ type ApplyAdapterDeps struct {
 //
 //	Mode=Native, ManagedByNRCC=true   → native-binary
 //	Mode=Native, ManagedByNRCC=false  → native-systemd
-//	Mode=Docker, ManagedByNRCC=true   → docker-compose
-//	Mode=Docker, ManagedByNRCC=false  → docker-custom
+//	Mode=Docker, ManagedByNRCC=true   → pinned docker target
+//	Mode=Docker, ManagedByNRCC=false  → pinned docker target
 //	Anything else / Adapter!="nodered-5" → ErrUnsupportedAdapter
 //
 // capabilities is the ConfigurationCapabilities from slice A's
 // inputs and nodeRed carries the install authority (Mode,
 // ManagedByNRCC, ContainerName). For non-managed native installs
 // the systemd unit name is carried in nodeRed.ContainerName; for
-// managed docker installs the compose project name lives there too.
+// managed docker installs it may contain the project name.
 func SelectApplyAdapter(capabilities model.ConfigurationCapabilities, nodeRed model.NodeRedEnvironment, deps ApplyAdapterDeps) (ApplyAdapter, error) {
 	// Slice A's compatibility policy gates editing on Adapter ==
 	// "nodered-5". The apply pipeline is a no-op against read-only
@@ -137,13 +140,23 @@ func SelectApplyAdapter(capabilities model.ConfigurationCapabilities, nodeRed mo
 	if capabilities.Adapter != "nodered-5" {
 		return nil, fmt.Errorf("%w: capabilities.adapter=%q", ErrUnsupportedAdapter, capabilities.Adapter)
 	}
+	if nodeRed.Ambiguous {
+		return nil, fmt.Errorf("%w: Node-RED authority is ambiguous", ErrUnsupportedAdapter)
+	}
 	switch nodeRed.Mode {
 	case model.InstallationModeNative:
 		if nodeRed.ManagedByNRCC {
 			if deps.ProcessManager == nil {
 				return nil, fmt.Errorf("%w: ProcessManager dependency not wired", ErrUnsupportedAdapter)
 			}
-			return &nativeBinaryAdapter{pm: deps.ProcessManager}, nil
+			readinessResolver := deps.ReadinessURLResolver
+			if readinessResolver == nil && strings.TrimSpace(nodeRed.ReadinessURL) != "" {
+				readinessResolver = func() (string, error) { return nodeRed.ReadinessURL, nil }
+			}
+			if readinessResolver == nil {
+				return nil, fmt.Errorf("%w: managed native readiness endpoint is unknown", ErrUnsupportedAdapter)
+			}
+			return &nativeBinaryAdapter{pm: deps.ProcessManager, readinessURLResolver: readinessResolver}, nil
 		}
 		if deps.SystemdManager == nil {
 			return nil, fmt.Errorf("%w: SystemdManager dependency not wired", ErrUnsupportedAdapter)
@@ -157,16 +170,19 @@ func SelectApplyAdapter(capabilities model.ConfigurationCapabilities, nodeRed mo
 			execCommand: ensureExecCommand(deps.ExecCommand),
 		}, nil
 	case model.InstallationModeDocker:
+		if strings.TrimSpace(nodeRed.ContainerID) == "" || strings.TrimSpace(nodeRed.ReadinessURL) == "" {
+			return nil, fmt.Errorf("%w: Docker target ID and published readiness endpoint are required", ErrUnsupportedAdapter)
+		}
+		auditName := AdapterNameDockerCustom
 		if nodeRed.ManagedByNRCC {
-			return &dockerComposeAdapter{
-				execCommand: ensureExecCommand(deps.ExecCommand),
-				projectName: strings.TrimSpace(nodeRed.ContainerName),
-			}, nil
+			auditName = AdapterNameDockerCompose
 		}
-		if deps.Docker == nil {
-			return nil, fmt.Errorf("%w: DockerService dependency not wired", ErrUnsupportedAdapter)
-		}
-		return &dockerCustomAdapter{docker: deps.Docker}, nil
+		return &dockerTargetAdapter{
+			execCommand:  ensureExecCommand(deps.ExecCommand),
+			containerID:  strings.TrimSpace(nodeRed.ContainerID),
+			readinessURL: strings.TrimSpace(nodeRed.ReadinessURL),
+			auditName:    auditName,
+		}, nil
 	default:
 		return nil, fmt.Errorf("%w: nodeRed.mode=%q", ErrUnsupportedAdapter, nodeRed.Mode)
 	}
@@ -186,7 +202,8 @@ func ensureExecCommand(deps func(name string, arg ...string) *exec.Cmd) func(nam
 // holds the lifecycle authority (the managed-runtime detection in
 // model.NodeRedEnvironment.ManagedByNRCC).
 type nativeBinaryAdapter struct {
-	pm *ProcessManager
+	pm                   *ProcessManager
+	readinessURLResolver func() (string, error)
 }
 
 func (a *nativeBinaryAdapter) Name() string { return AdapterNameNativeBinary }
@@ -202,7 +219,11 @@ func (a *nativeBinaryAdapter) Restart(ctx context.Context) error {
 }
 
 func (a *nativeBinaryAdapter) Ready(ctx context.Context) error {
-	return probeAdminReady(ctx, nativeDefaultAdminURL())
+	url, err := a.readinessURLResolver()
+	if err != nil {
+		return err
+	}
+	return probeAdminReady(ctx, url)
 }
 
 // nativeSystemdAdapter restarts Node-RED via `systemctl restart <unit>`.
@@ -252,6 +273,13 @@ type dockerComposeAdapter struct {
 	projectName string
 }
 
+type dockerTargetAdapter struct {
+	execCommand  func(name string, arg ...string) *exec.Cmd
+	containerID  string
+	readinessURL string
+	auditName    string
+}
+
 func (a *dockerComposeAdapter) Name() string { return AdapterNameDockerCompose }
 
 func (a *dockerComposeAdapter) Restart(ctx context.Context) error {
@@ -299,6 +327,69 @@ func (a *dockerCustomAdapter) Restart(ctx context.Context) error {
 
 func (a *dockerCustomAdapter) Ready(ctx context.Context) error {
 	return probeAdminReady(ctx, nativeDefaultAdminURL())
+}
+
+func (a *dockerTargetAdapter) Name() string { return AdapterNameDockerCustom }
+
+// AuditName preserves the historical topology label used by dashboard filters.
+func (a *dockerTargetAdapter) AuditName() string {
+	if a.auditName != "" {
+		return a.auditName
+	}
+	return a.Name()
+}
+
+// OperationName describes the command actually used for the pinned target.
+func (a *dockerTargetAdapter) OperationName() string { return "docker restart" }
+
+func (a *dockerTargetAdapter) Restart(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if a.containerID == "" {
+		return fmt.Errorf("%w: Docker container ID is empty", ErrUnsupportedAdapter)
+	}
+	boundedCtx := ctx
+	cancel := func() {}
+	if _, ok := ctx.Deadline(); !ok {
+		boundedCtx, cancel = context.WithTimeout(ctx, dockerRestartTimeout)
+	}
+	defer cancel()
+	cmd := a.execCommand("docker", "restart", a.containerID)
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("docker restart %s: %w", a.containerID, err)
+	}
+	wait := make(chan error, 1)
+	go func() { wait <- cmd.Wait() }()
+	select {
+	case err := <-wait:
+		if err != nil {
+			return fmt.Errorf("docker restart %s: %w", a.containerID, err)
+		}
+		return nil
+	case <-boundedCtx.Done():
+		_ = cmd.Process.Kill()
+		<-wait
+		return fmt.Errorf("docker restart %s: %w", a.containerID, boundedCtx.Err())
+	}
+}
+
+func (a *dockerTargetAdapter) Ready(ctx context.Context) error {
+	return probeAdminReady(ctx, a.readinessURL)
+}
+
+func applyAuditName(adapter ApplyAdapter) string {
+	if identified, ok := adapter.(interface{ AuditName() string }); ok {
+		return identified.AuditName()
+	}
+	return adapter.Name()
+}
+
+func applyOperationName(adapter ApplyAdapter) string {
+	if identified, ok := adapter.(interface{ OperationName() string }); ok {
+		return identified.OperationName()
+	}
+	return adapter.Name()
 }
 
 // nativeDefaultAdminURL returns the canonical Node-RED admin probe URL
