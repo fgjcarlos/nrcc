@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/fgjcarlos/nrcc/internal/model"
@@ -88,6 +89,18 @@ func TestApplyCandidatePortRequiresUnambiguousStaticLiteral(t *testing.T) {
 	cfg.Port = 65536
 	if _, err := applyCandidatePort(service.ApplyRequest{StructuredConfig: &cfg}); err == nil {
 		t.Fatal("accepted structured port above 65535")
+	}
+}
+
+func TestApplyCandidatePortReportsSyntaxErrorForInvalidRawSettings(t *testing.T) {
+	// The raw apply API must report a syntax error to the operator; the
+	// acceptance suite asserts that phrase on the validation failure.
+	_, err := applyCandidatePort(service.ApplyRequest{Content: "module.exports = { uiPort: 1880, broken: };"})
+	if err == nil {
+		t.Fatal("accepted invalid raw settings")
+	}
+	if !strings.Contains(err.Error(), "syntax error") {
+		t.Fatalf("error %q does not report a syntax error", err)
 	}
 }
 

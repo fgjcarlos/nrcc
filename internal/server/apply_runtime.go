@@ -80,7 +80,9 @@ func applyCandidatePort(req service.ApplyRequest) (int, error) {
 func staticSettingsPort(content string) (int, error) {
 	program, err := parser.ParseFile(nil, "settings.js", content, 0)
 	if err != nil {
-		return 0, fmt.Errorf("apply: cannot parse candidate settings for readiness: %w", err)
+		// The operator-facing contract for invalid raw settings is a syntax
+		// error (asserted by frontend/e2e/stack.spec.ts), so keep that phrase.
+		return 0, fmt.Errorf("apply: candidate settings syntax error: %w", err)
 	}
 	if len(program.Body) != 1 {
 		return 0, fmt.Errorf("apply: settings readiness port is ambiguous")
