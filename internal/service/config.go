@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -156,16 +157,13 @@ func (s *ConfigService) Save(cfg model.NodeRedConfig) error {
 	return nil
 }
 
-// StructuredApplyInput is the bundle the handler hands to the
-// slice C apply coordinator for the structured save path. The
-// fields mirror what ApplyRequest needs plus the committed cfg
-// the handler should echo back to the operator.
-//
-// All four fields are required to be populated by the helper
-// that produces them (CommitStructured); partial bundles are
-// never passed to the coordinator because the coordinator has
-// no concept of "no path" or "no backup directory".
+// StructuredApplyInput captures the config state committed as one step of
+// a coordinator-owned structured apply. Previous and Committed support
+// field-aware recovery without overwriting unrelated concurrent updates.
 type StructuredApplyInput struct {
+	// Previous is the authoritative config snapshot captured under the
+	// JSONStore update lock before this apply's fields were published.
+	Previous model.NodeRedConfig
 	// Committed is the post-store NodeRedConfig the operator
 	// should see in the response (passwords are bcrypt hashes
 	// at this point).
@@ -185,27 +183,19 @@ type StructuredApplyInput struct {
 	BackupDir string
 }
 
-// CommitStructured commits cfg to the JSON store and renders the
-// corresponding settings.js content. The slice C handler uses the
-// returned bundle to drive ApplyCoordinator.Apply so the settings.js
-// write participates in the validate → backup → atomic write → audit
-// transaction instead of going through the legacy writeSettingsFile
-// helper.
-//
-// Failure modes:
-//
-//   - Validation failure (adminAuth / sandbox / Validate): returned
-//     verbatim, JSON store is NOT modified.
-//   - Store commit failure: returned verbatim, JSON store may be in
-//     an indeterminate state (the JSONStore.Update atomicity contract
-//     is the source of truth for that).
-//   - renderSettings or GetRawSettings failure after a successful
-//     commit: returned verbatim, JSON store IS committed. This is the
-//     same "JSON committed but settings.js update failed" risk the
-//     legacy Save() surfaced; the slice C coordinator adds the
-//     revision check on top of it.
+// CommitStructured validates and atomically publishes the structured config
+// while capturing the prior snapshot under JSONStore's update lock. Callers
+// must invoke it only after acquiring the apply coordinator's single-flight
+// guard and passing the settings revision precondition. The coordinator owns
+// restoring Previous if any later apply or runtime stage fails.
 func (s *ConfigService) CommitStructured(cfg model.NodeRedConfig) (StructuredApplyInput, error) {
+	live, err := s.GetRawSettings()
+	if err != nil {
+		return StructuredApplyInput{}, err
+	}
+	var previous model.NodeRedConfig
 	committed, err := s.Update(func(current *model.NodeRedConfig) error {
+		previous = *current
 		candidate := cfg
 		preserveAdminAuthPasswords(current, &candidate)
 		if err := upgradePlaintextAdminAuthPasswords(candidate); err != nil {
@@ -217,6 +207,13 @@ func (s *ConfigService) CommitStructured(cfg model.NodeRedConfig) (StructuredApp
 		if err := s.Validate(candidate); err != nil {
 			return err
 		}
+		// Keep state owned by EnvService and other configuration readers out
+		// of the structured apply's write set.
+		candidate.EnvVars = current.EnvVars
+		candidate.FunctionLibraries = current.FunctionLibraries
+		candidate.RuntimeState = current.RuntimeState
+		candidate.SettingsPath = current.SettingsPath
+		candidate.SettingsSource = current.SettingsSource
 		s.decorateConfig(&candidate)
 		*current = candidate
 		return nil
@@ -224,16 +221,34 @@ func (s *ConfigService) CommitStructured(cfg model.NodeRedConfig) (StructuredApp
 	if err != nil {
 		return StructuredApplyInput{}, err
 	}
-	live, err := s.GetRawSettings()
-	if err != nil {
-		return StructuredApplyInput{}, fmt.Errorf("read live settings after commit: %w", err)
-	}
 	return StructuredApplyInput{
+		Previous:  previous,
 		Committed: committed,
 		Content:   s.renderSettings(committed),
 		Live:      live,
 		BackupDir: filepath.Join(s.dataDir, "backups", "settings"),
 	}, nil
+}
+
+// RestoreStructured restores only fields still carrying this transaction's
+// committed values. Concurrent unrelated writes therefore survive recovery.
+func (s *ConfigService) RestoreStructured(state StructuredApplyInput) error {
+	return s.store.Update(func(current *model.NodeRedConfig) error {
+		live := reflect.ValueOf(current).Elem()
+		previous := reflect.ValueOf(state.Previous)
+		committed := reflect.ValueOf(state.Committed)
+		for i := 0; i < live.NumField(); i++ {
+			name := live.Type().Field(i).Name
+			switch name {
+			case "EnvVars", "FunctionLibraries", "RuntimeState", "SettingsPath", "SettingsSource", "Extra":
+				continue
+			}
+			if reflect.DeepEqual(live.Field(i).Interface(), committed.Field(i).Interface()) {
+				live.Field(i).Set(previous.Field(i))
+			}
+		}
+		return nil
+	})
 }
 
 func preserveAdminAuthPasswords(existing, candidate *model.NodeRedConfig) {
@@ -597,7 +612,7 @@ func (s *ConfigService) renderSettings(cfg model.NodeRedConfig) string {
 	if path == "" {
 		path = filepath.Join(s.dataDir, "settings.js")
 	}
-	// #nosec G304 -- path is the configured settings.js path inside the dataDir; not request-derived.
+	// #nosec G304,G703 -- path is the configured settings.js path inside the dataDir; not request-derived.
 	existing, err := os.ReadFile(path)
 	if err != nil || len(strings.TrimSpace(string(existing))) == 0 {
 		return generateSettingsJS(cfg)

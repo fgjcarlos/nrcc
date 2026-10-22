@@ -176,6 +176,30 @@ Common causes:
 **Fix.** Per
 [`playbook § scenario 3`](playbook.md#scenario-3-node-red-does-not-come-back-after-a-restart).
 
+### Runtime apply recovery failed
+
+**Diagnosis.** The audit contains `apply.rollback.failed`; inspect
+`apply_rollback_stage`, `apply_rollback_action`, and
+`apply_rollback_error`. Recovery can fail while restoring bytes or
+structured state, restarting the selected runtime, or checking
+readiness. A failed recovery is not evidence that the previous
+configuration is usable.
+
+**Fix.** Stop further applies. Inspect the active `settings.js`,
+structured configuration, backup identified by the audit event,
+and the same runtime authority's logs. Restore the known-good state
+using the deployment's documented, authority-specific procedure,
+then verify its actual readiness endpoint before resuming applies.
+Do not edit or delete referenced TLS key/certificate files as part
+of settings recovery; they are not in the apply write-set. If the
+runtime remains unavailable, escalate with the audit events and
+logs for operator intervention.
+
+**Verification.** Confirm restored settings and structured fields,
+then probe the selected Node-RED admin endpoint and confirm the
+matching runtime is ready. The failed apply remains a failure even
+if manual recovery succeeds.
+
 ## Cross-layer symptoms
 
 ### Two operators see different revisions for the same file

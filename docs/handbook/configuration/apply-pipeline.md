@@ -25,9 +25,15 @@ construction.
 
 ## The eight steps
 
-Four official stages (`validate`, `backup`, `write`, `audit`),
-eight observable steps. Each step emits at most one audit event
-and one typed error.
+The persistence pipeline has four stages (`validate`, `backup`,
+`write`, `audit`) and eight observable steps. The production
+runtime-coordinated path adds `restart` and `ready` before it
+reports success. Each step emits the applicable audit event and
+returns a typed error.
+
+The table describes the persistence-only write stages; the
+production runtime coordinator adds restart, readiness, and recovery
+before its final success event.
 
 | # | Step | Stage | Audit event | Failure mode |
 |---|------|-------|-------------|--------------|
@@ -123,8 +129,17 @@ that fails to parse `settings.js`.
 The rename is atomic on POSIX filesystems. A crash before the
 rename leaves the live `settings.js` untouched.
 
-The write step does NOT touch Node-RED. The restart is a separate
-concern — see step 7.
+The atomic writer does not itself signal Node-RED. In production,
+the runtime coordinator immediately restarts the pinned runtime
+authority and verifies its HTTP readiness before success. The
+persistence-only `ApplyService` API remains available to legacy
+callers and does not restart a runtime.
+
+The persistence-only API computes its fingerprint and closes out
+its audit after the durable write. In the production
+runtime-coordinated path, that is not the final success boundary:
+`apply.success` is emitted only after the selected runtime has
+restarted and passed readiness. See [Runtime-coordinated apply](#runtime-coordinated-apply).
 
 ## Step 7 — Fingerprint + diff redaction
 
@@ -144,18 +159,48 @@ guaranteed to agree.
 
 ## Step 8 — Audit close-out
 
-The final `apply.success` event is the close-out. After it is
-emitted:
+On the persistence-only API, `apply.success` closes the write. On
+the production runtime-coordinated path, the close-out happens only
+after restart and readiness. The structured UI clears its unsaved
+changes banner only after that successful result. A failed runtime
+transition is reported as a failed apply even when automatic
+recovery succeeds.
 
-- `req.Path` holds the new content.
-- `req.BackupDir` holds at least one new backup file.
-- The audit log has a complete record (`apply.start` → up to three
-  intermediate events → `apply.success`).
-- The structured UI clears its "unsaved changes" banner.
+## Runtime-coordinated apply
 
-There is no "undo" step. Recovery uses the backup file from
-step 5 — see [`../operator/troubleshooting.md`](../operator/troubleshooting.md)
-for the recovery playbook.
+The production coordinator resolves a supported runtime adapter
+before it mutates configuration or files. Unsupported or ambiguous
+authority is rejected during validation, before mutation. Once
+accepted, the coordinator retains the same runtime authority through
+candidate restart, readiness, and any recovery; it does not switch
+to a different process midway through the transaction.
+
+The ordered transaction is:
+
+1. Validate the requested settings and revision; stage structured
+   fields when requested.
+2. Back up the live `settings.js`, then persist the candidate
+   atomically.
+3. Restart the selected runtime and probe its admin HTTP endpoint.
+   Only a ready runtime receives `apply.success`.
+4. If restart or readiness fails, restore the settings snapshot and
+   structured fields first, then restart and probe the same runtime.
+   The original apply remains a failure even when recovery succeeds.
+
+Recovery uses an independent bounded context, so cancellation of
+the caller cannot interrupt restoration. Candidate readiness uses
+the request's context and the readiness probe's bounded retry
+window; recovery defaults to 30 seconds unless configured by the
+request. These are separate budgets. If recovery itself fails, the
+failure is recorded and surfaced for operator intervention; inspect
+the restored files and runtime before attempting another apply.
+
+The referenced TLS key/certificate paths are not part of the apply
+write-set. NRCC stores their paths and Node-RED reads the files at
+startup; recovery restores `settings.js` and structured configuration
+but does not mutate referenced TLS files. See
+[`../operator/troubleshooting.md`](../operator/troubleshooting.md)
+for diagnosis and manual recovery.
 
 ## Failure modes and what the operator sees
 
@@ -172,25 +217,26 @@ for the recovery playbook.
 
 ## Restart policy
 
-The apply pipeline never restarts Node-RED. Restart is the
-operator's responsibility:
+Production configuration apply is runtime-coordinated: after the
+validated, backed-up, atomic persistence, the coordinator restarts
+the selected supported authority and requires its HTTP readiness
+before reporting success. The accepted authority remains pinned
+through recovery. Unsupported or ambiguous runtime authority is
+rejected before configuration or files are mutated.
 
-- The structured UI shows a banner listing the catalog entries
-  whose `RestartRequired=true` changed in the just-applied
-  transaction.
-- The operator clicks "Restart Node-RED" (or accepts the deferred
-  restart prompt on shutdown).
-- The restart uses the same audit hook and the same readiness
-  probe; a failed restart emits `restart.failure` with the
-  underlying cause.
-
-This decoupling is deliberate: the apply pipeline is local I/O
-only, the restart is a process lifecycle event, and conflating the
-two would make audit recovery impossible.
+The persistence-only `ApplyService` API is retained for legacy
+callers and does not restart Node-RED. Do not infer production UI
+apply behavior from that persistence-only contract. Restart-required
+catalog metadata continues to describe which settings need runtime
+application; the runtime coordinator applies the change as part of
+the guarded transaction rather than relying on a later unscoped
+restart.
 
 ## Reading the audit log
 
-The audit log is the source of truth. The shape:
+The audit log is the source of truth. Persistence-only audit
+records use the shape below; runtime-coordinated apply also emits
+restart/readiness outcomes and rollback events where applicable:
 
 ```
 apply.start     stage=validate result=ok
@@ -199,17 +245,21 @@ apply.write     stage=write    result=ok    (only if write succeeded)
 apply.success   stage=write    result=ok
 ```
 
-A failed transaction looks like:
+A validation failure looks like:
 
 ```
 apply.start     stage=validate result=ok
 apply.failure   stage=validate result=error   cause="parser: line 42, …"
 ```
 
-`apply.failure` is always the LAST event for a failed transaction.
-A transaction that emits `apply.failure` after `apply.backup` is
-the classic "operator got an error after the backup" race; the
-operator can roll back from the backup file.
+Runtime recovery uses the actual `apply.rollback.started`,
+`apply.rollback.succeeded`, and `apply.rollback.failed` events.
+Their metadata includes `apply_rollback_stage`, adapter identity,
+operation, and relevant backup/target basenames. A recovered
+candidate failure therefore has rollback events followed by the
+original `apply.failure`; it does not produce `apply.success`. The
+failure event is not necessarily the last event when recovery itself
+emits audit metadata.
 
 ## Related
 
@@ -217,8 +267,8 @@ operator can roll back from the backup file.
   that drive the parse step.
 - [`../security/auth-surfaces.md`](../security/auth-surfaces.md) —
   the four surfaces whose changes go through this pipeline.
-- [`../operator/playbook.md`](../operator/playbook.md) — restart
-  policy in production.
+- [`../operator/playbook.md`](../operator/playbook.md) — production
+  runtime recovery scenario and opt-in real acceptance test.
 - [`../contributing/parser-renderer-contract.md`](../contributing/parser-renderer-contract.md)
   — what the parser must accept (used in step 3).
 - [`../glossary.md`](../glossary.md) — `apply`, `Revision`,
