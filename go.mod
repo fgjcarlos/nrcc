@@ -9,14 +9,14 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/pquerna/otp v1.5.0
 	github.com/prometheus/client_golang v1.25.0
-	github.com/pterm/pterm v0.12.83
+	github.com/pterm/pterm v0.12.84
 	github.com/robfig/cron/v3 v3.0.1
 	golang.org/x/crypto v0.58.0
 )
 
 require (
 	atomicgo.dev/cursor v0.2.0 // indirect
-	atomicgo.dev/keyboard v0.2.9 // indirect
+	atomicgo.dev/keyboard v0.2.10 // indirect
 	atomicgo.dev/schedule v0.1.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc // indirect
@@ -26,16 +26,13 @@ require (
 	github.com/dlclark/regexp2/v2 v2.5.2 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
 	github.com/google/pprof v0.0.0-20230207041349-798e818bf904 // indirect
-	github.com/gookit/color v1.6.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/lithammer/fuzzysearch v1.1.8 // indirect
-	github.com/mattn/go-runewidth v0.0.20 // indirect
+	github.com/mattn/go-runewidth v0.0.24 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/prometheus/client_model v0.6.3 // indirect
 	github.com/prometheus/common v0.72.0 // indirect
 	github.com/prometheus/procfs v0.22.0 // indirect
-	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
-	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/term v0.47.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
