@@ -114,14 +114,17 @@ func (e *ApplyError) Is(target error) bool {
 // Request is optional; when non-nil its IP and User-Agent feed the audit
 // record. Actor populates the audit Actor field.
 type ApplyRequest struct {
-	Path            string
-	Content         string
-	Expected        model.SourceRevision
-	BackupDir       string
-	Actor           string
-	Request         *http.Request
-	Capabilities    model.ConfigurationCapabilities
-	RecoveryTimeout time.Duration
+	Path         string
+	Content      string
+	Expected     model.SourceRevision
+	BackupDir    string
+	Actor        string
+	Request      *http.Request
+	Capabilities model.ConfigurationCapabilities
+	// StructuredConfig is committed by the coordinator only after the
+	// single-flight and revision guards have accepted this transaction.
+	StructuredConfig *model.NodeRedConfig
+	RecoveryTimeout  time.Duration
 }
 
 // ApplyResult captures the outcome of a successful Apply. Revision is
@@ -131,10 +134,11 @@ type ApplyRequest struct {
 // previous file existed). Diff is the redacted diff suitable for the
 // audit log.
 type ApplyResult struct {
-	Revision   model.SourceRevision
-	BackupPath string
-	Diff       string
-	Path       string
+	Configuration model.NodeRedConfig
+	Revision      model.SourceRevision
+	BackupPath    string
+	Diff          string
+	Path          string
 }
 
 // AuditHookFunc is the function signature ApplyService uses to emit

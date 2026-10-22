@@ -36,9 +36,29 @@ func (c *ApplyCoordinator) applyRuntime(ctx context.Context, req ApplyRequest) (
 		c.apply.emit(req, "apply.failure", ApplyStageValidate, "error", err)
 		return ApplyResult{}, &ApplyError{Stage: ApplyStageValidate, Cause: err, Path: req.Path, Request: req}
 	}
-	result, err := c.apply.apply(ctx, req, false)
+	state, err := c.stageStructured(&req)
 	if err != nil {
 		return ApplyResult{}, err
+	}
+	if err := c.apply.applyValidate(ctx, req); err != nil {
+		if state != nil {
+			if restoreErr := c.apply.configSvc.RestoreStructured(*state); restoreErr != nil {
+				err = errors.Join(err, fmt.Errorf("restore structured config: %w", restoreErr))
+			}
+		}
+		return ApplyResult{}, &ApplyError{Stage: ApplyStageValidate, Cause: err, Path: req.Path, Request: req}
+	}
+	result, err := c.apply.apply(ctx, req, false)
+	if err != nil {
+		if state != nil {
+			if restoreErr := c.apply.configSvc.RestoreStructured(*state); restoreErr != nil {
+				return ApplyResult{}, &ApplyError{Stage: ApplyStageRollback, Cause: errors.Join(err, fmt.Errorf("restore structured config: %w", restoreErr)), Path: req.Path, Request: req}
+			}
+		}
+		return ApplyResult{}, err
+	}
+	if state != nil {
+		result.Configuration = state.Committed
 	}
 	stage := ApplyStageRestart
 	cause := adapter.Restart(ctx)
@@ -62,6 +82,12 @@ func (c *ApplyCoordinator) applyRuntime(ctx context.Context, req ApplyRequest) (
 		recoveryCtx, cancel := context.WithTimeout(context.Background(), recoveryTimeout)
 		recoveryErr := ExecuteRollback(recoveryCtx, RollbackRequest{
 			BackupPath: result.BackupPath, ActivePath: req.Path, Stage: RollbackStage(stage),
+			RestoreState: func(context.Context) error {
+				if state == nil {
+					return nil
+				}
+				return c.apply.configSvc.RestoreStructured(*state)
+			},
 			Adapter: adapter, Actor: req.Actor, Request: req.Request, AuditHook: c.apply.auditHook,
 			Capabilities: req.Capabilities, ReadyzTimeout: recoveryTimeout,
 		})
