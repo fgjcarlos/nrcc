@@ -91,6 +91,9 @@ type RollbackRequest struct {
 	// ReadyzTimeout caps the post-rollback readiness probe. Optional;
 	// zero falls back to the readiness probe default.
 	ReadyzTimeout time.Duration
+	// RestoreState restores additional authoritative state after the
+	// settings.js snapshot and before the recovered runtime is restarted.
+	RestoreState func(context.Context) error
 }
 
 // ExecuteRollback restores the snapshot at req.BackupPath to
@@ -179,6 +182,15 @@ func ExecuteRollback(ctx context.Context, req RollbackRequest) error {
 			Stage:   req.Stage,
 			Cause:   fmt.Errorf("restore snapshot: %w", err),
 			Restore: req.ActivePath,
+		}
+	}
+
+	if req.RestoreState != nil {
+		if err := req.RestoreState(ctx); err != nil {
+			emitRollback(req, "apply.rollback.failed", "error", err, map[string]string{
+				"apply_rollback_stage": string(req.Stage), "apply_rollback_action": "restore_state",
+			})
+			return &RollbackError{Stage: req.Stage, Cause: fmt.Errorf("restore authoritative state: %w", err), Restore: req.ActivePath}
 		}
 	}
 
@@ -275,7 +287,8 @@ func emitRollback(req RollbackRequest, action, result string, cause error, extra
 	meta["apply_rollback_stage"] = string(req.Stage)
 	meta["apply_rollback_adapter"] = ""
 	if req.Adapter != nil {
-		meta["apply_rollback_adapter"] = req.Adapter.Name()
+		meta["apply_rollback_adapter"] = applyAuditName(req.Adapter)
+		meta["apply_rollback_operation"] = applyOperationName(req.Adapter)
 	}
 	if req.BackupPath != "" {
 		meta["apply_rollback_backup_path"] = filepath.Base(req.BackupPath)

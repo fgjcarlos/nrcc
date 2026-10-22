@@ -251,6 +251,55 @@ catalog entry, open an issue with the use case. The catalog is
 extended conservatively (see
 [`../contributing/style.md`](../contributing/style.md)).
 
+## Scenario 9: Apply fails while Node-RED restarts
+
+**Symptom.** The apply returns an error after saving a settings
+change, or Node-RED is unavailable during the restart.
+
+**Diagnosis.** Check the matching `apply.failure` event and its
+`failure_stage`. For a runtime failure, inspect the associated
+`apply.rollback.started` and `apply.rollback.succeeded` or
+`apply.rollback.failed` events and their `apply_rollback_stage`
+and `apply_rollback_action` metadata.
+
+**Fix.** If `apply.rollback.succeeded` is present, the original
+apply failed but the prior settings and structured fields were
+restored and the selected runtime passed readiness. Retry only
+after reviewing the candidate and failure cause. If recovery failed,
+stop applying changes and follow the manual intervention steps in
+[troubleshooting](troubleshooting.md#runtime-apply-recovery-failed).
+Do not restart an unscoped service or alter referenced TLS files as
+part of settings rollback.
+
+**Verification.** Confirm the prior `settings.js` and structured
+values are present and the selected Node-RED admin endpoint is
+reachable. A recovered failure has no `apply.success` for the
+failed attempt.
+
+**Postmortem.** Preserve the audit event IDs and runtime logs when
+raising an issue. See the [apply pipeline](../configuration/apply-pipeline.md#runtime-coordinated-apply).
+
+## Optional real-runtime acceptance test
+
+The Linux-only real acceptance test is opt-in and starts only a
+tracked Node-RED child against temporary configuration, settings,
+userDir, backups, TLS paths, and an ephemeral loopback port. It
+never targets Docker or systemd. With Node.js and Node-RED already
+installed, run from the repository root:
+
+```sh
+NRCC_APPLY_REAL_ACCEPT=1 go test ./internal/service -run '^TestApplyRuntimeRealAcceptance' -count=1 -v -timeout=6m
+```
+
+The test discovers `node-red` from `PATH`, or accepts `NODE_RED_CMD`
+for an existing executable; it reports Node and Node-RED versions.
+It fails rather than treating missing prerequisites or an external
+port attachment as proof. It exercises failed TLS startup with
+structured-state restoration, caller cancellation recovery, and
+same-settings in-flight rejection. It installs nothing and makes no
+persistent configuration changes. The ordinary command without the
+environment gate skips these cases clearly.
+
 ## Related
 
 - [`troubleshooting.md`](troubleshooting.md) — symptom-driven

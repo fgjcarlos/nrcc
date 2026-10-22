@@ -272,7 +272,7 @@ func (pm *ProcessManager) startLocked(resetCounter bool) error {
 		return fmt.Errorf("failed to create settings.js: %w", err)
 	}
 
-	// #nosec G204 -- pm.nodeRedCmd is operator-supplied via configuration; rt fields are derived from operator-controlled dataDir.
+	// #nosec G204,G702 -- pm.nodeRedCmd is operator-supplied via configuration; rt fields are derived from operator-controlled dataDir.
 	cmd := exec.Command(pm.nodeRedCmd,
 		"--userDir", rt.UserDir,
 		"--settings", rt.SettingsPath,

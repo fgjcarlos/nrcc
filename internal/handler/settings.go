@@ -141,14 +141,6 @@ func (h *SettingsHandler) saveRawViaApply(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if h.processManager != nil && !h.processManager.IsExternalMode() {
-		if status := h.processManager.Status(); status.Status == "running" {
-			if err := h.processManager.Restart(); err != nil {
-				model.RespondError(w, http.StatusInternalServerError, "SETTINGS_SAVED_RESTART_FAILED", "settings.js was saved, but Node-RED could not restart: "+err.Error())
-				return
-			}
-		}
-	}
 	if h.audit != nil {
 		h.audit.Log(r, claims.Username, "SETTINGS_UPDATE", live.Path, "ok", compatibilityAuditMeta(capabilities))
 	}

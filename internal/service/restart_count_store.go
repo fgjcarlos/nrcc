@@ -68,9 +68,11 @@ func (s *restartCountStore) Save(n int) error {
 	}
 
 	tmpPath := s.path + ".tmp"
+	// #nosec G703 -- tmpPath is the operator-supplied store path plus a constant suffix; not request-derived.
 	if err := os.WriteFile(tmpPath, data, 0600); err != nil {
 		return err
 	}
 
+	// #nosec G703 -- both paths are the operator-supplied store path and its .tmp sibling; not request-derived.
 	return os.Rename(tmpPath, s.path)
 }
