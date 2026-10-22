@@ -66,9 +66,9 @@ import (
 // HTTP-shaped inputs to ApplyRequest and HTTP-shaped
 // outputs from ApplyResult.
 type ConfigApplyHandler struct {
-	configSvc       *service.ConfigService
+	configSvc        *service.ConfigService
 	applyCoordinator *service.ApplyCoordinator
-	audit           *audit.Service
+	audit            *audit.Service
 
 	// processManager is optional and follows the same wire-up
 	// rule as ConfigHandler: a successful apply triggers a
@@ -83,7 +83,7 @@ type ConfigApplyHandler struct {
 // the Set* setters.
 func NewConfigApplyHandler(configSvc *service.ConfigService, applyCoordinator *service.ApplyCoordinator) *ConfigApplyHandler {
 	return &ConfigApplyHandler{
-		configSvc:       configSvc,
+		configSvc:        configSvc,
 		applyCoordinator: applyCoordinator,
 	}
 }
@@ -121,8 +121,8 @@ type ApplyStructuredRequest struct {
 // after the apply so the operator UI can re-bind its
 // ExpectedRevision field without a follow-up GET.
 type ApplyStructuredResponse struct {
-	Configuration model.NodeRedConfig       `json:"configuration"`
-	Document      model.SettingsDocument    `json:"document"`
+	Configuration model.NodeRedConfig    `json:"configuration"`
+	Document      model.SettingsDocument `json:"document"`
 }
 
 // ApplyRawRequest is the wire payload for
@@ -148,12 +148,12 @@ type ApplyRawResponse struct {
 //
 // Validation order:
 //
-//   1. Admin claims required (401 otherwise).
-//   2. Configuration is editable (409 CONFIGURATION_READ_ONLY otherwise).
-//   3. JSON payload decodes (400 INVALID_REQUEST otherwise).
-//   4. JSON store commit succeeds (400 VALIDATION_ERROR otherwise).
-//   5. ApplyCoordinator.Apply succeeds (5xx / 409 / 422 mapped by
-//      writeApplyError).
+//  1. Admin claims required (401 otherwise).
+//  2. Configuration is editable (409 CONFIGURATION_READ_ONLY otherwise).
+//  3. JSON payload decodes (400 INVALID_REQUEST otherwise).
+//  4. JSON store commit succeeds (400 VALIDATION_ERROR otherwise).
+//  5. ApplyCoordinator.Apply succeeds (5xx / 409 / 422 mapped by
+//     writeApplyError).
 //
 // On success the response carries both the committed
 // configuration (with bcrypt password hashes) and the live
@@ -176,13 +176,13 @@ func (h *ConfigApplyHandler) ApplyStructured(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	staged, err := h.configSvc.CommitStructured(req.Configuration)
+	live, err := h.configSvc.GetRawSettings()
 	if err != nil {
-		model.RespondError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+		model.RespondError(w, http.StatusInternalServerError, "SETTINGS_ERROR", err.Error())
 		return
 	}
 
-	expected := staged.Live.Revision
+	expected := live.Revision
 	if req.ExpectedRevision != "" {
 		expected = model.SourceRevision{
 			Fingerprint: req.ExpectedRevision,
@@ -191,30 +191,26 @@ func (h *ConfigApplyHandler) ApplyStructured(w http.ResponseWriter, r *http.Requ
 	}
 
 	applyReq := service.ApplyRequest{
-		Path:         staged.Live.Path,
-		Content:      staged.Content,
-		Expected:     expected,
-		BackupDir:    staged.BackupDir,
-		Actor:        claims.Username,
-		Request:      r,
-		Capabilities: capabilities,
+		Path:             live.Path,
+		Expected:         expected,
+		BackupDir:        backupDirFor(h.configSvc, live.Path),
+		StructuredConfig: &req.Configuration,
+		Actor:            claims.Username,
+		Request:          r,
+		Capabilities:     capabilities,
 	}
-	if _, err := h.applyCoordinator.Apply(r.Context(), applyReq); err != nil {
+	result, err := h.applyCoordinator.Apply(r.Context(), applyReq)
+	if err != nil {
 		writeApplyError(w, err, "Failed to apply settings")
 		return
 	}
 
-	if err := h.maybeRestart(); err != nil {
-		model.RespondError(w, http.StatusInternalServerError, "CONFIG_SAVED_RESTART_FAILED", "Configuration was applied, but Node-RED could not restart: "+err.Error())
-		return
-	}
-
 	if h.audit != nil {
-		h.audit.Log(r, claims.Username, "CONFIG_APPLY", staged.Live.Path, "ok", compatibilityAuditMeta(capabilities))
+		h.audit.Log(r, claims.Username, "CONFIG_APPLY", live.Path, "ok", compatibilityAuditMeta(capabilities))
 	}
 	model.RespondJSON(w, http.StatusOK, ApplyStructuredResponse{
-		Configuration: staged.Committed,
-		Document:      h.refreshDocument(staged.Live.Path),
+		Configuration: result.Configuration,
+		Document:      h.refreshDocument(live.Path),
 	})
 }
 
@@ -272,34 +268,12 @@ func (h *ConfigApplyHandler) ApplyRaw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.maybeRestart(); err != nil {
-		model.RespondError(w, http.StatusInternalServerError, "SETTINGS_SAVED_RESTART_FAILED", "settings.js was applied, but Node-RED could not restart: "+err.Error())
-		return
-	}
-
 	if h.audit != nil {
 		h.audit.Log(r, claims.Username, "SETTINGS_APPLY", live.Path, "ok", compatibilityAuditMeta(capabilities))
 	}
 	model.RespondJSON(w, http.StatusOK, ApplyRawResponse{
 		Document: h.refreshDocument(live.Path),
 	})
-}
-
-// maybeRestart triggers the Node-RED restart on a successful
-// apply when a managed process is configured. The function
-// returns the restart error so the caller can map it onto the
-// existing CONFIG_SAVED_RESTART_FAILED / SETTINGS_SAVED_RESTART_FAILED
-// envelopes. nil when no restart is needed (no process manager,
-// external mode, or process not running).
-func (h *ConfigApplyHandler) maybeRestart() error {
-	if h.processManager == nil || h.processManager.IsExternalMode() {
-		return nil
-	}
-	status := h.processManager.Status()
-	if status.Status != "running" {
-		return nil
-	}
-	return h.processManager.Restart()
 }
 
 // refreshDocument re-reads the settings.js document after a
@@ -385,8 +359,8 @@ func DecodeStructuredApplyPayload(w http.ResponseWriter, r *http.Request, dst *A
 
 func writeRevisionConflict(w http.ResponseWriter, conflict *service.RevisionConflictError) {
 	resp := revisionConflictEnvelope{
-		Success:   false,
-		Error:     &model.ApiError{Code: "SETTINGS_REVISION_CONFLICT", Message: conflict.Error()},
+		Success: false,
+		Error:   &model.ApiError{Code: "SETTINGS_REVISION_CONFLICT", Message: conflict.Error()},
 		Data: revisionConflictData{
 			LiveRevision:     conflict.Live,
 			ProvidedRevision: conflict.Provided.Fingerprint,

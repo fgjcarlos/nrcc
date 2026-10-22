@@ -423,7 +423,7 @@ func parseEnvFile(path string) (map[string]string, error) {
 	result := make(map[string]string)
 
 	// If file doesn't exist, return empty map (not an error)
-	// #nosec G304 -- path is built from operator-supplied dataDir + a constant filename; not request-derived.
+	// #nosec G304,G703 -- path is built from operator-supplied dataDir + a constant filename; not request-derived.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {

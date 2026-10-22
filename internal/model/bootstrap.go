@@ -21,25 +21,28 @@ type DependencyStatus struct {
 
 // NodeRedEnvironment describes the detected Node-RED installation.
 type NodeRedEnvironment struct {
-	Detected      bool             `json:"detected"`
-	Mode          InstallationMode `json:"mode"`
-	ManagedByNRCC bool             `json:"managedByNrcc"`
-	Running       bool             `json:"running"`
-	Version       string           `json:"version,omitempty"`
-	Executable    string           `json:"executable,omitempty"`
-	ContainerName string           `json:"containerName,omitempty"`
-	ContainerID   string           `json:"containerId,omitempty"`
-	UserDir       string           `json:"userDir,omitempty"`
-	SettingsPath  string           `json:"settingsPath,omitempty"`
+	Detected       bool             `json:"detected"`
+	Mode           InstallationMode `json:"mode"`
+	ManagedByNRCC  bool             `json:"managedByNrcc"`
+	Running        bool             `json:"running"`
+	Version        string           `json:"version,omitempty"`
+	Executable     string           `json:"executable,omitempty"`
+	ContainerName  string           `json:"containerName,omitempty"`
+	ContainerID    string           `json:"containerId,omitempty"`
+	ComposeProject string           `json:"composeProject,omitempty"`
+	ReadinessURL   string           `json:"readinessUrl,omitempty"`
+	Ambiguous      bool             `json:"ambiguous,omitempty"`
+	UserDir        string           `json:"userDir,omitempty"`
+	SettingsPath   string           `json:"settingsPath,omitempty"`
 }
 
 // SettingsDocument describes the active settings.js file and backup metadata.
 type SettingsDocument struct {
-	Path       string        `json:"path"`
-	Source     string        `json:"source"`
-	Writable   bool          `json:"writable"`
-	BackupPath string        `json:"backupPath,omitempty"`
-	Content    string        `json:"content,omitempty"`
+	Path       string         `json:"path"`
+	Source     string         `json:"source"`
+	Writable   bool           `json:"writable"`
+	BackupPath string         `json:"backupPath,omitempty"`
+	Content    string         `json:"content,omitempty"`
 	Revision   SourceRevision `json:"revision"`
 }
 
@@ -69,17 +72,17 @@ type ConfigurationCapabilities struct {
 
 // HostStatus summarizes the detected host and runtime environment.
 type HostStatus struct {
-	Platform        string                   `json:"platform"`
-	Ready           bool                     `json:"ready"`
-	Interactive     bool                     `json:"interactive"`
-	NodeJS          DependencyStatus         `json:"nodejs"`
-	NPM             DependencyStatus         `json:"npm"`
-	NodeRedBinary   DependencyStatus         `json:"nodeRedBinary"`
-	Portless        DependencyStatus         `json:"portless"`
-	Docker          DependencyStatus         `json:"docker"`
-	DockerCompose   DependencyStatus         `json:"dockerCompose"`
-	NodeRed         NodeRedEnvironment       `json:"nodeRed"`
-	Settings        SettingsDocument         `json:"settings"`
+	Platform        string                    `json:"platform"`
+	Ready           bool                      `json:"ready"`
+	Interactive     bool                      `json:"interactive"`
+	NodeJS          DependencyStatus          `json:"nodejs"`
+	NPM             DependencyStatus          `json:"npm"`
+	NodeRedBinary   DependencyStatus          `json:"nodeRedBinary"`
+	Portless        DependencyStatus          `json:"portless"`
+	Docker          DependencyStatus          `json:"docker"`
+	DockerCompose   DependencyStatus          `json:"dockerCompose"`
+	NodeRed         NodeRedEnvironment        `json:"nodeRed"`
+	Settings        SettingsDocument          `json:"settings"`
 	Configuration   ConfigurationCapabilities `json:"configuration"`
-	Recommendations []string                 `json:"recommendations,omitempty"`
+	Recommendations []string                  `json:"recommendations,omitempty"`
 }
