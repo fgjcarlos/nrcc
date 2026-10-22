@@ -22,7 +22,7 @@
 
 | Layer | Language / Tooling | Version |
 | --- | --- | --- |
-| Backend | Go | `1.26.0` (`go.mod`) |
+| Backend | Go | `1.27.0` (`go.mod`) |
 | HTTP router | `github.com/go-chi/chi/v5` | `v5.3.2` |
 | Auth | `github.com/golang-jwt/jwt/v5`, `golang.org/x/crypto` | latest |
 | Metrics | `github.com/prometheus/client_golang` | `v1.24.1` |

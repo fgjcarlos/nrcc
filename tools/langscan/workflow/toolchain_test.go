@@ -33,7 +33,7 @@ func TestPatchedGoToolchainContract(t *testing.T) {
 			matrixReferences := 0
 			for _, match := range matches {
 				switch strings.TrimSpace(match[1]) {
-				case `"1.26.9"`, `["1.26.9"]`:
+				case `"1.27.3"`, `["1.27.3"]`:
 				case `${{ matrix.go-version }}`:
 					matrixReferences++
 				default:
@@ -50,12 +50,12 @@ func TestPatchedGoToolchainContract(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		want := "FROM golang:1.26.9-alpine@sha256:3082400e369fa24d5fc60bca20edab3f6d604e0c5a690ec66b295eff4dd87ade AS go-builder"
+		want := "FROM golang:1.27.3-alpine@sha256:f2c872bcee949b7be9c490efd02b48a8a2fbf947cdf533f1c58525ec9d8170fd AS go-builder"
 		builders := regexp.MustCompile(`(?m)^FROM golang:[^\r\n]+`).FindAllString(string(body), -1)
 		if len(builders) != 1 || builders[0] != want {
 			t.Fatalf("unexpected Go builder: %v; want %s", builders, want)
 		}
-		if !strings.Contains(string(body), "# ref: golang:1.26.9-alpine") {
+		if !strings.Contains(string(body), "# ref: golang:1.27.3-alpine") {
 			t.Error("Go builder reference comment must match the patched compiler")
 		}
 	})
@@ -64,7 +64,7 @@ func TestPatchedGoToolchainContract(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !strings.Contains(string(body), "| Go | 1.26.9 (golangci-lint, go test, govulncheck) |") {
+		if !strings.Contains(string(body), "| Go | 1.27.3 (golangci-lint, go test, govulncheck) |") {
 			t.Error("documented tested Go compiler must match CI")
 		}
 	})
