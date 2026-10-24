@@ -224,6 +224,8 @@ new `apply.reconcile` event.
 
 ## Next step
 
-Open a pull request from `fix/880-raw-apply-reconcile` against `main`.
-The merge, the issue label change and the issue closure stay human
-decisions.
+The pull request is open: <https://github.com/fgjcarlos/nrcc/pull/924>
+
+The remaining human decisions are: review the pull request, merge it, and
+close the issue. The issue label was not changed on the maintainer's
+behalf.
