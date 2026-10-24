@@ -340,4 +340,37 @@ describe('ConfigurationView (issue #762 — Security tab for credentialSecret / 
     expect(payload.https).toMatchObject({ key: '/etc/node-red/key.pem' });
     expect(payload.credentialSecret).toBeUndefined();
   });
+
+  // Issue #878 — the visual save must carry the settings.js revision the
+  // operator read, so a stale browser session cannot overwrite newer
+  // state.
+  it('sends the settings revision it read with the save', async () => {
+    const user = userEvent.setup();
+    const updateSpy = vi.fn().mockResolvedValue({ data: { data: {}, success: true, timestamp: '' } });
+    const configModule = await import('@/features/configuration/services');
+    vi.spyOn(configModule.configService, 'updateConfig').mockImplementation(updateSpy);
+    mocks.getRaw.mockResolvedValue({
+      data: {
+        data: {
+          content: 'module.exports = {};\n',
+          path: '/etc/node-red/settings.js',
+          writable: true,
+          revision: { fingerprint: 'rev-42', algorithm: 'sha256' },
+        },
+        success: true,
+        timestamp: '',
+      },
+    });
+
+    renderConfiguration();
+
+    await user.click(await screen.findByRole('button', { name: /^TLS & Secrets$/ }));
+    await user.click(findToggleButton(/^Require HTTPS$/));
+    await user.click(screen.getByText('Save', { selector: 'button' }));
+    const reviewPanel = await screen.findByTestId('review-changes-panel');
+    await user.click(within(reviewPanel).getByTestId('review-changes-panel-apply'));
+
+    await waitFor(() => expect(updateSpy).toHaveBeenCalled());
+    expect(updateSpy.mock.calls[0][1]).toBe('rev-42');
+  });
 });

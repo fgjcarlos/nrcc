@@ -166,6 +166,38 @@ changes banner only after that successful result. A failed runtime
 transition is reported as a failed apply even when automatic
 recovery succeeds.
 
+## Revision precondition on the structured surfaces
+
+Every structured save surface accepts an optional `expectedRevision`:
+the `settings.js` fingerprint the operator read before composing the
+edit. The revision travels in the request body, next to the
+configuration payload.
+
+| Surface | Endpoint | Revision source |
+|---------|----------|-----------------|
+| Visual save | `POST /api/config` | `revision.fingerprint` of the settings document the form loaded |
+| Structured apply | `POST /api/config/apply` | `revision.fingerprint` of the settings document the form loaded |
+| Raw editor | `POST /api/settings/raw` | `revision.fingerprint` of the settings document the editor loaded |
+| Security center | `POST /api/config/apply` | same as the structured apply |
+
+When the supplied revision does not match the live `settings.js`, the
+save is rejected with HTTP 409 `SETTINGS_REVISION_CONFLICT`. The
+response carries the live and the provided fingerprint so the operator
+UI can render one conflict dialog for every surface.
+
+A rejected save has no durable effect: the revision precondition is
+checked under the apply coordinator's single-flight guard, before the
+structured configuration or any file is written. The same holds for the
+other rejected stages — a validation failure, a backup failure and a
+write failure all leave `config.json` and `settings.js` as they were,
+because the structured commit is restored when a later stage fails.
+
+The precondition is optional. A client that never learned a revision
+(no field in the body) keeps the historical behaviour: the server
+compares the live revision against itself and the save proceeds. The
+operator UI always sends the revision it read, so two browser sessions
+editing the same deployment cannot silently overwrite each other.
+
 ## Runtime-coordinated apply
 
 The production coordinator resolves a supported runtime adapter

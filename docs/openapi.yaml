@@ -619,7 +619,16 @@ paths:
       tags: [Config]
       operationId: postConfig
       summary: Save Node-RED configuration
-      description: "**Admin only.** Overwrites the Node-RED configuration."
+      description: >-
+        **Admin only.** Overwrites the Node-RED configuration.
+
+
+        The body may carry an optional `expectedRevision`: the `settings.js`
+        fingerprint the operator read before composing the edit (issue #878).
+        When it does not match the live revision the save is rejected with
+        `409 SETTINGS_REVISION_CONFLICT` and neither `config.json` nor
+        `settings.js` is modified. Clients that omit the field keep the
+        historical "no expectation" behaviour.
       security:
         - bearerAuth: []
       requestBody:
@@ -627,7 +636,16 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/NodeRedConfig"
+              allOf:
+                - $ref: "#/components/schemas/NodeRedConfig"
+                - type: object
+                  properties:
+                    expectedRevision:
+                      type: string
+                      description: >-
+                        sha256 fingerprint of the `settings.js` bytes the
+                        operator read before composing the edit. Optional.
+                      example: 9f2c1b0d4e5a6f7c8d9e0a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f6
       responses:
         "200":
           description: Saved configuration
@@ -641,6 +659,20 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "409":
+          description: >-
+            Revision conflict — the live `settings.js` moved on since the
+            operator read it. Nothing was modified.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+              example:
+                success: false
+                error:
+                  code: SETTINGS_REVISION_CONFLICT
+                  message: "settings.js revision conflict: live=… provided=…"
+                timestamp: "2026-05-24T14:00:00Z"
 
   /api/config/default:
     get:
@@ -2426,6 +2458,7 @@ components:
             - RATE_LIMITED
             - SETUP_REQUIRED
             - ALREADY_INITIALIZED
+            - SETTINGS_REVISION_CONFLICT
           example: INVALID_REQUEST
         message:
           type: string
