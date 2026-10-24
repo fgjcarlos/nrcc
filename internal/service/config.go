@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -562,6 +563,7 @@ func (s *ConfigService) writeSettingsFile(content string, syncStore bool) (model
 	if err := os.MkdirAll(filepath.Dir(doc.Path), 0750); err != nil {
 		return doc, err
 	}
+	previous, readErr := os.ReadFile(doc.Path)
 	backupPath, err := s.backupSettingsFile(doc.Path)
 	if err != nil {
 		return doc, err
@@ -573,12 +575,18 @@ func (s *ConfigService) writeSettingsFile(content string, syncStore bool) (model
 		return doc, err
 	}
 	if syncStore {
-		parsed, err := s.parseConfigFromContent(content)
-		if err != nil {
-			return doc, err
-		}
-		s.decorateConfig(&parsed)
-		if err := s.store.Write(parsed); err != nil {
+		// The source is authoritative (issue #880): the structured mirror
+		// is re-derived from the applied bytes. Writing the parsed source
+		// wholesale would drop the NRCC-owned state the mirror also holds
+		// (the environment metadata, the function libraries, the runtime
+		// state).
+		if _, err := s.ReconcileRawSettings(content); err != nil {
+			// The transaction is rejected as a whole: the pre-write bytes
+			// are restored so neither representation keeps a partial
+			// effect.
+			if restoreErr := restoreSourceBytes(context.Background(), doc.Path, string(previous), readErr == nil); restoreErr != nil {
+				return doc, errors.Join(err, fmt.Errorf("restore source after failed reconciliation: %w", restoreErr))
+			}
 			return doc, err
 		}
 	}

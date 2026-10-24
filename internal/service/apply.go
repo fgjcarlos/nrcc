@@ -47,13 +47,14 @@ import (
 type ApplyStage string
 
 const (
-	ApplyStageValidate ApplyStage = "validate"
-	ApplyStageBackup   ApplyStage = "backup"
-	ApplyStageWrite    ApplyStage = "write"
-	ApplyStageAudit    ApplyStage = "audit"
-	ApplyStageRestart  ApplyStage = "restart"
-	ApplyStageReady    ApplyStage = "ready"
-	ApplyStageRollback ApplyStage = "rollback"
+	ApplyStageValidate  ApplyStage = "validate"
+	ApplyStageBackup    ApplyStage = "backup"
+	ApplyStageWrite     ApplyStage = "write"
+	ApplyStageReconcile ApplyStage = "reconcile"
+	ApplyStageAudit     ApplyStage = "audit"
+	ApplyStageRestart   ApplyStage = "restart"
+	ApplyStageReady     ApplyStage = "ready"
+	ApplyStageRollback  ApplyStage = "rollback"
 )
 
 // ApplyError is the typed error returned by ApplyService.Apply. Stage
@@ -147,6 +148,10 @@ type ApplyResult struct {
 	BackupPath    string
 	Diff          string
 	Path          string
+	// Mirror carries the structured-mirror snapshot of a raw apply. The
+	// coordinator uses it to restore the mirror when a later stage of the
+	// transaction fails (issue #880).
+	Mirror *MirrorSnapshot
 }
 
 // AuditHookFunc is the function signature ApplyService uses to emit
@@ -262,12 +267,41 @@ func (s *ApplyService) apply(ctx context.Context, req ApplyRequest, emitSuccess 
 	}
 	s.emit(req, "apply.write", ApplyStageWrite, "ok", nil)
 
-	// --- Stage 4: success --------------------------------------------------
+	// --- Stage 4: reconcile the structured mirror --------------------------
+	// The source is authoritative (issue #880). A raw apply must re-derive
+	// the structured mirror from the applied bytes, otherwise a structured
+	// read keeps reporting the pre-apply values and the next visual save
+	// writes the stale values back into the source.
+	//
+	// The structured apply path committed the mirror before the write, so
+	// there is nothing to reconcile.
+	var mirror *MirrorSnapshot
+	if req.StructuredConfig == nil && req.StructuredPatch == nil {
+		snapshot, err := s.configSvc.ReconcileRawSettings(req.Content)
+		if err != nil {
+			// The reconciliation failed: the transaction is rejected as a
+			// whole. The pre-write source bytes are restored so neither
+			// representation keeps a partial effect.
+			if restoreErr := restoreSourceBytes(ctx, req.Path, liveContent, backupPath != ""); restoreErr != nil {
+				err = errors.Join(err, fmt.Errorf("restore source after failed reconciliation: %w", restoreErr))
+			}
+			s.emit(req, "apply.failure", ApplyStageReconcile, "error", err)
+			return ApplyResult{}, &ApplyError{Stage: ApplyStageReconcile, Cause: err, Path: req.Path, Request: req}
+		}
+		mirror = &snapshot
+		s.emit(req, "apply.reconcile", ApplyStageReconcile, "ok", nil)
+	}
+
+	// --- Stage 5: success --------------------------------------------------
 	result := ApplyResult{
 		Revision:   FingerprintSource(req.Content),
 		BackupPath: backupPath,
 		Diff:       RedactDiff(liveContent, req.Content),
 		Path:       req.Path,
+		Mirror:     mirror,
+	}
+	if mirror != nil {
+		result.Configuration = mirror.Committed
 	}
 	if emitSuccess {
 		s.emit(req, "apply.success", ApplyStageWrite, "ok", nil)
@@ -338,6 +372,20 @@ func (s *ApplyService) applyBackup(req ApplyRequest) (backupPath string, liveCon
 		return "", liveContent, fmt.Errorf("write backup %s: %w", target, err)
 	}
 	return target, liveContent, nil
+}
+
+// restoreSourceBytes restores the pre-write settings.js content after a
+// failed reconciliation. A transaction that is rejected after the write
+// must leave the source exactly as it was: when no previous file existed
+// the written file is removed again.
+func restoreSourceBytes(ctx context.Context, path, previous string, existed bool) error {
+	if !existed {
+		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		return nil
+	}
+	return AtomicWriteSettings(ctx, path, previous)
 }
 
 // emit writes a single audit event. The function never returns an

@@ -183,9 +183,11 @@ func TestApplyTransactionHappyPath(t *testing.T) {
 		t.Errorf("diff missing [redacted] marker for credentialSecret: %q", result.Diff)
 	}
 
-	// Audit event order: apply.start → apply.backup → apply.write → apply.success.
+	// Audit event order: apply.start → apply.backup → apply.write →
+	// apply.reconcile → apply.success. The reconciliation event is the
+	// structured mirror commit of a raw apply (issue #880).
 	events := hook.snapshot()
-	wantOrder := []string{"apply.start", "apply.backup", "apply.write", "apply.success"}
+	wantOrder := []string{"apply.start", "apply.backup", "apply.write", "apply.reconcile", "apply.success"}
 	if len(events) != len(wantOrder) {
 		t.Fatalf("audit events = %d, want %d (events: %+v)", len(events), len(wantOrder), events)
 	}
