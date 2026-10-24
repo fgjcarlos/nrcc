@@ -101,7 +101,13 @@ func (h *ConfigHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	model.RespondJSON(w, http.StatusOK, cfg)
+	// Issue #877: the credential-encryption secret and the TLS
+	// private-key passphrase are write-only for every role, admin
+	// included. The response carries the non-secret TLS material so the
+	// configuration UI can still render the TLS section, and the stored
+	// secrets are untouched — the client reads them as "blank, keep the
+	// current value" and the service preserves them on write-back.
+	model.RespondJSON(w, http.StatusOK, cfg.RedactedSecrets())
 }
 
 // SaveConfig handles POST /api/config - protected, admin only.
@@ -170,7 +176,9 @@ func (h *ConfigHandler) saveConfigViaApply(w http.ResponseWriter, r *http.Reques
 	if h.audit != nil {
 		h.audit.Log(r, claims.Username, "CONFIG_SAVE", live.Path, "ok", compatibilityAuditMeta(capabilities))
 	}
-	model.RespondJSON(w, http.StatusOK, result.Configuration)
+	// Issue #877: the committed configuration echoes the write-only
+	// secrets, so they are redacted before the response leaves the API.
+	model.RespondJSON(w, http.StatusOK, result.Configuration.RedactedSecrets())
 }
 
 // saveConfigLegacy is the pre-slice-C path: it commits the JSON
@@ -193,7 +201,9 @@ func (h *ConfigHandler) saveConfigLegacy(w http.ResponseWriter, r *http.Request,
 	}
 
 	h.audit.Log(r, claims.Username, "CONFIG_SAVE", "", "ok", compatibilityAuditMeta(capabilities))
-	model.RespondJSON(w, http.StatusOK, cfg)
+	// Issue #877: the echo carries the write-only secrets, so they are
+	// redacted before the response leaves the API.
+	model.RespondJSON(w, http.StatusOK, cfg.RedactedSecrets())
 }
 
 // writeApplyError maps the slice C apply errors onto HTTP
@@ -277,7 +287,9 @@ func (h *ConfigHandler) GetDefaultConfig(w http.ResponseWriter, r *http.Request)
 	}
 
 	cfg := h.configSvc.GetDefault()
-	model.RespondJSON(w, http.StatusOK, cfg)
+	// Issue #877: the defaults are write-only secrets too — keep the
+	// contract uniform so no response shape ever carries them.
+	model.RespondJSON(w, http.StatusOK, cfg.RedactedSecrets())
 }
 
 // ValidateConfig handles POST /api/config/validate - protected

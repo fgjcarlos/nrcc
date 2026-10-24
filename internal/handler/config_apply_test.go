@@ -455,3 +455,30 @@ func TestSettingsHandler_SaveRaw_DelegatesToApplyCoordinator(t *testing.T) {
 		t.Errorf("settings.js was not updated via the apply transaction: %s", got)
 	}
 }
+
+// TestReleaseAuditViewerMustNotReceiveTLSOrCredentialSecrets is the
+// regression test for issue #877: the configuration response must never
+// carry the write-only secrets, for any role.
+func TestReleaseAuditViewerMustNotReceiveTLSOrCredentialSecrets(t *testing.T) {
+	f := newApplyHandlerFixture(t)
+	cfg, err := f.svc.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.CredentialSecret = "audit-credential-fixture"
+	cfg.Https = &model.HttpsConfig{Key: "/tmp/key.pem", Cert: "/tmp/cert.pem", Passphrase: "audit-tls-fixture"}
+	if err := f.svc.Save(cfg); err != nil {
+		t.Fatal(err)
+	}
+	req, w := adminRequest(t, http.MethodGet, "/api/config", nil)
+	req = req.WithContext(context.WithValue(req.Context(), middleware.CtxKeyUser, &model.Claims{Username: "viewer", Role: model.RoleViewer}))
+	NewConfigHandler(f.svc).GetConfig(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d", w.Code)
+	}
+	for _, secret := range []string{"audit-credential-fixture", "audit-tls-fixture"} {
+		if strings.Contains(w.Body.String(), secret) {
+			t.Errorf("viewer response includes %s", secret)
+		}
+	}
+}
