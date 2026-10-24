@@ -94,6 +94,44 @@ describe('useConfigurationSave', () => {
     expect(mocks.mutateAsync).toHaveBeenCalledTimes(1);
   });
 
+  // Issue #878 — the save must travel with the settings.js revision the
+  // operator read so the backend can reject a stale edit instead of
+  // overwriting newer state.
+  it('sends the revision the operator read with the save', async () => {
+    const { result } = renderHook(
+      () =>
+        useConfigurationSave({
+          formData: emptyForm(),
+          diff: diffFixture({ pendingCount: 1, canSave: true }),
+          expectedRevision: 'rev-123',
+        }),
+      { wrapper: makeWrapper() },
+    );
+
+    await act(async () => {
+      await result.current.save();
+    });
+
+    expect(mocks.mutateAsync).toHaveBeenCalledTimes(1);
+    const [payload] = mocks.mutateAsync.mock.calls[0] as [{ config: unknown; expectedRevision?: string }];
+    expect(payload.expectedRevision).toBe('rev-123');
+    expect(payload.config).toBeDefined();
+  });
+
+  it('omits the revision when the operator never read one', async () => {
+    const { result } = renderHook(
+      () => useConfigurationSave({ formData: emptyForm(), diff: diffFixture({ pendingCount: 1, canSave: true }) }),
+      { wrapper: makeWrapper() },
+    );
+
+    await act(async () => {
+      await result.current.save();
+    });
+
+    const [payload] = mocks.mutateAsync.mock.calls[0] as [{ config: unknown; expectedRevision?: string }];
+    expect(payload.expectedRevision).toBeUndefined();
+  });
+
   it('short-circuits when there are no pending changes', async () => {
     const { result } = renderHook(
       () =>
