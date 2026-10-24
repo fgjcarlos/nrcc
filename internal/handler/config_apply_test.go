@@ -465,8 +465,8 @@ func TestReleaseAuditViewerMustNotReceiveTLSOrCredentialSecrets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg.CredentialSecret = "audit-credential-fixture"
-	cfg.Https = &model.HttpsConfig{Key: "/tmp/key.pem", Cert: "/tmp/cert.pem", Passphrase: "audit-tls-fixture"}
+	cfg.CredentialSecret = "audit-credential-fixture"                                                           //nolint:gosec // G101 test fixture, not a credential.
+	cfg.Https = &model.HttpsConfig{Key: "/tmp/key.pem", Cert: "/tmp/cert.pem", Passphrase: "audit-tls-fixture"} //nolint:gosec // G101 test fixture, not a credential.
 	if err := f.svc.Save(cfg); err != nil {
 		t.Fatal(err)
 	}

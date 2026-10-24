@@ -16,8 +16,8 @@ import (
 
 // The fixtures below are invented test values, never real credentials.
 const (
-	credentialSecretFixture = "audit-credential-fixture"
-	tlsPassphraseFixture    = "audit-tls-fixture"
+	credentialSecretFixture = "audit-credential-fixture" //nolint:gosec // G101 test fixture, not a credential.
+	tlsPassphraseFixture    = "audit-tls-fixture"        //nolint:gosec // G101 test fixture, not a credential.
 )
 
 // seedSecretBearingConfig persists a configuration that carries both
@@ -197,6 +197,7 @@ func TestConfigHandler_SaveConfig_ExplicitSecretRotatesStoredValue(t *testing.T)
 	f := newApplyHandlerFixture(t)
 	seedSecretBearingConfig(t, f.svc)
 
+	//nolint:gosec // G101 test fixture, not a credential.
 	payload := model.NodeRedConfig{
 		Port:             1880,
 		UIPort:           1880,

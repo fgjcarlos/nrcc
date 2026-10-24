@@ -110,6 +110,7 @@ func TestAssistFlowDisabledRequiresExplicitConfiguration(t *testing.T) {
 // flow property named "passphrase" carries a TLS private-key passphrase
 // and must not leave the host in cleartext.
 func TestRedactSecretsRedactsPassphraseKeys(t *testing.T) {
+	//nolint:gosec // G101 test fixture, not a credential.
 	flow := map[string]interface{}{
 		"nodes": []interface{}{
 			map[string]interface{}{

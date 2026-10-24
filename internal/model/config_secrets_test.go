@@ -3,6 +3,7 @@ package model
 import "testing"
 
 func TestNodeRedConfig_RedactedSecrets_ClearsWriteOnlySecrets(t *testing.T) {
+	//nolint:gosec // G101 the literals below are invented test fixtures, not credentials.
 	cfg := NodeRedConfig{
 		Port:             1880,
 		CredentialSecret: "audit-credential-fixture",
@@ -37,9 +38,12 @@ func TestNodeRedConfig_RedactedSecrets_ClearsWriteOnlySecrets(t *testing.T) {
 }
 
 func TestNodeRedConfig_RedactedSecrets_DoesNotMutateReceiver(t *testing.T) {
+	//nolint:gosec // G101 the literals below are invented test fixtures, not credentials.
 	cfg := NodeRedConfig{
 		CredentialSecret: "audit-credential-fixture",
-		Https:            &HttpsConfig{Passphrase: "audit-tls-fixture"},
+		Https: &HttpsConfig{
+			Passphrase: "audit-tls-fixture",
+		},
 	}
 
 	_ = cfg.RedactedSecrets()

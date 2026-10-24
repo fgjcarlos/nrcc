@@ -11,8 +11,8 @@ import (
 
 // The fixtures below are invented test values, never real credentials.
 const (
-	credentialSecretFixture = "audit-credential-fixture"
-	tlsPassphraseFixture    = "audit-tls-fixture"
+	credentialSecretFixture = "audit-credential-fixture" //nolint:gosec // G101 test fixture, not a credential.
+	tlsPassphraseFixture    = "audit-tls-fixture"        //nolint:gosec // G101 test fixture, not a credential.
 	// redactedSecretMarker mirrors model.RedactedSecret: a client that
 	// echoes a redacted read back must not wipe the stored secret.
 	redactedSecretMarker = "[redacted]"
@@ -159,7 +159,7 @@ func TestConfigService_Save_PreservesHTTPSPassphraseInSettingsJS(t *testing.T) {
 		t.Fatalf("save config: %v", err)
 	}
 
-	content, err := os.ReadFile(settingsPath)
+	content, err := os.ReadFile(settingsPath) //nolint:gosec // G304 -- settingsPath is the hermetic test fixture inside t.TempDir(), not user input.
 	if err != nil {
 		t.Fatalf("read settings.js: %v", err)
 	}
@@ -177,7 +177,8 @@ func TestConfigService_Save_RotatesExplicitSecrets(t *testing.T) {
 	}
 
 	candidate := secretBearingConfig()
-	candidate.CredentialSecret = "rotated-credential-fixture"
+	candidate.CredentialSecret = "rotated-credential-fixture" //nolint:gosec // G101 test fixture, not a credential.
+	//nolint:gosec // G101 test fixture, not a credential.
 	candidate.Https = &model.HttpsConfig{
 		Key:        "/tmp/key.pem",
 		Cert:       "/tmp/cert.pem",
