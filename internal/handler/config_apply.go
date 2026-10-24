@@ -98,22 +98,32 @@ func (h *ConfigApplyHandler) SetProcessManager(pm *service.ProcessManager) { h.p
 
 // StructuredConfigRequest is the wire payload shared by the two
 // structured configuration surfaces: POST /api/config/apply and
-// POST /api/config (issue #878). The structured payload mirrors the
-// existing POST /api/config body; the extra field is
-// ExpectedRevision, an optional sha256 fingerprint of the
-// settings.js bytes the operator read before composing this
-// edit. When non-empty the apply coordinator enforces the
-// IfMatch precondition and returns 409 SETTINGS_REVISION_CONFLICT
-// on mismatch.
+// POST /api/config (issue #878). The extra field is ExpectedRevision,
+// an optional sha256 fingerprint of the settings.js bytes the
+// operator read before composing this edit. When non-empty the apply
+// coordinator enforces the IfMatch precondition and returns 409
+// SETTINGS_REVISION_CONFLICT on mismatch.
+//
+// The two surfaces read the payload differently (issue #879):
+//
+//   - POST /api/config/apply takes a presence-aware patch (Patch). A
+//     field the payload omits keeps its live value, a field present
+//     with an explicit null disables the surface it configures, and a
+//     field present with a value replaces the live value. The patch
+//     keeps the raw JSON of every field because a decoded struct
+//     cannot tell an omitted int from an int explicitly set to zero.
+//   - POST /api/config takes the complete configuration
+//     (Configuration). The configuration editor posts the whole
+//     configuration and must be able to clear a surface by leaving it
+//     out.
 //
 // The handler decodes the payload in two passes (see
 // DecodeStructuredConfigPayload) so the NodeRedConfig.UnmarshalJSON
 // hook does not consume the entire body and drop the
-// ExpectedRevision field. The type is kept as a documented
-// shape reference for the operator UI; it is not used as
-// the decode target directly.
+// ExpectedRevision field.
 type StructuredConfigRequest struct {
 	Configuration    model.NodeRedConfig
+	Patch            model.ConfigPatch
 	ExpectedRevision string
 }
 
@@ -192,13 +202,13 @@ func (h *ConfigApplyHandler) ApplyStructured(w http.ResponseWriter, r *http.Requ
 	}
 
 	applyReq := service.ApplyRequest{
-		Path:             live.Path,
-		Expected:         expected,
-		BackupDir:        backupDirFor(h.configSvc, live.Path),
-		StructuredConfig: &req.Configuration,
-		Actor:            claims.Username,
-		Request:          r,
-		Capabilities:     capabilities,
+		Path:            live.Path,
+		Expected:        expected,
+		BackupDir:       backupDirFor(h.configSvc, live.Path),
+		StructuredPatch: &req.Patch,
+		Actor:           claims.Username,
+		Request:         r,
+		Capabilities:    capabilities,
 	}
 	result, err := h.applyCoordinator.Apply(r.Context(), applyReq)
 	if err != nil {
@@ -318,11 +328,15 @@ func (h *ConfigApplyHandler) refreshDocument(path string) model.SettingsDocument
 // in two passes so the NodeRedConfig.UnmarshalJSON hook does not consume
 // the entire payload and drop ExpectedRevision.
 //
-// The first pass decodes into a generic map; the second pass re-encodes
-// that map minus the expectedRevision field and decodes the result as a
-// NodeRedConfig so the typed UnmarshalJSON runs against the standard
-// payload shape. The expectedRevision field is preserved as a string in
-// dst.
+// The first pass decodes into a generic map; the expectedRevision field
+// is lifted out of it. The remaining fields are kept twice: as the
+// presence-aware patch the apply endpoint merges onto the live
+// configuration (issue #879), and as the typed configuration the
+// full-replacement surface commits.
+//
+// The second pass decodes the remaining fields as a NodeRedConfig so a
+// payload whose fields carry the wrong JSON types is rejected with the
+// 400 INVALID_REQUEST envelope before any state is touched.
 //
 // On any decode failure the function writes a 400 INVALID_REQUEST
 // envelope and returns false so the handler can early-return.
@@ -355,7 +369,7 @@ func DecodeStructuredConfigPayload(w http.ResponseWriter, r *http.Request, dst *
 	}
 	// Second pass: re-encode and decode as NodeRedConfig so
 	// the typed UnmarshalJSON runs against the standard
-	// payload shape.
+	// payload shape and a malformed field is rejected here.
 	rest, err := json.Marshal(raw)
 	if err != nil {
 		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
@@ -365,6 +379,9 @@ func DecodeStructuredConfigPayload(w http.ResponseWriter, r *http.Request, dst *
 		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
 		return false
 	}
+	// The patch keeps the raw JSON of every field so the merge can tell
+	// an absent field from an explicit null or an explicit zero.
+	dst.Patch = model.NewConfigPatch(raw)
 	return true
 }
 
