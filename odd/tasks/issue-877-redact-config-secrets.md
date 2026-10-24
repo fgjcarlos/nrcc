@@ -127,13 +127,23 @@ $ go test ./internal/service -run TestRedactSecretsRedactsPassphraseKeys -count=
 
 ```
 $ go build ./...                                     # OK
+$ go vet ./...                                       # OK
 $ go test ./...                                      # 14 packages ok, 1 without tests, 0 failures
+$ go test -race -count=1 -timeout 20m ./...         # all packages ok (CI parity)
+$ golangci-lint run --config=.golangci.yml ./...    # 0 issues
+$ npx --yes @redocly/cli lint docs/openapi.yaml     # valid, same 9 pre-existing warnings as main
 $ gofmt -l <changed .go files>                       # no output
 $ git diff --check                                   # clean
 $ go run ./tools/langscan .                          # 0 findings
 $ go run ./scripts/cite_check ./docs                 # OK: no broken internal links
 $ go test ./internal/handler -run TestReleaseAuditViewerMustNotReceiveTLSOrCredentialSecrets -count=1   # ok
 ```
+
+The repo-wide `golangci-lint` gate is green. The invented credential and
+passphrase fixtures are annotated with the repository's existing
+`//nolint:gosec` test convention (G101) and the test-only settings path
+carries the matching G304 annotation, so the gate stays clean without
+weakening the rule.
 
 The repository is not gofmt-clean at `origin/main` (for example
 `internal/model/response.go` tag alignment), so only the files touched by
@@ -160,6 +170,20 @@ this feature were checked; none of them contributes a new gofmt diff.
 
 ## Next step
 
-Every task is closed and the branch carries four work-unit commits. The
-human decides the delivery: review the branch, then push, open the pull
-request, and close the issue.
+Every task is closed. The branch carries five work-unit commits and the
+pull request is open: <https://github.com/fgjcarlos/nrcc/pull/921>.
+
+- `5112684` `fix(security): keep stored config secrets on write-back`
+- `b9d0cbb` `fix(security): redact credential and TLS secrets from config responses`
+- `df5f954` `fix(security): redact passphrase keys in AI provider requests`
+- `1fd3744` `docs: document the write-only config secret contract`
+- `2e0b9cf` `test(security): annotate secret fixtures for the gosec gate`
+
+Delivery decision (maintainer, human-controlled gate): the slice is 953
+changed lines, above the 400-line review budget for a PR slice, so the pull
+request carries the `size:exception` label with the rationale documented in
+its body. The fix is atomic (redaction without write-back preservation
+would wipe the stored secrets), and the branch still splits it into
+reviewable commits. The pull request closes #877 on merge.
+
+Remaining human decisions: review and merge the pull request.
