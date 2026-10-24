@@ -189,17 +189,83 @@ type StructuredApplyInput struct {
 // must invoke it only after acquiring the apply coordinator's single-flight
 // guard and passing the settings revision precondition. The coordinator owns
 // restoring Previous if any later apply or runtime stage fails.
+//
+// The full-replacement contract is kept for the configuration editor
+// (POST /api/config). The apply endpoint uses CommitStructuredPatch so a
+// patch that carries a single surface does not drop the other settings.
 func (s *ConfigService) CommitStructured(cfg model.NodeRedConfig) (StructuredApplyInput, error) {
+	return s.commitStructured(&cfg, nil)
+}
+
+// CommitStructuredPatch merges a presence-aware patch onto the live
+// configuration and publishes the result while capturing the prior snapshot
+// under JSONStore's update lock. Callers must invoke it only after acquiring
+// the apply coordinator's single-flight guard and passing the settings
+// revision precondition.
+//
+// The merge reads the live configuration inside the store update lock, so
+// the patch is applied to the state the store holds at commit time and a
+// concurrent environment-variable write cannot slip between the read and
+// the write. The coordinator owns restoring Previous if any later apply or
+// runtime stage fails.
+func (s *ConfigService) CommitStructuredPatch(patch model.ConfigPatch) (StructuredApplyInput, error) {
+	return s.commitStructured(nil, &patch)
+}
+
+// PreviewStructuredPatch computes the merged configuration without
+// committing it. The runtime adapter needs the candidate port before the
+// transaction starts, and the port only exists once the patch has been
+// merged onto the live configuration.
+//
+// The preview reads the live configuration outside the commit lock; the
+// commit recomputes the merge under the lock. Both merges read the same
+// live state, and the store has a single writer per deployment, so the
+// previewed port and the committed port agree.
+func (s *ConfigService) PreviewStructuredPatch(patch model.ConfigPatch) (model.NodeRedConfig, error) {
+	base, _, err := s.patchBase()
+	if err != nil {
+		return model.NodeRedConfig{}, err
+	}
+	return MergePatch(base, patch)
+}
+
+// commitStructured publishes either a full configuration (full != nil) or a
+// patch merged onto the live configuration (patch != nil).
+func (s *ConfigService) commitStructured(full *model.NodeRedConfig, patch *model.ConfigPatch) (StructuredApplyInput, error) {
 	live, err := s.GetRawSettings()
+	if err != nil {
+		return StructuredApplyInput{}, err
+	}
+	// The merge base is read before the update lock is taken: the JSON
+	// store forbids re-entering the store from inside an update callback.
+	base, hasBase, err := s.patchBase()
 	if err != nil {
 		return StructuredApplyInput{}, err
 	}
 	var previous model.NodeRedConfig
 	committed, err := s.Update(func(current *model.NodeRedConfig) error {
 		previous = *current
-		candidate := cfg
-		preserveAdminAuthPasswords(current, &candidate)
-		preserveWriteOnlySecrets(current, &candidate)
+		candidate := model.NodeRedConfig{}
+		// The preservation source is the live configuration the candidate
+		// was derived from: the merge base for a patch, the committed
+		// state for a full replacement.
+		existing := current
+		if patch != nil {
+			mergeBase := *current
+			if !hasBase {
+				mergeBase = base
+			}
+			merged, err := MergePatch(mergeBase, *patch)
+			if err != nil {
+				return err
+			}
+			candidate = merged
+			existing = &base
+		} else {
+			candidate = *full
+		}
+		preserveAdminAuthPasswords(existing, &candidate)
+		preserveWriteOnlySecrets(existing, &candidate)
 		if err := upgradePlaintextAdminAuthPasswords(candidate); err != nil {
 			return err
 		}
@@ -230,6 +296,33 @@ func (s *ConfigService) CommitStructured(cfg model.NodeRedConfig) (StructuredApp
 		Live:      live,
 		BackupDir: filepath.Join(s.dataDir, "backups", "settings"),
 	}, nil
+}
+
+// patchBase returns the live configuration a patch merges onto, plus a flag
+// that reports whether the persisted store supplied it.
+//
+// The persisted store wins when it exists: it is NRCC's own authoritative
+// configuration. A deployment whose store does not exist yet falls back to
+// the configuration parsed from the live settings.js, so the first patch
+// keeps the port and the roots the running Node-RED already uses. The
+// defaults are the last resort.
+//
+// The store lookup happens outside the update lock because the JSON store
+// forbids re-entering the store from inside an update callback.
+func (s *ConfigService) patchBase() (model.NodeRedConfig, bool, error) {
+	if s.store.Exists() {
+		cfg, err := s.store.Read()
+		if err != nil {
+			return model.NodeRedConfig{}, false, fmt.Errorf("read persisted configuration: %w", err)
+		}
+		return cfg, true, nil
+	}
+	if cfg, ok, err := s.readFromSettingsFile(); err != nil {
+		return model.NodeRedConfig{}, false, err
+	} else if ok {
+		return cfg, false, nil
+	}
+	return s.GetDefault(), false, nil
 }
 
 // RestoreStructured restores only fields still carrying this transaction's
@@ -792,13 +885,7 @@ func ensureHTTPStatic(content, relDir string) string {
 	if re.MatchString(content) {
 		return content
 	}
-	insertPattern := `\n\s*\}\s*$`
-	appendRe := regexp.MustCompile(insertPattern)
-	if appendRe.MatchString(content) {
-		entry := fmt.Sprintf("  httpStatic: %q,\n", relDir)
-		return appendRe.ReplaceAllString(content, "\n"+entry+"}\n")
-	}
-	return content
+	return appendPropertyBeforeClosingBrace(content, fmt.Sprintf("  httpStatic: %q,\n", relDir))
 }
 
 // replaceScalarKey replaces or appends a scalar key:value pair
@@ -814,14 +901,44 @@ func replaceScalarKey(content, key, value string) string {
 	}
 
 	// Key not found, append before closing brace
+	return appendPropertyBeforeClosingBrace(content, fmt.Sprintf("  %s: %s,\n", key, value))
+}
+
+// appendPropertyBeforeClosingBrace inserts a rendered property just before
+// the closing brace of the module.exports object.
+//
+// The property that precedes the insertion point must end with a comma. The
+// Docker image ships a settings.js whose last property (`externalModules`)
+// carries no trailing comma, and appending a key after it would render
+// invalid JavaScript — every apply would then fail the candidate parse.
+func appendPropertyBeforeClosingBrace(content, entry string) string {
 	appendPattern := `\n\s*\}\s*$`
 	appendRe := regexp.MustCompile(appendPattern)
-	if appendRe.MatchString(content) {
-		newEntry := fmt.Sprintf("  %s: %s,\n", key, value)
-		return appendRe.ReplaceAllString(content, "\n"+newEntry+"}\n")
+	loc := appendRe.FindStringIndex(content)
+	if loc == nil {
+		return content
 	}
+	// The content is concatenated rather than passed through
+	// ReplaceAllString: the rendered entry can carry a bcrypt hash whose
+	// `$` characters ReplaceAllString would interpret as a capture
+	// reference.
+	head := ensureCommaTerminated(content[:loc[0]])
+	return head + "\n" + entry + "}\n"
+}
 
-	return content
+// ensureCommaTerminated appends a comma to the last property of the content
+// when it does not carry one. Content that ends with an opening delimiter
+// (an empty object or array) needs no comma.
+func ensureCommaTerminated(content string) string {
+	trimmed := strings.TrimRight(content, " \t")
+	if trimmed == "" {
+		return content
+	}
+	switch trimmed[len(trimmed)-1] {
+	case ',', '{', '[':
+		return content
+	}
+	return trimmed + "," + content[len(trimmed):]
 }
 
 // replaceArrayKey replaces or appends a multi-line array key.
@@ -1513,14 +1630,8 @@ func replaceBlockKey(content, key, blockContent string) string {
 	start, end, ok := findTopLevelBlock(content, key)
 	if !ok {
 		// Append before closing brace of the module.exports object.
-		appendPattern := `\n\s*\}\s*$`
-		idx := regexp.MustCompile(appendPattern).FindStringIndex(content)
-		if idx == nil {
-			return content
-		}
 		// blockContent already includes its own leading indent and trailing comma.
-		insertion := "\n" + blockContent + "\n"
-		return content[:idx[0]] + insertion + content[idx[0]:]
+		return appendPropertyBeforeClosingBrace(content, blockContent+"\n")
 	}
 	return content[:start] + blockContent + content[end:]
 }

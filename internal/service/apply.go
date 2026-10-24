@@ -124,6 +124,13 @@ type ApplyRequest struct {
 	// StructuredConfig is committed by the coordinator only after the
 	// single-flight and revision guards have accepted this transaction.
 	StructuredConfig *model.NodeRedConfig
+	// StructuredPatch is a presence-aware partial configuration update
+	// (issue #879). The coordinator merges it onto the live configuration
+	// and commits the merged result, so a payload that carries a single
+	// authentication surface does not drop the other settings. When it is
+	// set, StructuredConfig holds the merged preview until the commit
+	// replaces it with the committed configuration.
+	StructuredPatch *model.ConfigPatch
 	RecoveryTimeout  time.Duration
 	runtimeAdapter   ApplyAdapter
 }

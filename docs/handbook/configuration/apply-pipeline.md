@@ -234,6 +234,46 @@ but does not mutate referenced TLS files. See
 [`../operator/troubleshooting.md`](../operator/troubleshooting.md)
 for diagnosis and manual recovery.
 
+## Partial patches on `POST /api/config/apply`
+
+The structured apply endpoint takes a **patch**: the payload carries
+only the fields the operator changed. This is what the security
+boundary cards send — the admin-auth card owns `adminAuth`, the
+basic-auth cards own `httpNodeAuth` and `httpStaticAuth` — and it is
+what keeps an edit to one surface from dropping the rest of the
+configuration.
+
+The merge runs inside the same transaction as the write: the apply
+coordinator holds the single-flight slot and has already checked the
+revision precondition, and the merge itself runs under the
+configuration store's update lock. The patch is therefore merged onto
+the state the store holds at commit time, never onto a stale copy
+read before the transaction started.
+
+| Payload | Meaning |
+|---------|---------|
+| field absent | keep the live value |
+| field present, JSON object | merge key by key; nested arrays are replaced |
+| field present, `null` | disable the surface the field configures |
+| field present, value | replace the live value |
+
+Examples:
+
+- `{"adminAuth": {"users": [...]}}` replaces the user list and keeps
+  the auth type and the session expiry.
+- `{"httpNodeAuth": null}` disables the HTTP-node basic auth and
+  leaves the admin surface and the static surface alone.
+- `{"adminAuth": {"users": [{"username": "operator", "password": "", ...}]}}`
+  keeps the stored password hash: an empty password means "the
+  operator did not retype it", never "clear it".
+- A write-only secret echoed back as `[redacted]` (or as an empty
+  string) keeps the stored value, exactly like a full configuration
+  save does.
+
+`POST /api/config` keeps its full-replacement contract: the
+configuration editor posts the whole configuration, and the editor
+must be able to clear a surface by leaving it out.
+
 ## Failure modes and what the operator sees
 
 | Stage | Failure | Operator-visible error | Audit |

@@ -72,6 +72,13 @@ BOOTSTRAP_USER="${BOOTSTRAP_USER:-admin}"
 BOOTSTRAP_PASS="${BOOTSTRAP_PASS:-acceptance-fixture-pw-not-a-secret}"
 # nosecret (acceptance fixture; not a real credential)
 
+# Node-RED admin credentials installed by the scenario 6 security patch.
+# These belong to the supervised Node-RED instance, not to NRCC's own admin
+# user: the scenario proves the patch reached the running Node-RED.
+NODE_RED_ACCEPTANCE_USER="${NODE_RED_ACCEPTANCE_USER:-acceptance-operator}"
+NODE_RED_ACCEPTANCE_PASS="${NODE_RED_ACCEPTANCE_PASS:-acceptance-fixture-nodred-pw}"
+# nosecret (acceptance fixture; not a real credential)
+
 # Captured in scenario 1 and reused by later scenarios that hit admin
 # endpoints. Empty in DRY_RUN if scenario 1 was skipped.
 GLOBAL_TOKEN="${GLOBAL_TOKEN:-}"
@@ -583,6 +590,125 @@ scenario_5_entrypoint_umask() {
   ok "scenario 5: PASS (umask=0077 enforced + strict-mode set)"
 }
 
+# node_red_token_status performs the Node-RED editor credential exchange —
+# the request the Node-RED login form sends — and prints the HTTP status.
+node_red_token_status() {
+  local port="$1" user="$2" pass="$3"
+  curl -s -o /dev/null -w '%{http_code}' --max-time 10 \
+    -X POST -H 'Content-Type: application/x-www-form-urlencoded' \
+    --data-urlencode 'client_id=node-red-editor' \
+    --data-urlencode 'grant_type=password' \
+    --data-urlencode 'scope=' \
+    --data-urlencode "username=${user}" \
+    --data-urlencode "password=${pass}" \
+    "http://localhost:${port}/auth/token" || true
+}
+
+# node_red_token performs the same credential exchange and prints the
+# access token the editor API expects.
+node_red_token() {
+  local port="$1" user="$2" pass="$3"
+  curl -s --max-time 10 \
+    -X POST -H 'Content-Type: application/x-www-form-urlencoded' \
+    --data-urlencode 'client_id=node-red-editor' \
+    --data-urlencode 'grant_type=password' \
+    --data-urlencode 'scope=' \
+    --data-urlencode "username=${user}" \
+    --data-urlencode "password=${pass}" \
+    "http://localhost:${port}/auth/token" 2>/dev/null \
+    | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p'
+}
+
+# Scenario 6 — security-surface patch through the real apply API (issue #879).
+# The security boundary cards send only the surface they own. This scenario
+# sends an admin-auth-only patch through POST /api/config/apply on the running
+# stack and proves two things a mocked browser test cannot:
+#
+#   1. the real API accepts the partial payload and keeps every unrelated
+#      setting (the port, the roots, the credential secret);
+#   2. the live Node-RED instance enforces the credentials the patch
+#      installed — the patched user gets a token, a wrong password does not,
+#      and the editor API refuses an unauthenticated request.
+scenario_6_security_patch() {
+  log "scenario 6: security-surface patch through the real apply API"
+  if [[ "$DRY_RUN" == "1" ]]; then
+    ok "scenario 6: DRY-RUN skipped (a real API and a real Node-RED are required)"
+    return 0
+  fi
+
+  set_compose_env "$PROJECT_A" "$HOST_API_A" "$HOST_NR_A"
+
+  local token
+  token="$(login_api "$HOST_API_A")" || fail "scenario 6: login to A failed"
+  [[ -n "$token" ]] || fail "scenario 6: empty token"
+
+  # The live revision is the precondition of the structured apply.
+  local raw_settings revision
+  raw_settings="$(api_call_authed GET "http://localhost:${HOST_API_A}/api/settings/raw" "$token")" \
+    || fail "scenario 6: could not read the live settings"
+  revision="$(printf '%s' "$raw_settings" | sed -n 's/.*"fingerprint":"\([^"]*\)".*/\1/p')"
+  [[ -n "$revision" ]] || fail "scenario 6: no revision fingerprint in the live settings"
+
+  # The patch carries the admin surface only. Every other setting must
+  # survive it — that is the contract issue #879 asks for.
+  local patch response
+  patch="{\"adminAuth\":{\"type\":\"credentials\",\"users\":[{\"username\":\"${NODE_RED_ACCEPTANCE_USER}\",\"password\":\"${NODE_RED_ACCEPTANCE_PASS}\",\"permissions\":\"*\"}]},\"expectedRevision\":\"${revision}\"}"
+  response="$(api_call_authed POST "http://localhost:${HOST_API_A}/api/config/apply" "$token" "$patch")" \
+    || fail "scenario 6: the admin-only patch was rejected: ${response}"
+  assert_contains "$response" '"success":true' "admin-only patch response"
+  assert_contains "$response" '"uiPort":1880' "patch preserved the live UI port"
+  assert_contains "$response" '"httpAdminRoot":"/"' "patch preserved the admin root"
+  assert_contains "$response" '"httpNodeRoot":"/"' "patch preserved the node root"
+  assert_contains "$response" "\"username\":\"${NODE_RED_ACCEPTANCE_USER}\"" \
+    "patch applied the admin user"
+
+  # The rendered settings.js is the merged configuration, not the patch.
+  # The settings file is owned by the Node-RED user, so the read runs as
+  # that user (the same pattern the other scenarios use).
+  local container rendered
+  container="$(docker compose -p "$PROJECT_A" -f "$COMPOSE_FILE" ps -q nrcc | head -1)"
+  [[ -n "$container" ]] || fail "scenario 6: no nrcc container in A"
+  rendered="$(docker exec --user 1000:1000 "$container" cat /data/settings.js 2>/dev/null || true)"
+  assert_contains "$rendered" "uiPort: 1880" "rendered settings kept the live UI port"
+  assert_contains "$rendered" "$NODE_RED_ACCEPTANCE_USER" "rendered settings carry the patched user"
+
+  # The live Node-RED must now enforce the credentials the patch installed.
+  # The apply restarts Node-RED, so the first exchange is retried until the
+  # editor answers.
+  local deadline login_status
+  deadline=$((SECONDS + TIMEOUT_NODE))
+  login_status="000"
+  while (( SECONDS < deadline )); do
+    login_status="$(node_red_token_status "$HOST_NR_A" "$NODE_RED_ACCEPTANCE_USER" "$NODE_RED_ACCEPTANCE_PASS")"
+    [[ "$login_status" == "200" ]] && break
+    sleep 2
+  done
+  assert_eq "$login_status" "200" "live Node-RED accepts the patched admin credentials"
+
+  # A wrong password must still be rejected.
+  local wrong_status
+  wrong_status="$(node_red_token_status "$HOST_NR_A" "$NODE_RED_ACCEPTANCE_USER" "acceptance-wrong-password")"
+  case "$wrong_status" in
+    401|403) ok "live Node-RED rejects a wrong password (HTTP ${wrong_status})" ;;
+    *) fail "scenario 6: the Node-RED token endpoint answered HTTP ${wrong_status} for a wrong password, want 401 or 403" ;;
+  esac
+
+  # The editor API is protected: an unauthenticated request is refused and
+  # the patched credentials open it.
+  local flows_status access_token authed_status
+  flows_status="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 \
+    "http://localhost:${HOST_NR_A}/flows" || true)"
+  assert_eq "$flows_status" "401" "live Node-RED editor API refuses an unauthenticated request"
+
+  access_token="$(node_red_token "$HOST_NR_A" "$NODE_RED_ACCEPTANCE_USER" "$NODE_RED_ACCEPTANCE_PASS")"
+  [[ -n "$access_token" ]] || fail "scenario 6: the credential exchange returned no access token"
+  authed_status="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 \
+    -H "Authorization: Bearer ${access_token}" "http://localhost:${HOST_NR_A}/flows" || true)"
+  assert_eq "$authed_status" "200" "live Node-RED editor API accepts the patched credentials"
+
+  ok "scenario 6: PASS (partial security patch applied and enforced)"
+}
+
 # ── Driver ──────────────────────────────────────────────────────────────────
 main() {
   log "acceptance suite starting"
@@ -608,6 +734,7 @@ main() {
   scenario_3_persistence
   scenario_4_backup_restore
   scenario_5_entrypoint_umask
+  scenario_6_security_patch
 
   log "acceptance suite: ALL SCENARIOS PASSED"
 }

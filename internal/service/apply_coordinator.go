@@ -163,6 +163,21 @@ func (c *ApplyCoordinator) Apply(ctx context.Context, req ApplyRequest) (ApplyRe
 		return ApplyResult{}, ae
 	}
 
+	// A patch carries no full configuration, so the runtime adapter needs
+	// the merged candidate (and its port) before it can resolve the runtime
+	// authority. The preview merges the patch onto the live configuration
+	// without committing it; the commit below recomputes the merge under
+	// the store lock.
+	if c.resolve != nil && req.StructuredPatch != nil && req.StructuredConfig == nil {
+		preview, err := c.apply.configSvc.PreviewStructuredPatch(*req.StructuredPatch)
+		if err != nil {
+			ae := &ApplyError{Stage: ApplyStageValidate, Cause: err, Path: req.Path, Request: req}
+			c.emitFailure(req, "validate", ae)
+			return ApplyResult{}, ae
+		}
+		req.StructuredConfig = &preview
+	}
+
 	if c.resolve != nil {
 		return c.applyRuntime(ctx, req)
 	}
@@ -192,6 +207,19 @@ func (c *ApplyCoordinator) Apply(ctx context.Context, req ApplyRequest) (ApplyRe
 }
 
 func (c *ApplyCoordinator) stageStructured(req *ApplyRequest) (*StructuredApplyInput, error) {
+	// A patch is merged onto the live configuration and published as one
+	// commit, so the settings.js the apply writes is the merged one.
+	if req.StructuredPatch != nil {
+		state, err := c.apply.configSvc.CommitStructuredPatch(*req.StructuredPatch)
+		if err != nil {
+			c.apply.emit(*req, "apply.failure", ApplyStageValidate, "error", err)
+			return nil, &ApplyError{Stage: ApplyStageValidate, Cause: err, Path: req.Path, Request: *req}
+		}
+		req.Content = state.Content
+		req.BackupDir = state.BackupDir
+		req.StructuredConfig = &state.Committed
+		return &state, nil
+	}
 	if req.StructuredConfig == nil {
 		return nil, nil
 	}
