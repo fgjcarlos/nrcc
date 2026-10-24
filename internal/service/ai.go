@@ -210,8 +210,12 @@ func (s *AIService) BuildProviderRequest(req AIFlowRequest) (AIProviderRequest, 
 	}, nil
 }
 
-var secretKeyPattern = regexp.MustCompile(`(?i)(password|passwd|secret|token|credential|credentials|apikey|api_key|access[_-]?key|refresh[_-]?token|private[_-]?key|authorization|bearer|cookie|session)`)
-var envSecretLinePattern = regexp.MustCompile(`(?im)^([A-Z0-9_]*(?:PASSWORD|PASSWD|SECRET|TOKEN|API_KEY|ACCESS_KEY|PRIVATE_KEY|COOKIE|SESSION)[A-Z0-9_]*\s*=\s*)([^\n\r]+)`)
+// secretKeyPattern matches the property names that carry a secret. The
+// TLS private-key passphrase ("passphrase") is part of the set: Node-RED
+// stores it next to the certificate material, so it must never leave the
+// host inside an AI request (issue #877).
+var secretKeyPattern = regexp.MustCompile(`(?i)(password|passwd|passphrase|secret|token|credential|credentials|apikey|api_key|access[_-]?key|refresh[_-]?token|private[_-]?key|authorization|bearer|cookie|session)`)
+var envSecretLinePattern = regexp.MustCompile(`(?im)^([A-Z0-9_]*(?:PASSWORD|PASSWD|PASSPHRASE|SECRET|TOKEN|API_KEY|ACCESS_KEY|PRIVATE_KEY|COOKIE|SESSION)[A-Z0-9_]*\s*=\s*)([^\n\r]+)`)
 
 // RedactSecrets recursively redacts credentials, environment values, and payload samples.
 func RedactSecrets(v interface{}) interface{} {
