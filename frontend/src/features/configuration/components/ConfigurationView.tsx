@@ -174,7 +174,12 @@ export function ConfigurationView() {
     hostStatus,
     data.rawSettingsContent,
   );
-  const save = useConfigurationSave({ formData, diff });
+  // Issue #878 — the save travels with the settings.js revision the
+  // operator read. The backend rejects a stale revision with 409
+  // SETTINGS_REVISION_CONFLICT instead of overwriting newer state, so
+  // two browser sessions cannot silently clobber each other.
+  const expectedRevision = data.settingsDoc?.revision?.fingerprint;
+  const save = useConfigurationSave({ formData, diff, expectedRevision });
 
   // Sync loaded config to form
   useEffect(() => {
@@ -270,7 +275,9 @@ export function ConfigurationView() {
       toast.error(`Invalid settings.js: ${result.error.issues[0]?.message ?? 'syntax error'}`);
       return;
     }
-    actions.handleSaveRawSettings(content);
+    // Issue #878 — the raw editor sends the revision of the document it
+    // opened, so a stale editor session cannot overwrite newer source.
+    actions.handleSaveRawSettings(content, expectedRevision);
     // Snapshot the saved content so a re-lock restores the saved state,
     // not the pre-edit state.
     setRawEditorSnapshot(content);
@@ -387,6 +394,7 @@ export function ConfigurationView() {
       {/* Curated preset catalogue — slice 3 of #764 */}
       <AdvancedSettings
         rawContent={rawSettingsContent}
+        expectedRevision={expectedRevision}
         onApplied={() => { void data.refetchConfig(); void data.refetchSettings(); }}
       />
 
