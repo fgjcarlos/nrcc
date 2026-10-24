@@ -1,6 +1,6 @@
 # Apply pipeline (source-preserving configuration)
 
-> **Four official stages. Eight observable steps.** The apply
+> **Five official stages. Nine observable steps.** The apply
 > pipeline is the only path NRCC uses to write `settings.js`. It is
 > source-preserving, atomic, audited, and restart-aware. This page
 > is the operator's contract: what the pipeline does, what it
@@ -23,12 +23,12 @@ by hand outside of NRCC create four classes of problem:
 The apply pipeline exists to make all four impossible by
 construction.
 
-## The eight steps
+## The nine steps
 
-The persistence pipeline has four stages (`validate`, `backup`,
-`write`, `audit`) and eight observable steps. The production
-runtime-coordinated path adds `restart` and `ready` before it
-reports success. Each step emits the applicable audit event and
+The persistence pipeline has five stages (`validate`, `backup`,
+`write`, `reconcile`, `audit`) and nine observable steps. The
+production runtime-coordinated path adds `restart` and `ready` before
+it reports success. Each step emits the applicable audit event and
 returns a typed error.
 
 The table describes the persistence-only write stages; the
@@ -43,8 +43,9 @@ before its final success event.
 | 4 | Diff (existing vs. proposed) | validate | (folded into step 1) | `apply.failure` with `failure_stage=validate` |
 | 5 | Backup current file | backup | `apply.backup` (success only) | `apply.failure` with `failure_stage=backup` |
 | 6 | Atomic write | write | `apply.write` (success only) | `apply.failure` with `failure_stage=write` |
-| 7 | Fingerprint + diff redaction | write | `apply.success` | none — failure here is a panic, not an `*ApplyError` |
-| 8 | Audit close-out | audit | `apply.success` (close-out only) | none |
+| 7 | Reconcile structured mirror | reconcile | `apply.reconcile` (success only) | `apply.failure` with `failure_stage=reconcile` |
+| 8 | Fingerprint + diff redaction | write | `apply.success` | none — failure here is a panic, not an `*ApplyError` |
+| 9 | Audit close-out | audit | `apply.success` (close-out only) | none |
 
 ## Step 1 — Boundary check
 
@@ -141,7 +142,36 @@ runtime-coordinated path, that is not the final success boundary:
 `apply.success` is emitted only after the selected runtime has
 restarted and passed readiness. See [Runtime-coordinated apply](#runtime-coordinated-apply).
 
-## Step 7 — Fingerprint + diff redaction
+## Step 7 — Reconcile the structured mirror
+
+`settings.js` is the authoritative source for the values Node-RED
+reads; `config.json` is NRCC's structured mirror of the values its
+model represents. A raw apply therefore has to re-derive the mirror
+from the bytes it just wrote, otherwise a structured read keeps
+reporting the pre-apply values and the next visual save writes those
+stale values back into the source.
+
+The reconciliation is a single atomic commit of the mirror:
+
+- every managed value the source declares wins;
+- every managed value the source does not declare keeps its mirrored
+  value — the source speaks for the values it declares, it does not
+  reset the ones it is silent about;
+- the NRCC-owned state the mirror holds (the environment metadata,
+  the function libraries, the runtime state) is never taken from the
+  source;
+- the operator-owned blocks the structured model does not represent
+  stay in `settings.js`; the reconciliation never rewrites the source.
+
+A structured apply has nothing to reconcile: it committed the mirror
+before the write.
+
+If the reconciliation fails, the transaction is rejected as a whole.
+The pre-write source bytes are restored, so neither representation
+keeps a partial effect. The failure is reported with
+`failure_stage=reconcile`.
+
+## Step 8 — Fingerprint + diff redaction
 
 After a successful write, the pipeline computes:
 
@@ -157,7 +187,7 @@ Both pieces of information are computed BEFORE `apply.success` is
 emitted so the audit record and the operator-visible result are
 guaranteed to agree.
 
-## Step 8 — Audit close-out
+## Step 9 — Audit close-out
 
 On the persistence-only API, `apply.success` closes the write. On
 the production runtime-coordinated path, the close-out happens only
@@ -189,8 +219,10 @@ A rejected save has no durable effect: the revision precondition is
 checked under the apply coordinator's single-flight guard, before the
 structured configuration or any file is written. The same holds for the
 other rejected stages — a validation failure, a backup failure and a
-write failure all leave `config.json` and `settings.js` as they were,
-because the structured commit is restored when a later stage fails.
+write failure and a reconciliation failure all leave `config.json`
+and `settings.js` as they were, because the structured commit is
+restored when a later stage fails and the pre-write source bytes are
+restored when the reconciliation fails.
 
 The precondition is optional. A client that never learned a revision
 (no field in the body) keeps the historical behaviour: the server
@@ -285,6 +317,7 @@ must be able to clear a surface by leaving it out.
 | validate | revision mismatch | `*RevisionConflictError` | `apply.failure` `failure_stage=validate` |
 | backup | I/O error | `os: …` | `apply.failure` `failure_stage=backup` |
 | write | I/O error | `AtomicWriteSettings: …` | `apply.failure` `failure_stage=write` |
+| reconcile | mirror commit error | `reconcile: …` | `apply.failure` `failure_stage=reconcile` |
 | audit | panic | (operator sees 500) | (audit incomplete — recovery from log) |
 
 ## Restart policy
@@ -311,10 +344,11 @@ records use the shape below; runtime-coordinated apply also emits
 restart/readiness outcomes and rollback events where applicable:
 
 ```
-apply.start     stage=validate result=ok
-apply.backup    stage=backup   result=ok    (only if backup succeeded)
-apply.write     stage=write    result=ok    (only if write succeeded)
-apply.success   stage=write    result=ok
+apply.start     stage=validate  result=ok
+apply.backup    stage=backup    result=ok    (only if backup succeeded)
+apply.write     stage=write     result=ok    (only if write succeeded)
+apply.reconcile stage=reconcile result=ok    (raw apply only)
+apply.success   stage=write     result=ok
 ```
 
 A validation failure looks like:

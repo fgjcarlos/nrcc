@@ -149,8 +149,9 @@ type ApplyRawRequest struct {
 // ApplyRawResponse mirrors ApplyStructuredResponse for the
 // raw endpoint. Only the SettingsDocument is meaningful on
 // this surface — the structured Configuration is the empty
-// value because the raw editor does not update the JSON
-// store.
+// value because the raw editor does not publish the
+// reconciled configuration; the structured state is read
+// through the configuration endpoint.
 type ApplyRawResponse struct {
 	Document model.SettingsDocument `json:"document"`
 }

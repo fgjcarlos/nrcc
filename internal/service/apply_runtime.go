@@ -84,10 +84,18 @@ func (c *ApplyCoordinator) applyRuntime(ctx context.Context, req ApplyRequest) (
 		recoveryErr := ExecuteRollback(recoveryCtx, RollbackRequest{
 			BackupPath: result.BackupPath, ActivePath: req.Path, Stage: RollbackStage(stage),
 			RestoreState: func(context.Context) error {
-				if state == nil {
-					return nil
+				if state != nil {
+					if err := c.apply.configSvc.RestoreStructured(*state); err != nil {
+						return err
+					}
 				}
-				return c.apply.configSvc.RestoreStructured(*state)
+				// A raw apply reconciled the structured mirror before the
+				// runtime stages ran. The rollback restores the source, so
+				// the mirror has to go back with it (issue #880).
+				if result.Mirror != nil {
+					return c.apply.configSvc.RestoreMirror(*result.Mirror)
+				}
+				return nil
 			},
 			Adapter: adapter, Actor: req.Actor, Request: req.Request, AuditHook: c.apply.auditHook,
 			Capabilities: req.Capabilities, ReadyzTimeout: recoveryTimeout,
