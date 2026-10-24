@@ -226,6 +226,17 @@ new `apply.reconcile` event.
 
 The pull request is open: <https://github.com/fgjcarlos/nrcc/pull/924>
 
+CI status on the pull request — every job green:
+
+| Workflow | Result |
+|----------|--------|
+| PR Validation (backend, frontend, OpenAPI, golangci-lint) | success |
+| Acceptance (Docker stacks) | success |
+| Language policy (advisory) | success, 0 findings |
+| i18n checks | success |
+| Security (CodeQL, Trivy, govulncheck, pnpm audit, GitGuardian) | success |
+| Pages freshness checker | success |
+
 The remaining human decisions are: review the pull request, merge it, and
 close the issue. The issue label was not changed on the maintainer's
 behalf.
