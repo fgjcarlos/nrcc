@@ -2742,7 +2742,12 @@ components:
           type: string
         credentialSecret:
           type: string
-          description: Encryption secret for Node-RED credentials
+          writeOnly: true
+          description: >
+            Encryption secret for Node-RED credentials. Write-only: the API
+            never returns the stored value, for any role. An empty or
+            redacted value on write keeps the stored secret; a new value
+            rotates it. The literal "false" disables credential encryption.
         disableEditor:
           type: boolean
         adminAuth:
@@ -2760,6 +2765,35 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/EnvVar"
+        requireHttps:
+          type: boolean
+          description: Redirect HTTP requests to HTTPS
+        https:
+          $ref: "#/components/schemas/HttpsConfig"
+
+    HttpsConfig:
+      type: object
+      description: Node-RED TLS listener block
+      properties:
+        key:
+          type: string
+          description: Path to the TLS private key file
+        cert:
+          type: string
+          description: Path to the TLS certificate file
+        ca:
+          type: string
+          description: Path to the TLS certificate authority file
+        port:
+          type: integer
+          description: TLS listener port
+        passphrase:
+          type: string
+          writeOnly: true
+          description: >
+            Private-key passphrase. Write-only: the API never returns the
+            stored value, for any role. An empty or redacted value on write
+            keeps the stored passphrase; a new value rotates it.
 
     AdminAuth:
       type: object
