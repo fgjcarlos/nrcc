@@ -96,9 +96,10 @@ func (h *ConfigApplyHandler) SetAuditService(a *audit.Service) { h.audit = a }
 // (the default in tests and in edge mode).
 func (h *ConfigApplyHandler) SetProcessManager(pm *service.ProcessManager) { h.processManager = pm }
 
-// ApplyStructuredRequest is the wire payload for
-// POST /api/config/apply. The structured payload mirrors
-// the existing POST /api/config body; the new field is
+// StructuredConfigRequest is the wire payload shared by the two
+// structured configuration surfaces: POST /api/config/apply and
+// POST /api/config (issue #878). The structured payload mirrors the
+// existing POST /api/config body; the extra field is
 // ExpectedRevision, an optional sha256 fingerprint of the
 // settings.js bytes the operator read before composing this
 // edit. When non-empty the apply coordinator enforces the
@@ -106,12 +107,12 @@ func (h *ConfigApplyHandler) SetProcessManager(pm *service.ProcessManager) { h.p
 // on mismatch.
 //
 // The handler decodes the payload in two passes (see
-// ApplyStructured) so the NodeRedConfig.UnmarshalJSON hook
-// does not consume the entire body and drop the
+// DecodeStructuredConfigPayload) so the NodeRedConfig.UnmarshalJSON
+// hook does not consume the entire body and drop the
 // ExpectedRevision field. The type is kept as a documented
 // shape reference for the operator UI; it is not used as
 // the decode target directly.
-type ApplyStructuredRequest struct {
+type StructuredConfigRequest struct {
 	Configuration    model.NodeRedConfig
 	ExpectedRevision string
 }
@@ -171,8 +172,8 @@ func (h *ConfigApplyHandler) ApplyStructured(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	var req ApplyStructuredRequest
-	if !DecodeStructuredApplyPayload(w, r, &req) {
+	var req StructuredConfigRequest
+	if !DecodeStructuredConfigPayload(w, r, &req) {
 		return
 	}
 
@@ -312,21 +313,29 @@ func (h *ConfigApplyHandler) refreshDocument(path string) model.SettingsDocument
 // the operator UI can render a single conflict dialog for both
 // surfaces. It is also used by ConfigHandler.saveConfigViaApply
 // for the same reason.
-// DecodeStructuredApplyPayload decodes a POST /api/config/apply
-// body in two passes so the NodeRedConfig.UnmarshalJSON hook does
-// not consume the entire payload and drop ExpectedRevision.
+// DecodeStructuredConfigPayload decodes a structured configuration
+// body (POST /api/config/apply and, since issue #878, POST /api/config)
+// in two passes so the NodeRedConfig.UnmarshalJSON hook does not consume
+// the entire payload and drop ExpectedRevision.
 //
-// The first pass decodes into a generic map; the second pass
-// re-encodes that map minus the expectedRevision field and
-// decodes the result as a NodeRedConfig so the typed
-// UnmarshalJSON runs against the standard payload shape. The
-// expectedRevision field is preserved as a string in dst.
+// The first pass decodes into a generic map; the second pass re-encodes
+// that map minus the expectedRevision field and decodes the result as a
+// NodeRedConfig so the typed UnmarshalJSON runs against the standard
+// payload shape. The expectedRevision field is preserved as a string in
+// dst.
 //
 // On any decode failure the function writes a 400 INVALID_REQUEST
 // envelope and returns false so the handler can early-return.
-func DecodeStructuredApplyPayload(w http.ResponseWriter, r *http.Request, dst *ApplyStructuredRequest) bool {
+func DecodeStructuredConfigPayload(w http.ResponseWriter, r *http.Request, dst *StructuredConfigRequest) bool {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
+		// An oversized body must surface as 413, not as a generic 400:
+		// the body cap is a middleware policy (see
+		// middleware.BodyLimitMiddleware) and DecodeJSON reports it the
+		// same way.
+		if respondBodyLimitError(w, err) {
+			return false
+		}
 		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
 		return false
 	}
