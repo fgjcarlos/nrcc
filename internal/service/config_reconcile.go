@@ -37,12 +37,16 @@ import (
 // reconcilableSourceKeys are the top-level settings.js keys the
 // reconciliation reads back from the source. A key outside this list is
 // operator-owned: it stays in settings.js and the mirror does not model it.
+//
+// `runtimeState` is deliberately absent: the structured model owns the
+// runtime state and never renders it into the source, so the source never
+// speaks for it.
 var reconcilableSourceKeys = []string{
 	"uiPort", "port", "uiHost", "httpAdminRoot", "httpNodeRoot",
 	"flowFile", "userDir", "nodesDir", "lang", "disableEditor",
 	"projectsEnabled", "credentialSecret", "requireHttps", "https",
 	"adminAuth", "httpNodeAuth", "httpStaticAuth",
-	"editorTheme", "runtimeState", "env",
+	"editorTheme", "env",
 }
 
 // sourceKeyPattern matches the top-level (and nested) keys a source
