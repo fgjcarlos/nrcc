@@ -134,6 +134,7 @@ func (s *ConfigService) Save(cfg model.NodeRedConfig) error {
 	committed, err := s.Update(func(current *model.NodeRedConfig) error {
 		candidate := cfg
 		preserveAdminAuthPasswords(current, &candidate)
+		preserveWriteOnlySecrets(current, &candidate)
 		if err := upgradePlaintextAdminAuthPasswords(candidate); err != nil {
 			return err
 		}
@@ -198,6 +199,7 @@ func (s *ConfigService) CommitStructured(cfg model.NodeRedConfig) (StructuredApp
 		previous = *current
 		candidate := cfg
 		preserveAdminAuthPasswords(current, &candidate)
+		preserveWriteOnlySecrets(current, &candidate)
 		if err := upgradePlaintextAdminAuthPasswords(candidate); err != nil {
 			return err
 		}
@@ -249,6 +251,37 @@ func (s *ConfigService) RestoreStructured(state StructuredApplyInput) error {
 		}
 		return nil
 	})
+}
+
+// preserveWriteOnlySecrets keeps the stored value of the write-only
+// configuration secrets when the candidate does not carry one.
+//
+// The configuration API never returns credentialSecret or the TLS
+// passphrase (issue #877), so a client that reads the configuration and
+// writes it back submits an empty (or redacted) value for those fields.
+// Treating that as "clear the secret" would silently destroy the stored
+// credential-encryption secret and the TLS passphrase on every save.
+//
+// A candidate that carries a value rotates the secret, and the literal
+// "false" still disables credential encryption: only empty or redacted
+// placeholders mean "keep what is stored".
+//
+// The HTTPS block is cloned before the passphrase is restored so the
+// caller's configuration value is never mutated through the shared
+// pointer.
+func preserveWriteOnlySecrets(existing, candidate *model.NodeRedConfig) {
+	if candidate == nil || existing == nil {
+		return
+	}
+	if model.IsRedactedSecret(candidate.CredentialSecret) {
+		candidate.CredentialSecret = existing.CredentialSecret
+	}
+	if candidate.Https != nil && existing.Https != nil &&
+		model.IsRedactedSecret(candidate.Https.Passphrase) {
+		https := *candidate.Https
+		https.Passphrase = existing.Https.Passphrase
+		candidate.Https = &https
+	}
 }
 
 func preserveAdminAuthPasswords(existing, candidate *model.NodeRedConfig) {

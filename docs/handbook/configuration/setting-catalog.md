@@ -73,9 +73,13 @@ Encrypts `credentials.json` at rest. Setting it to `false` disables
 encryption (not recommended; the user explicitly opts in).
 **Secret**: changing it invalidates stored credentials, so the
 catalog treats it as a secret even though the UI accepts the value
-through a normal text field. **Restart required**. **Verification**:
-editor login still works after restart, and `credentials.json`
-cannot be read without the secret.
+through a normal text field. **Write-only**: the configuration API
+never returns the stored value — not to an admin, not to a viewer.
+The UI shows the field empty and the operator leaves it blank to keep
+the current value; an empty or redacted value on write preserves the
+stored secret, and a new value rotates it. **Restart required**.
+**Verification**: editor login still works after restart, and
+`credentials.json` cannot be read without the secret.
 
 ### `flowFilePretty`
 
@@ -137,7 +141,10 @@ disables them. Restart required.
 TLS listener block (key/cert/ca/port/passphrase options). When set,
 Node-RED serves HTTPS instead of HTTP. **Secret**: cert/key paths
 leak server identity, and the private key must never appear in
-plaintext logs. **Restart required**. **Verification**:
+plaintext logs. The `passphrase` option is **write-only**: the
+configuration API never returns the stored value, for any role, and an
+empty or redacted value on write preserves the stored passphrase.
+**Restart required**. **Verification**:
 `openssl s_client -connect host:port` returns the configured
 certificate. See [`../security/auth-surfaces.md`](../security/auth-surfaces.md)
 and the TLS playbook in [`../operator/playbook.md`](../operator/playbook.md).

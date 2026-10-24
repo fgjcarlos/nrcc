@@ -209,7 +209,9 @@ func (h *ConfigApplyHandler) ApplyStructured(w http.ResponseWriter, r *http.Requ
 		h.audit.Log(r, claims.Username, "CONFIG_APPLY", live.Path, "ok", compatibilityAuditMeta(capabilities))
 	}
 	model.RespondJSON(w, http.StatusOK, ApplyStructuredResponse{
-		Configuration: result.Configuration,
+		// Issue #877: the committed configuration echoes the write-only
+		// secrets, so they are redacted before the response leaves the API.
+		Configuration: result.Configuration.RedactedSecrets(),
 		Document:      h.refreshDocument(live.Path),
 	})
 }
