@@ -12,8 +12,11 @@ The mocked Playwright spec reported success, so only a real API call exposed
 the defect.
 
 Issue: https://github.com/fgjcarlos/nrcc/issues/879
+Pull request: https://github.com/fgjcarlos/nrcc/pull/923
 Branch: `fix/879-security-partial-patch`
-Base: `origin/main` = `eff5918` (merge of #921). `main` was not rewritten.
+Base: `origin/main`. The branch was rebased onto `7593c9d` (the merge of
+#922, which landed while the slice was open) so the pull request carries
+only this slice. `main` was not rewritten.
 
 ## Authorized policy and constraints
 
@@ -120,7 +123,16 @@ documentation.
 - `go run ./tools/langscan .` — 0 findings.
 - `go run ./scripts/cite_check ./docs` — no broken internal links.
 - `DRY_RUN=1 bash scripts/acceptance/docker-stacks.sh` — all scenarios pass.
+- Pull request #923: all 18 checks green —
+  `Backend (Go 1.27.3)`, `Frontend (Node 22)`, `Lint (golangci-lint)`,
+  `OpenAPI Spec`, `Docker stack acceptance (#434)`, `Security`
+  (`govulncheck`, `pnpm audit`, `Trivy container scan`, `GitGuardian`),
+  `Language policy scan`, `i18n catalog coverage`,
+  `Hardcoded copy guard`, `Pages content + link integrity`, `CodeQL`
+  and the three CodeQL analyses.
+- The pull request is mergeable and waits for the maintainer's review and
+  merge.
 
 ## Next step
 
-Open the pull request and wait for the CI gates.
+The maintainer reviews and merges pull request #923.
