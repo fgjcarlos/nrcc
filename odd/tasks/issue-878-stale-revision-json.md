@@ -191,5 +191,24 @@ Work units (one reviewable unit each, all inside the 400-line budget):
 
 ## Next step
 
-The branch is ready for review. The pull request closes #878 on merge.
-Remaining human decisions: review and merge.
+The pull request is open and green: <https://github.com/fgjcarlos/nrcc/pull/922>
+(`fix/878-stale-revision-json` → `main`, label `type:bug`, `Closes #878`).
+
+CI status on the pull request — every job green:
+
+| Job | Result |
+|-----|--------|
+| Backend (Go 1.27.3) | pass |
+| Frontend (Node 22) | pass |
+| Lint (golangci-lint) | pass |
+| Docker stack acceptance (#434) | pass |
+| OpenAPI Spec | pass |
+| Language policy scan | pass |
+| Hardcoded copy guard | pass |
+| i18n catalog coverage | pass |
+| Pages content + link integrity | pass |
+| Trivy container scan / Trivy / CodeQL / govulncheck / pnpm audit | pass |
+
+`main` requires one approving review before the merge, so the remaining
+human decisions are: review the pull request and merge it. The issue
+stays open until the merge lands `Closes #878`.
