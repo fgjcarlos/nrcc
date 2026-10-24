@@ -792,13 +792,7 @@ func ensureHTTPStatic(content, relDir string) string {
 	if re.MatchString(content) {
 		return content
 	}
-	insertPattern := `\n\s*\}\s*$`
-	appendRe := regexp.MustCompile(insertPattern)
-	if appendRe.MatchString(content) {
-		entry := fmt.Sprintf("  httpStatic: %q,\n", relDir)
-		return appendRe.ReplaceAllString(content, "\n"+entry+"}\n")
-	}
-	return content
+	return appendPropertyBeforeClosingBrace(content, fmt.Sprintf("  httpStatic: %q,\n", relDir))
 }
 
 // replaceScalarKey replaces or appends a scalar key:value pair
@@ -814,14 +808,44 @@ func replaceScalarKey(content, key, value string) string {
 	}
 
 	// Key not found, append before closing brace
+	return appendPropertyBeforeClosingBrace(content, fmt.Sprintf("  %s: %s,\n", key, value))
+}
+
+// appendPropertyBeforeClosingBrace inserts a rendered property just before
+// the closing brace of the module.exports object.
+//
+// The property that precedes the insertion point must end with a comma. The
+// Docker image ships a settings.js whose last property (`externalModules`)
+// carries no trailing comma, and appending a key after it would render
+// invalid JavaScript — every apply would then fail the candidate parse.
+func appendPropertyBeforeClosingBrace(content, entry string) string {
 	appendPattern := `\n\s*\}\s*$`
 	appendRe := regexp.MustCompile(appendPattern)
-	if appendRe.MatchString(content) {
-		newEntry := fmt.Sprintf("  %s: %s,\n", key, value)
-		return appendRe.ReplaceAllString(content, "\n"+newEntry+"}\n")
+	loc := appendRe.FindStringIndex(content)
+	if loc == nil {
+		return content
 	}
+	// The content is concatenated rather than passed through
+	// ReplaceAllString: the rendered entry can carry a bcrypt hash whose
+	// `$` characters ReplaceAllString would interpret as a capture
+	// reference.
+	head := ensureCommaTerminated(content[:loc[0]])
+	return head + "\n" + entry + "}\n"
+}
 
-	return content
+// ensureCommaTerminated appends a comma to the last property of the content
+// when it does not carry one. Content that ends with an opening delimiter
+// (an empty object or array) needs no comma.
+func ensureCommaTerminated(content string) string {
+	trimmed := strings.TrimRight(content, " \t")
+	if trimmed == "" {
+		return content
+	}
+	switch trimmed[len(trimmed)-1] {
+	case ',', '{', '[':
+		return content
+	}
+	return trimmed + "," + content[len(trimmed):]
 }
 
 // replaceArrayKey replaces or appends a multi-line array key.
@@ -1513,14 +1537,8 @@ func replaceBlockKey(content, key, blockContent string) string {
 	start, end, ok := findTopLevelBlock(content, key)
 	if !ok {
 		// Append before closing brace of the module.exports object.
-		appendPattern := `\n\s*\}\s*$`
-		idx := regexp.MustCompile(appendPattern).FindStringIndex(content)
-		if idx == nil {
-			return content
-		}
 		// blockContent already includes its own leading indent and trailing comma.
-		insertion := "\n" + blockContent + "\n"
-		return content[:idx[0]] + insertion + content[idx[0]:]
+		return appendPropertyBeforeClosingBrace(content, blockContent+"\n")
 	}
 	return content[:start] + blockContent + content[end:]
 }
