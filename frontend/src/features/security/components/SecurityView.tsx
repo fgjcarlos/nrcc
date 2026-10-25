@@ -47,16 +47,19 @@ export function SecurityView() {
     void data.refetchSettings();
   };
 
-  // SAFETY: NodeRedConfigResponse types nodeHttpAuth / staticAuth as
-  // CredentialsAuthResponse (a multi-user credentials shape), but the
-  // basic-auth surfaces carry { user, pass } at runtime. SecurityCenter
-  // worked around this with a per-cast `as Partial<BasicAuth>` for
-  // years; slice E formalises the boundary by declaring an
-  // HttpBasicAuthSurface on the card. The runtime payload matches the
-  // card's expectations; the type-system gap is a known schema drift.
+  // SAFETY: the basic-auth surfaces carry { user, pass } at runtime, while
+  // `NodeRedConfigResponse` also describes the multi-account `adminAuth`
+  // shape. The cards declare their own `HttpBasicAuthSurface` type, so the
+  // boundary is explicit instead of an `as any` cast.
+  //
+  // The keys are the ones the backend reports: `httpNodeAuth` and
+  // `httpStaticAuth`. The legacy aliases (`nodeHttpAuth` / `staticAuth`)
+  // are only ever written by hand in settings.js — the backend never
+  // reports them — so reading them here made the cards show an
+  // unconfigured surface for a host that actually had one.
   const config = data.config as NodeRedConfigResponse | null;
-  const httpNodeConfig = (config?.nodeHttpAuth ?? null) as HttpBasicAuthSurface;
-  const httpStaticConfig = (config?.staticAuth ?? null) as HttpBasicAuthSurface;
+  const httpNodeConfig = (config?.httpNodeAuth ?? null) as HttpBasicAuthSurface;
+  const httpStaticConfig = (config?.httpStaticAuth ?? null) as HttpBasicAuthSurface;
 
   const securityViewState = data.configLoading || data.settingsLoading
     ? { status: 'pending' as const }

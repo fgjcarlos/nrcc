@@ -16,7 +16,7 @@ type AdminUser = { username: string; permissions: '*' | 'read'; password: string
 type Permission = AdminUser['permissions'];
 
 interface AdminAuthConfig {
-  type?: 'credentials';
+  type?: string;
   users?: Array<{ username?: string; permissions?: Permission }>;
   sessionExpiryTime?: number;
 }

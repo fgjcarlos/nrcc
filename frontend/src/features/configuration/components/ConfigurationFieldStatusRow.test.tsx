@@ -80,21 +80,21 @@ describe('<ConfigurationFieldStatusRow>', () => {
       <table>
         <tbody>
           <ConfigurationFieldStatusRow
-            fieldKey="authAdminPassword"
-            label="Password"
+            fieldKey="httpAdminRoot"
+            label="Admin root"
             diff={diff({
                 configuredValue: '',
                 effectiveValue: '',
-                formValue: 'short',
+                formValue: 'admin',
                 source: 'form default',
                 pending: true,
-                validation: { state: 'invalid', message: 'Password must be at least 8 characters' },
+                validation: { state: 'invalid', message: 'Must start with /' },
               })}
           />
         </tbody>
       </table>
     );
     expect(screen.getByTestId('configuration-field-status-validation')).toHaveAttribute('data-state', 'invalid');
-    expect(screen.getByText(/at least 8 characters/i)).toBeInTheDocument();
+    expect(screen.getByText('Must start with /')).toBeInTheDocument();
   });
 });

@@ -127,9 +127,6 @@ describe('configTransformers', () => {
       expect(result.runtimeStateEnabled).toBe(true);
       expect(result.runtimeStateFile).toBe('/data/runtime-state.json');
       expect(result.lang).toBe('es-ES');
-      expect(result.authEnabled).toBe(true);
-      expect(result.authAdminUser).toBe('admin');
-      expect(result.authAdminPassword).toBe(''); // never expose password hash
     });
 
     it('should provide sensible defaults for minimal config', () => {
@@ -156,64 +153,41 @@ describe('configTransformers', () => {
       expect(result.editorPageTitle).toBe('Node-RED');
       expect(result.editorHeaderTitle).toBe('Node-RED');
       expect(result.lang).toBe('en-US');
-      expect(result.authEnabled).toBe(false);
     });
 
-    it('should handle authentication enabled state correctly', () => {
+    it('should not carry the authentication surfaces into the form (issue #881)', () => {
       const configWithAuth = {
         uiPort: 1880,
         projectsEnabled: false,
         adminAuth: {
+          type: 'credentials',
           users: [
             {
               username: 'testuser',
+              permissions: 'read' as const,
             },
           ],
+          sessionExpiryTime: 3600,
+        },
+        httpNodeAuth: {
+          user: 'http-user',
+        },
+        httpStaticAuth: {
+          user: 'static-user',
         },
       };
 
       const result = configToFormData(configWithAuth);
 
-      expect(result.authEnabled).toBe(true);
-      expect(result.authAdminUser).toBe('testuser');
-      expect(result.authAdminPassword).toBe(''); // empty: don't expose hash
-    });
-
-    it('should handle multiple authentication types', () => {
-      const configWithMultiAuth = {
-        uiPort: 1880,
-        projectsEnabled: false,
-        adminAuth: {
-          users: [
-            {
-              username: 'admin-user',
-            },
-          ],
-        },
-        nodeHttpAuth: {
-          users: [
-            {
-              username: 'http-user',
-            },
-          ],
-        },
-        staticAuth: {
-          users: [
-            {
-              username: 'static-user',
-            },
-          ],
-        },
-      };
-
-      const result = configToFormData(configWithMultiAuth);
-
-      expect(result.authEnabled).toBe(true);
-      expect(result.authAdminUser).toBe('admin-user');
-      expect(result.authNodeHttpEnabled).toBe(true);
-      expect(result.authNodeHttpUser).toBe('http-user');
-      expect(result.authStaticEnabled).toBe(true);
-      expect(result.authStaticUser).toBe('static-user');
+      // The authentication surfaces are owned by the /security boundary
+      // cards. The configuration form model does not describe them, so it
+      // can neither truncate them nor rebuild them from one account.
+      const formKeys = Object.keys(result);
+      expect(formKeys).not.toContain('authEnabled');
+      expect(formKeys).not.toContain('authAdminUser');
+      expect(formKeys).not.toContain('authAdminPassword');
+      expect(formKeys).not.toContain('authNodeHttpUser');
+      expect(formKeys).not.toContain('authStaticUser');
     });
 
     it('should handle editor theme with only page title', () => {
@@ -303,29 +277,6 @@ describe('configTransformers', () => {
       expect(result.runtimeStateFile).toBe('/custom/runtime-state.json');
     });
 
-    it('should handle missing authentication users gracefully', () => {
-      const config = {
-        uiPort: 1880,
-        projectsEnabled: false,
-        adminAuth: {
-          users: [
-            {
-              username: 'admin',
-            },
-          ],
-        },
-        nodeHttpAuth: {
-          users: [], // empty array
-        },
-      };
-
-      const result = configToFormData(config);
-
-      expect(result.authAdminUser).toBe('admin');
-      expect(result.authNodeHttpUser).toBe('');
-      expect(result.authNodeHttpEnabled).toBe(true); // enabled because nodeHttpAuth exists
-    });
-
     it('should handle editor palette editable default (true when not specified)', () => {
       const config = {
         uiPort: 1880,
@@ -402,15 +353,6 @@ describe('configTransformers', () => {
         runtimeStateEnabled: true,
         runtimeStateFile: '/data/runtime-state.json',
         lang: 'es-ES',
-        authEnabled: true,
-        authAdminUser: 'admin',
-        authAdminPassword: 'password123',
-        authNodeHttpEnabled: true,
-        authNodeHttpUser: 'http-user',
-        authNodeHttpPassword: 'http-pass',
-        authStaticEnabled: true,
-        authStaticUser: 'static-user',
-        authStaticPassword: 'static-pass',
       };
 
       const result = formDataToConfigPayload(formData);
@@ -431,287 +373,67 @@ describe('configTransformers', () => {
       expect(result.lang).toBe('es-ES');
     });
 
-    it('should create adminAuth when authEnabled and authAdminUser provided', () => {
-      const formData: NodeRedConfigFormData = {
+    // Issue #881: the configuration form owns the capabilities it edits.
+    // The authentication surfaces belong to the /security boundary cards,
+    // which edit every account, the per-account permission and the session
+    // expiry. A payload that omits a surface leaves it untouched.
+    it('never emits an adminAuth surface, even when the loaded config has accounts', () => {
+      const formData = configToFormData({
         uiPort: 1880,
-        uiHost: '0.0.0.0',
-        httpAdminRoot: '/',
-        httpNodeRoot: '/',
-        disableEditor: false,
         projectsEnabled: false,
-        loggingConsoleLevel: 'info',
-        loggingConsoleMetrics: false,
-        loggingInternalLevel: 'info',
-        loggingInternalMetrics: false,
-        flowFile: 'flows.json',
-        userDir: '',
-        nodesDir: '',
-        editorPageTitle: '',
-        editorPageFavicon: '',
-        editorPageCss: '',
-        editorHeaderTitle: '',
-        editorHeaderImage: '',
-        editorHeaderUrl: '',
-        editorDeployType: 'default',
-        editorDeployLabel: '',
-        editorDeployIcon: '',
-        editorPaletteEditable: true,
-        editorPaletteCatalogues: '',
-        editorProjectsEnabled: false,
-        editorCodeLib: 'ace',
-        editorCodeTheme: 'vs',
-        editorCodeFontSize: 12,
-        editorUserMenu: true,
-        editorTours: true,
-        editorLoginImage: '',
-        editorLogoutRedirect: '',
-        runtimeStateEnabled: false,
-        runtimeStateFile: '',
-        lang: 'en-US',
-        authEnabled: true,
-        authAdminUser: 'admin-user',
-        authAdminPassword: 'secret123',
-        authNodeHttpEnabled: false,
-        authNodeHttpUser: '',
-        authNodeHttpPassword: '',
-        authStaticEnabled: false,
-        authStaticUser: '',
-        authStaticPassword: '',
-      };
-
-      const result = formDataToConfigPayload(formData);
-
-      expect(result.adminAuth).toEqual({
-        type: 'credentials',
-        users: [
-          {
-            username: 'admin-user',
-            password: 'secret123',
-            permissions: '*',
-          },
-        ],
+        adminAuth: {
+          type: 'credentials',
+          users: [{ username: 'admin-user', permissions: '*' }],
+        },
       });
-    });
-
-    it('should not create adminAuth when authEnabled is false', () => {
-      const formData: NodeRedConfigFormData = {
-        uiPort: 1880,
-        uiHost: '0.0.0.0',
-        httpAdminRoot: '/',
-        httpNodeRoot: '/',
-        disableEditor: false,
-        projectsEnabled: false,
-        loggingConsoleLevel: 'info',
-        loggingConsoleMetrics: false,
-        loggingInternalLevel: 'info',
-        loggingInternalMetrics: false,
-        flowFile: 'flows.json',
-        userDir: '',
-        nodesDir: '',
-        editorPageTitle: '',
-        editorPageFavicon: '',
-        editorPageCss: '',
-        editorHeaderTitle: '',
-        editorHeaderImage: '',
-        editorHeaderUrl: '',
-        editorDeployType: 'default',
-        editorDeployLabel: '',
-        editorDeployIcon: '',
-        editorPaletteEditable: true,
-        editorPaletteCatalogues: '',
-        editorProjectsEnabled: false,
-        editorCodeLib: 'ace',
-        editorCodeTheme: 'vs',
-        editorCodeFontSize: 12,
-        editorUserMenu: true,
-        editorTours: true,
-        editorLoginImage: '',
-        editorLogoutRedirect: '',
-        runtimeStateEnabled: false,
-        runtimeStateFile: '',
-        lang: 'en-US',
-        authEnabled: false,
-        authAdminUser: '',
-        authAdminPassword: '',
-        authNodeHttpEnabled: false,
-        authNodeHttpUser: '',
-        authNodeHttpPassword: '',
-        authStaticEnabled: false,
-        authStaticUser: '',
-        authStaticPassword: '',
-      };
 
       const result = formDataToConfigPayload(formData);
 
-      expect(result.adminAuth).toBeUndefined();
+      expect(Object.keys(result)).not.toContain('adminAuth');
     });
 
-    it('should preserve empty password when authAdminPassword is empty (backend preserves hash)', () => {
-      const formData: NodeRedConfigFormData = {
+    it('never emits the http basic auth surfaces', () => {
+      const formData = configToFormData({
         uiPort: 1880,
-        uiHost: '0.0.0.0',
-        httpAdminRoot: '/',
-        httpNodeRoot: '/',
-        disableEditor: false,
         projectsEnabled: false,
-        loggingConsoleLevel: 'info',
-        loggingConsoleMetrics: false,
-        loggingInternalLevel: 'info',
-        loggingInternalMetrics: false,
-        flowFile: 'flows.json',
-        userDir: '',
-        nodesDir: '',
-        editorPageTitle: '',
-        editorPageFavicon: '',
-        editorPageCss: '',
-        editorHeaderTitle: '',
-        editorHeaderImage: '',
-        editorHeaderUrl: '',
-        editorDeployType: 'default',
-        editorDeployLabel: '',
-        editorDeployIcon: '',
-        editorPaletteEditable: true,
-        editorPaletteCatalogues: '',
-        editorProjectsEnabled: false,
-        editorCodeLib: 'ace',
-        editorCodeTheme: 'vs',
-        editorCodeFontSize: 12,
-        editorUserMenu: true,
-        editorTours: true,
-        editorLoginImage: '',
-        editorLogoutRedirect: '',
-        runtimeStateEnabled: false,
-        runtimeStateFile: '',
-        lang: 'en-US',
-        authEnabled: true,
-        authAdminUser: 'admin',
-        authAdminPassword: '', // empty = don't change backend hash
-        authNodeHttpEnabled: false,
-        authNodeHttpUser: '',
-        authNodeHttpPassword: '',
-        authStaticEnabled: false,
-        authStaticUser: '',
-        authStaticPassword: '',
-      };
-
-      const result = formDataToConfigPayload(formData);
-
-      expect(result.adminAuth?.users?.[0]?.password).toBe('');
-    });
-
-    it('should create nodeHttpAuth when enabled with all fields', () => {
-      const formData: NodeRedConfigFormData = {
-        uiPort: 1880,
-        uiHost: '0.0.0.0',
-        httpAdminRoot: '/',
-        httpNodeRoot: '/',
-        disableEditor: false,
-        projectsEnabled: false,
-        loggingConsoleLevel: 'info',
-        loggingConsoleMetrics: false,
-        loggingInternalLevel: 'info',
-        loggingInternalMetrics: false,
-        flowFile: 'flows.json',
-        userDir: '',
-        nodesDir: '',
-        editorPageTitle: '',
-        editorPageFavicon: '',
-        editorPageCss: '',
-        editorHeaderTitle: '',
-        editorHeaderImage: '',
-        editorHeaderUrl: '',
-        editorDeployType: 'default',
-        editorDeployLabel: '',
-        editorDeployIcon: '',
-        editorPaletteEditable: true,
-        editorPaletteCatalogues: '',
-        editorProjectsEnabled: false,
-        editorCodeLib: 'ace',
-        editorCodeTheme: 'vs',
-        editorCodeFontSize: 12,
-        editorUserMenu: true,
-        editorTours: true,
-        editorLoginImage: '',
-        editorLogoutRedirect: '',
-        runtimeStateEnabled: false,
-        runtimeStateFile: '',
-        lang: 'en-US',
-        authEnabled: false,
-        authAdminUser: '',
-        authAdminPassword: '',
-        authNodeHttpEnabled: true,
-        authNodeHttpUser: 'nodehttp-user',
-        authNodeHttpPassword: 'nodehttp-pass',
-        authStaticEnabled: false,
-        authStaticUser: '',
-        authStaticPassword: '',
-      };
-
-      const result = formDataToConfigPayload(formData);
-
-      expect(result.nodeHttpAuth).toEqual({
-        type: 'credentials',
-        users: [
-          {
-            username: 'nodehttp-user',
-            password: 'nodehttp-pass',
-          },
-        ],
+        httpNodeAuth: { user: 'nodehttp-user', pass: '$2b$10$hash' },
+        httpStaticAuth: { user: 'static-user', pass: '$2b$10$hash' },
       });
-    });
-
-    it('should not create nodeHttpAuth when missing any required field', () => {
-      const formData: NodeRedConfigFormData = {
-        uiPort: 1880,
-        uiHost: '0.0.0.0',
-        httpAdminRoot: '/',
-        httpNodeRoot: '/',
-        disableEditor: false,
-        projectsEnabled: false,
-        loggingConsoleLevel: 'info',
-        loggingConsoleMetrics: false,
-        loggingInternalLevel: 'info',
-        loggingInternalMetrics: false,
-        flowFile: 'flows.json',
-        userDir: '',
-        nodesDir: '',
-        editorPageTitle: '',
-        editorPageFavicon: '',
-        editorPageCss: '',
-        editorHeaderTitle: '',
-        editorHeaderImage: '',
-        editorHeaderUrl: '',
-        editorDeployType: 'default',
-        editorDeployLabel: '',
-        editorDeployIcon: '',
-        editorPaletteEditable: true,
-        editorPaletteCatalogues: '',
-        editorProjectsEnabled: false,
-        editorCodeLib: 'ace',
-        editorCodeTheme: 'vs',
-        editorCodeFontSize: 12,
-        editorUserMenu: true,
-        editorTours: true,
-        editorLoginImage: '',
-        editorLogoutRedirect: '',
-        runtimeStateEnabled: false,
-        runtimeStateFile: '',
-        lang: 'en-US',
-        authEnabled: false,
-        authAdminUser: '',
-        authAdminPassword: '',
-        authNodeHttpEnabled: true,
-        authNodeHttpUser: '', // missing!
-        authNodeHttpPassword: 'pass',
-        authStaticEnabled: false,
-        authStaticUser: '',
-        authStaticPassword: '',
-      };
 
       const result = formDataToConfigPayload(formData);
 
-      expect(result.nodeHttpAuth).toBeUndefined();
+      expect(Object.keys(result)).not.toContain('nodeHttpAuth');
+      expect(Object.keys(result)).not.toContain('httpNodeAuth');
+      expect(Object.keys(result)).not.toContain('staticAuth');
+      expect(Object.keys(result)).not.toContain('httpStaticAuth');
     });
+
+    it('keeps every admin account, permission and the session expiry out of an unrelated visual edit', () => {
+      const loaded = {
+        uiPort: 1880,
+        projectsEnabled: false,
+        adminAuth: {
+          type: 'credentials',
+          users: [
+            { username: 'observer', permissions: 'read' as const },
+            { username: 'administrator', permissions: '*' as const },
+          ],
+          sessionExpiryTime: 3600,
+        },
+      };
+
+      const form = configToFormData(loaded);
+      form.editorPageTitle = 'New title';
+      const payload = formDataToConfigPayload(form);
+
+      // The visual edit is submitted...
+      expect(payload.editorTheme?.page?.title).toBe('New title');
+      // ...and no security surface is rebuilt from the single-account
+      // legacy fields, so every account, permission and the session
+      // expiry survive the save untouched.
+      expect(Object.keys(payload)).not.toContain('adminAuth');
+    });
+
 
     it('should create editor theme with all page settings', () => {
       const formData: NodeRedConfigFormData = {
@@ -750,15 +472,6 @@ describe('configTransformers', () => {
         runtimeStateEnabled: false,
         runtimeStateFile: '',
         lang: 'en-US',
-        authEnabled: false,
-        authAdminUser: '',
-        authAdminPassword: '',
-        authNodeHttpEnabled: false,
-        authNodeHttpUser: '',
-        authNodeHttpPassword: '',
-        authStaticEnabled: false,
-        authStaticUser: '',
-        authStaticPassword: '',
       };
 
       const result = formDataToConfigPayload(formData);
@@ -820,15 +533,6 @@ describe('configTransformers', () => {
         runtimeStateEnabled: false,
         runtimeStateFile: '',
         lang: 'en-US',
-        authEnabled: false,
-        authAdminUser: '',
-        authAdminPassword: '',
-        authNodeHttpEnabled: false,
-        authNodeHttpUser: '',
-        authNodeHttpPassword: '',
-        authStaticEnabled: false,
-        authStaticUser: '',
-        authStaticPassword: '',
       };
 
       const result = formDataToConfigPayload(formData);
@@ -878,15 +582,6 @@ describe('configTransformers', () => {
         runtimeStateEnabled: false,
         runtimeStateFile: '',
         lang: 'en-US',
-        authEnabled: false,
-        authAdminUser: '',
-        authAdminPassword: '',
-        authNodeHttpEnabled: false,
-        authNodeHttpUser: '',
-        authNodeHttpPassword: '',
-        authStaticEnabled: false,
-        authStaticUser: '',
-        authStaticPassword: '',
       };
 
       const result = formDataToConfigPayload(formData);
@@ -934,15 +629,6 @@ describe('configTransformers', () => {
         runtimeStateEnabled: false,
         runtimeStateFile: '',
         lang: 'en-US',
-        authEnabled: false,
-        authAdminUser: '',
-        authAdminPassword: '',
-        authNodeHttpEnabled: false,
-        authNodeHttpUser: '',
-        authNodeHttpPassword: '',
-        authStaticEnabled: false,
-        authStaticUser: '',
-        authStaticPassword: '',
       };
 
       const result = formDataToConfigPayload(formData);
@@ -988,15 +674,6 @@ describe('configTransformers', () => {
         runtimeStateEnabled: false,
         runtimeStateFile: '',
         lang: 'en-US',
-        authEnabled: false,
-        authAdminUser: '',
-        authAdminPassword: '',
-        authNodeHttpEnabled: false,
-        authNodeHttpUser: '',
-        authNodeHttpPassword: '',
-        authStaticEnabled: false,
-        authStaticUser: '',
-        authStaticPassword: '',
       };
 
       const result = formDataToConfigPayload(formData);
@@ -1042,15 +719,6 @@ describe('configTransformers', () => {
         runtimeStateEnabled: true,
         runtimeStateFile: '/custom/runtime.json',
         lang: 'en-US',
-        authEnabled: false,
-        authAdminUser: '',
-        authAdminPassword: '',
-        authNodeHttpEnabled: false,
-        authNodeHttpUser: '',
-        authNodeHttpPassword: '',
-        authStaticEnabled: false,
-        authStaticUser: '',
-        authStaticPassword: '',
       };
 
       const result = formDataToConfigPayload(formData);
@@ -1098,15 +766,6 @@ describe('configTransformers', () => {
         runtimeStateEnabled: false,
         runtimeStateFile: '',
         lang: 'en-US',
-        authEnabled: false,
-        authAdminUser: '',
-        authAdminPassword: '',
-        authNodeHttpEnabled: false,
-        authNodeHttpUser: '',
-        authNodeHttpPassword: '',
-        authStaticEnabled: false,
-        authStaticUser: '',
-        authStaticPassword: '',
       };
 
       const result = formDataToConfigPayload(formData);
@@ -1151,15 +810,6 @@ describe('configTransformers', () => {
         runtimeStateEnabled: false,
         runtimeStateFile: '',
         lang: 'en-US',
-        authEnabled: false,
-        authAdminUser: '',
-        authAdminPassword: '',
-        authNodeHttpEnabled: false,
-        authNodeHttpUser: '',
-        authNodeHttpPassword: '',
-        authStaticEnabled: false,
-        authStaticUser: '',
-        authStaticPassword: '',
       };
 
       const result = formDataToConfigPayload(formData);
@@ -1204,15 +854,6 @@ describe('configTransformers', () => {
         runtimeStateEnabled: false,
         runtimeStateFile: '',
         lang: 'en-US',
-        authEnabled: false,
-        authAdminUser: '',
-        authAdminPassword: '',
-        authNodeHttpEnabled: false,
-        authNodeHttpUser: '',
-        authNodeHttpPassword: '',
-        authStaticEnabled: false,
-        authStaticUser: '',
-        authStaticPassword: '',
       };
 
       const result = formDataToConfigPayload(formData);
@@ -1258,15 +899,6 @@ describe('configTransformers', () => {
         runtimeStateEnabled: false,
         runtimeStateFile: '',
         lang: 'en-US',
-        authEnabled: false,
-        authAdminUser: '',
-        authAdminPassword: '',
-        authNodeHttpEnabled: false,
-        authNodeHttpUser: '',
-        authNodeHttpPassword: '',
-        authStaticEnabled: false,
-        authStaticUser: '',
-        authStaticPassword: '',
       };
 
       const result = formDataToConfigPayload(formData);
@@ -1327,7 +959,7 @@ describe('configTransformers', () => {
       ]);
     });
 
-    it('should not preserve authentication passwords through round-trip (security)', () => {
+    it('should not round-trip authentication through the configuration payload (security)', () => {
       const configWithAuth = {
         uiPort: 1880,
         projectsEnabled: false,
@@ -1342,12 +974,11 @@ describe('configTransformers', () => {
 
       const formData = configToFormData(configWithAuth);
 
-      // Password should be empty in form data (don't expose hash to frontend)
-      expect(formData.authAdminPassword).toBe('');
-
-      // When converting back, the empty password is preserved
+      // The configuration payload carries no authentication surface at all:
+      // the admin accounts are owned by the /security boundary cards, so the
+      // configuration form can neither leak nor rewrite them (issue #881).
       const payload = formDataToConfigPayload(formData);
-      expect(payload.adminAuth?.users?.[0]?.password).toBe('');
+      expect(Object.keys(payload)).not.toContain('adminAuth');
     });
   });
 });

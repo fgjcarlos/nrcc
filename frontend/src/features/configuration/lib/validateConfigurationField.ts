@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import type { NodeRedConfigFormData } from '@/shared/types';
 import type { FieldDiff, ValidationState } from '../hooks/useConfigurationDiff';
-import { passwordSchema } from '@/shared/validation/schemas';
 
 /**
  * Issue #766 slice F — per-field validation helper.
@@ -21,7 +20,6 @@ interface ValidationResult {
 const portRange = z.number().int().min(1).max(65535);
 const positiveInt = z.number().int().positive();
 const requiredString = z.string().trim().min(1, 'Required');
-const minUsername = z.string().trim().min(3, 'Username must be at least 3 characters');
 
 /**
  * Per-field validators. Return `{ state: 'valid' }` for fields with no
@@ -70,32 +68,6 @@ function validateOne(key: keyof NodeRedConfigFormData, value: unknown): Validati
       return parsed.success
         ? { state: 'valid' }
         : { state: 'invalid', message: 'Font size must be a positive integer' };
-    }
-    case 'authAdminPassword': {
-      // Only validate when non-empty: the form treats empty as "leave
-      // existing hash intact".
-      if (typeof value !== 'string' || value.length === 0) return { state: 'valid' };
-      const parsed = passwordSchema.safeParse(value);
-      return parsed.success
-        ? { state: 'valid' }
-        : { state: 'invalid', message: parsed.error.issues[0]?.message ?? 'Invalid password' };
-    }
-    case 'authAdminUser':
-    case 'authNodeHttpUser':
-    case 'authStaticUser': {
-      if (typeof value !== 'string' || value.length === 0) return { state: 'valid' };
-      const parsed = minUsername.safeParse(value);
-      return parsed.success
-        ? { state: 'valid' }
-        : { state: 'invalid', message: parsed.error.issues[0]?.message ?? 'Invalid username' };
-    }
-    case 'authNodeHttpPassword':
-    case 'authStaticPassword': {
-      if (typeof value !== 'string' || value.length === 0) return { state: 'valid' };
-      const parsed = passwordSchema.safeParse(value);
-      return parsed.success
-        ? { state: 'valid' }
-        : { state: 'invalid', message: parsed.error.issues[0]?.message ?? 'Invalid password' };
     }
     case 'httpsPort': {
       // Optional; 0 means "no TLS port"

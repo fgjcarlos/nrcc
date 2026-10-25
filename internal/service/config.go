@@ -132,9 +132,13 @@ func upgradePlaintextAdminAuthPasswords(cfg model.NodeRedConfig) error {
 // frontend can submit cleartext when changing the admin password without the
 // validation rejecting it (#706).
 func (s *ConfigService) Save(cfg model.NodeRedConfig) error {
+	fallbacks := s.securityFallbacks(&cfg)
 	committed, err := s.Update(func(current *model.NodeRedConfig) error {
 		candidate := cfg
 		preserveAdminAuthPasswords(current, &candidate)
+		// Issue #881: a payload that omits a security surface keeps the
+		// loaded one instead of clearing it.
+		preserveSecuritySurfaces(current, fallbacks, &candidate)
 		preserveWriteOnlySecrets(current, &candidate)
 		if err := upgradePlaintextAdminAuthPasswords(candidate); err != nil {
 			return err
@@ -243,6 +247,10 @@ func (s *ConfigService) commitStructured(full *model.NodeRedConfig, patch *model
 	if err != nil {
 		return StructuredApplyInput{}, err
 	}
+	// Issue #881: the full-replacement contract keeps a security surface the
+	// payload omits. The fallback lookup happens outside the update lock
+	// because it reads the live settings.js.
+	fallbacks := s.securityFallbacks(full)
 	var previous model.NodeRedConfig
 	committed, err := s.Update(func(current *model.NodeRedConfig) error {
 		previous = *current
@@ -264,6 +272,9 @@ func (s *ConfigService) commitStructured(full *model.NodeRedConfig, patch *model
 			existing = &base
 		} else {
 			candidate = *full
+			// Issue #881: a payload that omits a security surface keeps the
+			// loaded one instead of clearing it.
+			preserveSecuritySurfaces(current, fallbacks, &candidate)
 		}
 		preserveAdminAuthPasswords(existing, &candidate)
 		preserveWriteOnlySecrets(existing, &candidate)
@@ -330,21 +341,46 @@ func (s *ConfigService) patchBase() (model.NodeRedConfig, bool, error) {
 // committed values. Concurrent unrelated writes therefore survive recovery.
 func (s *ConfigService) RestoreStructured(state StructuredApplyInput) error {
 	return s.store.Update(func(current *model.NodeRedConfig) error {
-		live := reflect.ValueOf(current).Elem()
-		previous := reflect.ValueOf(state.Previous)
-		committed := reflect.ValueOf(state.Committed)
-		for i := 0; i < live.NumField(); i++ {
-			name := live.Type().Field(i).Name
-			switch name {
-			case "EnvVars", "FunctionLibraries", "RuntimeState", "SettingsPath", "SettingsSource", "Extra":
-				continue
-			}
-			if reflect.DeepEqual(live.Field(i).Interface(), committed.Field(i).Interface()) {
-				live.Field(i).Set(previous.Field(i))
-			}
-		}
+		restoreUnchangedFields(current, state.Previous, state.Committed, structuredRestoreSkip)
 		return nil
 	})
+}
+
+// structuredRestoreSkip lists the fields the structured apply does not own:
+// the state of the other services and the internal bookkeeping.
+var structuredRestoreSkip = map[string]struct{}{
+	"EnvVars": {}, "FunctionLibraries": {}, "RuntimeState": {},
+	"SettingsPath": {}, "SettingsSource": {}, "Extra": {},
+}
+
+// mirrorRestoreSkip lists the fields the mirror reconciliation does not own.
+var mirrorRestoreSkip = map[string]struct{}{
+	"FunctionLibraries": {}, "RuntimeState": {}, "SettingsPath": {},
+	"SettingsSource": {}, "Extra": {},
+}
+
+// restoreUnchangedFields copies the previous value of every exported field
+// that still holds the committed value.
+//
+// Unexported fields are skipped: they are internal bookkeeping (the
+// security-surface presence of issue #881) and reflect.Value.Interface
+// panics when it is called on them.
+func restoreUnchangedFields(current *model.NodeRedConfig, previous, committed model.NodeRedConfig, skip map[string]struct{}) {
+	live := reflect.ValueOf(current).Elem()
+	livePrevious := reflect.ValueOf(previous)
+	liveCommitted := reflect.ValueOf(committed)
+	for i := 0; i < live.NumField(); i++ {
+		field := live.Type().Field(i)
+		if !field.IsExported() {
+			continue
+		}
+		if _, ok := skip[field.Name]; ok {
+			continue
+		}
+		if reflect.DeepEqual(live.Field(i).Interface(), liveCommitted.Field(i).Interface()) {
+			live.Field(i).Set(livePrevious.Field(i))
+		}
+	}
 }
 
 // preserveWriteOnlySecrets keeps the stored value of the write-only
@@ -394,6 +430,139 @@ func preserveAdminAuthPasswords(existing, candidate *model.NodeRedConfig) {
 			}
 		}
 	}
+}
+
+// securitySurfaceFallbacks holds the authentication surfaces loaded from the
+// live settings.js. They are the fallback source when nrcc's own store does
+// not know a surface yet, for example when the operator wrote adminAuth by
+// hand before the first save.
+type securitySurfaceFallbacks struct {
+	adminAuth      *model.AdminAuth
+	httpNodeAuth   *model.HTTPBasicAuth
+	httpStaticAuth *model.HTTPBasicAuth
+}
+
+// preserveSecuritySurfaces keeps the authentication surfaces a payload did
+// not carry, and the password hashes of the accounts it did.
+//
+// Issue #881: the configuration form submits only the capabilities it
+// edits. A payload that omits `adminAuth` (or a basic-auth surface) must
+// leave the loaded surface untouched. Before this rule existed, the
+// configuration form rebuilt `adminAuth` from a single account with
+// wildcard permissions, so an unrelated visual edit replaced Node-RED's
+// complete authentication model: every other account, every `read`
+// permission and the session expiry were dropped.
+//
+// Sources, in order:
+//  1. the persisted nrcc store — what the operator last saved,
+//  2. the live settings.js — what Node-RED is actually running with.
+func preserveSecuritySurfaces(current *model.NodeRedConfig, fallbacks *securitySurfaceFallbacks, candidate *model.NodeRedConfig) {
+	if candidate.AdminAuthCarried() {
+		// The payload carries the surface: keep the password hash of every
+		// account the operator did not change. An empty password means
+		// "unchanged", exactly like the security cards send it.
+		preserveAdminAuthPasswords(current, candidate)
+		fillAdminAuthPasswords(fallbacks.adminAuth, candidate.AdminAuth)
+	} else {
+		// The payload omits the surface: keep the loaded one.
+		candidate.AdminAuth = current.AdminAuth
+		if candidate.AdminAuth == nil {
+			candidate.AdminAuth = fallbacks.adminAuth
+		}
+	}
+
+	preserveBasicAuthSurface(current.HTTPNodeAuth, fallbacks.httpNodeAuth, candidate.HTTPNodeAuthCarried(), &candidate.HTTPNodeAuth)
+	preserveBasicAuthSurface(current.HTTPStaticAuth, fallbacks.httpStaticAuth, candidate.HTTPStaticAuthCarried(), &candidate.HTTPStaticAuth)
+}
+
+// fillAdminAuthPasswords copies the password hash of every candidate
+// account without one from the first source that knows the username.
+func fillAdminAuthPasswords(source, candidate *model.AdminAuth) {
+	if source == nil || candidate == nil {
+		return
+	}
+	for i := range candidate.Users {
+		if candidate.Users[i].Password != "" {
+			continue
+		}
+		for _, existing := range source.Users {
+			if existing.Username == candidate.Users[i].Username && existing.Password != "" {
+				candidate.Users[i].Password = existing.Password
+				break
+			}
+		}
+	}
+}
+
+// preserveBasicAuthSurface keeps a basic-auth surface a payload omitted and
+// the bcrypt hash of a pass the operator did not change.
+func preserveBasicAuthSurface(current, fallback *model.HTTPBasicAuth, carried bool, candidate **model.HTTPBasicAuth) {
+	if !carried {
+		if current != nil {
+			*candidate = current
+		} else if fallback != nil {
+			*candidate = fallback
+		}
+		return
+	}
+	if *candidate == nil || (*candidate).Pass != "" {
+		return
+	}
+	for _, source := range []*model.HTTPBasicAuth{current, fallback} {
+		if source != nil && source.User == (*candidate).User && source.Pass != "" {
+			(*candidate).Pass = source.Pass
+			break
+		}
+	}
+}
+
+// securityFallbacks returns the live settings.js authentication surfaces
+// needed to preserve a surface the payload omitted.
+//
+// The live settings.js is only parsed when the persisted store cannot
+// supply the surface: the parse runs the settings sandbox and is far more
+// expensive than reading the store.
+func (s *ConfigService) securityFallbacks(cfg *model.NodeRedConfig) *securitySurfaceFallbacks {
+	fallbacks := &securitySurfaceFallbacks{}
+	if cfg == nil {
+		// The patch path merges onto the live configuration, so the merge
+		// itself resolves the presence of every surface.
+		return fallbacks
+	}
+	if cfg.AdminAuthCarried() && cfg.HTTPNodeAuthCarried() && cfg.HTTPStaticAuthCarried() {
+		// Every surface was carried by the payload: nothing to preserve.
+		return fallbacks
+	}
+
+	persisted, err := s.store.Read()
+	if err != nil {
+		persisted = model.NodeRedConfig{}
+	}
+	needAdmin := !cfg.AdminAuthCarried() && persisted.AdminAuth == nil
+	needNode := !cfg.HTTPNodeAuthCarried() && persisted.HTTPNodeAuth == nil
+	needStatic := !cfg.HTTPStaticAuthCarried() && persisted.HTTPStaticAuth == nil
+	if !needAdmin && !needNode && !needStatic {
+		return fallbacks
+	}
+
+	doc, err := s.GetRawSettings()
+	if err != nil || doc.Content == "" {
+		return fallbacks
+	}
+	parsed, err := s.parseConfigFromContent(doc.Content)
+	if err != nil {
+		return fallbacks
+	}
+	if needAdmin {
+		fallbacks.adminAuth = parsed.AdminAuth
+	}
+	if needNode {
+		fallbacks.httpNodeAuth = parsed.HTTPNodeAuth
+	}
+	if needStatic {
+		fallbacks.httpStaticAuth = parsed.HTTPStaticAuth
+	}
+	return fallbacks
 }
 
 func validateAdminAuthPasswords(cfg model.NodeRedConfig) error {
@@ -947,6 +1116,7 @@ func ensureCommaTerminated(content string) string {
 		return content
 	}
 	return trimmed + "," + content[len(trimmed):]
+
 }
 
 // replaceArrayKey replaces or appends a multi-line array key.
@@ -957,13 +1127,7 @@ func replaceArrayKey(content, key, arrayContent string) string {
 		return re.ReplaceAllString(content, arrayContent)
 	}
 
-	appendPattern := `\n\s*\}\s*$`
-	appendRe := regexp.MustCompile(appendPattern)
-	if appendRe.MatchString(content) {
-		newEntry := "\n" + arrayContent + "\n"
-		return appendRe.ReplaceAllString(content, newEntry+"}\n")
-	}
-	return content
+	return appendPropertyBeforeClosingBrace(content, arrayContent+"\n")
 }
 
 func removeArrayKey(content, key string) string {

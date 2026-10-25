@@ -91,15 +91,14 @@ describe('computeConfigurationDiff', () => {
     expect(sample.effectiveLabel).toBe('Effective (NRCC-loaded)');
   });
 
-  it('marks auth fields with restart=hard when enable flips', () => {
+  it('marks settings.js-sourced fields with restart=hard', () => {
     const form = baseForm();
-    form.authEnabled = true;
-    form.authAdminUser = 'admin';
+    form.uiPort = 2000;
     const diff = computeConfigurationDiff(form, loadedConfig(), emptyHost(), '');
-    // authEnabled is sourced from settings.js (Node-RED adminAuth); enabling
-    // it requires a Node-RED restart.
-    expect(diff.fields.authEnabled.source).toBe('settings.js');
-    expect(diff.fields.authEnabled.restart).toBe('hard');
+    // uiPort is sourced from settings.js (Node-RED listener); changing it
+    // requires a Node-RED restart.
+    expect(diff.fields.uiPort.source).toBe('settings.js');
+    expect(diff.fields.uiPort.restart).toBe('hard');
   });
 
   it('aggregates restartRequired to the highest severity across dirty fields', () => {
@@ -114,13 +113,11 @@ describe('computeConfigurationDiff', () => {
     expect(distinct.has('hard')).toBe(true);
   });
 
-  it('reports validationErrors from validateConfigurationField when password is too short', () => {
+  it('reports validationErrors from validateConfigurationField when a root path is invalid', () => {
     const form = baseForm();
-    form.authEnabled = true;
-    form.authAdminUser = 'admin';
-    form.authAdminPassword = 'short'; // < 8 chars
+    form.httpAdminRoot = 'admin'; // must start with /
     const diff = computeConfigurationDiff(form, loadedConfig(), emptyHost(), '');
-    expect(diff.validationErrors['authAdminPassword']).toBeDefined();
+    expect(diff.validationErrors['httpAdminRoot']).toBeDefined();
     // Save should be blocked
     expect(diff.canSave).toBe(false);
   });
@@ -139,8 +136,8 @@ describe('computeConfigurationDiff', () => {
     expect(diff.fields.uiPort.source).toBe('settings.js');
     // disableEditor (UI-only affordance) is NRCC-side
     expect(diff.fields.disableEditor.source satisfies FieldSource).toBe('settings.js');
-    // authAdminPassword is write-only; never sourced from settings.js
-    expect(diff.fields.authAdminPassword.source satisfies FieldSource).toBe('form default');
+    // credentialSecret is write-only; never sourced from settings.js
+    expect(diff.fields.credentialSecret.source satisfies FieldSource).toBe('form default');
   });
 
   it('falls back to all-zero pending state when loadedConfig is null (initial render)', () => {

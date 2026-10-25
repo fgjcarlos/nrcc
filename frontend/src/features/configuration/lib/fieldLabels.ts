@@ -21,15 +21,6 @@ export const FIELD_LABELS: Record<keyof NodeRedConfigFormData, string> = {
   httpNodeRoot: 'Node Root',
   disableEditor: 'Disable Editor',
   // Auth
-  authEnabled: 'Auth Enabled',
-  authAdminUser: 'Auth Admin User',
-  authAdminPassword: 'Auth Admin Password',
-  authNodeHttpEnabled: 'Node HTTP Auth Enabled',
-  authNodeHttpUser: 'Node HTTP Auth User',
-  authNodeHttpPassword: 'Node HTTP Auth Password',
-  authStaticEnabled: 'Static Auth Enabled',
-  authStaticUser: 'Static Auth User',
-  authStaticPassword: 'Static Auth Password',
   // Projects
   projectsEnabled: 'Projects Enabled',
   // Logging

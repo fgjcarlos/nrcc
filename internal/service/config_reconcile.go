@@ -3,7 +3,6 @@ package service
 import (
 	"errors"
 	"fmt"
-	"reflect"
 	"regexp"
 	"sort"
 	"strconv"
@@ -128,19 +127,7 @@ func (s *ConfigService) RestoreMirror(snapshot MirrorSnapshot) error {
 		return s.store.Delete()
 	}
 	return s.store.Update(func(current *model.NodeRedConfig) error {
-		live := reflect.ValueOf(current).Elem()
-		previous := reflect.ValueOf(snapshot.Previous)
-		committed := reflect.ValueOf(snapshot.Committed)
-		for i := 0; i < live.NumField(); i++ {
-			name := live.Type().Field(i).Name
-			switch name {
-			case "FunctionLibraries", "RuntimeState", "SettingsPath", "SettingsSource", "Extra":
-				continue
-			}
-			if reflect.DeepEqual(live.Field(i).Interface(), committed.Field(i).Interface()) {
-				live.Field(i).Set(previous.Field(i))
-			}
-		}
+		restoreUnchangedFields(current, snapshot.Previous, snapshot.Committed, mirrorRestoreSkip)
 		return nil
 	})
 }
