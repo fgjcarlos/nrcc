@@ -324,16 +324,9 @@ export function configToFormData(config: NodeRedConfigResponse): NodeRedConfigFo
     httpNodeRoot: typeof config.httpNodeRoot === 'string' ? config.httpNodeRoot : '/',
     disableEditor: config.disableEditor || false,
 
-    // Authentication — password nunca se precarga (no exponemos hashes)
-    authEnabled: !!config.adminAuth,
-    authAdminUser: config.adminAuth?.users?.[0]?.username || '',
-    authAdminPassword: '', // vacío: si no cambia, el backend preserva el hash
-    authNodeHttpEnabled: !!config.nodeHttpAuth,
-    authNodeHttpUser: config.nodeHttpAuth?.users?.[0]?.username || '',
-    authNodeHttpPassword: '',
-    authStaticEnabled: !!config.staticAuth,
-    authStaticUser: config.staticAuth?.users?.[0]?.username || '',
-    authStaticPassword: '',
+    // Authentication surfaces are not part of the form model (issue #881):
+    // they are owned by the /security boundary cards. The configuration form
+    // neither reads nor writes them.
 
     projectsEnabled: config.projectsEnabled || false,
 

@@ -60,15 +60,6 @@ const INITIAL_FORM_DATA: NodeRedConfigFormData = {
   disableEditor: false,
 
   // Authentication
-  authEnabled: false,
-  authAdminUser: '',
-  authAdminPassword: '',
-  authNodeHttpEnabled: false,
-  authNodeHttpUser: '',
-  authNodeHttpPassword: '',
-  authStaticEnabled: false,
-  authStaticUser: '',
-  authStaticPassword: '',
 
   // Projects
   projectsEnabled: false,

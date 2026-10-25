@@ -127,9 +127,6 @@ describe('configTransformers', () => {
       expect(result.runtimeStateEnabled).toBe(true);
       expect(result.runtimeStateFile).toBe('/data/runtime-state.json');
       expect(result.lang).toBe('es-ES');
-      expect(result.authEnabled).toBe(true);
-      expect(result.authAdminUser).toBe('admin');
-      expect(result.authAdminPassword).toBe(''); // never expose password hash
     });
 
     it('should provide sensible defaults for minimal config', () => {
@@ -156,64 +153,41 @@ describe('configTransformers', () => {
       expect(result.editorPageTitle).toBe('Node-RED');
       expect(result.editorHeaderTitle).toBe('Node-RED');
       expect(result.lang).toBe('en-US');
-      expect(result.authEnabled).toBe(false);
     });
 
-    it('should handle authentication enabled state correctly', () => {
+    it('should not carry the authentication surfaces into the form (issue #881)', () => {
       const configWithAuth = {
         uiPort: 1880,
         projectsEnabled: false,
         adminAuth: {
+          type: 'credentials',
           users: [
             {
               username: 'testuser',
+              permissions: 'read' as const,
             },
           ],
+          sessionExpiryTime: 3600,
+        },
+        httpNodeAuth: {
+          user: 'http-user',
+        },
+        httpStaticAuth: {
+          user: 'static-user',
         },
       };
 
       const result = configToFormData(configWithAuth);
 
-      expect(result.authEnabled).toBe(true);
-      expect(result.authAdminUser).toBe('testuser');
-      expect(result.authAdminPassword).toBe(''); // empty: don't expose hash
-    });
-
-    it('should handle multiple authentication types', () => {
-      const configWithMultiAuth = {
-        uiPort: 1880,
-        projectsEnabled: false,
-        adminAuth: {
-          users: [
-            {
-              username: 'admin-user',
-            },
-          ],
-        },
-        nodeHttpAuth: {
-          users: [
-            {
-              username: 'http-user',
-            },
-          ],
-        },
-        staticAuth: {
-          users: [
-            {
-              username: 'static-user',
-            },
-          ],
-        },
-      };
-
-      const result = configToFormData(configWithMultiAuth);
-
-      expect(result.authEnabled).toBe(true);
-      expect(result.authAdminUser).toBe('admin-user');
-      expect(result.authNodeHttpEnabled).toBe(true);
-      expect(result.authNodeHttpUser).toBe('http-user');
-      expect(result.authStaticEnabled).toBe(true);
-      expect(result.authStaticUser).toBe('static-user');
+      // The authentication surfaces are owned by the /security boundary
+      // cards. The configuration form model does not describe them, so it
+      // can neither truncate them nor rebuild them from one account.
+      const formKeys = Object.keys(result);
+      expect(formKeys).not.toContain('authEnabled');
+      expect(formKeys).not.toContain('authAdminUser');
+      expect(formKeys).not.toContain('authAdminPassword');
+      expect(formKeys).not.toContain('authNodeHttpUser');
+      expect(formKeys).not.toContain('authStaticUser');
     });
 
     it('should handle editor theme with only page title', () => {
@@ -303,29 +277,6 @@ describe('configTransformers', () => {
       expect(result.runtimeStateFile).toBe('/custom/runtime-state.json');
     });
 
-    it('should handle missing authentication users gracefully', () => {
-      const config = {
-        uiPort: 1880,
-        projectsEnabled: false,
-        adminAuth: {
-          users: [
-            {
-              username: 'admin',
-            },
-          ],
-        },
-        nodeHttpAuth: {
-          users: [], // empty array
-        },
-      };
-
-      const result = configToFormData(config);
-
-      expect(result.authAdminUser).toBe('admin');
-      expect(result.authNodeHttpUser).toBe('');
-      expect(result.authNodeHttpEnabled).toBe(true); // enabled because nodeHttpAuth exists
-    });
-
     it('should handle editor palette editable default (true when not specified)', () => {
       const config = {
         uiPort: 1880,
@@ -402,15 +353,6 @@ describe('configTransformers', () => {
         runtimeStateEnabled: true,
         runtimeStateFile: '/data/runtime-state.json',
         lang: 'es-ES',
-        authEnabled: true,
-        authAdminUser: 'admin',
-        authAdminPassword: 'password123',
-        authNodeHttpEnabled: true,
-        authNodeHttpUser: 'http-user',
-        authNodeHttpPassword: 'http-pass',
-        authStaticEnabled: true,
-        authStaticUser: 'static-user',
-        authStaticPassword: 'static-pass',
       };
 
       const result = formDataToConfigPayload(formData);
@@ -530,15 +472,6 @@ describe('configTransformers', () => {
         runtimeStateEnabled: false,
         runtimeStateFile: '',
         lang: 'en-US',
-        authEnabled: false,
-        authAdminUser: '',
-        authAdminPassword: '',
-        authNodeHttpEnabled: false,
-        authNodeHttpUser: '',
-        authNodeHttpPassword: '',
-        authStaticEnabled: false,
-        authStaticUser: '',
-        authStaticPassword: '',
       };
 
       const result = formDataToConfigPayload(formData);
@@ -600,15 +533,6 @@ describe('configTransformers', () => {
         runtimeStateEnabled: false,
         runtimeStateFile: '',
         lang: 'en-US',
-        authEnabled: false,
-        authAdminUser: '',
-        authAdminPassword: '',
-        authNodeHttpEnabled: false,
-        authNodeHttpUser: '',
-        authNodeHttpPassword: '',
-        authStaticEnabled: false,
-        authStaticUser: '',
-        authStaticPassword: '',
       };
 
       const result = formDataToConfigPayload(formData);
@@ -658,15 +582,6 @@ describe('configTransformers', () => {
         runtimeStateEnabled: false,
         runtimeStateFile: '',
         lang: 'en-US',
-        authEnabled: false,
-        authAdminUser: '',
-        authAdminPassword: '',
-        authNodeHttpEnabled: false,
-        authNodeHttpUser: '',
-        authNodeHttpPassword: '',
-        authStaticEnabled: false,
-        authStaticUser: '',
-        authStaticPassword: '',
       };
 
       const result = formDataToConfigPayload(formData);
@@ -714,15 +629,6 @@ describe('configTransformers', () => {
         runtimeStateEnabled: false,
         runtimeStateFile: '',
         lang: 'en-US',
-        authEnabled: false,
-        authAdminUser: '',
-        authAdminPassword: '',
-        authNodeHttpEnabled: false,
-        authNodeHttpUser: '',
-        authNodeHttpPassword: '',
-        authStaticEnabled: false,
-        authStaticUser: '',
-        authStaticPassword: '',
       };
 
       const result = formDataToConfigPayload(formData);
@@ -768,15 +674,6 @@ describe('configTransformers', () => {
         runtimeStateEnabled: false,
         runtimeStateFile: '',
         lang: 'en-US',
-        authEnabled: false,
-        authAdminUser: '',
-        authAdminPassword: '',
-        authNodeHttpEnabled: false,
-        authNodeHttpUser: '',
-        authNodeHttpPassword: '',
-        authStaticEnabled: false,
-        authStaticUser: '',
-        authStaticPassword: '',
       };
 
       const result = formDataToConfigPayload(formData);
@@ -822,15 +719,6 @@ describe('configTransformers', () => {
         runtimeStateEnabled: true,
         runtimeStateFile: '/custom/runtime.json',
         lang: 'en-US',
-        authEnabled: false,
-        authAdminUser: '',
-        authAdminPassword: '',
-        authNodeHttpEnabled: false,
-        authNodeHttpUser: '',
-        authNodeHttpPassword: '',
-        authStaticEnabled: false,
-        authStaticUser: '',
-        authStaticPassword: '',
       };
 
       const result = formDataToConfigPayload(formData);
@@ -878,15 +766,6 @@ describe('configTransformers', () => {
         runtimeStateEnabled: false,
         runtimeStateFile: '',
         lang: 'en-US',
-        authEnabled: false,
-        authAdminUser: '',
-        authAdminPassword: '',
-        authNodeHttpEnabled: false,
-        authNodeHttpUser: '',
-        authNodeHttpPassword: '',
-        authStaticEnabled: false,
-        authStaticUser: '',
-        authStaticPassword: '',
       };
 
       const result = formDataToConfigPayload(formData);
@@ -931,15 +810,6 @@ describe('configTransformers', () => {
         runtimeStateEnabled: false,
         runtimeStateFile: '',
         lang: 'en-US',
-        authEnabled: false,
-        authAdminUser: '',
-        authAdminPassword: '',
-        authNodeHttpEnabled: false,
-        authNodeHttpUser: '',
-        authNodeHttpPassword: '',
-        authStaticEnabled: false,
-        authStaticUser: '',
-        authStaticPassword: '',
       };
 
       const result = formDataToConfigPayload(formData);
@@ -984,15 +854,6 @@ describe('configTransformers', () => {
         runtimeStateEnabled: false,
         runtimeStateFile: '',
         lang: 'en-US',
-        authEnabled: false,
-        authAdminUser: '',
-        authAdminPassword: '',
-        authNodeHttpEnabled: false,
-        authNodeHttpUser: '',
-        authNodeHttpPassword: '',
-        authStaticEnabled: false,
-        authStaticUser: '',
-        authStaticPassword: '',
       };
 
       const result = formDataToConfigPayload(formData);
@@ -1038,15 +899,6 @@ describe('configTransformers', () => {
         runtimeStateEnabled: false,
         runtimeStateFile: '',
         lang: 'en-US',
-        authEnabled: false,
-        authAdminUser: '',
-        authAdminPassword: '',
-        authNodeHttpEnabled: false,
-        authNodeHttpUser: '',
-        authNodeHttpPassword: '',
-        authStaticEnabled: false,
-        authStaticUser: '',
-        authStaticPassword: '',
       };
 
       const result = formDataToConfigPayload(formData);
@@ -1107,7 +959,7 @@ describe('configTransformers', () => {
       ]);
     });
 
-    it('should not preserve authentication passwords through round-trip (security)', () => {
+    it('should not round-trip authentication through the configuration payload (security)', () => {
       const configWithAuth = {
         uiPort: 1880,
         projectsEnabled: false,
@@ -1122,12 +974,11 @@ describe('configTransformers', () => {
 
       const formData = configToFormData(configWithAuth);
 
-      // Password should be empty in form data (don't expose hash to frontend)
-      expect(formData.authAdminPassword).toBe('');
-
-      // When converting back, the empty password is preserved
+      // The configuration payload carries no authentication surface at all:
+      // the admin accounts are owned by the /security boundary cards, so the
+      // configuration form can neither leak nor rewrite them (issue #881).
       const payload = formDataToConfigPayload(formData);
-      expect(payload.adminAuth?.users?.[0]?.password).toBe('');
+      expect(Object.keys(payload)).not.toContain('adminAuth');
     });
   });
 });

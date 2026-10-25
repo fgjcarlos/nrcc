@@ -68,15 +68,6 @@ const FIELD_SOURCE: Record<keyof NodeRedConfigFormData, FieldSource> = {
   httpNodeRoot: 'settings.js',
   disableEditor: 'settings.js',
   // Auth (write-only)
-  authEnabled: 'settings.js',
-  authAdminUser: 'settings.js',
-  authAdminPassword: 'form default',
-  authNodeHttpEnabled: 'settings.js',
-  authNodeHttpUser: 'settings.js',
-  authNodeHttpPassword: 'form default',
-  authStaticEnabled: 'settings.js',
-  authStaticUser: 'settings.js',
-  authStaticPassword: 'form default',
   // Projects
   projectsEnabled: 'settings.js',
   // Logging
@@ -133,12 +124,6 @@ const HARD_RESTART_FIELDS: ReadonlySet<keyof NodeRedConfigFormData> = new Set([
   'httpAdminRoot',
   'httpNodeRoot',
   'disableEditor',
-  'authEnabled',
-  'authAdminUser',
-  'authNodeHttpEnabled',
-  'authNodeHttpUser',
-  'authStaticEnabled',
-  'authStaticUser',
   'flowFile',
   'userDir',
   'nodesDir',

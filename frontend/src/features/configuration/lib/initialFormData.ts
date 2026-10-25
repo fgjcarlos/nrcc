@@ -15,15 +15,6 @@ export const INITIAL_FORM_DATA: NodeRedConfigFormData = {
   httpNodeRoot: '/',
   disableEditor: false,
 
-  authEnabled: false,
-  authAdminUser: '',
-  authAdminPassword: '',
-  authNodeHttpEnabled: false,
-  authNodeHttpUser: '',
-  authNodeHttpPassword: '',
-  authStaticEnabled: false,
-  authStaticUser: '',
-  authStaticPassword: '',
 
   projectsEnabled: false,
 

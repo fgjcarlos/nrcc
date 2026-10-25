@@ -21,9 +21,8 @@ export type {
   EditorLogout,
   EditorMermaid,
   AdminAuthSettings,
-  NodeHttpAuthSettings,
-  StaticAuthSettings,
-  AuthSettings,
+  AdminAuthUserSettings,
+  BasicAuthSettings,
   RuntimeStateSettings,
 } from '@/shared/types';
 
