@@ -176,6 +176,21 @@ Node-RED `runtimeState` block (`enabled`, `ui`). Restart required.
 Node-RED `logging` block. Restart required. Defaults to
 `{console:{level:info}}`.
 
+NRCC renders the block from the values the operator submits: the `level`,
+the `metrics` flag and the `audit` flag of every handler the
+configuration exposes (`console` and `internal`). A logging entry the
+operator authored itself — a custom handler with its own `handler`
+function — is preserved verbatim on every save, as is a property of a
+managed handler the submission does not carry.
+
+**Levels**: `off`, `fatal`, `error`, `warn`, `info`, `debug`, `trace`.
+Node-RED falls back to `info` for a level it does not know.
+
+**Note**: Node-RED only registers the `console` handler and the handlers
+that expose a `handler` function. The `internal` handler is NRCC's own
+vocabulary: it round-trips through the configuration model and the API,
+and Node-RED ignores it unless the entry carries a `handler` function.
+
 ### `disableEditor`
 
 When `true` Node-RED refuses to mount the editor even with a
