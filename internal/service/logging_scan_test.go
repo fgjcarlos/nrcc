@@ -105,6 +105,12 @@ func TestInsertJSEntries_KeepsTheLayout(t *testing.T) {
 			want:    "\n    console: { level: 'info' },\n    internal: { level: 'warn' },\n  ",
 		},
 		{
+			name:    "multi-line body without a trailing comma",
+			body:    "\n    console: { level: 'info' }\n  ",
+			literal: "internal: { level: 'warn' }",
+			want:    "\n    console: { level: 'info' },\n    internal: { level: 'warn' },\n  ",
+		},
+		{
 			name:    "single-line body",
 			body:    " console: { level: 'info' } ",
 			literal: "internal: { level: 'warn' }",

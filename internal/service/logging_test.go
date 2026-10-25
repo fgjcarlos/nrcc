@@ -293,6 +293,64 @@ func TestGenerateSettingsJS_KeepsConsoleHandlerInTheBlock(t *testing.T) {
 	}
 }
 
+// TestPatchSettingsJS_RendersValidJavaScript asserts the rendered
+// settings.js is valid JavaScript and carries the submitted values.
+//
+// The runtime image ships a settings.js whose last entry of the logging
+// block carries no trailing comma. An entry inserted after it must not
+// leave the block without a separator: the file would not parse and every
+// save would be rejected.
+func TestPatchSettingsJS_RendersValidJavaScript(t *testing.T) {
+	source := `module.exports = {
+    // Node-RED settings — managed by nrcc
+    flowFile: 'flows.json',
+    credentialSecret: false,
+    adminAuth: null,
+    editorTheme: {
+        projects: { enabled: false }
+    },
+    logging: {
+        console: { level: 'info', metrics: false, audit: false }
+    },
+    exportGlobalContextKeys: false,
+    externalModules: {}
+}
+`
+	cfg := model.DefaultNodeRedConfig()
+	cfg.Logging = map[string]any{
+		"console":  map[string]any{"level": "info"},
+		"internal": map[string]any{"level": "info"},
+	}
+
+	patched := patchSettingsJS(source, cfg)
+
+	exported, err := exportSettingsObject(patched)
+	if err != nil {
+		t.Fatalf("the rendered settings.js does not parse: %v\n%s", err, patched)
+	}
+	logging, ok := exported["logging"].(map[string]any)
+	if !ok {
+		t.Fatalf("the rendered settings.js has no logging block: %+v", exported["logging"])
+	}
+	console, ok := logging["console"].(map[string]any)
+	if !ok {
+		t.Fatalf("the rendered settings.js has no console handler: %+v", logging)
+	}
+	if console["level"] != "info" {
+		t.Errorf("the rendered console level = %v, want info", console["level"])
+	}
+	if console["metrics"] != false {
+		t.Errorf("the rendered console metrics = %v, want false", console["metrics"])
+	}
+	internal, ok := logging["internal"].(map[string]any)
+	if !ok {
+		t.Fatalf("the rendered settings.js has no internal handler: %+v", logging)
+	}
+	if internal["level"] != "info" {
+		t.Errorf("the rendered internal level = %v, want info", internal["level"])
+	}
+}
+
 // TestQuoteJSString_EscapesOperatorInput asserts a submitted level can
 // never terminate the literal and inject JavaScript into settings.js.
 func TestQuoteJSString_EscapesOperatorInput(t *testing.T) {

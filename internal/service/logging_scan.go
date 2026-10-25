@@ -153,6 +153,12 @@ func insertJSEntries(body string, entries []jsObjectEntry, literals []string) (s
 		// indentation of their siblings.
 		indent := jsLineIndent(body, last.start)
 		text := "\n" + indent + strings.Join(literals, ",\n"+indent) + ","
+		if !strings.HasSuffix(core, ",") {
+			// The last entry carries no trailing comma: it becomes the
+			// separator of the entries that follow. Without it the
+			// rendered block would not be valid JavaScript.
+			text = "," + text
+		}
 		return text, len(core), len(core), true
 	}
 	// A single-line body: the entries follow the last value inline. The
