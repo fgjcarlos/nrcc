@@ -99,10 +99,13 @@ vocabulary the frontend publishes.
 
 | File | Change |
 |------|--------|
-| `internal/service/logging.go` (new) | The logging model: normalisation, rendering, parsing and the source-preserving patch. A depth-aware scanner reads the entries of an object literal so a nested `handler` function is never mistaken for a sibling. |
+| `internal/service/logging.go` (new) | The logging model: normalisation, rendering, parsing and the source-preserving patch. |
+| `internal/service/logging_scan.go` (new) | The depth-aware scanner that reads the entries of a JavaScript object literal, so a nested `handler` function is never mistaken for a sibling. |
 | `internal/service/config.go` | `renderLoggingBlock` renders the operator-submitted values; `patchSettingsJS` patches the existing block in place; `parseConfigFromContent` reads the block back into the model; `appendPropertyBeforeClosingBrace` accepts a source that closes the object literal with a semicolon. |
 | `internal/service/config_reconcile.go` | `logging` joins the reconcilable source keys, so a raw apply adopts the logging values the source declares. |
 | `internal/handler/config_apply_test.go` | The issue's reproduction test plus the API round-trip test. |
+| `internal/service/logging_test.go` | The file round-trip tests, the preservation guarantees and the JavaScript validity check. |
+| `internal/service/logging_scan_test.go` | The scanner tests. |
 
 ### Frontend
 
@@ -165,7 +168,37 @@ After the change:
 The pre-existing failure is
 `TestNpmInstallKillsChildOnCancel` (`internal/service`): it fails the same
 way on a pristine `origin/main` worktree, because the `pgrep` in the
-sandbox matches unrelated processes. It is unrelated to this change.
+sandbox matches unrelated processes. It is unrelated to this change and
+does not reproduce on a clean run.
+
+### The defect the CI found
+
+The first CI run failed in the browser acceptance step, not in the
+acceptance scenario: the configuration form submits the internal handler
+alongside the console one, so the renderer inserted an entry after the
+last entry of the logging block. The runtime image ships a `settings.js`
+whose last logging entry carries no trailing comma, and the inserted entry
+was not separated from it: the rendered file was not valid JavaScript, the
+apply was rejected and the save never reached the file.
+
+The fix separates the inserted entry from the last one when the last one
+carries no comma. The regression test renders the file and evaluates it
+with the JavaScript engine of the sandbox, so a `settings.js` that does
+not parse fails the test.
+
+The browser acceptance suite passes on the fixed tree:
+
+```
+✓  unknown API routes fail as JSON instead of returning the SPA
+✓  invalid raw settings are rejected without restarting healthy Node-RED
+✓  dashboard restart changes the managed Node-RED process PID
+✓  dashboard labels container-scoped resource metrics returned by the API
+✓  environment action reaches a live Node-RED flow after its restart
+✓  environment page imports a Node-RED global entry automatically on route entry
+✓  unrelated visual edit keeps every admin account, permission and session expiry
+
+7 passed
+```
 
 The live Node-RED evidence (acceptance scenario 7):
 
