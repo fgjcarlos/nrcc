@@ -220,8 +220,22 @@ runtime's own stdout is drained by the supervisor, so the container log
 cannot show it. The scenario also proves the apply restarted the runtime:
 the Node-RED process runs under a new pid after the change.
 
-## Known boundaries
+## Delivery
 
+- Pull request: <https://github.com/fgjcarlos/nrcc/pull/934>
+- Branch: `fix/882-logging-render`, based on `origin/main`
+- CI: green. Every check passes, including the Docker stack acceptance, which
+  runs the new scenario 7 against a real Node-RED:
+
+  ```
+  [PASS] scenario 7: PASS (the submitted logging configuration reached the live runtime)
+  acceptance suite: ALL SCENARIOS PASSED
+  ```
+
+- The merge is the human's decision. The issue closes when the pull request
+  is merged.
+
+## Known boundaries
 - `internal` is not a Node-RED built-in handler: Node-RED ignores it
   unless the entry carries a `handler` function. It is rendered and
   parsed because it is the NRCC UI's vocabulary, and it round-trips
