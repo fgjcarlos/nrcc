@@ -290,6 +290,15 @@ func writeApplyError(w http.ResponseWriter, err error, fallback string) {
 			model.RespondError(w, http.StatusInternalServerError, "SETTINGS_BACKUP_FAILED", ae.Error())
 		case service.ApplyStageWrite:
 			model.RespondError(w, http.StatusInternalServerError, "SETTINGS_WRITE_ERROR", ae.Error())
+		case service.ApplyStageReconcile:
+			// A source that declares a configuration the structured mirror
+			// cannot hold is a validation failure (issue #880); a failing
+			// mirror commit is an infrastructure failure.
+			if errors.Is(ae, service.ErrMirrorRejected) {
+				model.RespondError(w, http.StatusBadRequest, "VALIDATION_ERROR", ae.Error())
+				return
+			}
+			model.RespondError(w, http.StatusInternalServerError, "SETTINGS_RECONCILE_ERROR", ae.Error())
 		case service.ApplyStageRestart:
 			var rollbackErr *service.RollbackError
 			if errors.As(ae, &rollbackErr) {

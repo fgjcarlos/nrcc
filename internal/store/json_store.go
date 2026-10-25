@@ -127,6 +127,18 @@ func (s *JSONStore[T]) Update(fn func(*T) error) error {
 	return s.writeUnlocked(current)
 }
 
+// Delete removes the store file. A missing file is not an error: the
+// caller asked for the store to be gone and it is gone.
+func (s *JSONStore[T]) Delete() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if err := os.Remove(s.path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	return nil
+}
+
 // Exists checks if the file exists
 func (s *JSONStore[T]) Exists() bool {
 	s.mu.RLock()

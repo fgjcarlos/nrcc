@@ -14,7 +14,7 @@
 # ref: node:26-slim — pinned to digest for supply-chain integrity.
 # Dependabot (docker ecosystem, weekly) bumps the digest when upstream
 # changes. See issue #593 and auditoria/devops-security.md §2.1.
-FROM node:26-slim@sha256:ec7758ee051e457b468b32bde57b0879010b325bb9862718e9615225ce4aaae1 AS builder
+FROM node:26-slim@sha256:36793bcbb160a6a16cede1e62b93f84e26b78a972a8a4c0b879c1c12f22761ec AS builder
 
 RUN npm install -g pnpm@11.12.0 --no-audit --no-fund
 
@@ -43,7 +43,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 # ref: nodered/node-red:5.0.4-24-minimal — community image, pinned to
 # digest. Dependabot (docker ecosystem, weekly) bumps the digest when
 # upstream changes. See issue #593 and auditoria/devops-security.md §2.1.
-FROM nodered/node-red:5.0.8-24-minimal@sha256:f8705efbf2b9c1a82b26cbda0f909fc9ad1b85946a6d341e3333e9313acc85c4 AS runtime
+FROM nodered/node-red:5.0.9-24-minimal@sha256:db4067af09d4ecdf1ff1eb1cf80e3ec2ad0504c68d1d47a36c8e8b4ebb9fa055 AS runtime
 LABEL org.opencontainers.image.title="nrcc" \
       org.opencontainers.image.description="Node-RED Control Center — all-in-one" \
       org.opencontainers.image.source="https://github.com/fgjcarlos/nrcc"

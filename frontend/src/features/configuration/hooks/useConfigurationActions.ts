@@ -49,6 +49,11 @@ export function useConfigurationActions() {
       toast.success('settings.js saved');
       queryClient.invalidateQueries({ queryKey: queryKeys.config.rawSettings });
       queryClient.invalidateQueries({ queryKey: queryKeys.bootstrap.status });
+      // Issue #880 — a raw save rewrites settings.js, and the backend
+      // reconciles the structured configuration with the applied source.
+      // The structured configuration query must be refreshed too, or the
+      // operator keeps seeing the pre-save configuration.
+      queryClient.invalidateQueries({ queryKey: queryKeys.config.root });
     },
     onError: (error) => {
       toast.error(`Failed to save settings.js: ${errorMessage(error)}`);
