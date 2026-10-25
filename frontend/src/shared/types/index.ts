@@ -16,7 +16,7 @@ export interface ApiResponse<T> {
 // LOGGING
 // ============================================
 
-export type LoggingLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+export type LoggingLevel = 'off' | 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
 
 export interface LoggingHandler {
   level?: LoggingLevel;
