@@ -344,8 +344,14 @@ func (s *ConfigService) RestoreStructured(state StructuredApplyInput) error {
 		previous := reflect.ValueOf(state.Previous)
 		committed := reflect.ValueOf(state.Committed)
 		for i := 0; i < live.NumField(); i++ {
-			name := live.Type().Field(i).Name
-			switch name {
+			field := live.Type().Field(i)
+			if !field.IsExported() {
+				// Unexported fields are internal bookkeeping (the
+				// security-surface presence of issue #881) and cannot be
+				// read through reflect.Value.Interface.
+				continue
+			}
+			switch field.Name {
 			case "EnvVars", "FunctionLibraries", "RuntimeState", "SettingsPath", "SettingsSource", "Extra":
 				continue
 			}
