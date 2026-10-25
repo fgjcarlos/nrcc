@@ -4,6 +4,13 @@ const nrccURL = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:3001'
 const nodeRedURL = process.env.E2E_NODE_RED_URL ?? 'http://127.0.0.1:1880'
 const username = 'admin'
 const password = 'acceptance-fixture-pw-not-a-secret'
+// Issue #881 fixtures: two Node-RED editor accounts, one read-only and one
+// full-access. They are deliberately-fake credentials for a loopback-only
+// container.
+const observerUsername = 'observer'
+const observerPassword = 'observer-fixture-pw-not-a-secret'
+const administratorUsername = 'administrator'
+const administratorPassword = 'administrator-fixture-pw-not-a-secret'
 
 let nrcc: APIRequestContext
 let nodeRed: APIRequestContext
@@ -29,13 +36,46 @@ async function authHeaders(): Promise<Record<string, string>> {
 async function restartNodeRed(headers: Record<string, string>): Promise<void> {
   const response = await nrcc.post('/api/runtime/restart', { headers })
   await expect(response).toBeOK()
+  await waitForNodeRed()
+}
+
+/**
+ * Waits until Node-RED answers again. Once `adminAuth` is enabled the
+ * unauthenticated `/flows` probe answers 401, so "the listener is up" is
+ * signalled by any HTTP status, not by a 2xx.
+ */
+async function waitForNodeRed(): Promise<void> {
   await expect.poll(async () => {
     try {
-      return (await nodeRed.get('/flows')).ok()
+      return (await nodeRed.get('/flows')).status()
     } catch {
-      return false
+      return 0
     }
-  }, { timeout: 30_000 }).toBe(true)
+  }, { timeout: 30_000 }).toBeGreaterThan(0)
+}
+
+/**
+ * Signs a Node-RED editor account in and returns its access token.
+ *
+ * Node-RED's token endpoint is an OAuth2 password grant: the request needs
+ * the editor client credentials and an explicit scope. An omitted scope
+ * makes Node-RED compare the requested scope against the account's own
+ * permission, which a read-only account never satisfies.
+ */
+async function nodeRedToken(account: string, secret: string, scope = ''): Promise<string> {
+  const response = await nodeRed.post('/auth/token', {
+    data: {
+      client_id: 'node-red-editor',
+      client_secret: 'not_available',
+      grant_type: 'password',
+      scope,
+      username: account,
+      password: secret,
+    },
+  })
+  if (!response.ok()) return ''
+  const payload = await response.json() as { access_token?: string }
+  return payload.access_token ?? ''
 }
 
 async function socketHandshake(headers: Record<string, string> = {}): Promise<string> {
@@ -119,6 +159,26 @@ async function seedProbeFlow(): Promise<void> {
     ],
   })
   await expect(response).toBeOK()
+}
+
+/**
+ * Removes the `adminAuth` block from a rendered settings.js.
+ *
+ * The block nrcc renders spans several lines, so the closing brace is
+ * matched by its own indentation rather than by the first `},` in the
+ * block — the account entries close with a deeper indent.
+ */
+function stripAdminAuthBlock(content: string): string {
+  const lines = content.split('\n')
+  const start = lines.findIndex((line) => /^\s*adminAuth:\s*\{/.test(line))
+  if (start < 0) return content
+  const indent = lines[start].match(/^\s*/)?.[0] ?? ''
+  const closing = new RegExp(`^${indent}\\},?$`)
+  let end = start
+  while (end < lines.length && !closing.test(lines[end])) end += 1
+  if (end >= lines.length) return content
+  lines.splice(start, end - start + 1)
+  return lines.join('\n')
 }
 
 test.describe.configure({ mode: 'serial' })
@@ -214,6 +274,164 @@ test('environment page imports a Node-RED global entry automatically on route en
   await expect(page.getByText('NODE_RED_E2E_IMPORTED')).toBeVisible()
   await expect(page.getByRole('cell', { name: 'Node-RED', exact: true })).toBeVisible()
   await expect(page.getByTestId('node-red-sync-status')).toContainText('synchronized')
+})
+
+// Issue #881 — an unrelated visual edit must leave Node-RED's
+// authentication model untouched.
+//
+// The configuration form used to rebuild `adminAuth` from a single account
+// with wildcard permissions, so saving a page title replaced Node-RED's
+// complete authentication model: the other accounts, their `read`
+// permission and the session expiry were dropped.
+//
+// The test drives the real /configuration screen, so the payload under test
+// is the one the form actually sends.
+test('unrelated visual edit keeps every admin account, permission and session expiry', async ({ page }) => {
+  const headers = await authHeaders()
+
+  // --- setup: two editor accounts, one read-only ------------------
+  const currentResponse = await nrcc.get('/api/config', { headers })
+  await expect(currentResponse).toBeOK()
+  const currentConfig = ((await currentResponse.json()) as { data?: Record<string, unknown> }).data ?? {}
+
+  // The listener port comes from the settings.js, which Node-RED's own
+  // default file does not carry: the API rejects a config without a valid
+  // port, so the setup payload states it explicitly.
+  const port = typeof currentConfig.uiPort === 'number' && currentConfig.uiPort > 0 ? currentConfig.uiPort : 1880
+
+  const configured = await nrcc.post('/api/config', {
+    headers,
+    data: {
+      ...currentConfig,
+      uiPort: port,
+      port,
+      httpAdminRoot: currentConfig.httpAdminRoot ?? '/',
+      httpNodeRoot: currentConfig.httpNodeRoot ?? '/',
+      flowFile: currentConfig.flowFile ?? 'flows.json',
+      projectsEnabled: currentConfig.projectsEnabled ?? false,
+      adminAuth: {
+        type: 'credentials',
+        users: [
+          { username: observerUsername, password: observerPassword, permissions: 'read' },
+          { username: administratorUsername, password: administratorPassword, permissions: '*' },
+        ],
+        sessionExpiryTime: 3600,
+      },
+    },
+  })
+  await expect(configured).toBeOK()
+  await restartNodeRed(headers)
+
+  // The runtime enforces the model: the read-only account signs in and can
+  // read the flows, but cannot deploy them.
+  const observerToken = await nodeRedToken(observerUsername, observerPassword)
+  expect(observerToken).toBeTruthy()
+  const observerRead = await nodeRed.get('/flows', {
+    headers: { Authorization: `Bearer ${observerToken}` },
+  })
+  await expect(observerRead).toBeOK()
+  const observerDeploy = await nodeRed.post('/flows', {
+    headers: { Authorization: `Bearer ${observerToken}`, 'Node-RED-Deployment-Type': 'full' },
+    data: [],
+  })
+  expect(observerDeploy.status()).toBe(401)
+  expect(await nodeRedToken(administratorUsername, administratorPassword)).toBeTruthy()
+
+  // --- the unrelated visual edit, through the real screen ---------
+  await login(page)
+  await page.getByTestId('app-sidebar').getByRole('link', { name: 'Configuration' }).click()
+  await page.getByRole('button', { name: 'Editor Theme' }).click()
+  // The configuration view loads the saved config asynchronously and resets
+  // the form when it arrives, so the edit is re-applied until it sticks.
+  await expect(async () => {
+    await page.getByLabel('Page Title').fill('NRCC issue 881')
+    await page.waitForTimeout(300)
+    expect(await page.getByLabel('Page Title').inputValue()).toBe('NRCC issue 881')
+  }).toPass({ timeout: 30_000 })
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  // Issue #766 slice F: the global Save button opens the review panel and
+  // the panel's Apply button performs the save.
+  await page.getByTestId('review-changes-panel-apply').click()
+  await expect(page.getByText('Configuration saved successfully')).toBeVisible()
+
+  // --- the authentication model is unchanged ----------------------
+  const afterResponse = await nrcc.get('/api/config', { headers })
+  await expect(afterResponse).toBeOK()
+  const after = ((await afterResponse.json()) as {
+    data?: {
+      adminAuth?: {
+        users?: Array<{ username?: string; permissions?: string }>
+        sessionExpiryTime?: number
+      }
+      editorTheme?: { page?: { title?: string } }
+    }
+  }).data ?? {}
+
+  // The visual edit landed...
+  expect(after.editorTheme?.page?.title).toBe('NRCC issue 881')
+  // ...and every account, permission and the session expiry survived.
+  const users = after.adminAuth?.users ?? []
+  expect(users).toHaveLength(2)
+  const observer = users.find((user) => user.username === observerUsername)
+  const administrator = users.find((user) => user.username === administratorUsername)
+  expect(observer?.permissions).toBe('read')
+  expect(administrator?.permissions).toBe('*')
+  expect(after.adminAuth?.sessionExpiryTime).toBe(3600)
+
+  // The live settings.js — the file Node-RED loads — still carries the
+  // complete model.
+  const rawSettings = await nrcc.get('/api/settings/raw', { headers })
+  await expect(rawSettings).toBeOK()
+  const raw = await rawSettings.text()
+  expect(raw).toContain(observerUsername)
+  expect(raw).toContain(administratorUsername)
+  expect(raw).toContain('sessionExpiryTime')
+
+  // And the runtime still enforces it after a restart that reloads
+  // settings.js.
+  await restartNodeRed(headers)
+  const observerTokenAfter = await nodeRedToken(observerUsername, observerPassword)
+  expect(observerTokenAfter).toBeTruthy()
+  const observerReadAfter = await nodeRed.get('/flows', {
+    headers: { Authorization: `Bearer ${observerTokenAfter}` },
+  })
+  await expect(observerReadAfter).toBeOK()
+  const observerDeployAfter = await nodeRed.post('/flows', {
+    headers: { Authorization: `Bearer ${observerTokenAfter}`, 'Node-RED-Deployment-Type': 'full' },
+    data: [],
+  })
+  expect(observerDeployAfter.status()).toBe(401)
+  expect(await nodeRedToken(administratorUsername, administratorPassword)).toBeTruthy()
+
+  // --- leave the stack as we found it -----------------------------
+  const liveRaw = await nrcc.get('/api/settings/raw', { headers })
+  await expect(liveRaw).toBeOK()
+  const liveSettings = ((await liveRaw.json()) as { data?: { content?: string; revision?: { fingerprint?: string } } }).data
+  const liveRevision = liveSettings?.revision?.fingerprint
+  const withoutAdminAuth = stripAdminAuthBlock(liveSettings?.content ?? '')
+  const restored = await nrcc.post('/api/settings/raw', {
+    headers,
+    data: { content: withoutAdminAuth, expectedRevision: liveRevision },
+  })
+  await expect(restored).toBeOK()
+
+  // The raw write leaves the accounts in nrcc's own store: clear the
+  // surface explicitly so a later save does not resurrect them.
+  const cleared = await nrcc.post('/api/config', {
+    headers,
+    data: {
+      ...currentConfig,
+      uiPort: port,
+      port,
+      httpAdminRoot: currentConfig.httpAdminRoot ?? '/',
+      httpNodeRoot: currentConfig.httpNodeRoot ?? '/',
+      flowFile: currentConfig.flowFile ?? 'flows.json',
+      projectsEnabled: currentConfig.projectsEnabled ?? false,
+      adminAuth: null,
+    },
+  })
+  await expect(cleared).toBeOK()
+  await restartNodeRed(headers)
 })
 
 test('FlowFuse policy protects deployed HTTP and Socket.IO endpoints', async () => {
