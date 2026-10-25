@@ -748,7 +748,7 @@ func ensureHTTPStatic(content, relDir string) string {
 	appendRe := regexp.MustCompile(insertPattern)
 	if appendRe.MatchString(content) {
 		entry := fmt.Sprintf("  httpStatic: %q,\n", relDir)
-		return appendRe.ReplaceAllString(content, "\n"+entry+"}\n")
+		return appendBeforeClosingBrace(content, entry)
 	}
 	return content
 }
@@ -766,14 +766,28 @@ func replaceScalarKey(content, key, value string) string {
 	}
 
 	// Key not found, append before closing brace
-	appendPattern := `\n\s*\}\s*$`
-	appendRe := regexp.MustCompile(appendPattern)
-	if appendRe.MatchString(content) {
-		newEntry := fmt.Sprintf("  %s: %s,\n", key, value)
-		return appendRe.ReplaceAllString(content, "\n"+newEntry+"}\n")
-	}
+	return appendBeforeClosingBrace(content, fmt.Sprintf("  %s: %s,\n", key, value))
+}
 
-	return content
+// appendBeforeClosingBrace inserts entry before the closing brace of the
+// module.exports object.
+//
+// The entry that precedes the insertion point may be missing its trailing
+// comma: Node-RED's own default settings.js ends with
+// "externalModules: {}" and no comma, so appending a key after it produced
+// invalid JavaScript and the whole settings.js was rejected (issue #881's
+// live-stack proof surfaced it).
+func appendBeforeClosingBrace(content, entry string) string {
+	appendRe := regexp.MustCompile(`\n\s*\}\s*$`)
+	idx := appendRe.FindStringIndex(content)
+	if idx == nil {
+		return content
+	}
+	head := strings.TrimRight(content[:idx[0]], " \t\r\n")
+	if head != "" && !strings.HasSuffix(head, ",") {
+		head += ","
+	}
+	return head + "\n" + entry + content[idx[0]:]
 }
 
 // replaceArrayKey replaces or appends a multi-line array key.
@@ -784,13 +798,7 @@ func replaceArrayKey(content, key, arrayContent string) string {
 		return re.ReplaceAllString(content, arrayContent)
 	}
 
-	appendPattern := `\n\s*\}\s*$`
-	appendRe := regexp.MustCompile(appendPattern)
-	if appendRe.MatchString(content) {
-		newEntry := "\n" + arrayContent + "\n"
-		return appendRe.ReplaceAllString(content, newEntry+"}\n")
-	}
-	return content
+	return appendBeforeClosingBrace(content, "\n"+arrayContent+"\n")
 }
 
 func removeArrayKey(content, key string) string {
@@ -1467,14 +1475,8 @@ func replaceBlockKey(content, key, blockContent string) string {
 	start, end, ok := findTopLevelBlock(content, key)
 	if !ok {
 		// Append before closing brace of the module.exports object.
-		appendPattern := `\n\s*\}\s*$`
-		idx := regexp.MustCompile(appendPattern).FindStringIndex(content)
-		if idx == nil {
-			return content
-		}
 		// blockContent already includes its own leading indent and trailing comma.
-		insertion := "\n" + blockContent + "\n"
-		return content[:idx[0]] + insertion + content[idx[0]:]
+		return appendBeforeClosingBrace(content, "\n"+blockContent+"\n")
 	}
 	return content[:start] + blockContent + content[end:]
 }
