@@ -50,6 +50,49 @@ type NodeRedConfig struct {
 	SettingsPath      string                 `json:"settingsPath,omitempty"`
 	SettingsSource    string                 `json:"settingsSource,omitempty"`
 	Extra             map[string]interface{} `json:"-"`
+
+	// presence records which security surfaces the JSON payload that
+	// produced this config carried. It is never serialized.
+	presence securitySurfacePresence
+}
+
+// securitySurfacePresence tracks whether a decoded payload carried the
+// authentication surfaces.
+//
+// Issue #881: a payload that omits `adminAuth` means "leave the surface
+// alone", not "clear the surface". The zero value of a pointer field
+// cannot express that difference, so the presence is recorded while
+// decoding.
+//
+// A config built in Go (not decoded from JSON) stays authoritative: the
+// caller passed the whole model on purpose, so every surface it carries
+// wins.
+type securitySurfacePresence struct {
+	decodedFromJSON      bool
+	adminAuthAbsent      bool
+	httpNodeAuthAbsent   bool
+	httpStaticAuthAbsent bool
+}
+
+// AdminAuthCarried reports whether the caller supplied an adminAuth
+// surface. False means the payload omitted it and the loaded surface must
+// be preserved.
+func (c NodeRedConfig) AdminAuthCarried() bool {
+	return !c.presence.decodedFromJSON || !c.presence.adminAuthAbsent
+}
+
+// HTTPNodeAuthCarried reports whether the caller supplied an httpNodeAuth
+// surface. False means the payload omitted it and the loaded surface must
+// be preserved.
+func (c NodeRedConfig) HTTPNodeAuthCarried() bool {
+	return !c.presence.decodedFromJSON || !c.presence.httpNodeAuthAbsent
+}
+
+// HTTPStaticAuthCarried reports whether the caller supplied an
+// httpStaticAuth surface. False means the payload omitted it and the
+// loaded surface must be preserved.
+func (c NodeRedConfig) HTTPStaticAuthCarried() bool {
+	return !c.presence.decodedFromJSON || !c.presence.httpStaticAuthAbsent
 }
 
 // AdminAuth represents Node-RED admin authentication config
@@ -129,7 +172,24 @@ func (c *NodeRedConfig) UnmarshalJSON(data []byte) error {
 		c.Port = c.UIPort
 	}
 
+	// Record which security surfaces this payload carried (issue #881).
+	// "absent" and "explicitly null" are different intents: absent means
+	// "leave the loaded surface alone", null means "clear the surface".
+	c.presence = securitySurfacePresence{decodedFromJSON: true}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err == nil {
+		c.presence.adminAuthAbsent = !hasJSONKey(raw, "adminAuth")
+		c.presence.httpNodeAuthAbsent = !hasJSONKey(raw, "httpNodeAuth")
+		c.presence.httpStaticAuthAbsent = !hasJSONKey(raw, "httpStaticAuth")
+	}
+
 	return nil
+}
+
+// hasJSONKey reports whether the decoded object contains the key.
+func hasJSONKey(raw map[string]json.RawMessage, key string) bool {
+	_, ok := raw[key]
+	return ok
 }
 
 // MarshalJSON ensures we export port consistently

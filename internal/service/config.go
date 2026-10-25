@@ -130,9 +130,10 @@ func upgradePlaintextAdminAuthPasswords(cfg model.NodeRedConfig) error {
 // frontend can submit cleartext when changing the admin password without the
 // validation rejecting it (#706).
 func (s *ConfigService) Save(cfg model.NodeRedConfig) error {
+	fallbacks := s.securityFallbacks(cfg)
 	committed, err := s.Update(func(current *model.NodeRedConfig) error {
 		candidate := cfg
-		preserveAdminAuthPasswords(current, &candidate)
+		preserveSecuritySurfaces(current, fallbacks, &candidate)
 		if err := upgradePlaintextAdminAuthPasswords(candidate); err != nil {
 			return err
 		}
@@ -205,9 +206,10 @@ type StructuredApplyInput struct {
 //     legacy Save() surfaced; the slice C coordinator adds the
 //     revision check on top of it.
 func (s *ConfigService) CommitStructured(cfg model.NodeRedConfig) (StructuredApplyInput, error) {
+	fallbacks := s.securityFallbacks(cfg)
 	committed, err := s.Update(func(current *model.NodeRedConfig) error {
 		candidate := cfg
-		preserveAdminAuthPasswords(current, &candidate)
+		preserveSecuritySurfaces(current, fallbacks, &candidate)
 		if err := upgradePlaintextAdminAuthPasswords(candidate); err != nil {
 			return err
 		}
@@ -252,6 +254,134 @@ func preserveAdminAuthPasswords(existing, candidate *model.NodeRedConfig) {
 			}
 		}
 	}
+}
+
+// securitySurfaceFallbacks holds the authentication surfaces loaded from the
+// live settings.js. They are the fallback source when nrcc's own store does
+// not know a surface yet, for example when the operator wrote adminAuth by
+// hand before the first save.
+type securitySurfaceFallbacks struct {
+	adminAuth      *model.AdminAuth
+	httpNodeAuth   *model.HTTPBasicAuth
+	httpStaticAuth *model.HTTPBasicAuth
+}
+
+// preserveSecuritySurfaces keeps the authentication surfaces a payload did
+// not carry, and the password hashes of the accounts it did.
+//
+// Issue #881: the configuration form submits only the capabilities it
+// edits. A payload that omits `adminAuth` (or a basic-auth surface) must
+// leave the loaded surface untouched. Before this rule existed, the
+// configuration form rebuilt `adminAuth` from a single account with
+// wildcard permissions, so an unrelated visual edit replaced Node-RED's
+// complete authentication model: every other account, every `read`
+// permission and the session expiry were dropped.
+//
+// Sources, in order:
+//  1. the persisted nrcc store — what the operator last saved,
+//  2. the live settings.js — what Node-RED is actually running with.
+func preserveSecuritySurfaces(current *model.NodeRedConfig, fallbacks *securitySurfaceFallbacks, candidate *model.NodeRedConfig) {
+	if candidate.AdminAuthCarried() {
+		// The payload carries the surface: keep the password hash of every
+		// account the operator did not change. An empty password means
+		// "unchanged", exactly like the security cards send it.
+		preserveAdminAuthPasswords(current, candidate)
+		fillAdminAuthPasswords(fallbacks.adminAuth, candidate.AdminAuth)
+	} else {
+		// The payload omits the surface: keep the loaded one.
+		candidate.AdminAuth = current.AdminAuth
+		if candidate.AdminAuth == nil {
+			candidate.AdminAuth = fallbacks.adminAuth
+		}
+	}
+
+	preserveBasicAuthSurface(current.HTTPNodeAuth, fallbacks.httpNodeAuth, candidate.HTTPNodeAuthCarried(), &candidate.HTTPNodeAuth)
+	preserveBasicAuthSurface(current.HTTPStaticAuth, fallbacks.httpStaticAuth, candidate.HTTPStaticAuthCarried(), &candidate.HTTPStaticAuth)
+}
+
+// fillAdminAuthPasswords copies the password hash of every candidate
+// account without one from the first source that knows the username.
+func fillAdminAuthPasswords(source, candidate *model.AdminAuth) {
+	if source == nil || candidate == nil {
+		return
+	}
+	for i := range candidate.Users {
+		if candidate.Users[i].Password != "" {
+			continue
+		}
+		for _, existing := range source.Users {
+			if existing.Username == candidate.Users[i].Username && existing.Password != "" {
+				candidate.Users[i].Password = existing.Password
+				break
+			}
+		}
+	}
+}
+
+// preserveBasicAuthSurface keeps a basic-auth surface a payload omitted and
+// the bcrypt hash of a pass the operator did not change.
+func preserveBasicAuthSurface(current, fallback *model.HTTPBasicAuth, carried bool, candidate **model.HTTPBasicAuth) {
+	if !carried {
+		if current != nil {
+			*candidate = current
+		} else if fallback != nil {
+			*candidate = fallback
+		}
+		return
+	}
+	if *candidate == nil || (*candidate).Pass != "" {
+		return
+	}
+	for _, source := range []*model.HTTPBasicAuth{current, fallback} {
+		if source != nil && source.User == (*candidate).User && source.Pass != "" {
+			(*candidate).Pass = source.Pass
+			break
+		}
+	}
+}
+
+// securityFallbacks returns the live settings.js authentication surfaces
+// needed to preserve a surface the payload omitted.
+//
+// The live settings.js is only parsed when the persisted store cannot
+// supply the surface: the parse runs the settings sandbox and is far more
+// expensive than reading the store.
+func (s *ConfigService) securityFallbacks(cfg model.NodeRedConfig) *securitySurfaceFallbacks {
+	fallbacks := &securitySurfaceFallbacks{}
+	if cfg.AdminAuthCarried() && cfg.HTTPNodeAuthCarried() && cfg.HTTPStaticAuthCarried() {
+		// Every surface was carried by the payload: nothing to preserve.
+		return fallbacks
+	}
+
+	persisted, err := s.store.Read()
+	if err != nil {
+		persisted = model.NodeRedConfig{}
+	}
+	needAdmin := !cfg.AdminAuthCarried() && persisted.AdminAuth == nil
+	needNode := !cfg.HTTPNodeAuthCarried() && persisted.HTTPNodeAuth == nil
+	needStatic := !cfg.HTTPStaticAuthCarried() && persisted.HTTPStaticAuth == nil
+	if !needAdmin && !needNode && !needStatic {
+		return fallbacks
+	}
+
+	doc, err := s.GetRawSettings()
+	if err != nil || doc.Content == "" {
+		return fallbacks
+	}
+	parsed, err := s.parseConfigFromContent(doc.Content)
+	if err != nil {
+		return fallbacks
+	}
+	if needAdmin {
+		fallbacks.adminAuth = parsed.AdminAuth
+	}
+	if needNode {
+		fallbacks.httpNodeAuth = parsed.HTTPNodeAuth
+	}
+	if needStatic {
+		fallbacks.httpStaticAuth = parsed.HTTPStaticAuth
+	}
+	return fallbacks
 }
 
 func validateAdminAuthPasswords(cfg model.NodeRedConfig) error {
