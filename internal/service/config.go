@@ -806,9 +806,10 @@ func generateSettingsJS(cfg model.NodeRedConfig) string {
 	builder.WriteString("  editorTheme: {\n")
 	fmt.Fprintf(&builder, "    projects: { enabled: %t },\n", cfg.ProjectsEnabled)
 	builder.WriteString("  },\n")
-	builder.WriteString("  logging: {\n")
-	builder.WriteString("    console: { level: 'info', metrics: false, audit: false },\n")
-	builder.WriteString("  },\n")
+	if block := renderLoggingBlock(loggingModelOrDefault(cfg.Logging)); block != "" {
+		builder.WriteString(block)
+		builder.WriteString("\n")
+	}
 	builder.WriteString("}\n")
 	return builder.String()
 }
@@ -875,7 +876,7 @@ func patchSettingsJS(existingContent string, cfg model.NodeRedConfig) string {
 		content = replaceBlockKey(content, "httpStaticAuth", renderHTTPBasicAuthBlock("httpStaticAuth", cfg.HTTPStaticAuth))
 	}
 	content = replaceBlockKey(content, "editorTheme", renderEditorThemeBlock(cfg))
-	content = replaceBlockKey(content, "logging", renderLoggingBlock())
+	content = patchLoggingSettings(content, cfg.Logging)
 	content = ensureHTTPStatic(content, "uploads")
 
 	return content
@@ -919,10 +920,16 @@ func replaceScalarKey(content, key, value string) string {
 // Docker image ships a settings.js whose last property (`externalModules`)
 // carries no trailing comma, and appending a key after it would render
 // invalid JavaScript — every apply would then fail the candidate parse.
+//
+// A source that closes the object literal with a semicolon (`};`) is
+// supported too: the semicolon terminates the statement, not the object, so
+// it is kept after the closing brace. Without it the insertion point is not
+// found and the rendered property is dropped — the apply then reports a
+// success while the value never reaches settings.js (issue #882).
 func appendPropertyBeforeClosingBrace(content, entry string) string {
-	appendPattern := `\n\s*\}\s*$`
+	appendPattern := `\n\s*\}(;?)\s*$`
 	appendRe := regexp.MustCompile(appendPattern)
-	loc := appendRe.FindStringIndex(content)
+	loc := appendRe.FindStringSubmatchIndex(content)
 	if loc == nil {
 		return content
 	}
@@ -931,7 +938,11 @@ func appendPropertyBeforeClosingBrace(content, entry string) string {
 	// `$` characters ReplaceAllString would interpret as a capture
 	// reference.
 	head := ensureCommaTerminated(content[:loc[0]])
-	return head + "\n" + entry + "}\n"
+	semicolon := ""
+	if loc[2] >= 0 {
+		semicolon = ";"
+	}
+	return head + "\n" + entry + "}" + semicolon + "\n"
 }
 
 // ensureCommaTerminated appends a comma to the last property of the content
@@ -1300,9 +1311,15 @@ func renderEditorThemeBlock(cfg model.NodeRedConfig) string {
 	return builder.String()
 }
 
-// renderLoggingBlock renders logging as a block string
-func renderLoggingBlock() string {
-	return "  logging: {\n    console: { level: 'info', metrics: false, audit: false },\n  },"
+// loggingModelOrDefault normalises the logging value of the structured
+// model and falls back to Node-RED's default console handler when the
+// operator has not configured one.
+func loggingModelOrDefault(value any) loggingModel {
+	logging := newLoggingModel(value)
+	if len(logging) == 0 {
+		return defaultLoggingModel()
+	}
+	return logging
 }
 
 func (s *ConfigService) parseConfigFromContent(content string) (model.NodeRedConfig, error) {
@@ -1321,6 +1338,11 @@ func (s *ConfigService) parseConfigFromContent(content string) (model.NodeRedCon
 	cfg.CredentialSecret = parseCredentialSecretFromJS(content)
 	cfg.RequireHttps = parseBoolFromJS(content, "requireHttps", false)
 	cfg.Https = parseHttpsBlockFromJS(content)
+	if logging := parseLoggingBlock(content); len(logging) > 0 {
+		// The logging block is read back from the source so the mirror
+		// reports the values Node-RED actually runs with (issue #882).
+		cfg.Logging = logging.value()
+	}
 	surfaces, err := parseAuthenticationSurfacesFromJS(content)
 	if err != nil {
 		// Inspection failures are validation failures, not missing auth.

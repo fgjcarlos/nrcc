@@ -47,6 +47,10 @@ var reconcilableSourceKeys = []string{
 	"projectsEnabled", "credentialSecret", "requireHttps", "https",
 	"adminAuth", "httpNodeAuth", "httpStaticAuth",
 	"editorTheme", "env",
+	// logging — issue #882. The source declares the logging values
+	// Node-RED runs with, so the mirror adopts them like every other
+	// managed block.
+	"logging",
 }
 
 // sourceKeyPattern matches the top-level (and nested) keys a source
@@ -195,6 +199,9 @@ func reconcileConfigWithSource(current, parsed model.NodeRedConfig, content stri
 	}
 	if declared["https"] {
 		merged.Https = parsed.Https
+	}
+	if declared["logging"] {
+		merged.Logging = parsed.Logging
 	}
 	if declared["adminAuth"] {
 		merged.AdminAuth = parsed.AdminAuth
