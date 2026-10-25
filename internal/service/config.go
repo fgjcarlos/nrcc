@@ -341,27 +341,46 @@ func (s *ConfigService) patchBase() (model.NodeRedConfig, bool, error) {
 // committed values. Concurrent unrelated writes therefore survive recovery.
 func (s *ConfigService) RestoreStructured(state StructuredApplyInput) error {
 	return s.store.Update(func(current *model.NodeRedConfig) error {
-		live := reflect.ValueOf(current).Elem()
-		previous := reflect.ValueOf(state.Previous)
-		committed := reflect.ValueOf(state.Committed)
-		for i := 0; i < live.NumField(); i++ {
-			field := live.Type().Field(i)
-			if !field.IsExported() {
-				// Unexported fields are internal bookkeeping (the
-				// security-surface presence of issue #881) and cannot be
-				// read through reflect.Value.Interface.
-				continue
-			}
-			switch field.Name {
-			case "EnvVars", "FunctionLibraries", "RuntimeState", "SettingsPath", "SettingsSource", "Extra":
-				continue
-			}
-			if reflect.DeepEqual(live.Field(i).Interface(), committed.Field(i).Interface()) {
-				live.Field(i).Set(previous.Field(i))
-			}
-		}
+		restoreUnchangedFields(current, state.Previous, state.Committed, structuredRestoreSkip)
 		return nil
 	})
+}
+
+// structuredRestoreSkip lists the fields the structured apply does not own:
+// the state of the other services and the internal bookkeeping.
+var structuredRestoreSkip = map[string]struct{}{
+	"EnvVars": {}, "FunctionLibraries": {}, "RuntimeState": {},
+	"SettingsPath": {}, "SettingsSource": {}, "Extra": {},
+}
+
+// mirrorRestoreSkip lists the fields the mirror reconciliation does not own.
+var mirrorRestoreSkip = map[string]struct{}{
+	"FunctionLibraries": {}, "RuntimeState": {}, "SettingsPath": {},
+	"SettingsSource": {}, "Extra": {},
+}
+
+// restoreUnchangedFields copies the previous value of every exported field
+// that still holds the committed value.
+//
+// Unexported fields are skipped: they are internal bookkeeping (the
+// security-surface presence of issue #881) and reflect.Value.Interface
+// panics when it is called on them.
+func restoreUnchangedFields(current *model.NodeRedConfig, previous, committed model.NodeRedConfig, skip map[string]struct{}) {
+	live := reflect.ValueOf(current).Elem()
+	livePrevious := reflect.ValueOf(previous)
+	liveCommitted := reflect.ValueOf(committed)
+	for i := 0; i < live.NumField(); i++ {
+		field := live.Type().Field(i)
+		if !field.IsExported() {
+			continue
+		}
+		if _, ok := skip[field.Name]; ok {
+			continue
+		}
+		if reflect.DeepEqual(live.Field(i).Interface(), liveCommitted.Field(i).Interface()) {
+			live.Field(i).Set(livePrevious.Field(i))
+		}
+	}
 }
 
 // preserveWriteOnlySecrets keeps the stored value of the write-only
