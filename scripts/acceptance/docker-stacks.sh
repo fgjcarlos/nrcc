@@ -15,6 +15,13 @@
 #      `compose down` then `compose up`, verify the state survived.
 #   4. Backup → wipe → restore   — create a backup, simulate a destructive
 #      restore into a fresh stack, verify health comes back.
+#   5. Entrypoint umask          — verify the runtime directories are not
+#      world-readable after the boot.
+#   6. Security-surface patch    — send an admin-only patch through the
+#      real apply API and prove the live Node-RED enforces it.
+#   7. Logging configuration     — send a logging-only patch through the
+#      real apply API and prove the live Node-RED runs with the
+#      submitted log level.
 # Scenario 1 also seeds root-owned backup/node_modules volumes, proves uid 1000
 # writes both after startup, and proves nrcc retains no capabilities.
 #
@@ -709,6 +716,152 @@ scenario_6_security_patch() {
   ok "scenario 6: PASS (partial security patch applied and enforced)"
 }
 
+# node_red_log_probe logs one info message through the Node-RED logging
+# library that ships with the runtime, using the live settings.js the
+# running instance was started with. It prints whatever the configured
+# console handler emits: a handler set to a quieter level than info drops
+# the message and the probe stays silent.
+#
+# The probe is the observation point for the effective log level. The
+# runtime's own stdout is drained by the supervisor, so the container log
+# cannot show it.
+#
+# The probe runs as the runtime user: the container drops every capability,
+# so even root cannot read the 0600 settings.js.
+node_red_log_probe() {
+  local container="$1"
+  docker exec --user 1000:1000 "$container" node -e "
+    const settings = require('/data/settings.js');
+    const log = require('@node-red/util').log;
+    log.init(settings);
+    log.log({level: log.INFO, msg: 'nrcc-acceptance-probe'});
+  " 2>/dev/null
+}
+
+# node_red_pid prints the pid of the Node-RED process inside the container.
+node_red_pid() {
+  local container="$1"
+  docker exec --user 1000:1000 "$container" sh -c 'pidof node-red' 2>/dev/null || true
+}
+
+# wait_for_node_red_restart waits until the Node-RED process runs under a
+# different pid than the one the caller recorded before the change. It is
+# how the scenario proves the apply really restarted the runtime with the
+# new settings.
+wait_for_node_red_restart() {
+  local container="$1" baseline="$2"
+  local deadline current
+  deadline=$((SECONDS + TIMEOUT_NODE))
+  while (( SECONDS < deadline )); do
+    current="$(node_red_pid "$container")"
+    [[ -n "$current" && "$current" != "$baseline" ]] && return 0
+    sleep 2
+  done
+  return 1
+}
+
+# Scenario 7 — the submitted logging configuration reaches the live runtime
+# (issue #882).
+#
+# The renderer used to write a constant logging block, so the logging
+# controls reported a successful persistence while Node-RED kept running
+# with the default level. This scenario sends a logging-only patch through
+# the real apply API and proves three things a mocked browser test cannot:
+#
+#   1. the real API accepts the logging patch and reports the submitted
+#      level;
+#   2. the rendered settings.js carries the submitted level;
+#   3. the live Node-RED runtime honours it — the runtime is restarted
+#      with the new settings and stops logging at the info level.
+scenario_7_logging_configuration() {
+  log "scenario 7: the submitted logging configuration reaches the live runtime"
+  if [[ "$DRY_RUN" == "1" ]]; then
+    ok "scenario 7: DRY-RUN skipped (a real API and a real Node-RED are required)"
+    return 0
+  fi
+
+  set_compose_env "$PROJECT_A" "$HOST_API_A" "$HOST_NR_A"
+
+  local token
+  token="$(login_api "$HOST_API_A")" || fail "scenario 7: login to A failed"
+  [[ -n "$token" ]] || fail "scenario 7: empty token"
+
+  local container
+  container="$(docker compose -p "$PROJECT_A" -f "$COMPOSE_FILE" ps -q nrcc | head -1)"
+  [[ -n "$container" ]] || fail "scenario 7: no nrcc container in A"
+
+  # The probe message the runtime logs at the info level.
+  local probe="nrcc-acceptance-probe"
+
+  # Baseline: the live runtime logs at the info level.
+  local output
+  output="$(node_red_log_probe "$container")" \
+    || fail "scenario 7: the log probe failed inside the container"
+  assert_contains "$output" "$probe" \
+    "the live runtime logs at the info level before the change"
+
+  local runtime_pid
+  runtime_pid="$(node_red_pid "$container")"
+  [[ -n "$runtime_pid" ]] || fail "scenario 7: the live Node-RED process was not found"
+
+  # Apply the logging change through the real apply API.
+  local raw_settings revision response
+  raw_settings="$(api_call_authed GET "http://localhost:${HOST_API_A}/api/settings/raw" "$token")" \
+    || fail "scenario 7: could not read the live settings"
+  revision="$(printf '%s' "$raw_settings" | sed -n 's/.*"fingerprint":"\([^"]*\)".*/\1/p')"
+  [[ -n "$revision" ]] || fail "scenario 7: no revision fingerprint in the live settings"
+
+  response="$(api_call_authed POST "http://localhost:${HOST_API_A}/api/config/apply" "$token" \
+    "{\"logging\":{\"console\":{\"level\":\"off\"}},\"expectedRevision\":\"${revision}\"}")" \
+    || fail "scenario 7: the logging patch was rejected: ${response}"
+  assert_contains "$response" '"success":true' "logging patch response"
+  assert_contains "$response" '"level":"off"' "the response reports the submitted level"
+
+  # The rendered settings.js carries the submitted level.
+  local rendered
+  rendered="$(docker exec --user 1000:1000 "$container" cat /data/settings.js 2>/dev/null || true)"
+  assert_contains "$rendered" "level: 'off'" "rendered settings carry the submitted level"
+
+  # The apply restarts the runtime with the new settings.
+  wait_for_node_red_restart "$container" "$runtime_pid" \
+    || fail "scenario 7: the live Node-RED was not restarted after the logging change"
+  runtime_pid="$(node_red_pid "$container")"
+
+  # The runtime now runs with the submitted level: the info probe is
+  # dropped. The unrelated settings survived the logging-only patch.
+  assert_contains "$rendered" "uiPort: 1880" "rendered settings kept the live UI port"
+
+  local quiet
+  quiet="$(node_red_log_probe "$container")" \
+    || fail "scenario 7: the log probe failed inside the container"
+  if [[ "$quiet" == *"$probe"* ]]; then
+    fail "scenario 7: the live runtime still logs at the info level after the submitted 'off' level was applied"
+  fi
+  ok "the live runtime honours the submitted log level"
+
+  # Restore the default level: the stack stays usable for the next run and
+  # the round trip proves the change is reversible.
+  raw_settings="$(api_call_authed GET "http://localhost:${HOST_API_A}/api/settings/raw" "$token")" \
+    || fail "scenario 7: could not read the live settings"
+  revision="$(printf '%s' "$raw_settings" | sed -n 's/.*"fingerprint":"\([^"]*\)".*/\1/p')"
+  [[ -n "$revision" ]] || fail "scenario 7: no revision fingerprint in the live settings"
+
+  response="$(api_call_authed POST "http://localhost:${HOST_API_A}/api/config/apply" "$token" \
+    "{\"logging\":{\"console\":{\"level\":\"info\"}},\"expectedRevision\":\"${revision}\"}")" \
+    || fail "scenario 7: the restore patch was rejected: ${response}"
+  assert_contains "$response" '"success":true' "restore patch response"
+
+  wait_for_node_red_restart "$container" "$runtime_pid" \
+    || fail "scenario 7: the live Node-RED was not restarted after the level was restored"
+
+  output="$(node_red_log_probe "$container")" \
+    || fail "scenario 7: the log probe failed inside the container"
+  assert_contains "$output" "$probe" \
+    "the live runtime logs again after the level was restored"
+
+  ok "scenario 7: PASS (the submitted logging configuration reached the live runtime)"
+}
+
 # ── Driver ──────────────────────────────────────────────────────────────────
 main() {
   log "acceptance suite starting"
@@ -735,6 +888,7 @@ main() {
   scenario_4_backup_restore
   scenario_5_entrypoint_umask
   scenario_6_security_patch
+  scenario_7_logging_configuration
 
   log "acceptance suite: ALL SCENARIOS PASSED"
 }
