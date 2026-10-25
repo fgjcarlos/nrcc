@@ -1,5 +1,4 @@
 export { BasicSettings } from './BasicSettings';
-export { AuthSettings } from './AuthSettings';
 export { SecuritySettings } from './SecuritySettings';
 export { LoggingSettings } from './LoggingSettings';
 export { EditorThemeSettings } from './EditorThemeSettings';

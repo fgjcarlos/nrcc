@@ -169,7 +169,7 @@ export function ReviewChangesPanel({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="relative surface-panel flex h-full w-full max-w-xl flex-col border-l border-border shadow-glow sm:rounded-none rounded-t-2xl sm:mt-0 mt-auto max-h-[85vh] sm:max-h-full"
+        className="relative z-[60] surface-panel flex h-full w-full max-w-xl flex-col border-l border-border shadow-glow sm:rounded-none rounded-t-2xl sm:mt-0 mt-auto max-h-[85vh] sm:max-h-full"
         data-testid="review-changes-panel"
       >
         {/* Header */}

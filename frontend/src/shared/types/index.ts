@@ -205,26 +205,33 @@ export interface HttpsConfig {
 // AUTHENTICATION
 // ============================================
 
+/**
+ * One Node-RED editor account. `permissions` is the only vocabulary
+ * Node-RED accepts: "*" (full access) or "read" (read-only editor).
+ */
+export interface AdminAuthUserSettings {
+  username: string;
+  password?: string;
+  permissions: '*' | 'read';
+}
+
+/**
+ * The `adminAuth` block. It carries every account plus the session
+ * expiry, so it must never be rebuilt from a single account (issue #881).
+ */
 export interface AdminAuthSettings {
-  user: string;
-  password: string;
-  tokens?: string[];
+  type: string;
+  users?: AdminAuthUserSettings[];
+  sessionExpiryTime?: number;
 }
 
-export interface NodeHttpAuthSettings {
+/**
+ * Node-RED basic-auth surface (`httpNodeAuth` / `httpStaticAuth`).
+ * Node-RED expects `{ user, pass }`; `pass` is a bcrypt hash.
+ */
+export interface BasicAuthSettings {
   user: string;
-  password: string;
-}
-
-export interface StaticAuthSettings {
-  user: string;
-  password: string;
-}
-
-export interface AuthSettings {
-  adminAuth?: AdminAuthSettings;
-  nodeHttpAuth?: NodeHttpAuthSettings | boolean;
-  staticAuth?: StaticAuthSettings | boolean;
+  pass?: string;
 }
 
 // ============================================
@@ -248,8 +255,8 @@ export interface NodeRedConfig {
   runtimeState?: RuntimeStateSettings;
   lang?: string;
   adminAuth?: AdminAuthSettings;
-  nodeHttpAuth?: NodeHttpAuthSettings | boolean;
-  staticAuth?: StaticAuthSettings | boolean;
+  httpNodeAuth?: BasicAuthSettings;
+  httpStaticAuth?: BasicAuthSettings;
   // Security slice (issue #762) — credentialSecret is write-only;
   // requireHttps always round-trips; https mirrors PR #776.
   credentialSecret?: string;
@@ -317,15 +324,10 @@ export interface NodeRedConfigFormData {
   runtimeStateEnabled: boolean;
   runtimeStateFile: string;
   lang: string;
-  authEnabled: boolean;
-  authAdminUser: string;
-  authAdminPassword: string;
-  authNodeHttpEnabled: boolean;
-  authNodeHttpUser: string;
-  authNodeHttpPassword: string;
-  authStaticEnabled: boolean;
-  authStaticUser: string;
-  authStaticPassword: string;
+  // Authentication surfaces are deliberately absent from the form model
+  // (issue #881): they are owned by the /security boundary cards, which
+  // edit every account, the per-account permission and the session
+  // expiry. The configuration form neither reads nor writes them.
   // Security slice (issue #762) — optional; SecuritySettings uses
   // `?? ''` / `?? false` / `?? 0` fallbacks.
   credentialSecret?: string;
@@ -376,15 +378,6 @@ export function configToFormData(config: NodeRedConfig): NodeRedConfigFormData {
     runtimeStateEnabled: config.runtimeState?.enabled || false,
     runtimeStateFile: config.runtimeState?.file || '',
     lang: config.lang || 'en-US',
-    authEnabled: !!config.adminAuth,
-    authAdminUser: config.adminAuth?.user || '',
-    authAdminPassword: '',
-    authNodeHttpEnabled: !!config.nodeHttpAuth && typeof config.nodeHttpAuth === 'object',
-    authNodeHttpUser: typeof config.nodeHttpAuth === 'object' ? config.nodeHttpAuth?.user || '' : '',
-    authNodeHttpPassword: '',
-    authStaticEnabled: !!config.staticAuth && typeof config.staticAuth === 'object',
-    authStaticUser: typeof config.staticAuth === 'object' ? config.staticAuth?.user || '' : '',
-    authStaticPassword: '',
     // Security slice — credentialSecret is read back empty (write-only);
     // requireHttps round-trips; https falls back to '' / 0.
     credentialSecret: '',
