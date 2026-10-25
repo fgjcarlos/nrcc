@@ -5,13 +5,38 @@ import type { NodeRedConfigFormData, LoggingLevel, EditorTheme, RuntimeStateSett
  *
  * This models the READ response, which is external data: enum-like fields
  * (log level, code editor lib, deploy type) arrive as plain strings and are
- * narrowed to the domain unions at the point of use. Auth is a credentials
- * object with a `users` array (distinct from the write-side AdminAuthSettings).
- * The index signature keeps the door open for the many other Node-RED settings
- * without resorting to `as any` on the fields we actually read.
+ * narrowed to the domain unions at the point of use. The index signature
+ * keeps the door open for the many other Node-RED settings without resorting
+ * to `as any` on the fields we actually read.
  */
-interface CredentialsAuthResponse {
-  users?: Array<{ username?: string }>;
+
+/**
+ * One Node-RED editor account. `permissions` is the only vocabulary
+ * Node-RED accepts: "*" (full access) or "read" (read-only editor).
+ */
+interface AdminAuthUserResponse {
+  username?: string;
+  permissions?: '*' | 'read';
+}
+
+/**
+ * The `adminAuth` block as the backend reports it. Issue #881: the block
+ * carries every account plus the session expiry, so it must never be
+ * reconstructed from a single account.
+ */
+interface AdminAuthResponse {
+  type?: string;
+  users?: AdminAuthUserResponse[];
+  sessionExpiryTime?: number;
+}
+
+/**
+ * Node-RED basic-auth surface (`httpNodeAuth` / `httpStaticAuth`).
+ * Node-RED expects `{ user, pass }`; `pass` is a bcrypt hash.
+ */
+interface BasicAuthResponse {
+  user?: string;
+  pass?: string;
 }
 
 interface LoggingHandlerResponse {
@@ -47,9 +72,9 @@ export interface NodeRedConfigResponse {
   httpNodeRoot?: string | false;
   disableEditor?: boolean;
   projectsEnabled?: boolean;
-  adminAuth?: CredentialsAuthResponse;
-  nodeHttpAuth?: CredentialsAuthResponse;
-  staticAuth?: CredentialsAuthResponse;
+  adminAuth?: AdminAuthResponse;
+  httpNodeAuth?: BasicAuthResponse;
+  httpStaticAuth?: BasicAuthResponse;
   logging?: { console?: LoggingHandlerResponse; internal?: LoggingHandlerResponse };
   flowFile?: string;
   userDir?: string;
@@ -66,21 +91,18 @@ export interface NodeRedConfigResponse {
 }
 
 /**
- * API payload shape for admin/node-http/static auth
- */
-export interface AuthPayloadUser {
-  username: string;
-  password: string;
-  permissions?: string;
-}
-
-export interface AuthPayload {
-  type: string;
-  users: AuthPayloadUser[];
-}
-
-/**
- * Typed payload returned by formDataToConfigPayload
+ * API payload shape for the surfaces the configuration form owns.
+ *
+ * Issue #881: the authentication surfaces (`adminAuth`, `httpNodeAuth`,
+ * `httpStaticAuth`) are deliberately absent. They are owned by the
+ * `/security` boundary cards, which edit every account, the per-account
+ * permission and the session expiry. The configuration form used to
+ * rebuild `adminAuth` from two single-account legacy fields and hardcode
+ * `permissions: '*'`, so an unrelated visual edit replaced the complete
+ * Node-RED authentication model with one wildcard account.
+ *
+ * The backend preserves every surface a payload omits, so submitting only
+ * the edited capabilities is enough.
  */
 export interface ConfigPayload {
   uiPort: number;
@@ -99,9 +121,6 @@ export interface ConfigPayload {
   editorTheme?: EditorTheme;
   runtimeState?: RuntimeStateSettings;
   lang: string;
-  adminAuth?: AuthPayload;
-  nodeHttpAuth?: AuthPayload;
-  staticAuth?: AuthPayload;
   // Security slice (issue #762) — credentialSecret only on rotation;
   // requireHttps always round-trips; https only when at least one
   // field is set.
@@ -138,39 +157,20 @@ export function formDataToConfigPayload(formData: NodeRedConfigFormData): Config
   config.httpNodeRoot = formData.httpNodeRoot || '/';
   if (formData.disableEditor) config.disableEditor = true;
 
-  // Authentication
-  // Si authEnabled pero password vacío → mandamos solo el username para indicar
-  // que la auth sigue activa pero SIN cambiar el password (backend lo preserva)
-  if (formData.authEnabled && formData.authAdminUser) {
-    config.adminAuth = {
-      type: 'credentials',
-      users: [{
-        username: formData.authAdminUser,
-        password: formData.authAdminPassword || '', // vacío = backend preserva hash
-        permissions: '*'
-      }]
-    };
-  }
-
-  if (formData.authNodeHttpEnabled && formData.authNodeHttpUser && formData.authNodeHttpPassword) {
-    config.nodeHttpAuth = {
-      type: 'credentials',
-      users: [{
-        username: formData.authNodeHttpUser,
-        password: formData.authNodeHttpPassword
-      }]
-    };
-  }
-
-  if (formData.authStaticEnabled && formData.authStaticUser && formData.authStaticPassword) {
-    config.staticAuth = {
-      type: 'credentials',
-      users: [{
-        username: formData.authStaticUser,
-        password: formData.authStaticPassword
-      }]
-    };
-  }
+  // Authentication — intentionally not part of this payload.
+  //
+  // Issue #881: the admin / node-http / static auth surfaces are owned by
+  // the `/security` boundary cards (AdminAuthBoundaryCard and
+  // HttpBasicAuthBoundaryCard), which edit every account, the per-account
+  // `read` / `*` permission and the session expiry, and apply them through
+  // `POST /api/config/apply`. Reconstructing them here from the legacy
+  // single-account form fields produced a destructive payload: every other
+  // account was dropped and the surviving one was rewritten with
+  // `permissions: '*'`, so a harmless visual edit silently escalated and
+  // truncated Node-RED's authentication model.
+  //
+  // The backend preserves every security surface a payload omits, so the
+  // configuration form only submits the capabilities it owns.
 
   // Projects
   config.projectsEnabled = formData.projectsEnabled;

@@ -619,7 +619,15 @@ paths:
       tags: [Config]
       operationId: postConfig
       summary: Save Node-RED configuration
-      description: "**Admin only.** Overwrites the Node-RED configuration."
+      description: >-
+        **Admin only.** Overwrites the Node-RED configuration.
+
+        The authentication surfaces (`adminAuth`, `httpNodeAuth`,
+        `httpStaticAuth`) are preserved when the payload omits them, so a
+        payload that only edits other capabilities leaves Node-RED's
+        accounts, permissions and session expiry untouched. Send an explicit
+        `null` to clear a surface. Inside a carried `adminAuth`, an empty
+        `password` means "unchanged" and keeps the stored bcrypt hash.
       security:
         - bearerAuth: []
       requestBody:
@@ -2747,6 +2755,10 @@ components:
           type: boolean
         adminAuth:
           $ref: "#/components/schemas/AdminAuth"
+        httpNodeAuth:
+          $ref: "#/components/schemas/HTTPBasicAuth"
+        httpStaticAuth:
+          $ref: "#/components/schemas/HTTPBasicAuth"
         projectsEnabled:
           type: boolean
         lang:
@@ -2772,6 +2784,11 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AdminAuthUser"
+        sessionExpiryTime:
+          type: integer
+          description: >-
+            Session lifetime in seconds. Omitted means Node-RED's own default.
+          example: 86400
 
     AdminAuthUser:
       type: object
@@ -2783,6 +2800,20 @@ components:
           type: string
         permissions:
           type: string
+          description: >-
+            Node-RED's only permission vocabulary: `*` (full access) or `read`
+            (read-only editor).
+          example: read
+
+    HTTPBasicAuth:
+      type: object
+      required: [user, pass]
+      properties:
+        user:
+          type: string
+        pass:
+          type: string
+          description: bcrypt hash of the password
 
     FunctionLibrary:
       type: object
