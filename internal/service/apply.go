@@ -51,6 +51,9 @@ const (
 	ApplyStageBackup   ApplyStage = "backup"
 	ApplyStageWrite    ApplyStage = "write"
 	ApplyStageAudit    ApplyStage = "audit"
+	ApplyStageRestart  ApplyStage = "restart"
+	ApplyStageReady    ApplyStage = "ready"
+	ApplyStageRollback ApplyStage = "rollback"
 )
 
 // ApplyError is the typed error returned by ApplyService.Apply. Stage
@@ -103,8 +106,8 @@ func (e *ApplyError) Is(target error) bool {
 //
 //   - Path        : doc.Path (the on-disk settings.js location)
 //   - BackupDir   : doc.Path's parent + "/backups/settings" (the
-//                   established backup directory) or operator-configured
-//                   override.
+//     established backup directory) or operator-configured
+//     override.
 //   - Expected    : doc.Revision (the fingerprint at the time of read)
 //   - Content     : the operator's edited settings.js body.
 //
@@ -118,6 +121,18 @@ type ApplyRequest struct {
 	Actor        string
 	Request      *http.Request
 	Capabilities model.ConfigurationCapabilities
+	// StructuredConfig is committed by the coordinator only after the
+	// single-flight and revision guards have accepted this transaction.
+	StructuredConfig *model.NodeRedConfig
+	// StructuredPatch is a presence-aware partial configuration update
+	// (issue #879). The coordinator merges it onto the live configuration
+	// and commits the merged result, so a payload that carries a single
+	// authentication surface does not drop the other settings. When it is
+	// set, StructuredConfig holds the merged preview until the commit
+	// replaces it with the committed configuration.
+	StructuredPatch *model.ConfigPatch
+	RecoveryTimeout  time.Duration
+	runtimeAdapter   ApplyAdapter
 }
 
 // ApplyResult captures the outcome of a successful Apply. Revision is
@@ -127,10 +142,11 @@ type ApplyRequest struct {
 // previous file existed). Diff is the redacted diff suitable for the
 // audit log.
 type ApplyResult struct {
-	Revision   model.SourceRevision
-	BackupPath string
-	Diff       string
-	Path       string
+	Configuration model.NodeRedConfig
+	Revision      model.SourceRevision
+	BackupPath    string
+	Diff          string
+	Path          string
 }
 
 // AuditHookFunc is the function signature ApplyService uses to emit
@@ -188,6 +204,10 @@ func (s *ApplyService) WithClock(clock func() time.Time) *ApplyService {
 // exact Stage the caller receives. Success events are emitted AFTER
 // the on-disk state is durable.
 func (s *ApplyService) Apply(ctx context.Context, req ApplyRequest) (ApplyResult, error) {
+	return s.apply(ctx, req, true)
+}
+
+func (s *ApplyService) apply(ctx context.Context, req ApplyRequest, emitSuccess bool) (ApplyResult, error) {
 	// Apply.start is emitted FIRST so observability captures every
 	// transaction attempt — including boundary-validation failures.
 	s.emit(req, "apply.start", ApplyStageValidate, "ok", nil)
@@ -249,7 +269,9 @@ func (s *ApplyService) Apply(ctx context.Context, req ApplyRequest) (ApplyResult
 		Diff:       RedactDiff(liveContent, req.Content),
 		Path:       req.Path,
 	}
-	s.emit(req, "apply.success", ApplyStageWrite, "ok", nil)
+	if emitSuccess {
+		s.emit(req, "apply.success", ApplyStageWrite, "ok", nil)
+	}
 	return result, nil
 }
 
@@ -328,7 +350,14 @@ func (s *ApplyService) emit(req ApplyRequest, action string, stage ApplyStage, r
 		return
 	}
 	meta := RedactedCapabilityMeta(req.Capabilities)
+	if req.runtimeAdapter != nil {
+		meta["apply_adapter"] = applyAuditName(req.runtimeAdapter)
+		meta["apply_operation"] = applyOperationName(req.runtimeAdapter)
+	}
 	meta["apply_stage"] = string(stage)
+	if action == "apply.success" {
+		meta["failure_stage"] = "ok"
+	}
 	if req.Path != "" {
 		meta["apply_path"] = filepath.Base(req.Path)
 	}

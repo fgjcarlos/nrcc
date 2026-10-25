@@ -80,17 +80,20 @@ func (e *RollbackError) Unwrap() error {
 // post-rollback readiness probe. Actor / Request / Capabilities feed
 // the audit emit.
 type RollbackRequest struct {
-	BackupPath  string
-	ActivePath  string
-	Stage       RollbackStage
-	Adapter     ApplyAdapter
-	Actor       string
-	Request     *http.Request
-	AuditHook   AuditHookFunc
+	BackupPath   string
+	ActivePath   string
+	Stage        RollbackStage
+	Adapter      ApplyAdapter
+	Actor        string
+	Request      *http.Request
+	AuditHook    AuditHookFunc
 	Capabilities model.ConfigurationCapabilities
 	// ReadyzTimeout caps the post-rollback readiness probe. Optional;
 	// zero falls back to the readiness probe default.
 	ReadyzTimeout time.Duration
+	// RestoreState restores additional authoritative state after the
+	// settings.js snapshot and before the recovered runtime is restarted.
+	RestoreState func(context.Context) error
 }
 
 // ExecuteRollback restores the snapshot at req.BackupPath to
@@ -164,13 +167,13 @@ func ExecuteRollback(ctx context.Context, req RollbackRequest) error {
 		// rollback — the operator still needs the prior settings.js
 		// back in place.
 		emitRollback(req, "apply.rollback.started", "degraded", err, map[string]string{
-			"apply_rollback_stage":         string(req.Stage),
-			"apply_rollback_failed_sibling": filepath.Base(failedSibling),
+			"apply_rollback_stage":                string(req.Stage),
+			"apply_rollback_failed_sibling":       filepath.Base(failedSibling),
 			"apply_rollback_failed_sibling_error": err.Error(),
 		})
 	}
 
-	if err := restoreSnapshot(req.BackupPath, req.ActivePath); err != nil {
+	if err := restoreSnapshotContext(ctx, req.BackupPath, req.ActivePath); err != nil {
 		emitRollback(req, "apply.rollback.failed", "error", err, map[string]string{
 			"apply_rollback_stage":  string(req.Stage),
 			"apply_rollback_action": "restore",
@@ -182,11 +185,22 @@ func ExecuteRollback(ctx context.Context, req RollbackRequest) error {
 		}
 	}
 
-	// Verify the rollback brought Node-RED back. We honour an
-	// optional ReadyzTimeout (slice C may pass 30s, etc.) by
-	// wrapping the adapter's Ready with a timeout-aware adapter
-	// when one is supplied; otherwise the readiness probe uses
-	// its own per-attempt timeout.
+	if req.RestoreState != nil {
+		if err := req.RestoreState(ctx); err != nil {
+			emitRollback(req, "apply.rollback.failed", "error", err, map[string]string{
+				"apply_rollback_stage": string(req.Stage), "apply_rollback_action": "restore_state",
+			})
+			return &RollbackError{Stage: req.Stage, Cause: fmt.Errorf("restore authoritative state: %w", err), Restore: req.ActivePath}
+		}
+	}
+
+	if err := req.Adapter.Restart(ctx); err != nil {
+		emitRollback(req, "apply.rollback.failed", "error", err, map[string]string{
+			"apply_rollback_stage": string(req.Stage), "apply_rollback_action": "restart",
+		})
+		return &RollbackError{Stage: req.Stage, Cause: fmt.Errorf("restart restored configuration: %w", err), Restore: req.ActivePath}
+	}
+	// Verify the restored runtime before reporting recovery success.
 	if err := req.Adapter.Ready(ctx); err != nil {
 		emitRollback(req, "apply.rollback.failed", "error", err, map[string]string{
 			"apply_rollback_stage":  string(req.Stage),
@@ -200,7 +214,7 @@ func ExecuteRollback(ctx context.Context, req RollbackRequest) error {
 	}
 
 	emitRollback(req, "apply.rollback.succeeded", "ok", nil, map[string]string{
-		"apply_rollback_stage":         string(req.Stage),
+		"apply_rollback_stage":          string(req.Stage),
 		"apply_rollback_failed_sibling": filepath.Base(failedSibling),
 	})
 	return nil
@@ -212,6 +226,10 @@ func ExecuteRollback(ctx context.Context, req RollbackRequest) error {
 // the rollback writes the previous-good file in place of the failed
 // candidate without going through the apply pipeline.
 func restoreSnapshot(backupPath, activePath string) error {
+	return restoreSnapshotContext(context.Background(), backupPath, activePath)
+}
+
+func restoreSnapshotContext(ctx context.Context, backupPath, activePath string) error {
 	if err := validateSettingsPath(backupPath); err != nil {
 		return err
 	}
@@ -223,7 +241,7 @@ func restoreSnapshot(backupPath, activePath string) error {
 	if err != nil {
 		return fmt.Errorf("read backup %s: %w", backupPath, err)
 	}
-	return AtomicWriteSettings(context.Background(), activePath, string(data))
+	return AtomicWriteSettings(ctx, activePath, string(data))
 }
 
 // copyFile copies src to dst, preserving the source mode. dst's parent
@@ -269,7 +287,8 @@ func emitRollback(req RollbackRequest, action, result string, cause error, extra
 	meta["apply_rollback_stage"] = string(req.Stage)
 	meta["apply_rollback_adapter"] = ""
 	if req.Adapter != nil {
-		meta["apply_rollback_adapter"] = req.Adapter.Name()
+		meta["apply_rollback_adapter"] = applyAuditName(req.Adapter)
+		meta["apply_rollback_operation"] = applyOperationName(req.Adapter)
 	}
 	if req.BackupPath != "" {
 		meta["apply_rollback_backup_path"] = filepath.Base(req.BackupPath)

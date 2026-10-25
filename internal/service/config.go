@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -130,10 +131,14 @@ func upgradePlaintextAdminAuthPasswords(cfg model.NodeRedConfig) error {
 // frontend can submit cleartext when changing the admin password without the
 // validation rejecting it (#706).
 func (s *ConfigService) Save(cfg model.NodeRedConfig) error {
-	fallbacks := s.securityFallbacks(cfg)
+	fallbacks := s.securityFallbacks(&cfg)
 	committed, err := s.Update(func(current *model.NodeRedConfig) error {
 		candidate := cfg
+		preserveAdminAuthPasswords(current, &candidate)
+		// Issue #881: a payload that omits a security surface keeps the
+		// loaded one instead of clearing it.
 		preserveSecuritySurfaces(current, fallbacks, &candidate)
+		preserveWriteOnlySecrets(current, &candidate)
 		if err := upgradePlaintextAdminAuthPasswords(candidate); err != nil {
 			return err
 		}
@@ -157,16 +162,13 @@ func (s *ConfigService) Save(cfg model.NodeRedConfig) error {
 	return nil
 }
 
-// StructuredApplyInput is the bundle the handler hands to the
-// slice C apply coordinator for the structured save path. The
-// fields mirror what ApplyRequest needs plus the committed cfg
-// the handler should echo back to the operator.
-//
-// All four fields are required to be populated by the helper
-// that produces them (CommitStructured); partial bundles are
-// never passed to the coordinator because the coordinator has
-// no concept of "no path" or "no backup directory".
+// StructuredApplyInput captures the config state committed as one step of
+// a coordinator-owned structured apply. Previous and Committed support
+// field-aware recovery without overwriting unrelated concurrent updates.
 type StructuredApplyInput struct {
+	// Previous is the authoritative config snapshot captured under the
+	// JSONStore update lock before this apply's fields were published.
+	Previous model.NodeRedConfig
 	// Committed is the post-store NodeRedConfig the operator
 	// should see in the response (passwords are bcrypt hashes
 	// at this point).
@@ -186,30 +188,95 @@ type StructuredApplyInput struct {
 	BackupDir string
 }
 
-// CommitStructured commits cfg to the JSON store and renders the
-// corresponding settings.js content. The slice C handler uses the
-// returned bundle to drive ApplyCoordinator.Apply so the settings.js
-// write participates in the validate → backup → atomic write → audit
-// transaction instead of going through the legacy writeSettingsFile
-// helper.
+// CommitStructured validates and atomically publishes the structured config
+// while capturing the prior snapshot under JSONStore's update lock. Callers
+// must invoke it only after acquiring the apply coordinator's single-flight
+// guard and passing the settings revision precondition. The coordinator owns
+// restoring Previous if any later apply or runtime stage fails.
 //
-// Failure modes:
-//
-//   - Validation failure (adminAuth / sandbox / Validate): returned
-//     verbatim, JSON store is NOT modified.
-//   - Store commit failure: returned verbatim, JSON store may be in
-//     an indeterminate state (the JSONStore.Update atomicity contract
-//     is the source of truth for that).
-//   - renderSettings or GetRawSettings failure after a successful
-//     commit: returned verbatim, JSON store IS committed. This is the
-//     same "JSON committed but settings.js update failed" risk the
-//     legacy Save() surfaced; the slice C coordinator adds the
-//     revision check on top of it.
+// The full-replacement contract is kept for the configuration editor
+// (POST /api/config). The apply endpoint uses CommitStructuredPatch so a
+// patch that carries a single surface does not drop the other settings.
 func (s *ConfigService) CommitStructured(cfg model.NodeRedConfig) (StructuredApplyInput, error) {
-	fallbacks := s.securityFallbacks(cfg)
+	return s.commitStructured(&cfg, nil)
+}
+
+// CommitStructuredPatch merges a presence-aware patch onto the live
+// configuration and publishes the result while capturing the prior snapshot
+// under JSONStore's update lock. Callers must invoke it only after acquiring
+// the apply coordinator's single-flight guard and passing the settings
+// revision precondition.
+//
+// The merge reads the live configuration inside the store update lock, so
+// the patch is applied to the state the store holds at commit time and a
+// concurrent environment-variable write cannot slip between the read and
+// the write. The coordinator owns restoring Previous if any later apply or
+// runtime stage fails.
+func (s *ConfigService) CommitStructuredPatch(patch model.ConfigPatch) (StructuredApplyInput, error) {
+	return s.commitStructured(nil, &patch)
+}
+
+// PreviewStructuredPatch computes the merged configuration without
+// committing it. The runtime adapter needs the candidate port before the
+// transaction starts, and the port only exists once the patch has been
+// merged onto the live configuration.
+//
+// The preview reads the live configuration outside the commit lock; the
+// commit recomputes the merge under the lock. Both merges read the same
+// live state, and the store has a single writer per deployment, so the
+// previewed port and the committed port agree.
+func (s *ConfigService) PreviewStructuredPatch(patch model.ConfigPatch) (model.NodeRedConfig, error) {
+	base, _, err := s.patchBase()
+	if err != nil {
+		return model.NodeRedConfig{}, err
+	}
+	return MergePatch(base, patch)
+}
+
+// commitStructured publishes either a full configuration (full != nil) or a
+// patch merged onto the live configuration (patch != nil).
+func (s *ConfigService) commitStructured(full *model.NodeRedConfig, patch *model.ConfigPatch) (StructuredApplyInput, error) {
+	live, err := s.GetRawSettings()
+	if err != nil {
+		return StructuredApplyInput{}, err
+	}
+	// The merge base is read before the update lock is taken: the JSON
+	// store forbids re-entering the store from inside an update callback.
+	base, hasBase, err := s.patchBase()
+	if err != nil {
+		return StructuredApplyInput{}, err
+	}
+	// Issue #881: the full-replacement contract keeps a security surface the
+	// payload omits. The fallback lookup happens outside the update lock
+	// because it reads the live settings.js.
+	fallbacks := s.securityFallbacks(full)
+	var previous model.NodeRedConfig
 	committed, err := s.Update(func(current *model.NodeRedConfig) error {
-		candidate := cfg
-		preserveSecuritySurfaces(current, fallbacks, &candidate)
+		previous = *current
+		candidate := model.NodeRedConfig{}
+		// The preservation source is the live configuration the candidate
+		// was derived from: the merge base for a patch, the committed
+		// state for a full replacement.
+		existing := current
+		if patch != nil {
+			mergeBase := *current
+			if !hasBase {
+				mergeBase = base
+			}
+			merged, err := MergePatch(mergeBase, *patch)
+			if err != nil {
+				return err
+			}
+			candidate = merged
+			existing = &base
+		} else {
+			candidate = *full
+			// Issue #881: a payload that omits a security surface keeps the
+			// loaded one instead of clearing it.
+			preserveSecuritySurfaces(current, fallbacks, &candidate)
+		}
+		preserveAdminAuthPasswords(existing, &candidate)
+		preserveWriteOnlySecrets(existing, &candidate)
 		if err := upgradePlaintextAdminAuthPasswords(candidate); err != nil {
 			return err
 		}
@@ -219,6 +286,13 @@ func (s *ConfigService) CommitStructured(cfg model.NodeRedConfig) (StructuredApp
 		if err := s.Validate(candidate); err != nil {
 			return err
 		}
+		// Keep state owned by EnvService and other configuration readers out
+		// of the structured apply's write set.
+		candidate.EnvVars = current.EnvVars
+		candidate.FunctionLibraries = current.FunctionLibraries
+		candidate.RuntimeState = current.RuntimeState
+		candidate.SettingsPath = current.SettingsPath
+		candidate.SettingsSource = current.SettingsSource
 		s.decorateConfig(&candidate)
 		*current = candidate
 		return nil
@@ -226,16 +300,92 @@ func (s *ConfigService) CommitStructured(cfg model.NodeRedConfig) (StructuredApp
 	if err != nil {
 		return StructuredApplyInput{}, err
 	}
-	live, err := s.GetRawSettings()
-	if err != nil {
-		return StructuredApplyInput{}, fmt.Errorf("read live settings after commit: %w", err)
-	}
 	return StructuredApplyInput{
+		Previous:  previous,
 		Committed: committed,
 		Content:   s.renderSettings(committed),
 		Live:      live,
 		BackupDir: filepath.Join(s.dataDir, "backups", "settings"),
 	}, nil
+}
+
+// patchBase returns the live configuration a patch merges onto, plus a flag
+// that reports whether the persisted store supplied it.
+//
+// The persisted store wins when it exists: it is NRCC's own authoritative
+// configuration. A deployment whose store does not exist yet falls back to
+// the configuration parsed from the live settings.js, so the first patch
+// keeps the port and the roots the running Node-RED already uses. The
+// defaults are the last resort.
+//
+// The store lookup happens outside the update lock because the JSON store
+// forbids re-entering the store from inside an update callback.
+func (s *ConfigService) patchBase() (model.NodeRedConfig, bool, error) {
+	if s.store.Exists() {
+		cfg, err := s.store.Read()
+		if err != nil {
+			return model.NodeRedConfig{}, false, fmt.Errorf("read persisted configuration: %w", err)
+		}
+		return cfg, true, nil
+	}
+	if cfg, ok, err := s.readFromSettingsFile(); err != nil {
+		return model.NodeRedConfig{}, false, err
+	} else if ok {
+		return cfg, false, nil
+	}
+	return s.GetDefault(), false, nil
+}
+
+// RestoreStructured restores only fields still carrying this transaction's
+// committed values. Concurrent unrelated writes therefore survive recovery.
+func (s *ConfigService) RestoreStructured(state StructuredApplyInput) error {
+	return s.store.Update(func(current *model.NodeRedConfig) error {
+		live := reflect.ValueOf(current).Elem()
+		previous := reflect.ValueOf(state.Previous)
+		committed := reflect.ValueOf(state.Committed)
+		for i := 0; i < live.NumField(); i++ {
+			name := live.Type().Field(i).Name
+			switch name {
+			case "EnvVars", "FunctionLibraries", "RuntimeState", "SettingsPath", "SettingsSource", "Extra":
+				continue
+			}
+			if reflect.DeepEqual(live.Field(i).Interface(), committed.Field(i).Interface()) {
+				live.Field(i).Set(previous.Field(i))
+			}
+		}
+		return nil
+	})
+}
+
+// preserveWriteOnlySecrets keeps the stored value of the write-only
+// configuration secrets when the candidate does not carry one.
+//
+// The configuration API never returns credentialSecret or the TLS
+// passphrase (issue #877), so a client that reads the configuration and
+// writes it back submits an empty (or redacted) value for those fields.
+// Treating that as "clear the secret" would silently destroy the stored
+// credential-encryption secret and the TLS passphrase on every save.
+//
+// A candidate that carries a value rotates the secret, and the literal
+// "false" still disables credential encryption: only empty or redacted
+// placeholders mean "keep what is stored".
+//
+// The HTTPS block is cloned before the passphrase is restored so the
+// caller's configuration value is never mutated through the shared
+// pointer.
+func preserveWriteOnlySecrets(existing, candidate *model.NodeRedConfig) {
+	if candidate == nil || existing == nil {
+		return
+	}
+	if model.IsRedactedSecret(candidate.CredentialSecret) {
+		candidate.CredentialSecret = existing.CredentialSecret
+	}
+	if candidate.Https != nil && existing.Https != nil &&
+		model.IsRedactedSecret(candidate.Https.Passphrase) {
+		https := *candidate.Https
+		https.Passphrase = existing.Https.Passphrase
+		candidate.Https = &https
+	}
 }
 
 func preserveAdminAuthPasswords(existing, candidate *model.NodeRedConfig) {
@@ -346,8 +496,13 @@ func preserveBasicAuthSurface(current, fallback *model.HTTPBasicAuth, carried bo
 // The live settings.js is only parsed when the persisted store cannot
 // supply the surface: the parse runs the settings sandbox and is far more
 // expensive than reading the store.
-func (s *ConfigService) securityFallbacks(cfg model.NodeRedConfig) *securitySurfaceFallbacks {
+func (s *ConfigService) securityFallbacks(cfg *model.NodeRedConfig) *securitySurfaceFallbacks {
 	fallbacks := &securitySurfaceFallbacks{}
+	if cfg == nil {
+		// The patch path merges onto the live configuration, so the merge
+		// itself resolves the presence of every surface.
+		return fallbacks
+	}
 	if cfg.AdminAuthCarried() && cfg.HTTPNodeAuthCarried() && cfg.HTTPStaticAuthCarried() {
 		// Every surface was carried by the payload: nothing to preserve.
 		return fallbacks
@@ -727,7 +882,7 @@ func (s *ConfigService) renderSettings(cfg model.NodeRedConfig) string {
 	if path == "" {
 		path = filepath.Join(s.dataDir, "settings.js")
 	}
-	// #nosec G304 -- path is the configured settings.js path inside the dataDir; not request-derived.
+	// #nosec G304,G703 -- path is the configured settings.js path inside the dataDir; not request-derived.
 	existing, err := os.ReadFile(path)
 	if err != nil || len(strings.TrimSpace(string(existing))) == 0 {
 		return generateSettingsJS(cfg)
@@ -874,13 +1029,7 @@ func ensureHTTPStatic(content, relDir string) string {
 	if re.MatchString(content) {
 		return content
 	}
-	insertPattern := `\n\s*\}\s*$`
-	appendRe := regexp.MustCompile(insertPattern)
-	if appendRe.MatchString(content) {
-		entry := fmt.Sprintf("  httpStatic: %q,\n", relDir)
-		return appendBeforeClosingBrace(content, entry)
-	}
-	return content
+	return appendPropertyBeforeClosingBrace(content, fmt.Sprintf("  httpStatic: %q,\n", relDir))
 }
 
 // replaceScalarKey replaces or appends a scalar key:value pair
@@ -896,28 +1045,45 @@ func replaceScalarKey(content, key, value string) string {
 	}
 
 	// Key not found, append before closing brace
-	return appendBeforeClosingBrace(content, fmt.Sprintf("  %s: %s,\n", key, value))
+	return appendPropertyBeforeClosingBrace(content, fmt.Sprintf("  %s: %s,\n", key, value))
 }
 
-// appendBeforeClosingBrace inserts entry before the closing brace of the
-// module.exports object.
+// appendPropertyBeforeClosingBrace inserts a rendered property just before
+// the closing brace of the module.exports object.
 //
-// The entry that precedes the insertion point may be missing its trailing
-// comma: Node-RED's own default settings.js ends with
-// "externalModules: {}" and no comma, so appending a key after it produced
-// invalid JavaScript and the whole settings.js was rejected (issue #881's
-// live-stack proof surfaced it).
-func appendBeforeClosingBrace(content, entry string) string {
-	appendRe := regexp.MustCompile(`\n\s*\}\s*$`)
-	idx := appendRe.FindStringIndex(content)
-	if idx == nil {
+// The property that precedes the insertion point must end with a comma. The
+// Docker image ships a settings.js whose last property (`externalModules`)
+// carries no trailing comma, and appending a key after it would render
+// invalid JavaScript — every apply would then fail the candidate parse.
+func appendPropertyBeforeClosingBrace(content, entry string) string {
+	appendPattern := `\n\s*\}\s*$`
+	appendRe := regexp.MustCompile(appendPattern)
+	loc := appendRe.FindStringIndex(content)
+	if loc == nil {
 		return content
 	}
-	head := strings.TrimRight(content[:idx[0]], " \t\r\n")
-	if head != "" && !strings.HasSuffix(head, ",") {
-		head += ","
+	// The content is concatenated rather than passed through
+	// ReplaceAllString: the rendered entry can carry a bcrypt hash whose
+	// `$` characters ReplaceAllString would interpret as a capture
+	// reference.
+	head := ensureCommaTerminated(content[:loc[0]])
+	return head + "\n" + entry + "}\n"
+}
+
+// ensureCommaTerminated appends a comma to the last property of the content
+// when it does not carry one. Content that ends with an opening delimiter
+// (an empty object or array) needs no comma.
+func ensureCommaTerminated(content string) string {
+	trimmed := strings.TrimRight(content, " \t")
+	if trimmed == "" {
+		return content
 	}
-	return head + "\n" + entry + content[idx[0]:]
+	switch trimmed[len(trimmed)-1] {
+	case ',', '{', '[':
+		return content
+	}
+	return trimmed + "," + content[len(trimmed):]
+
 }
 
 // replaceArrayKey replaces or appends a multi-line array key.
@@ -928,7 +1094,7 @@ func replaceArrayKey(content, key, arrayContent string) string {
 		return re.ReplaceAllString(content, arrayContent)
 	}
 
-	return appendBeforeClosingBrace(content, "\n"+arrayContent+"\n")
+	return appendPropertyBeforeClosingBrace(content, arrayContent+"\n")
 }
 
 func removeArrayKey(content, key string) string {
@@ -1288,13 +1454,8 @@ func (s *ConfigService) parseConfigFromContent(content string) (model.NodeRedCon
 	cfg.Https = parseHttpsBlockFromJS(content)
 	surfaces, err := parseAuthenticationSurfacesFromJS(content)
 	if err != nil {
-		// ErrSandboxTimeout is propagated so the HTTP handler can return
-		// SETTINGS_TIMEOUT; other sandbox errors fall back to the legacy
-		// contract of "no adminAuth parsed".
-		if errors.Is(err, ErrSandboxTimeout) {
-			return cfg, err
-		}
-		return cfg, nil
+		// Inspection failures are validation failures, not missing auth.
+		return cfg, err
 	}
 	if surfaces != nil {
 		cfg.AdminAuth = surfaces.AdminAuth
@@ -1425,10 +1586,13 @@ func parseAdminAuthFromJS(content string) (*model.AdminAuth, error) {
 func parseAuthenticationSurfacesFromJS(content string) (*model.AuthenticationSurfaces, error) {
 	surfaces, err := ParseAuthenticationSurfacesViaSandbox(content)
 	if err != nil {
-		if errors.Is(err, ErrSandboxTimeout) {
-			return nil, err
+		if errors.Is(err, ErrAdminAuthMissing) || errors.Is(err, ErrSandboxHostAPI) {
+			// A successful inspection without auth and source-managed settings
+			// requiring Node-RED host APIs are distinct sandbox outcomes. The
+			// latter retain their source unchanged; auth cannot be inspected.
+			return nil, nil
 		}
-		return nil, nil
+		return nil, err
 	}
 	if surfaces.AdminAuth != nil && surfaces.AdminAuth.Type != "credentials" {
 		// Non-credential strategies can contain executable callbacks. They are
@@ -1606,7 +1770,7 @@ func replaceBlockKey(content, key, blockContent string) string {
 	if !ok {
 		// Append before closing brace of the module.exports object.
 		// blockContent already includes its own leading indent and trailing comma.
-		return appendBeforeClosingBrace(content, "\n"+blockContent+"\n")
+		return appendPropertyBeforeClosingBrace(content, blockContent+"\n")
 	}
 	return content[:start] + blockContent + content[end:]
 }

@@ -39,12 +39,16 @@ interface AdvancedSettingsProps {
   // The live settings.js source the operator opened with. Used to
   // scope the preview request and as the "back to source" target.
   rawContent: string;
+  // Issue #878 — the revision of the document the operator opened. The
+  // preset write carries it so a stale preview cannot overwrite newer
+  // settings.js.
+  expectedRevision?: string;
   // Called after the operator confirms an apply and the parent
   // has written the new source through /api/settings/raw.
   onApplied: () => void;
 }
 
-export function AdvancedSettings({ rawContent, onApplied }: AdvancedSettingsProps) {
+export function AdvancedSettings({ rawContent, expectedRevision, onApplied }: AdvancedSettingsProps) {
   const [activePreset, setActivePreset] = useState<PresetView | null>(null);
   const [preview, setPreview] = useState<PresetPreview | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -94,16 +98,19 @@ export function AdvancedSettings({ rawContent, onApplied }: AdvancedSettingsProp
     // flight, audit-logged, source-revision-checked). The preview was
     // generated against the same rawContent the parent mounted with,
     // so preview.after is a valid write target.
-    actions.saveRawSettingsMutation.mutate(preview.after, {
-      onSuccess: () => {
-        toast.success(`Applied ${activePreset.name}.`);
-        onApplied();
-        cancelPreview();
+    actions.saveRawSettingsMutation.mutate(
+      { content: preview.after, expectedRevision },
+      {
+        onSuccess: () => {
+          toast.success(`Applied ${activePreset.name}.`);
+          onApplied();
+          cancelPreview();
+        },
+        onError: (err) => {
+          toast.error(`Failed to apply preset: ${(err as Error).message}`);
+        },
       },
-      onError: (err) => {
-        toast.error(`Failed to apply preset: ${(err as Error).message}`);
-      },
-    });
+    );
   }
 
   if (presetsQuery.isLoading) {

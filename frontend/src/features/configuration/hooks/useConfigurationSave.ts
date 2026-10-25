@@ -13,6 +13,12 @@
  * The hook returns a structured `SaveOutcome` so the caller can show
  * a targeted error (no pending changes / validation errors / backend
  * failure) without the toast noise the old aggregate helper caused.
+ *
+ * Issue #878: `expectedRevision` is the settings.js fingerprint the
+ * operator read before composing the edit. It travels with the save so
+ * the backend rejects a stale edit with 409 SETTINGS_REVISION_CONFLICT
+ * instead of overwriting newer state. Without it the backend falls back
+ * to the historical "no expectation" behaviour.
  */
 
 import { useMemo } from 'react';
@@ -31,9 +37,11 @@ export type SaveOutcome =
 interface UseConfigurationSaveInput {
   formData: NodeRedConfigFormData;
   diff: ConfigurationDiffSummary;
+  /** settings.js revision the operator read (issue #878). */
+  expectedRevision?: string;
 }
 
-export function useConfigurationSave({ formData, diff }: UseConfigurationSaveInput) {
+export function useConfigurationSave({ formData, diff, expectedRevision }: UseConfigurationSaveInput) {
   const { saveConfigMutation } = useConfigurationActions();
 
   // Stabilise the gate so a re-render with the same inputs does not
@@ -60,7 +68,7 @@ export function useConfigurationSave({ formData, diff }: UseConfigurationSaveInp
 
         const payload = formDataToConfigPayload(formData);
         try {
-          await saveConfigMutation.mutateAsync(payload);
+          await saveConfigMutation.mutateAsync({ config: payload, expectedRevision });
           return { ok: true };
         } catch (error) {
           return { ok: false, reason: 'mutation-failed', error };
@@ -68,5 +76,5 @@ export function useConfigurationSave({ formData, diff }: UseConfigurationSaveInp
       },
       isPending: saveConfigMutation.isPending,
     };
-  }, [formData, diff, saveConfigMutation]);
+  }, [formData, diff, expectedRevision, saveConfigMutation]);
 }

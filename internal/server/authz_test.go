@@ -21,6 +21,17 @@ func newAuthzTestServer(t *testing.T) (*Server, *service.AuthService) {
 	sessionStore := store.NewJSONStore[model.RefreshSessions](dir + "/sessions.json")
 	authSvc := service.NewAuthService("test-secret", userStore, sessionStore)
 	srv := NewServerWithConfig(authSvc, Config{DataDir: dir, CORS: middleware.CORSConfig{}, HTTPLogger: discardHTTPLogger()})
+	t.Cleanup(srv.Shutdown)
+	return srv, authSvc
+}
+
+// newAuthzGateTestServer keeps the registered router and its middleware but
+// stops permission probes before product handlers can mutate data or start jobs.
+// Read/route-walk tests continue to use newAuthzTestServer without isolation.
+func newAuthzGateTestServer(t *testing.T) (*Server, *service.AuthService) {
+	t.Helper()
+	srv, authSvc := newAuthzTestServer(t)
+	isolateAuthzHandlers(t, srv.router)
 	return srv, authSvc
 }
 
@@ -74,7 +85,7 @@ var mutatingRoutes = []struct{ method, path string }{
 // TestAuthz_ViewerForbiddenOnMutatingRoutes is the #274 regression: a viewer
 // token must be rejected with 403 on every state-mutating endpoint.
 func TestAuthz_ViewerForbiddenOnMutatingRoutes(t *testing.T) {
-	srv, authSvc := newAuthzTestServer(t)
+	srv, authSvc := newAuthzGateTestServer(t)
 	viewerToken := tokenForRole(t, authSvc, "viewer", model.RoleViewer)
 
 	for _, route := range mutatingRoutes {
@@ -87,14 +98,16 @@ func TestAuthz_ViewerForbiddenOnMutatingRoutes(t *testing.T) {
 		if rec.Code != http.StatusForbidden {
 			t.Errorf("viewer %s %s: expected 403, got %d", route.method, route.path, rec.Code)
 		}
+		if rec.Header().Get("X-Authz-Gate") != "" {
+			t.Errorf("viewer %s %s: reached the gate sentinel", route.method, route.path)
+		}
 	}
 }
 
-// TestAuthz_AdminPassesAdminGate verifies the admin role is not blocked by the
-// RequireAdmin gate (it may still get 4xx/5xx from the handler for an empty
-// body, but never 403 from the authorization layer).
+// TestAuthz_AdminPassesAdminGate verifies the admin role passes the registered
+// middleware chain and reaches the sentinel, without running product handlers.
 func TestAuthz_AdminPassesAdminGate(t *testing.T) {
-	srv, authSvc := newAuthzTestServer(t)
+	srv, authSvc := newAuthzGateTestServer(t)
 	adminToken := tokenForRole(t, authSvc, "admin", model.RoleAdmin)
 
 	for _, route := range mutatingRoutes {
@@ -104,8 +117,9 @@ func TestAuthz_AdminPassesAdminGate(t *testing.T) {
 
 		srv.ServeHTTP(rec, req)
 
-		if rec.Code == http.StatusForbidden {
-			t.Errorf("admin %s %s: must not be blocked by RequireAdmin, got 403", route.method, route.path)
+		if rec.Code != http.StatusNoContent || rec.Header().Get("X-Authz-Gate") != "passed" || rec.Body.Len() != 0 {
+			t.Errorf("admin %s %s: expected gate sentinel with 204 and empty body, got status=%d marker=%q body=%q",
+				route.method, route.path, rec.Code, rec.Header().Get("X-Authz-Gate"), rec.Body.String())
 		}
 	}
 }

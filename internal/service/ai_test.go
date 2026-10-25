@@ -105,3 +105,28 @@ func TestAssistFlowDisabledRequiresExplicitConfiguration(t *testing.T) {
 		t.Fatalf("expected disabled configuration error, got %v", err)
 	}
 }
+
+// TestRedactSecretsRedactsPassphraseKeys covers the export surface: a
+// flow property named "passphrase" carries a TLS private-key passphrase
+// and must not leave the host in cleartext.
+func TestRedactSecretsRedactsPassphraseKeys(t *testing.T) {
+	//nolint:gosec // G101 test fixture, not a credential.
+	flow := map[string]interface{}{
+		"nodes": []interface{}{
+			map[string]interface{}{
+				"id":         "tls-1",
+				"type":       "tls-config",
+				"passphrase": "audit-tls-fixture",
+			},
+		},
+	}
+
+	redacted := RedactSecrets(flow)
+	encoded, err := json.Marshal(redacted)
+	if err != nil {
+		t.Fatalf("marshal redacted flow: %v", err)
+	}
+	if strings.Contains(string(encoded), "audit-tls-fixture") {
+		t.Fatalf("redacted output leaked the passphrase: %s", encoded)
+	}
+}

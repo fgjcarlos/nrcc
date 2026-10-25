@@ -66,9 +66,9 @@ import (
 // HTTP-shaped inputs to ApplyRequest and HTTP-shaped
 // outputs from ApplyResult.
 type ConfigApplyHandler struct {
-	configSvc       *service.ConfigService
+	configSvc        *service.ConfigService
 	applyCoordinator *service.ApplyCoordinator
-	audit           *audit.Service
+	audit            *audit.Service
 
 	// processManager is optional and follows the same wire-up
 	// rule as ConfigHandler: a successful apply triggers a
@@ -83,7 +83,7 @@ type ConfigApplyHandler struct {
 // the Set* setters.
 func NewConfigApplyHandler(configSvc *service.ConfigService, applyCoordinator *service.ApplyCoordinator) *ConfigApplyHandler {
 	return &ConfigApplyHandler{
-		configSvc:       configSvc,
+		configSvc:        configSvc,
 		applyCoordinator: applyCoordinator,
 	}
 }
@@ -96,23 +96,34 @@ func (h *ConfigApplyHandler) SetAuditService(a *audit.Service) { h.audit = a }
 // (the default in tests and in edge mode).
 func (h *ConfigApplyHandler) SetProcessManager(pm *service.ProcessManager) { h.processManager = pm }
 
-// ApplyStructuredRequest is the wire payload for
-// POST /api/config/apply. The structured payload mirrors
-// the existing POST /api/config body; the new field is
-// ExpectedRevision, an optional sha256 fingerprint of the
-// settings.js bytes the operator read before composing this
-// edit. When non-empty the apply coordinator enforces the
-// IfMatch precondition and returns 409 SETTINGS_REVISION_CONFLICT
-// on mismatch.
+// StructuredConfigRequest is the wire payload shared by the two
+// structured configuration surfaces: POST /api/config/apply and
+// POST /api/config (issue #878). The extra field is ExpectedRevision,
+// an optional sha256 fingerprint of the settings.js bytes the
+// operator read before composing this edit. When non-empty the apply
+// coordinator enforces the IfMatch precondition and returns 409
+// SETTINGS_REVISION_CONFLICT on mismatch.
+//
+// The two surfaces read the payload differently (issue #879):
+//
+//   - POST /api/config/apply takes a presence-aware patch (Patch). A
+//     field the payload omits keeps its live value, a field present
+//     with an explicit null disables the surface it configures, and a
+//     field present with a value replaces the live value. The patch
+//     keeps the raw JSON of every field because a decoded struct
+//     cannot tell an omitted int from an int explicitly set to zero.
+//   - POST /api/config takes the complete configuration
+//     (Configuration). The configuration editor posts the whole
+//     configuration and must be able to clear a surface by leaving it
+//     out.
 //
 // The handler decodes the payload in two passes (see
-// ApplyStructured) so the NodeRedConfig.UnmarshalJSON hook
-// does not consume the entire body and drop the
-// ExpectedRevision field. The type is kept as a documented
-// shape reference for the operator UI; it is not used as
-// the decode target directly.
-type ApplyStructuredRequest struct {
+// DecodeStructuredConfigPayload) so the NodeRedConfig.UnmarshalJSON
+// hook does not consume the entire body and drop the
+// ExpectedRevision field.
+type StructuredConfigRequest struct {
 	Configuration    model.NodeRedConfig
+	Patch            model.ConfigPatch
 	ExpectedRevision string
 }
 
@@ -121,8 +132,8 @@ type ApplyStructuredRequest struct {
 // after the apply so the operator UI can re-bind its
 // ExpectedRevision field without a follow-up GET.
 type ApplyStructuredResponse struct {
-	Configuration model.NodeRedConfig       `json:"configuration"`
-	Document      model.SettingsDocument    `json:"document"`
+	Configuration model.NodeRedConfig    `json:"configuration"`
+	Document      model.SettingsDocument `json:"document"`
 }
 
 // ApplyRawRequest is the wire payload for
@@ -148,12 +159,12 @@ type ApplyRawResponse struct {
 //
 // Validation order:
 //
-//   1. Admin claims required (401 otherwise).
-//   2. Configuration is editable (409 CONFIGURATION_READ_ONLY otherwise).
-//   3. JSON payload decodes (400 INVALID_REQUEST otherwise).
-//   4. JSON store commit succeeds (400 VALIDATION_ERROR otherwise).
-//   5. ApplyCoordinator.Apply succeeds (5xx / 409 / 422 mapped by
-//      writeApplyError).
+//  1. Admin claims required (401 otherwise).
+//  2. Configuration is editable (409 CONFIGURATION_READ_ONLY otherwise).
+//  3. JSON payload decodes (400 INVALID_REQUEST otherwise).
+//  4. JSON store commit succeeds (400 VALIDATION_ERROR otherwise).
+//  5. ApplyCoordinator.Apply succeeds (5xx / 409 / 422 mapped by
+//     writeApplyError).
 //
 // On success the response carries both the committed
 // configuration (with bcrypt password hashes) and the live
@@ -171,18 +182,18 @@ func (h *ConfigApplyHandler) ApplyStructured(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	var req ApplyStructuredRequest
-	if !DecodeStructuredApplyPayload(w, r, &req) {
+	var req StructuredConfigRequest
+	if !DecodeStructuredConfigPayload(w, r, &req) {
 		return
 	}
 
-	staged, err := h.configSvc.CommitStructured(req.Configuration)
+	live, err := h.configSvc.GetRawSettings()
 	if err != nil {
-		model.RespondError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+		model.RespondError(w, http.StatusInternalServerError, "SETTINGS_ERROR", err.Error())
 		return
 	}
 
-	expected := staged.Live.Revision
+	expected := live.Revision
 	if req.ExpectedRevision != "" {
 		expected = model.SourceRevision{
 			Fingerprint: req.ExpectedRevision,
@@ -191,30 +202,28 @@ func (h *ConfigApplyHandler) ApplyStructured(w http.ResponseWriter, r *http.Requ
 	}
 
 	applyReq := service.ApplyRequest{
-		Path:         staged.Live.Path,
-		Content:      staged.Content,
-		Expected:     expected,
-		BackupDir:    staged.BackupDir,
-		Actor:        claims.Username,
-		Request:      r,
-		Capabilities: capabilities,
+		Path:            live.Path,
+		Expected:        expected,
+		BackupDir:       backupDirFor(h.configSvc, live.Path),
+		StructuredPatch: &req.Patch,
+		Actor:           claims.Username,
+		Request:         r,
+		Capabilities:    capabilities,
 	}
-	if _, err := h.applyCoordinator.Apply(r.Context(), applyReq); err != nil {
+	result, err := h.applyCoordinator.Apply(r.Context(), applyReq)
+	if err != nil {
 		writeApplyError(w, err, "Failed to apply settings")
 		return
 	}
 
-	if err := h.maybeRestart(); err != nil {
-		model.RespondError(w, http.StatusInternalServerError, "CONFIG_SAVED_RESTART_FAILED", "Configuration was applied, but Node-RED could not restart: "+err.Error())
-		return
-	}
-
 	if h.audit != nil {
-		h.audit.Log(r, claims.Username, "CONFIG_APPLY", staged.Live.Path, "ok", compatibilityAuditMeta(capabilities))
+		h.audit.Log(r, claims.Username, "CONFIG_APPLY", live.Path, "ok", compatibilityAuditMeta(capabilities))
 	}
 	model.RespondJSON(w, http.StatusOK, ApplyStructuredResponse{
-		Configuration: staged.Committed,
-		Document:      h.refreshDocument(staged.Live.Path),
+		// Issue #877: the committed configuration echoes the write-only
+		// secrets, so they are redacted before the response leaves the API.
+		Configuration: result.Configuration.RedactedSecrets(),
+		Document:      h.refreshDocument(live.Path),
 	})
 }
 
@@ -272,34 +281,12 @@ func (h *ConfigApplyHandler) ApplyRaw(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.maybeRestart(); err != nil {
-		model.RespondError(w, http.StatusInternalServerError, "SETTINGS_SAVED_RESTART_FAILED", "settings.js was applied, but Node-RED could not restart: "+err.Error())
-		return
-	}
-
 	if h.audit != nil {
 		h.audit.Log(r, claims.Username, "SETTINGS_APPLY", live.Path, "ok", compatibilityAuditMeta(capabilities))
 	}
 	model.RespondJSON(w, http.StatusOK, ApplyRawResponse{
 		Document: h.refreshDocument(live.Path),
 	})
-}
-
-// maybeRestart triggers the Node-RED restart on a successful
-// apply when a managed process is configured. The function
-// returns the restart error so the caller can map it onto the
-// existing CONFIG_SAVED_RESTART_FAILED / SETTINGS_SAVED_RESTART_FAILED
-// envelopes. nil when no restart is needed (no process manager,
-// external mode, or process not running).
-func (h *ConfigApplyHandler) maybeRestart() error {
-	if h.processManager == nil || h.processManager.IsExternalMode() {
-		return nil
-	}
-	status := h.processManager.Status()
-	if status.Status != "running" {
-		return nil
-	}
-	return h.processManager.Restart()
 }
 
 // refreshDocument re-reads the settings.js document after a
@@ -336,21 +323,33 @@ func (h *ConfigApplyHandler) refreshDocument(path string) model.SettingsDocument
 // the operator UI can render a single conflict dialog for both
 // surfaces. It is also used by ConfigHandler.saveConfigViaApply
 // for the same reason.
-// DecodeStructuredApplyPayload decodes a POST /api/config/apply
-// body in two passes so the NodeRedConfig.UnmarshalJSON hook does
-// not consume the entire payload and drop ExpectedRevision.
+// DecodeStructuredConfigPayload decodes a structured configuration
+// body (POST /api/config/apply and, since issue #878, POST /api/config)
+// in two passes so the NodeRedConfig.UnmarshalJSON hook does not consume
+// the entire payload and drop ExpectedRevision.
 //
-// The first pass decodes into a generic map; the second pass
-// re-encodes that map minus the expectedRevision field and
-// decodes the result as a NodeRedConfig so the typed
-// UnmarshalJSON runs against the standard payload shape. The
-// expectedRevision field is preserved as a string in dst.
+// The first pass decodes into a generic map; the expectedRevision field
+// is lifted out of it. The remaining fields are kept twice: as the
+// presence-aware patch the apply endpoint merges onto the live
+// configuration (issue #879), and as the typed configuration the
+// full-replacement surface commits.
+//
+// The second pass decodes the remaining fields as a NodeRedConfig so a
+// payload whose fields carry the wrong JSON types is rejected with the
+// 400 INVALID_REQUEST envelope before any state is touched.
 //
 // On any decode failure the function writes a 400 INVALID_REQUEST
 // envelope and returns false so the handler can early-return.
-func DecodeStructuredApplyPayload(w http.ResponseWriter, r *http.Request, dst *ApplyStructuredRequest) bool {
+func DecodeStructuredConfigPayload(w http.ResponseWriter, r *http.Request, dst *StructuredConfigRequest) bool {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
+		// An oversized body must surface as 413, not as a generic 400:
+		// the body cap is a middleware policy (see
+		// middleware.BodyLimitMiddleware) and DecodeJSON reports it the
+		// same way.
+		if respondBodyLimitError(w, err) {
+			return false
+		}
 		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
 		return false
 	}
@@ -370,7 +369,7 @@ func DecodeStructuredApplyPayload(w http.ResponseWriter, r *http.Request, dst *A
 	}
 	// Second pass: re-encode and decode as NodeRedConfig so
 	// the typed UnmarshalJSON runs against the standard
-	// payload shape.
+	// payload shape and a malformed field is rejected here.
 	rest, err := json.Marshal(raw)
 	if err != nil {
 		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
@@ -380,13 +379,16 @@ func DecodeStructuredApplyPayload(w http.ResponseWriter, r *http.Request, dst *A
 		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
 		return false
 	}
+	// The patch keeps the raw JSON of every field so the merge can tell
+	// an absent field from an explicit null or an explicit zero.
+	dst.Patch = model.NewConfigPatch(raw)
 	return true
 }
 
 func writeRevisionConflict(w http.ResponseWriter, conflict *service.RevisionConflictError) {
 	resp := revisionConflictEnvelope{
-		Success:   false,
-		Error:     &model.ApiError{Code: "SETTINGS_REVISION_CONFLICT", Message: conflict.Error()},
+		Success: false,
+		Error:   &model.ApiError{Code: "SETTINGS_REVISION_CONFLICT", Message: conflict.Error()},
 		Data: revisionConflictData{
 			LiveRevision:     conflict.Live,
 			ProvidedRevision: conflict.Provided.Fingerprint,

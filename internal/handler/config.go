@@ -101,7 +101,13 @@ func (h *ConfigHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	model.RespondJSON(w, http.StatusOK, cfg)
+	// Issue #877: the credential-encryption secret and the TLS
+	// private-key passphrase are write-only for every role, admin
+	// included. The response carries the non-secret TLS material so the
+	// configuration UI can still render the TLS section, and the stored
+	// secrets are untouched — the client reads them as "blank, keep the
+	// current value" and the service preserves them on write-back.
+	model.RespondJSON(w, http.StatusOK, cfg.RedactedSecrets())
 }
 
 // SaveConfig handles POST /api/config - protected, admin only.
@@ -111,11 +117,20 @@ func (h *ConfigHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 // Slice C: when an ApplyCoordinator is wired, the structured save runs
 // through it so the settings.js write is single-flighted against
 // /api/settings/raw and goes through the validate → backup → atomic write
-// → audit transaction. The JSON store commit still happens FIRST (the
-// same order as the legacy Save) so password preservation / bcrypt
-// upgrade / validation keep their existing semantics. A revision
-// mismatch at the apply stage surfaces as 409 SETTINGS_REVISION_CONFLICT
-// matching the slice C handler envelope.
+// → audit transaction. The revision precondition runs inside the
+// coordinator, under the single-flight guard and before the structured
+// commit, so a rejected save leaves both representations unchanged. A
+// revision mismatch surfaces as 409 SETTINGS_REVISION_CONFLICT matching
+// the slice C handler envelope.
+//
+// Issue #878: the body may carry the optional `expectedRevision`
+// precondition — the settings.js fingerprint the operator read before
+// composing the edit. When it is present the save is rejected with 409
+// SETTINGS_REVISION_CONFLICT unless the live revision still matches, so a
+// stale browser session cannot overwrite newer state. When it is absent
+// the endpoint keeps its historical "no expectation" behaviour for
+// clients that never learned the revision (see
+// CheckRevisionPrecondition's empty-expectation bypass).
 func (h *ConfigHandler) SaveConfig(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.ClaimsFromContext(r)
 	capabilities := h.configSvc.ConfigurationCapabilities()
@@ -124,78 +139,84 @@ func (h *ConfigHandler) SaveConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var cfg model.NodeRedConfig
-	if !DecodeJSON(w, r, &cfg) {
+	// The typed NodeRedConfig decode swallows unknown fields, so the
+	// shared two-pass decoder is used to keep `expectedRevision` out of
+	// the configuration payload while preserving it as the precondition.
+	var req StructuredConfigRequest
+	if !DecodeStructuredConfigPayload(w, r, &req) {
 		return
 	}
+	cfg := req.Configuration
 
 	if h.applyCoordinator != nil {
-		h.saveConfigViaApply(w, r, claims, cfg, capabilities)
+		h.saveConfigViaApply(w, r, claims, cfg, capabilities, req.ExpectedRevision)
 		return
 	}
-	h.saveConfigLegacy(w, r, claims, cfg, capabilities)
+	h.saveConfigLegacy(w, r, claims, cfg, capabilities, req.ExpectedRevision)
 }
 
 // saveConfigViaApply is the slice C delegation path. It commits
 // the JSON store, then drives ApplyCoordinator.Apply against the
-// rendered settings.js content. The apply's revision check uses
-// the live revision captured during CommitStructured (no wire
-// expectedRevision is supplied by /api/config for backward
-// compatibility — the frontend learns the revision via GET).
-func (h *ConfigHandler) saveConfigViaApply(w http.ResponseWriter, r *http.Request, claims *model.Claims, cfg model.NodeRedConfig, capabilities model.ConfigurationCapabilities) {
-	staged, err := h.configSvc.CommitStructured(cfg)
+// rendered settings.js content.
+//
+// Issue #878: the apply's revision precondition uses the revision the
+// operator actually read (expectedRevision from the request body). Only
+// when the client omits it does the handler fall back to the live
+// revision captured at read time — the historical behaviour that kept
+// older dashboards working.
+func (h *ConfigHandler) saveConfigViaApply(w http.ResponseWriter, r *http.Request, claims *model.Claims, cfg model.NodeRedConfig, capabilities model.ConfigurationCapabilities, expectedRevision string) {
+	live, err := h.configSvc.GetRawSettings()
 	if err != nil {
-		// Mirror the legacy SaveConfig error envelope: validation
-		// failures are 400 VALIDATION_ERROR so the operator sees the
-		// same UX they had before slice C. The apply coordinator is
-		// never invoked for invalid configs.
-		model.RespondError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
+		model.RespondError(w, http.StatusInternalServerError, "SETTINGS_ERROR", err.Error())
 		return
 	}
 
+	expected := live.Revision
+	if expectedRevision != "" {
+		expected = model.SourceRevision{
+			Fingerprint: expectedRevision,
+			Algorithm:   service.SourceRevisionAlgorithm,
+		}
+	}
+
 	req := service.ApplyRequest{
-		Path:         staged.Live.Path,
-		Content:      staged.Content,
-		Expected:     staged.Live.Revision,
-		BackupDir:    staged.BackupDir,
-		Actor:        claims.Username,
-		Request:      r,
-		Capabilities: capabilities,
+		Path:             live.Path,
+		Expected:         expected,
+		BackupDir:        backupDirFor(h.configSvc, live.Path),
+		StructuredConfig: &cfg,
+		Actor:            claims.Username,
+		Request:          r,
+		Capabilities:     capabilities,
 	}
 	result, err := h.applyCoordinator.Apply(r.Context(), req)
 	if err != nil {
 		writeApplyError(w, err, "Failed to apply settings")
 		return
 	}
-	_ = result
-
-	// Node-RED reads settings.js only at start. Do not acknowledge the save
-	// until a managed running process has successfully reloaded it; otherwise
-	// the UI would claim success while the active runtime still used the old
-	// configuration.
-	if h.processManager != nil && !h.processManager.IsExternalMode() {
-		if status := h.processManager.Status(); status.Status == "running" {
-			if err := h.processManager.Restart(); err != nil {
-				model.RespondError(w, http.StatusInternalServerError, "CONFIG_SAVED_RESTART_FAILED", "Configuration was saved, but Node-RED could not restart: "+err.Error())
-				return
-			}
-		}
-	}
 
 	// The apply coordinator already emitted apply.success; we keep
 	// the legacy CONFIG_SAVE audit for parity with the pre-slice-C
 	// dashboards that consume the action field.
 	if h.audit != nil {
-		h.audit.Log(r, claims.Username, "CONFIG_SAVE", staged.Live.Path, "ok", compatibilityAuditMeta(capabilities))
+		h.audit.Log(r, claims.Username, "CONFIG_SAVE", live.Path, "ok", compatibilityAuditMeta(capabilities))
 	}
-	model.RespondJSON(w, http.StatusOK, staged.Committed)
+	// Issue #877: the committed configuration echoes the write-only
+	// secrets, so they are redacted before the response leaves the API.
+	model.RespondJSON(w, http.StatusOK, result.Configuration.RedactedSecrets())
 }
 
 // saveConfigLegacy is the pre-slice-C path: it commits the JSON
 // store + writes settings.js directly via ConfigService.Save and
 // triggers the ProcessManager restart. Kept so existing unit
 // tests that do not wire an ApplyCoordinator keep passing.
-func (h *ConfigHandler) saveConfigLegacy(w http.ResponseWriter, r *http.Request, claims *model.Claims, cfg model.NodeRedConfig, capabilities model.ConfigurationCapabilities) {
+//
+// Issue #878: the legacy path has no apply coordinator to run the
+// revision precondition, so the handler enforces the client-supplied
+// expectation itself before the first write.
+func (h *ConfigHandler) saveConfigLegacy(w http.ResponseWriter, r *http.Request, claims *model.Claims, cfg model.NodeRedConfig, capabilities model.ConfigurationCapabilities, expectedRevision string) {
+	if !h.checkExpectedRevision(w, expectedRevision) {
+		return
+	}
 	if err := h.configSvc.Save(cfg); err != nil {
 		model.RespondError(w, http.StatusBadRequest, "VALIDATION_ERROR", err.Error())
 		return
@@ -211,7 +232,43 @@ func (h *ConfigHandler) saveConfigLegacy(w http.ResponseWriter, r *http.Request,
 	}
 
 	h.audit.Log(r, claims.Username, "CONFIG_SAVE", "", "ok", compatibilityAuditMeta(capabilities))
-	model.RespondJSON(w, http.StatusOK, cfg)
+	// Issue #877: the echo carries the write-only secrets, so they are
+	// redacted before the response leaves the API.
+	model.RespondJSON(w, http.StatusOK, cfg.RedactedSecrets())
+}
+
+// checkExpectedRevision enforces the client-supplied revision
+// precondition (issue #878) on the paths that do not run an apply
+// coordinator. It returns true when the request may proceed.
+//
+// An empty expectation keeps the historical "no expectation" semantics:
+// the caller never read a revision, so there is nothing to compare
+// against. A non-empty expectation that does not match the live
+// settings.js revision writes the same 409 SETTINGS_REVISION_CONFLICT
+// envelope the apply surfaces use, so the operator UI renders one
+// conflict dialog for every save surface.
+func (h *ConfigHandler) checkExpectedRevision(w http.ResponseWriter, expectedRevision string) bool {
+	if expectedRevision == "" {
+		return true
+	}
+	live, err := h.configSvc.GetRawSettings()
+	if err != nil {
+		model.RespondError(w, http.StatusInternalServerError, "SETTINGS_ERROR", err.Error())
+		return false
+	}
+	provided := model.SourceRevision{
+		Fingerprint: expectedRevision,
+		Algorithm:   service.SourceRevisionAlgorithm,
+	}
+	if service.RevisionMatches(provided, live.Revision) {
+		return true
+	}
+	writeRevisionConflict(w, &service.RevisionConflictError{
+		Live:     live.Revision,
+		Provided: provided,
+		Path:     live.Path,
+	})
+	return false
 }
 
 // writeApplyError maps the slice C apply errors onto HTTP
@@ -233,6 +290,22 @@ func writeApplyError(w http.ResponseWriter, err error, fallback string) {
 			model.RespondError(w, http.StatusInternalServerError, "SETTINGS_BACKUP_FAILED", ae.Error())
 		case service.ApplyStageWrite:
 			model.RespondError(w, http.StatusInternalServerError, "SETTINGS_WRITE_ERROR", ae.Error())
+		case service.ApplyStageRestart:
+			var rollbackErr *service.RollbackError
+			if errors.As(ae, &rollbackErr) {
+				model.RespondError(w, http.StatusInternalServerError, "RUNTIME_RECOVERY_FAILED", "Configuration apply failed and runtime recovery was unsuccessful")
+				return
+			}
+			model.RespondError(w, http.StatusInternalServerError, "RUNTIME_RESTART_FAILED", "Configuration apply failed while restarting Node-RED")
+		case service.ApplyStageReady:
+			var rollbackErr *service.RollbackError
+			if errors.As(ae, &rollbackErr) {
+				model.RespondError(w, http.StatusInternalServerError, "RUNTIME_RECOVERY_FAILED", "Configuration apply failed and runtime recovery was unsuccessful")
+				return
+			}
+			model.RespondError(w, http.StatusInternalServerError, "RUNTIME_READINESS_FAILED", "Configuration apply failed because Node-RED did not become ready")
+		case service.ApplyStageRollback:
+			model.RespondError(w, http.StatusInternalServerError, "RUNTIME_RECOVERY_FAILED", "Configuration apply failed and authoritative state recovery was unsuccessful")
 		default:
 			model.RespondError(w, http.StatusInternalServerError, "APPLY_ERROR", ae.Error())
 		}
@@ -279,7 +352,9 @@ func (h *ConfigHandler) GetDefaultConfig(w http.ResponseWriter, r *http.Request)
 	}
 
 	cfg := h.configSvc.GetDefault()
-	model.RespondJSON(w, http.StatusOK, cfg)
+	// Issue #877: the defaults are write-only secrets too — keep the
+	// contract uniform so no response shape ever carries them.
+	model.RespondJSON(w, http.StatusOK, cfg.RedactedSecrets())
 }
 
 // ValidateConfig handles POST /api/config/validate - protected

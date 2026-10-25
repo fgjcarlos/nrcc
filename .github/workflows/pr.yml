@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go-version: ["1.26.8"]
+        go-version: ["1.27.3"]
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # pin to commit (v7.0.0)
@@ -91,7 +91,7 @@ jobs:
           pnpm --version
 
       - name: Set up Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # pin to commit (v7.0.0)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # pin to commit (v7.0.0)
         with:
           node-version: ${{ matrix.node-version }}
           cache: pnpm
@@ -131,7 +131,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # pin to commit (v7.0.0)
 
       - name: Set up Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # pin to commit (v7.0.0)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # pin to commit (v7.0.0)
         with:
           node-version: "22"
 
@@ -153,7 +153,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # pin to commit (v7.0.0)
         with:
-          go-version: "1.26.8"
+          go-version: "1.27.3"
           cache-dependency-path: go.sum
 
       # golangci-lint type-checks the packages, so go:embed needs a real file.
@@ -168,7 +168,10 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a  # pin to commit (v9.0.0)
         with:
-          version: v2.12.2
+          # v2.14.0 is the first release whose binary is built with Go 1.27,
+          # so it can analyze a module that targets go 1.27.0. v2.12.2 is
+          # built with Go 1.26 and refuses that module outright.
+          version: v2.14.0
           # Repo-wide gate, not a ratchet: the prior ~72 findings were cleaned
           # up in #396. Keep CI exit 0 = green.
           only-new-issues: false

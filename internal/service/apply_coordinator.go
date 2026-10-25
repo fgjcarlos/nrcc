@@ -62,6 +62,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"sync"
 )
@@ -86,6 +87,7 @@ type applyFlight struct {
 // stateless beyond its in-flight map.
 type ApplyCoordinator struct {
 	apply   *ApplyService
+	resolve ApplyAdapterResolver
 	mu      sync.Mutex
 	flights map[string]*applyFlight
 }
@@ -161,7 +163,37 @@ func (c *ApplyCoordinator) Apply(ctx context.Context, req ApplyRequest) (ApplyRe
 		return ApplyResult{}, ae
 	}
 
+	// A patch carries no full configuration, so the runtime adapter needs
+	// the merged candidate (and its port) before it can resolve the runtime
+	// authority. The preview merges the patch onto the live configuration
+	// without committing it; the commit below recomputes the merge under
+	// the store lock.
+	if c.resolve != nil && req.StructuredPatch != nil && req.StructuredConfig == nil {
+		preview, err := c.apply.configSvc.PreviewStructuredPatch(*req.StructuredPatch)
+		if err != nil {
+			ae := &ApplyError{Stage: ApplyStageValidate, Cause: err, Path: req.Path, Request: req}
+			c.emitFailure(req, "validate", ae)
+			return ApplyResult{}, ae
+		}
+		req.StructuredConfig = &preview
+	}
+
+	if c.resolve != nil {
+		return c.applyRuntime(ctx, req)
+	}
+	state, err := c.stageStructured(&req)
+	if err != nil {
+		return ApplyResult{}, err
+	}
 	result, err := c.apply.Apply(ctx, req)
+	if err != nil && state != nil {
+		if restoreErr := c.apply.configSvc.RestoreStructured(*state); restoreErr != nil {
+			return ApplyResult{}, &ApplyError{Stage: ApplyStageRollback, Cause: errors.Join(err, fmt.Errorf("restore structured config: %w", restoreErr)), Path: req.Path, Request: req}
+		}
+	}
+	if err == nil && state != nil {
+		result.Configuration = state.Committed
+	}
 	if err != nil {
 		// ApplyService.Apply already emitted the apply.failure
 		// audit event with its own meta (apply_stage). We do NOT
@@ -171,8 +203,34 @@ func (c *ApplyCoordinator) Apply(ctx context.Context, req ApplyRequest) (ApplyRe
 		// above (where ApplyService never ran).
 		return ApplyResult{}, err
 	}
-	c.emitSuccess(req)
 	return result, nil
+}
+
+func (c *ApplyCoordinator) stageStructured(req *ApplyRequest) (*StructuredApplyInput, error) {
+	// A patch is merged onto the live configuration and published as one
+	// commit, so the settings.js the apply writes is the merged one.
+	if req.StructuredPatch != nil {
+		state, err := c.apply.configSvc.CommitStructuredPatch(*req.StructuredPatch)
+		if err != nil {
+			c.apply.emit(*req, "apply.failure", ApplyStageValidate, "error", err)
+			return nil, &ApplyError{Stage: ApplyStageValidate, Cause: err, Path: req.Path, Request: *req}
+		}
+		req.Content = state.Content
+		req.BackupDir = state.BackupDir
+		req.StructuredConfig = &state.Committed
+		return &state, nil
+	}
+	if req.StructuredConfig == nil {
+		return nil, nil
+	}
+	state, err := c.apply.configSvc.CommitStructured(*req.StructuredConfig)
+	if err != nil {
+		c.apply.emit(*req, "apply.failure", ApplyStageValidate, "error", err)
+		return nil, &ApplyError{Stage: ApplyStageValidate, Cause: err, Path: req.Path, Request: *req}
+	}
+	req.Content = state.Content
+	req.BackupDir = state.BackupDir
+	return &state, nil
 }
 
 // acquire grabs the per-path slot. Returns ErrApplyInFlight if
@@ -233,22 +291,4 @@ func (c *ApplyCoordinator) emitFailure(req ApplyRequest, failureStage string, ca
 		meta["apply_error"] = cause.Error()
 	}
 	c.apply.auditHook(req.Request, req.Actor, "apply.failure", req.Path, "error", meta)
-}
-
-// emitSuccess writes apply.success with failure_stage=ok so the
-// audit reader can tell a clean transaction from a start-only
-// record.
-func (c *ApplyCoordinator) emitSuccess(req ApplyRequest) {
-	if c.apply == nil || c.apply.auditHook == nil {
-		return
-	}
-	meta := RedactedCapabilityMeta(req.Capabilities)
-	meta["failure_stage"] = "ok"
-	if req.Path != "" {
-		meta["apply_path"] = filepath.Base(req.Path)
-	}
-	if req.BackupDir != "" {
-		meta["apply_backup_dir"] = filepath.Base(req.BackupDir)
-	}
-	c.apply.auditHook(req.Request, req.Actor, "apply.success", req.Path, "ok", meta)
 }

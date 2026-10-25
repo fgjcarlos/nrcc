@@ -628,6 +628,13 @@ paths:
         accounts, permissions and session expiry untouched. Send an explicit
         `null` to clear a surface. Inside a carried `adminAuth`, an empty
         `password` means "unchanged" and keeps the stored bcrypt hash.
+
+        The body may carry an optional `expectedRevision`: the `settings.js`
+        fingerprint the operator read before composing the edit (issue #878).
+        When it does not match the live revision the save is rejected with
+        `409 SETTINGS_REVISION_CONFLICT` and neither `config.json` nor
+        `settings.js` is modified. Clients that omit the field keep the
+        historical "no expectation" behaviour.
       security:
         - bearerAuth: []
       requestBody:
@@ -635,7 +642,16 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/NodeRedConfig"
+              allOf:
+                - $ref: "#/components/schemas/NodeRedConfig"
+                - type: object
+                  properties:
+                    expectedRevision:
+                      type: string
+                      description: >-
+                        sha256 fingerprint of the `settings.js` bytes the
+                        operator read before composing the edit. Optional.
+                      example: 9f2c1b0d4e5a6f7c8d9e0a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f6
       responses:
         "200":
           description: Saved configuration
@@ -649,6 +665,20 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "409":
+          description: >-
+            Revision conflict — the live `settings.js` moved on since the
+            operator read it. Nothing was modified.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+              example:
+                success: false
+                error:
+                  code: SETTINGS_REVISION_CONFLICT
+                  message: "settings.js revision conflict: live=… provided=…"
+                timestamp: "2026-05-24T14:00:00Z"
 
   /api/config/default:
     get:
@@ -2434,6 +2464,7 @@ components:
             - RATE_LIMITED
             - SETUP_REQUIRED
             - ALREADY_INITIALIZED
+            - SETTINGS_REVISION_CONFLICT
           example: INVALID_REQUEST
         message:
           type: string
@@ -2750,7 +2781,12 @@ components:
           type: string
         credentialSecret:
           type: string
-          description: Encryption secret for Node-RED credentials
+          writeOnly: true
+          description: >
+            Encryption secret for Node-RED credentials. Write-only: the API
+            never returns the stored value, for any role. An empty or
+            redacted value on write keeps the stored secret; a new value
+            rotates it. The literal "false" disables credential encryption.
         disableEditor:
           type: boolean
         adminAuth:
@@ -2772,6 +2808,35 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/EnvVar"
+        requireHttps:
+          type: boolean
+          description: Redirect HTTP requests to HTTPS
+        https:
+          $ref: "#/components/schemas/HttpsConfig"
+
+    HttpsConfig:
+      type: object
+      description: Node-RED TLS listener block
+      properties:
+        key:
+          type: string
+          description: Path to the TLS private key file
+        cert:
+          type: string
+          description: Path to the TLS certificate file
+        ca:
+          type: string
+          description: Path to the TLS certificate authority file
+        port:
+          type: integer
+          description: TLS listener port
+        passphrase:
+          type: string
+          writeOnly: true
+          description: >
+            Private-key passphrase. Write-only: the API never returns the
+            stored value, for any role. An empty or redacted value on write
+            keeps the stored passphrase; a new value rotates it.
 
     AdminAuth:
       type: object

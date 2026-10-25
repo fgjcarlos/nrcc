@@ -84,7 +84,7 @@ and every merge to `main`:
 
 | Layer | Configuration |
 |-------|---------------|
-| Go | 1.26.8 (golangci-lint, go test, govulncheck) |
+| Go | 1.27.3 (golangci-lint, go test, govulncheck) |
 | Node.js | 22 (frontend unit tests) |
 | pnpm | 10.x (frontend dependencies) |
 | Node-RED | 5.0.6 (docker stack acceptance) |

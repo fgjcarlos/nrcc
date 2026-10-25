@@ -27,7 +27,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # pin to commit (v7.0.0)
         with:
-          go-version: "1.26.8"
+          go-version: "1.27.3"
           cache-dependency-path: go.sum
 
       - name: Install govulncheck
@@ -59,7 +59,7 @@ jobs:
           pnpm --version
 
       - name: Set up Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # pin to commit (v7.0.0)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # pin to commit (v7.0.0)
         with:
           node-version: "22"
           cache: pnpm
@@ -95,7 +95,7 @@ jobs:
           exit-code: "0"
 
       - name: Upload SARIF to GitHub Security
-        uses: github/codeql-action/upload-sarif@v4.38.1
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee  # pin to commit (v4.38.2)
         if: always()
         with:
           sarif_file: trivy-results.sarif

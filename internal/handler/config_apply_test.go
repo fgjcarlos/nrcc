@@ -22,13 +22,13 @@ import (
 // recorder captures the audit events the handler + coordinator
 // emit so tests can assert the failure_stage envelope.
 type applyHandlerFixture struct {
-	dir         string
-	svc         *service.ConfigService
-	apply       *service.ApplyService
-	coordinator *service.ApplyCoordinator
-	handler     *ConfigApplyHandler
+	dir          string
+	svc          *service.ConfigService
+	apply        *service.ApplyService
+	coordinator  *service.ApplyCoordinator
+	handler      *ConfigApplyHandler
 	settingsPath string
-	recorder    *applyHandlerRecorder
+	recorder     *applyHandlerRecorder
 }
 
 type applyHandlerRecorder struct {
@@ -40,6 +40,7 @@ type handlerRecordedAudit struct {
 	Action       string
 	Result       string
 	FailureStage string
+	ApplyStage   string
 }
 
 func (r *applyHandlerRecorder) Log(_ *http.Request, _, action, _, result string, meta map[string]string) {
@@ -49,6 +50,7 @@ func (r *applyHandlerRecorder) Log(_ *http.Request, _, action, _, result string,
 		Action:       action,
 		Result:       result,
 		FailureStage: meta["failure_stage"],
+		ApplyStage:   meta["apply_stage"],
 	})
 }
 
@@ -214,6 +216,14 @@ func TestApplyStructuredHandler_HappyPath(t *testing.T) {
 // the 409 SETTINGS_REVISION_CONFLICT envelope.
 func TestApplyStructuredHandler_StaleRevisionRejected(t *testing.T) {
 	f := newApplyHandlerFixture(t)
+	original := f.svc.GetDefault()
+	if err := f.svc.Save(original); err != nil {
+		t.Fatalf("seed config: %v", err)
+	}
+	before, err := os.ReadFile(filepath.Join(f.dir, "config.json"))
+	if err != nil {
+		t.Fatalf("read seeded config: %v", err)
+	}
 
 	stale := f.liveRevision(t)
 	stale.Fingerprint = strings.Repeat("a", 64)
@@ -243,6 +253,13 @@ func TestApplyStructuredHandler_StaleRevisionRejected(t *testing.T) {
 	}
 	if providedFP != stale.Fingerprint {
 		t.Errorf("envelope providedRevision = %q, want %q", providedFP, stale.Fingerprint)
+	}
+	after, err := os.ReadFile(filepath.Join(f.dir, "config.json"))
+	if err != nil {
+		t.Fatalf("read config after stale rejection: %v", err)
+	}
+	if string(after) != string(before) {
+		t.Fatal("config.json changed despite stale revision rejection")
 	}
 }
 
@@ -436,5 +453,32 @@ func TestSettingsHandler_SaveRaw_DelegatesToApplyCoordinator(t *testing.T) {
 	}
 	if !strings.Contains(string(got), "uiPort: 9999") {
 		t.Errorf("settings.js was not updated via the apply transaction: %s", got)
+	}
+}
+
+// TestReleaseAuditViewerMustNotReceiveTLSOrCredentialSecrets is the
+// regression test for issue #877: the configuration response must never
+// carry the write-only secrets, for any role.
+func TestReleaseAuditViewerMustNotReceiveTLSOrCredentialSecrets(t *testing.T) {
+	f := newApplyHandlerFixture(t)
+	cfg, err := f.svc.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.CredentialSecret = "audit-credential-fixture"                                                           //nolint:gosec // G101 test fixture, not a credential.
+	cfg.Https = &model.HttpsConfig{Key: "/tmp/key.pem", Cert: "/tmp/cert.pem", Passphrase: "audit-tls-fixture"} //nolint:gosec // G101 test fixture, not a credential.
+	if err := f.svc.Save(cfg); err != nil {
+		t.Fatal(err)
+	}
+	req, w := adminRequest(t, http.MethodGet, "/api/config", nil)
+	req = req.WithContext(context.WithValue(req.Context(), middleware.CtxKeyUser, &model.Claims{Username: "viewer", Role: model.RoleViewer}))
+	NewConfigHandler(f.svc).GetConfig(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d", w.Code)
+	}
+	for _, secret := range []string{"audit-credential-fixture", "audit-tls-fixture"} {
+		if strings.Contains(w.Body.String(), secret) {
+			t.Errorf("viewer response includes %s", secret)
+		}
 	}
 }

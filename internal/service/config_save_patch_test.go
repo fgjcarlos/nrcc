@@ -74,6 +74,55 @@ func TestSave_GeneratesSettingsJSWhenMissing(t *testing.T) {
 	}
 }
 
+// The Docker image ships a settings.js whose last property carries no
+// trailing comma and that defines no uiPort. Appending the keys the typed
+// configuration owns must still render valid JavaScript — otherwise every
+// apply against the canonical deployment fails the candidate parse.
+//
+// Regression guard for the companion fix of issue #879.
+func TestSave_RendersValidJavaScriptWhenLastPropertyHasNoComma(t *testing.T) {
+	dir := t.TempDir()
+	svc := NewIsolatedConfigService(dir)
+	settingsPath := filepath.Join(dir, "settings.js")
+
+	existing := `module.exports = {
+    // Node-RED settings — managed by nrcc
+    flowFile: 'flows.json',
+    credentialSecret: false,
+    adminAuth: null,
+    logging: {
+        console: { level: 'info', metrics: false, audit: false }
+    },
+    exportGlobalContextKeys: false,
+    externalModules: {}
+}
+`
+	if err := os.WriteFile(settingsPath, []byte(existing), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := model.DefaultNodeRedConfig()
+	cfg.AdminAuth = &model.AdminAuth{
+		Type: "credentials",
+		Users: []model.AdminAuthUser{{
+			Username:    "operator",
+			Password:    testBcryptHash,
+			Permissions: "*",
+		}},
+	}
+	if err := svc.Save(cfg); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	after := readFileString(t, settingsPath)
+	if !strings.Contains(after, "uiPort:") {
+		t.Fatalf("the appended key is missing:\n%s", after)
+	}
+	if _, err := svc.parseConfigFromContent(after); err != nil {
+		t.Fatalf("the rendered settings.js is not valid JavaScript: %v\n%s", err, after)
+	}
+}
+
 func readFileString(t *testing.T, path string) string {
 	t.Helper()
 	// #nosec G304 -- path is a t.TempDir()-derived path; not request-derived.
