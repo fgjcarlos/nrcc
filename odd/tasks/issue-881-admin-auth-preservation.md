@@ -134,6 +134,16 @@ therefore clears the surface, while an absent key preserves it.
 | `c1a2daf` | `fix(frontend)`: the configuration form no longer rebuilds the auth surfaces (T1) |
 | `1352895` | `chore(frontend)`: the legacy single-user auth form fields are gone (T3) |
 | `4d18404` | `test(e2e)`: the real-stack proof (T4) |
+| `3f656ed` | `docs(odd)`: this task file |
+| `273fb3a` | `chore(merge)`: sync with `origin/main` (#879 partial patch) |
+| `8e03fee` | `fix(service)`: the recovery path skipped the unexported presence field |
+| `0066790` | `chore(merge)`: sync with `origin/main` (#880 raw apply reconcile) |
+| `d641103` | `fix(service)`: both recovery paths share one exported-fields-only restore |
+
+The renderer work unit (`5aaea49`) was independently merged upstream as
+`15c4583` before this branch was rebased. The merge keeps the upstream
+version, so the branch does not duplicate it; the redundant regression test
+of the first attempt was dropped.
 
 ## Constraints
 
@@ -150,3 +160,43 @@ therefore clears the surface, while an absent key preserves it.
   commits must not include them.
 - No generated artifact is edited by hand.
 - Every claim needs observed evidence (test output, build, real stack).
+
+## Delivery
+
+Pull request #933: <https://github.com/fgjcarlos/nrcc/pull/933>
+(`fix/admin-auth-preservation` → `main`, label `type:bug`).
+
+## Evidence
+
+Observed on the merged branch (`origin/main` at `377d11e`):
+
+- `go build ./...` — ok.
+- `go vet ./...` — ok.
+- `go test ./...` — all packages ok (exit 0).
+- `golangci-lint run ./...` — 0 issues.
+- `go run ./tools/langscan .` — 0 findings.
+- `go run ./scripts/cite_check ./docs` — no broken internal links.
+- `npx tsc --noEmit` — ok.
+- `npx eslint src e2e` — ok.
+- `npx vitest run` — 86 files, 586 tests passed, 2 skipped.
+- `npx playwright test --config playwright.config.ts` — 21 tests passed.
+- Live acceptance on a real Docker stack
+  (`docker compose build && docker compose up -d --wait`):
+  `npx playwright test --config playwright.stack.config.ts` — 7 passed,
+  including "unrelated visual edit keeps every admin account, permission
+  and session expiry".
+
+Contraprove of the original defect: with the pre-fix payload shape the new
+stack test fails with `Expected length: 2, Received length: 1` — the
+read-only account is dropped, which is exactly the bug of issue #881.
+
+Contraprove of the recovery-path fix: removing the exported-field guard
+from `restoreUnchangedFields` makes
+`TestRestorePaths_IgnoreUnexportedFields` panic with
+`reflect.Value.Interface: cannot return value obtained from unexported
+field or method`.
+
+## Next step
+
+The maintainer reviews and merges pull request #933.
+
