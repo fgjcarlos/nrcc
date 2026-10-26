@@ -95,6 +95,7 @@ const LOGGING_LEVELS: { value: LoggingLevel; label: string }[] = [
   { value: 'warn', label: 'Warning' },
   { value: 'error', label: 'Error' },
   { value: 'fatal', label: 'Fatal' },
+  { value: 'off', label: 'Off' },
 ];
 
 export { LOGGING_LEVELS };

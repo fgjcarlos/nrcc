@@ -456,6 +456,86 @@ func TestSettingsHandler_SaveRaw_DelegatesToApplyCoordinator(t *testing.T) {
 	}
 }
 
+// TestReleaseAuditStructuredApplyMustHonorLogging is the regression test
+// for issue #882: a structured apply must render the logging values the
+// operator submitted instead of the constant info/false/false block.
+func TestReleaseAuditStructuredApplyMustHonorLogging(t *testing.T) {
+	f := newApplyHandlerFixture(t)
+	body, err := json.Marshal(map[string]interface{}{
+		"uiPort": 1880, "httpAdminRoot": "/", "httpNodeRoot": "/",
+		"logging":          map[string]interface{}{"console": map[string]interface{}{"level": "debug", "metrics": true}},
+		"expectedRevision": f.liveRevision(t).Fingerprint,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req, w := adminRequest(t, http.MethodPost, "/api/config/apply", body)
+	f.handler.ApplyStructured(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	source, err := os.ReadFile(f.settingsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(source), "debug") {
+		t.Error("successful apply rendered logging.console.level=info instead of debug")
+	}
+}
+
+// TestApplyStructuredHandler_LoggingRoundTrip asserts the logging values
+// the operator submits through the API reach settings.js and are reported
+// by the structured read (issue #882).
+func TestApplyStructuredHandler_LoggingRoundTrip(t *testing.T) {
+	f := newApplyHandlerFixture(t)
+	body, err := json.Marshal(map[string]interface{}{
+		"uiPort": 1880, "httpAdminRoot": "/", "httpNodeRoot": "/",
+		"logging": map[string]interface{}{
+			"console":  map[string]interface{}{"level": "debug", "metrics": true},
+			"internal": map[string]interface{}{"level": "warn"},
+		},
+		"expectedRevision": f.liveRevision(t).Fingerprint,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req, w := adminRequest(t, http.MethodPost, "/api/config/apply", body)
+	f.handler.ApplyStructured(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	source, err := os.ReadFile(f.settingsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(source), "console: { level: 'debug', metrics: true }") {
+		t.Errorf("settings.js does not carry the submitted logging values:\n%s", source)
+	}
+	if !strings.Contains(string(source), "internal: { level: 'warn' }") {
+		t.Errorf("settings.js does not carry the submitted internal handler:\n%s", source)
+	}
+
+	var envelope model.ApiResponse[ApplyStructuredResponse]
+	if err := json.Unmarshal(w.Body.Bytes(), &envelope); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	logging, ok := envelope.Data.Configuration.Logging.(map[string]interface{})
+	if !ok {
+		t.Fatalf("the response does not carry the logging block: %+v", envelope.Data.Configuration.Logging)
+	}
+	console, ok := logging["console"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("the response does not carry the console handler: %+v", logging)
+	}
+	if console["level"] != "debug" {
+		t.Errorf("the response reports console level %v, want debug", console["level"])
+	}
+	if console["metrics"] != true {
+		t.Errorf("the response reports console metrics %v, want true", console["metrics"])
+	}
+}
+
 // TestReleaseAuditViewerMustNotReceiveTLSOrCredentialSecrets is the
 // regression test for issue #877: the configuration response must never
 // carry the write-only secrets, for any role.
