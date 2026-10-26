@@ -141,6 +141,13 @@ After the change:
 | Frontend tests | `corepack pnpm test --run` | 86 files, 586 passed, 2 skipped |
 | Language policy | `go run ./tools/langscan .` | `[]` |
 
+One local run of `internal/service` failed while three other heavy jobs
+(the CI poll, the frontend suite and the acceptance) ran on the same
+machine. The output of that run was not captured, so the failing test
+could not be named. It did not reproduce: three consecutive runs of the
+package on the same tree passed (`340s`, `377s`), and the CI backend job
+runs the same suite with the race detector on the very same commit.
+
 The CI of the pull request runs the same gates plus the Docker stack
 acceptance, the OpenAPI lint, the browser acceptance and the security
 scans. Every job is green:
