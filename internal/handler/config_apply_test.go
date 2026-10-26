@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/fgjcarlos/nrcc/internal/middleware"
 	"github.com/fgjcarlos/nrcc/internal/model"
@@ -559,6 +560,75 @@ func TestReleaseAuditViewerMustNotReceiveTLSOrCredentialSecrets(t *testing.T) {
 	for _, secret := range []string{"audit-credential-fixture", "audit-tls-fixture"} {
 		if strings.Contains(w.Body.String(), secret) {
 			t.Errorf("viewer response includes %s", secret)
+		}
+	}
+}
+
+// TestReleaseAuditRapidAppliesMustKeepDistinctSnapshots is the
+// regression test for issue #883: two successful applies that land inside
+// the same second must not share a snapshot path, because the second one
+// would destroy the recovery point of the first one.
+func TestReleaseAuditRapidAppliesMustKeepDistinctSnapshots(t *testing.T) {
+	f := newApplyHandlerFixture(t)
+	f.apply.WithClock(func() time.Time { return time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC) })
+	var snapshots []string
+	for _, content := range []string{
+		"module.exports = {uiPort: 7777};",
+		"module.exports = {uiPort: 8888};",
+	} {
+		result, err := f.coordinator.Apply(context.Background(), service.ApplyRequest{
+			Path: f.settingsPath, Content: content, Expected: f.liveRevision(t),
+			BackupDir: f.dir + "/backups", Capabilities: f.svc.ConfigurationCapabilities(),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		snapshots = append(snapshots, result.BackupPath)
+	}
+	if snapshots[0] == snapshots[1] {
+		t.Errorf("two successful transactions reused and overwrote snapshot %s", snapshots[0])
+	}
+}
+
+// TestReleaseAuditRapidAppliesMustKeepExactPreviousBytes proves every
+// snapshot of a rapid apply holds the exact bytes of the state its own
+// transaction replaced, so each of them can be used to recover.
+func TestReleaseAuditRapidAppliesMustKeepExactPreviousBytes(t *testing.T) {
+	f := newApplyHandlerFixture(t)
+	f.apply.WithClock(func() time.Time { return time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC) })
+	seeded, err := os.ReadFile(f.settingsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	contents := []string{
+		"module.exports = {uiPort: 7777};",
+		"module.exports = {uiPort: 8888};",
+	}
+	// The state every transaction is expected to snapshot: the seeded
+	// content for the first one, the first candidate for the second one.
+	wantStates := []string{string(seeded), contents[0]}
+
+	var snapshots []string
+	for _, content := range contents {
+		result, err := f.coordinator.Apply(context.Background(), service.ApplyRequest{
+			Path: f.settingsPath, Content: content, Expected: f.liveRevision(t),
+			BackupDir: f.dir + "/backups", Capabilities: f.svc.ConfigurationCapabilities(),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		snapshots = append(snapshots, result.BackupPath)
+	}
+
+	for i, snapshot := range snapshots {
+		// #nosec G304 -- snapshot is the test-controlled backup path returned by the apply.
+		data, err := os.ReadFile(snapshot)
+		if err != nil {
+			t.Fatalf("read snapshot %d: %v", i, err)
+		}
+		if string(data) != wantStates[i] {
+			t.Errorf("snapshot %d holds %q, want %q", i, data, wantStates[i])
 		}
 	}
 }

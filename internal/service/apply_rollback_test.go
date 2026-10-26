@@ -161,6 +161,65 @@ func TestExecuteRollback_FailedReady(t *testing.T) {
 	}
 }
 
+// TestExecuteRollback_KeepsDistinctFailedSiblings proves two rollbacks
+// that land inside the same second keep two distinct post-mortem
+// artifacts: the rejected candidate of the first rollback is not
+// overwritten by the second one (issue #883).
+func TestExecuteRollback_KeepsDistinctFailedSiblings(t *testing.T) {
+	dir := t.TempDir()
+	activePath := filepath.Join(dir, "settings.js")
+	backupPath := filepath.Join(dir, "settings-20260101-000000.js.bak")
+	backup := "module.exports = { uiPort: 1880 };\n"
+	if err := os.WriteFile(backupPath, []byte(backup), 0o600); err != nil {
+		t.Fatalf("seed backup: %v", err)
+	}
+
+	var siblings []string
+	for _, failed := range []string{
+		"module.exports = { uiPort: 9999 };\n",
+		"module.exports = { uiPort: 7777 };\n",
+	} {
+		if err := os.WriteFile(activePath, []byte(failed), 0o600); err != nil {
+			t.Fatalf("seed active: %v", err)
+		}
+		fa := &fakeAdapter{name: AdapterNameNativeBinary}
+		hook := &recordingRollbackHook{}
+		if err := ExecuteRollback(context.Background(), RollbackRequest{
+			BackupPath: backupPath,
+			ActivePath: activePath,
+			Stage:      RollbackStageRestart,
+			Adapter:    fa,
+			AuditHook:  hook.Log,
+		}); err != nil {
+			t.Fatalf("ExecuteRollback: %v", err)
+		}
+		var sibling string
+		for _, ev := range hook.events {
+			if ev.Action == "apply.rollback.succeeded" {
+				sibling = ev.Meta["apply_rollback_failed_sibling"]
+			}
+		}
+		if sibling == "" {
+			t.Fatalf("the audit envelope does not report the failed sibling: %+v", hook.events)
+		}
+		siblings = append(siblings, sibling)
+	}
+
+	if siblings[0] == siblings[1] {
+		t.Fatalf("two rollbacks reused and overwrote the failed sibling %s", siblings[0])
+	}
+	for i, sibling := range siblings {
+		// #nosec G304 -- sibling is the test-controlled artifact path under the test's temp dir.
+		data, err := os.ReadFile(filepath.Join(dir, sibling))
+		if err != nil {
+			t.Fatalf("read the failed sibling %d: %v", i, err)
+		}
+		if !strings.Contains(string(data), "uiPort") {
+			t.Errorf("the failed sibling %d holds %q, want the rejected candidate", i, data)
+		}
+	}
+}
+
 // TestExecuteRollback_MissingBackup asserts the boundary check fires
 // before any filesystem work: an empty backup path returns a typed
 // *RollbackError and the audit envelope carries an apply.rollback.failed
