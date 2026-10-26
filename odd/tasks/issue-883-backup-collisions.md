@@ -120,11 +120,12 @@ snapshot is the state *that transaction* replaced.
 
 ## Verification evidence
 
-Baseline (RED), on `origin/main` = `3c0fb02`, before the change:
+Baseline (RED), on `origin/main` = `3c0fb02`, before the change, with the
+issue's reproduction test:
 
 ```
---- FAIL: TestReleaseAuditRapidAppliesMustKeepDistinctSnapshots (0.06s)
-    config_apply_test.go: two successful transactions reused and overwrote snapshot /tmp/.../backups/settings-20261014-120000.js.bak
+--- FAIL: TestReleaseAuditRapidAppliesMustKeepDistinctSnapshots (3.71s)
+    config_apply_test.go:589: two successful transactions reused and overwrote snapshot /tmp/TestReleaseAuditRapidAppliesMustKeepDistinctSnapshots658274072/001/backups/settings-20261014-120000.js.bak
 ```
 
 After the change:
@@ -132,19 +133,44 @@ After the change:
 | Check | Command | Result |
 |-------|---------|--------|
 | Backend build | `go build ./...` | pass |
-| Backend vet | `go vet ./internal/...` | pass |
-| Backend tests | `go test ./internal/...` | pass |
-| Backend lint | `golangci-lint run --config=.golangci.yml ./...` | `0 issues.` |
-| Frontend lint | `corepack pnpm lint` | pass |
+| Backend vet | `go vet ./...` | pass |
+| Backend tests | `go test -race -count=1 -timeout 20m ./...` | pass, every package `ok` |
+| Backend lint | `golangci-lint run --config=.golangci.yml ./...` (v2.14.0) | `0 issues.` |
+| Frontend lint | `corepack pnpm lint` | pass (1 pre-existing warning) |
 | Frontend typecheck | `corepack pnpm typecheck` | pass |
-| Frontend tests | `corepack pnpm test --run` | pass |
+| Frontend tests | `corepack pnpm test --run` | 86 files, 586 passed, 2 skipped |
 | Language policy | `go run ./tools/langscan .` | `[]` |
+
+The CI of the pull request runs the same gates plus the Docker stack
+acceptance, the OpenAPI lint, the browser acceptance and the security
+scans. Every job is green:
+
+```
+Analyze (actions)                 pass  42s
+Analyze (go)                      pass  1m15s
+Analyze (javascript-typescript)   pass  59s
+Backend (Go 1.27.3)               pass  4m23s
+CodeQL                            pass  3s
+Docker stack acceptance (#434)    pass  5m41s
+Frontend (Node 22)                pass  14m35s
+GitGuardian Security Checks       pass  1s
+Hardcoded copy guard              pass  19s
+Language policy scan              pass  19s
+Lint (golangci-lint)              pass  44s
+OpenAPI Spec                      pass  7s
+Trivy                             pass  3s
+Trivy container scan              pass  1m25s
+govulncheck                       pass  18s
+i18n catalog coverage             pass  22s
+pnpm audit                        pass  17s
+```
 
 ## Delivery
 
 - Pull request: <https://github.com/fgjcarlos/nrcc/pull/935>
 - Branch: `fix/883-backup-collisions`, based on `origin/main`
-- CI: green.
+- CI: green. Every check passes, including the backend race suite and the
+  Docker stack acceptance.
 
 - The merge is the human's decision. The issue closes when the pull request
   is merged.
