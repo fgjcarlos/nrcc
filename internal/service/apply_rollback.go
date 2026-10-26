@@ -160,17 +160,34 @@ func ExecuteRollback(ctx context.Context, req RollbackRequest) error {
 	// preserve the failed candidate — the audit log and the on-disk
 	// ".failed" sibling let post-mortem tooling reconstruct what
 	// Node-RED rejected.
-	failedSibling := req.ActivePath + ".failed-" + time.Now().UTC().Format("20060102-150405")
-	if err := copyFile(req.ActivePath, failedSibling); err != nil {
-		// Best-effort: a missing live file is normal on the very
-		// first apply. We log via audit meta but do not abort the
-		// rollback — the operator still needs the prior settings.js
-		// back in place.
-		emitRollback(req, "apply.rollback.started", "degraded", err, map[string]string{
+	//
+	// The sibling name carries a random token and the file is created
+	// exclusively, so two rollbacks inside the same second keep two
+	// distinct artifacts instead of one overwriting the other
+	// (issue #883).
+	failedSibling, siblingErr := failedSiblingPath(req.ActivePath)
+	switch {
+	case siblingErr != nil:
+		// The post-mortem artifact is skipped, but the rollback itself
+		// continues: the operator still needs the prior settings.js back
+		// in place.
+		emitRollback(req, "apply.rollback.started", "degraded", siblingErr, map[string]string{
 			"apply_rollback_stage":                string(req.Stage),
-			"apply_rollback_failed_sibling":       filepath.Base(failedSibling),
-			"apply_rollback_failed_sibling_error": err.Error(),
+			"apply_rollback_failed_sibling":       "",
+			"apply_rollback_failed_sibling_error": siblingErr.Error(),
 		})
+	default:
+		if err := copyFileExclusive(req.ActivePath, failedSibling); err != nil {
+			// Best-effort: a missing live file is normal on the very
+			// first apply. We log via audit meta but do not abort the
+			// rollback — the operator still needs the prior settings.js
+			// back in place.
+			emitRollback(req, "apply.rollback.started", "degraded", err, map[string]string{
+				"apply_rollback_stage":                string(req.Stage),
+				"apply_rollback_failed_sibling":       filepath.Base(failedSibling),
+				"apply_rollback_failed_sibling_error": err.Error(),
+			})
+		}
 	}
 
 	if err := restoreSnapshotContext(ctx, req.BackupPath, req.ActivePath); err != nil {
@@ -244,11 +261,12 @@ func restoreSnapshotContext(ctx context.Context, backupPath, activePath string) 
 	return AtomicWriteSettings(ctx, activePath, string(data))
 }
 
-// copyFile copies src to dst, preserving the source mode. dst's parent
-// directory is created if missing. The function returns nil when src
-// does not exist (the post-apply file may be a first-write case).
-// Any other error is wrapped with the offending path.
-func copyFile(src, dst string) error {
+// copyFileExclusive copies src to dst, preserving the source mode. The
+// destination is created exclusively: an existing artifact is never
+// overwritten (issue #883). The function returns nil when src does not
+// exist (the post-apply file may be a first-write case). Any other error
+// is wrapped with the offending path.
+func copyFileExclusive(src, dst string) error {
 	info, err := os.Stat(src)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -268,11 +286,19 @@ func copyFile(src, dst string) error {
 	if mode == 0 {
 		mode = 0o600
 	}
-	// #nosec G304,G703 -- dst is the operator-supplied .failed sibling built from the active path; the boundary check above validates it.
-	if err := os.WriteFile(dst, data, mode); err != nil {
-		return fmt.Errorf("write %s: %w", dst, err)
+	return writeFileExclusive(dst, data, mode)
+}
+
+// failedSiblingPath builds the name of the post-mortem sibling that keeps
+// the rejected candidate next to the live settings.js. The name carries a
+// random token so two rollbacks inside the same second keep two distinct
+// artifacts (issue #883).
+func failedSiblingPath(activePath string) (string, error) {
+	token, err := randomHex(settingsSnapshotTokenBytes)
+	if err != nil {
+		return "", fmt.Errorf("generate failed sibling token: %w", err)
 	}
-	return nil
+	return activePath + ".failed-" + time.Now().UTC().Format("20060102-150405") + "-" + token, nil
 }
 
 // emitRollback wraps ApplyService.emit so the rollback flow reuses
