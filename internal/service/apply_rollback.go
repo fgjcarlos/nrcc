@@ -184,7 +184,7 @@ func ExecuteRollback(ctx context.Context, req RollbackRequest) error {
 			// back in place.
 			emitRollback(req, "apply.rollback.started", "degraded", err, map[string]string{
 				"apply_rollback_stage":                string(req.Stage),
-				"apply_rollback_failed_sibling":       filepath.Base(failedSibling),
+				"apply_rollback_failed_sibling":       siblingBaseName(failedSibling),
 				"apply_rollback_failed_sibling_error": err.Error(),
 			})
 		}
@@ -232,9 +232,18 @@ func ExecuteRollback(ctx context.Context, req RollbackRequest) error {
 
 	emitRollback(req, "apply.rollback.succeeded", "ok", nil, map[string]string{
 		"apply_rollback_stage":          string(req.Stage),
-		"apply_rollback_failed_sibling": filepath.Base(failedSibling),
+		"apply_rollback_failed_sibling": siblingBaseName(failedSibling),
 	})
 	return nil
+}
+
+// siblingBaseName returns the base name of the post-mortem sibling, or an
+// empty string when the artifact was not created.
+func siblingBaseName(path string) string {
+	if path == "" {
+		return ""
+	}
+	return filepath.Base(path)
 }
 
 // restoreSnapshot atomically replaces activePath with the contents of
