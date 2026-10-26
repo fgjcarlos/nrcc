@@ -340,15 +340,16 @@ func (s *ApplyService) applyValidate(ctx context.Context, req ApplyRequest) erro
 }
 
 // applyBackup copies the current settings.js (if any) to a timestamped
-// sibling inside req.BackupDir. The returned liveContent is the bytes
+// snapshot inside req.BackupDir. The returned liveContent is the bytes
 // that were just backed up; the caller uses them to render the
 // redacted diff. When the live file is missing the backup is skipped
 // and the function returns "", "" so the diff collapses to "all lines
 // are additions".
+//
+// The snapshot name is collision-resistant and the file is created
+// exclusively, so two transactions inside the same second keep two
+// distinct recovery points (issue #883).
 func (s *ApplyService) applyBackup(req ApplyRequest) (backupPath string, liveContent string, err error) {
-	if err := os.MkdirAll(req.BackupDir, 0o750); err != nil {
-		return "", "", fmt.Errorf("create backup dir %s: %w", req.BackupDir, err)
-	}
 	// Read the live content (for the diff). os.ReadFile errors only when
 	// the file is missing or unreadable; we treat missing as the
 	// first-write case and surface any other error.
@@ -361,15 +362,13 @@ func (s *ApplyService) applyBackup(req ApplyRequest) (backupPath string, liveCon
 	}
 	liveContent = string(liveBytes)
 
-	// Build a timestamped backup filename. The format mirrors the one
-	// used by ConfigService.backupSettingsFile so the existing backup
-	// tooling continues to find the new files.
-	stamp := s.clock().Format("20060102-150405")
-	backupName := fmt.Sprintf("settings-%s.js.bak", stamp)
-	target := filepath.Join(req.BackupDir, backupName)
-	// #nosec G703 -- target is built from the operator-validated BackupDir (already passed validateSettingsPath) plus a constant filename; not request-derived.
-	if err := os.WriteFile(target, liveBytes, 0o600); err != nil {
-		return "", liveContent, fmt.Errorf("write backup %s: %w", target, err)
+	// Write the snapshot with a collision-resistant name and an exclusive
+	// creation, so two transactions inside the same second keep two
+	// distinct recovery points (issue #883). An existing snapshot is never
+	// overwritten.
+	target, err := writeSettingsSnapshot(req.BackupDir, s.clock(), liveBytes)
+	if err != nil {
+		return "", liveContent, fmt.Errorf("write backup %s: %w", req.BackupDir, err)
 	}
 	return target, liveContent, nil
 }

@@ -894,16 +894,15 @@ func (s *ConfigService) backupSettingsFile(path string) (string, error) {
 		return "", err
 	}
 	backupDir := filepath.Join(s.dataDir, "backups", "settings")
-	if err := os.MkdirAll(backupDir, 0750); err != nil {
-		return "", err
-	}
-	backupPath := filepath.Join(backupDir, fmt.Sprintf("settings-%s.js.bak", time.Now().UTC().Format("20060102-150405")))
 	// #nosec G304 -- path is the caller-validated settings.js inside the dataDir; write target is a derived backup file.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", err
 	}
-	return backupPath, os.WriteFile(backupPath, data, 0600) // #nosec G703 -- backupPath is built from operator-supplied dataDir + a constant filename; the caller validates the destination.
+	// The snapshot is created exclusively under a collision-resistant name,
+	// so a save never overwrites the recovery point of another transaction
+	// that landed in the same second (issue #883).
+	return writeSettingsSnapshot(backupDir, time.Now().UTC(), data)
 }
 
 // renderSettings patches the live settings.js when one already exists, so

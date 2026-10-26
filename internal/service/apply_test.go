@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 // Test fixtures -------------------------------------------------------------
@@ -807,3 +808,229 @@ var _ = func() bool {
 // Compile-time check: ensure net/http is referenced (it is, via the
 // recordingAuditHook signature).
 var _ = func(r *http.Request) bool { return r != nil }
+
+// Snapshot collisions (issue #883) --------------------------------------------
+
+// TestApplyService_RapidAppliesKeepDistinctSnapshots proves two applies
+// that land inside the same second keep two distinct recovery points, and
+// that every snapshot holds the exact bytes of the state its own
+// transaction replaced.
+func TestApplyService_RapidAppliesKeepDistinctSnapshots(t *testing.T) {
+	dir := t.TempDir()
+	svc := NewIsolatedConfigService(dir)
+	settingsPath := filepath.Join(dir, "settings.js")
+	seeded := validSettingsJS(t)
+	if err := os.WriteFile(settingsPath, []byte(seeded), 0o600); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	hook := &recordingAuditHook{}
+	apply := NewApplyService(svc, hook.Log)
+	// The clock is pinned: both transactions stamp their snapshot in the
+	// same second, which is the collision the issue reports.
+	apply.WithClock(func() time.Time { return snapshotStamp })
+
+	backupDir := filepath.Join(dir, "backups", "settings")
+	candidates := []string{
+		strings.Replace(validSettingsJS(t), "uiPort: 1880", "uiPort: 1881", 1),
+		strings.Replace(validSettingsJS(t), "uiPort: 1880", "uiPort: 1882", 1),
+	}
+	// The state each transaction is expected to snapshot: the seeded
+	// content for the first one, the first candidate for the second one.
+	wantSnapshots := []string{seeded, candidates[0]}
+
+	var snapshots []string
+	for i, candidate := range candidates {
+		doc, err := svc.GetRawSettings()
+		if err != nil {
+			t.Fatalf("live revision before apply %d: %v", i, err)
+		}
+		result, err := apply.Apply(context.Background(), ApplyRequest{
+			Path:      settingsPath,
+			Content:   candidate,
+			Expected:  doc.Revision,
+			BackupDir: backupDir,
+		})
+		if err != nil {
+			t.Fatalf("apply %d: %v", i, err)
+		}
+		if result.BackupPath == "" {
+			t.Fatalf("apply %d returned an empty backup path", i)
+		}
+		snapshots = append(snapshots, result.BackupPath)
+	}
+
+	if snapshots[0] == snapshots[1] {
+		t.Fatalf("two successful transactions reused and overwrote the snapshot %s", snapshots[0])
+	}
+	for i, path := range snapshots {
+		// #nosec G304 -- path is the snapshot path the apply returned under the test's temp dir.
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read snapshot %d: %v", i, err)
+		}
+		if string(data) != wantSnapshots[i] {
+			t.Errorf("snapshot %d holds %q, want %q", i, data, wantSnapshots[i])
+		}
+	}
+
+	// Both snapshots are on disk: the first recovery point was not
+	// destroyed by the second transaction.
+	matches, err := filepath.Glob(filepath.Join(backupDir, "settings-*.js.bak"))
+	if err != nil {
+		t.Fatalf("glob backup dir: %v", err)
+	}
+	if len(matches) != 2 {
+		t.Errorf("expected 2 snapshots in the backup dir, found %d (%v)", len(matches), matches)
+	}
+}
+
+// TestApplyService_ExistingSnapshotIsNotOverwritten proves an apply never
+// rewrites a snapshot that already exists in the backup directory.
+func TestApplyService_ExistingSnapshotIsNotOverwritten(t *testing.T) {
+	dir := t.TempDir()
+	svc := NewIsolatedConfigService(dir)
+	settingsPath := filepath.Join(dir, "settings.js")
+	if err := os.WriteFile(settingsPath, []byte(validSettingsJS(t)), 0o600); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	doc, err := svc.GetRawSettings()
+	if err != nil {
+		t.Fatalf("seed GetRawSettings: %v", err)
+	}
+
+	backupDir := filepath.Join(dir, "backups", "settings")
+	if err := os.MkdirAll(backupDir, 0o750); err != nil {
+		t.Fatalf("backup dir: %v", err)
+	}
+	existing := filepath.Join(backupDir, "settings-20261014-120000-legacy.js.bak")
+	if err := os.WriteFile(existing, []byte("legacy snapshot"), 0o600); err != nil {
+		t.Fatalf("seed snapshot: %v", err)
+	}
+
+	apply := NewApplyService(svc, nil)
+	apply.WithClock(func() time.Time { return snapshotStamp })
+	if _, err := apply.Apply(context.Background(), ApplyRequest{
+		Path:      settingsPath,
+		Content:   strings.Replace(validSettingsJS(t), "uiPort: 1880", "uiPort: 1893", 1),
+		Expected:  doc.Revision,
+		BackupDir: backupDir,
+	}); err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+
+	// #nosec G304 -- existing is the test-controlled snapshot path under the test's temp dir.
+	data, err := os.ReadFile(existing)
+	if err != nil {
+		t.Fatalf("read the pre-existing snapshot: %v", err)
+	}
+	if string(data) != "legacy snapshot" {
+		t.Errorf("the pre-existing snapshot was rewritten: got %q", data)
+	}
+}
+
+// TestApplyService_BackupCreationFailureKeepsLiveFile proves a failed
+// snapshot creation rejects the transaction and leaves the live
+// settings.js untouched: the deployment never loses its recovery point.
+func TestApplyService_BackupCreationFailureKeepsLiveFile(t *testing.T) {
+	dir := t.TempDir()
+	svc := NewIsolatedConfigService(dir)
+	settingsPath := filepath.Join(dir, "settings.js")
+	seeded := validSettingsJS(t)
+	if err := os.WriteFile(settingsPath, []byte(seeded), 0o600); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	doc, err := svc.GetRawSettings()
+	if err != nil {
+		t.Fatalf("seed GetRawSettings: %v", err)
+	}
+	// A regular file where the backup directory belongs makes the snapshot
+	// creation fail with ENOTDIR.
+	blocker := filepath.Join(dir, "blocker")
+	if err := os.WriteFile(blocker, []byte("not a dir"), 0o600); err != nil {
+		t.Fatalf("blocker: %v", err)
+	}
+
+	apply := NewApplyService(svc, nil)
+	result, err := apply.Apply(context.Background(), ApplyRequest{
+		Path:      settingsPath,
+		Content:   strings.Replace(validSettingsJS(t), "uiPort: 1880", "uiPort: 1894", 1),
+		Expected:  doc.Revision,
+		BackupDir: filepath.Join(blocker, "backups"),
+	})
+	if err == nil {
+		t.Fatal("expected the apply to fail when the snapshot cannot be created")
+	}
+	var ae *ApplyError
+	if !errors.As(err, &ae) {
+		t.Fatalf("expected *ApplyError, got %T: %v", err, err)
+	}
+	if ae.Stage != ApplyStageBackup {
+		t.Errorf("ApplyError.Stage = %q, want %q", ae.Stage, ApplyStageBackup)
+	}
+	if result.BackupPath != "" {
+		t.Errorf("result.BackupPath = %q, want it empty on a failed transaction", result.BackupPath)
+	}
+
+	// #nosec G304 -- settingsPath is the test-controlled destination, derived from t.TempDir().
+	data, readErr := os.ReadFile(settingsPath)
+	if readErr != nil {
+		t.Fatalf("read settings.js: %v", readErr)
+	}
+	if string(data) != seeded {
+		t.Errorf("the live settings.js changed after a failed snapshot: got %q", data)
+	}
+}
+
+// TestApplyService_EachSnapshotRestoresItsOwnState proves every snapshot
+// can be used to recover the state it captured.
+func TestApplyService_EachSnapshotRestoresItsOwnState(t *testing.T) {
+	dir := t.TempDir()
+	svc := NewIsolatedConfigService(dir)
+	settingsPath := filepath.Join(dir, "settings.js")
+	seeded := validSettingsJS(t)
+	if err := os.WriteFile(settingsPath, []byte(seeded), 0o600); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	hook := &recordingAuditHook{}
+	apply := NewApplyService(svc, hook.Log)
+	apply.WithClock(func() time.Time { return snapshotStamp })
+
+	backupDir := filepath.Join(dir, "backups", "settings")
+	candidates := []string{
+		strings.Replace(validSettingsJS(t), "uiPort: 1880", "uiPort: 1885", 1),
+		strings.Replace(validSettingsJS(t), "uiPort: 1880", "uiPort: 1886", 1),
+	}
+	wantStates := []string{seeded, candidates[0]}
+
+	var snapshots []string
+	for i, candidate := range candidates {
+		doc, err := svc.GetRawSettings()
+		if err != nil {
+			t.Fatalf("live revision before apply %d: %v", i, err)
+		}
+		result, err := apply.Apply(context.Background(), ApplyRequest{
+			Path:      settingsPath,
+			Content:   candidate,
+			Expected:  doc.Revision,
+			BackupDir: backupDir,
+		})
+		if err != nil {
+			t.Fatalf("apply %d: %v", i, err)
+		}
+		snapshots = append(snapshots, result.BackupPath)
+	}
+
+	for i, snapshot := range snapshots {
+		if err := restoreSnapshot(snapshot, settingsPath); err != nil {
+			t.Fatalf("restore snapshot %d: %v", i, err)
+		}
+		// #nosec G304 -- settingsPath is the test-controlled destination, derived from t.TempDir().
+		data, err := os.ReadFile(settingsPath)
+		if err != nil {
+			t.Fatalf("read settings.js after restore %d: %v", i, err)
+		}
+		if string(data) != wantStates[i] {
+			t.Errorf("restore from snapshot %d wrote %q, want %q", i, data, wantStates[i])
+		}
+	}
+}
