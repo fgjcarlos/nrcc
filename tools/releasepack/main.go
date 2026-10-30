@@ -40,6 +40,8 @@ func run(args []string) error {
 		return runBuild(args[1:])
 	case "verify":
 		return runVerify(args[1:])
+	case "gate":
+		return runGate(args[1:])
 	case "help", "-h", "--help":
 		usage()
 		return nil
@@ -57,6 +59,7 @@ Usage:
                       [--created <rfc3339>] [--format json|github]
   releasepack build  --version <version> [--dist <dir>] [--source <dir>]
   releasepack verify --version <version> [--dist <dir>]
+  releasepack gate   --required <name[,name...]> [--checks <file>] [--statuses <file>]
 
 Subcommands:
   plan    Compute the release plan: supported targets, publication channel,
@@ -65,5 +68,6 @@ Subcommands:
           and write the SHA256SUMS file plus the per-binary sidecars.
   verify  Verify the produced artifacts: expected file set, checksums,
           sidecars and stamped version metadata.
+  gate    Evaluate downloaded check results against the required check list.
 `)
 }
