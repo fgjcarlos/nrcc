@@ -36,6 +36,8 @@ func run(args []string) error {
 	switch args[0] {
 	case "plan":
 		return runPlan(args[1:])
+	case "build":
+		return runBuild(args[1:])
 	case "help", "-h", "--help":
 		usage()
 		return nil
@@ -51,9 +53,12 @@ func usage() {
 Usage:
   releasepack plan   --version <version> [--image <ref>]... [--revision <rev>]
                       [--created <rfc3339>] [--format json|github]
+  releasepack build  --version <version> [--dist <dir>] [--source <dir>]
 
 Subcommands:
   plan    Compute the release plan: supported targets, publication channel,
           Docker tags, image targets and OCI labels.
+  build   Cross-compile the supported Linux binaries into the dist directory
+          and write the SHA256SUMS file plus the per-binary sidecars.
 `)
 }
