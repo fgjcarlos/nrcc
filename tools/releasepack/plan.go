@@ -34,13 +34,20 @@ type Plan struct {
 //
 // nrcc is Linux-only at compile time (ADR 0004): the backend uses
 // POSIX-only syscall symbols, so a macOS or Windows binary cannot be
-// produced. The three Linux architectures below are exactly the ones the
-// multi-architecture container image ships.
+// produced. The two Linux architectures below are the ones the project
+// supports and tests (CONTRIBUTING.md, "Supported platforms") and are
+// exactly the ones the multi-architecture container image ships.
+//
+// linux/arm/v7 (32-bit ARM) is deliberately not published: the backend
+// does not compile for 32-bit platforms, because syscall.Sysinfo_t
+// exposes Totalram and Freeram as uint32 there while the metrics code
+// assigns them to uint64 fields. Supporting 32-bit ARM means implementing
+// and testing that platform, which is a separate piece of work; the
+// release must not claim an artifact it cannot build.
 func supportedTargets() []Target {
 	return []Target{
 		{OS: "linux", Arch: "amd64", Platform: "linux/amd64", Binary: "nrcc-linux-amd64"},
 		{OS: "linux", Arch: "arm64", Platform: "linux/arm64", Binary: "nrcc-linux-arm64"},
-		{OS: "linux", Arch: "arm", ARM: "7", Platform: "linux/arm/v7", Binary: "nrcc-linux-armv7"},
 	}
 }
 

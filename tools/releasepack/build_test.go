@@ -89,3 +89,31 @@ func TestWriteChecksums_WritesNormalizedSidecars(t *testing.T) {
 		t.Fatalf("expected the sidecar checksum %q, got %q", sum, fields[0])
 	}
 }
+
+func TestWriteChecksums_SetsDeterministicModes(t *testing.T) {
+	dist := writeDist(t, "1.2.3")
+
+	paths := []string{
+		filepath.Join(dist, ChecksumFileName),
+		filepath.Join(dist, SidecarFileName("nrcc-linux-amd64")),
+	}
+	for _, path := range paths {
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if info.Mode().Perm() != ChecksumFileMode {
+			t.Fatalf("expected mode %s for %s, got %s", ChecksumFileMode, path, info.Mode().Perm())
+		}
+	}
+
+	for _, target := range supportedTargets() {
+		info, err := os.Stat(filepath.Join(dist, target.Binary))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if info.Mode().Perm()&0o111 == 0 {
+			t.Fatalf("expected %s to be executable, got %s", target.Binary, info.Mode().Perm())
+		}
+	}
+}

@@ -9,8 +9,8 @@ import (
 
 func TestSupportedTargets_AreLinuxOnly(t *testing.T) {
 	targets := supportedTargets()
-	if len(targets) != 3 {
-		t.Fatalf("expected three supported targets, got %d", len(targets))
+	if len(targets) != 2 {
+		t.Fatalf("expected two supported targets, got %d", len(targets))
 	}
 
 	for _, target := range targets {
@@ -22,7 +22,7 @@ func TestSupportedTargets_AreLinuxOnly(t *testing.T) {
 		}
 	}
 
-	for _, unsupported := range []string{"darwin/amd64", "darwin/arm64", "windows/amd64", "linux/386"} {
+	for _, unsupported := range []string{"darwin/amd64", "darwin/arm64", "windows/amd64", "linux/386", "linux/arm/v7"} {
 		if isSupportedTarget(unsupported) {
 			t.Fatalf("platform %s must not be supported", unsupported)
 		}
@@ -125,7 +125,7 @@ func TestWriteGitHubOutput_EmitsHeredocEntries(t *testing.T) {
 		"metadata_tags<<EOF\n",
 		"labels<<EOF\n",
 		"org.opencontainers.image.version=1.2.3\n",
-		"platforms=linux/amd64,linux/arm64,linux/arm/v7\n",
+		"platforms=linux/amd64,linux/arm64\n",
 	} {
 		if !strings.Contains(output, expected) {
 			t.Fatalf("expected the output to contain %q, got:\n%s", expected, output)
@@ -144,7 +144,7 @@ func TestRunPlan_JSONOutput(t *testing.T) {
 		}
 	})
 
-	for _, expected := range []string{`"channel": "stable"`, `"latest"`, `"linux/arm/v7"`} {
+	for _, expected := range []string{`"channel": "stable"`, `"latest"`, `"linux/arm64"`} {
 		if !strings.Contains(stdout, expected) {
 			t.Fatalf("expected the output to contain %q, got:\n%s", expected, stdout)
 		}

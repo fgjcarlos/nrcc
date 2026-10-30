@@ -115,7 +115,7 @@ func TestVerifyArtifacts_RejectsMissingSidecar(t *testing.T) {
 func TestVerifyArtifacts_RejectsMissingBinary(t *testing.T) {
 	dist := writeDist(t, "1.2.3")
 
-	if err := os.Remove(filepath.Join(dist, "nrcc-linux-armv7")); err != nil {
+	if err := os.Remove(filepath.Join(dist, "nrcc-linux-arm64")); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -128,7 +128,7 @@ func TestVerifyArtifacts_RejectsMissingBinary(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected the verification to fail for a missing binary")
 	}
-	if !strings.Contains(err.Error(), "missing artifact nrcc-linux-armv7") {
+	if !strings.Contains(err.Error(), "missing artifact nrcc-linux-arm64") {
 		t.Fatalf("expected the missing binary to be reported, got: %v", err)
 	}
 }

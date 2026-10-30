@@ -116,6 +116,13 @@ func buildBinary(source, dist string, version Version, target Target) error {
 		return fmt.Errorf("build %s: %w: %s", target.Platform, err, strings.TrimSpace(stderr.String()))
 	}
 
+	// The mode of a produced file depends on the umask of the builder, so
+	// it is set explicitly: a published binary must be executable by every
+	// consumer of the release.
+	if err := os.Chmod(output, BinaryFileMode); err != nil {
+		return fmt.Errorf("set the mode of %s: %w", output, err)
+	}
+
 	fmt.Printf("built %s -> %s\n", target.Platform, output)
 	return nil
 }
@@ -146,6 +153,9 @@ func writeChecksums(dist string, targets []Target) error {
 	if err := os.WriteFile(checksumPath, []byte(combined.String()), ChecksumFileMode); err != nil {
 		return fmt.Errorf("write %s: %w", checksumPath, err)
 	}
+	if err := os.Chmod(checksumPath, ChecksumFileMode); err != nil {
+		return fmt.Errorf("set the mode of %s: %w", checksumPath, err)
+	}
 
 	for _, name := range names {
 		sum, err := fileChecksum(filepath.Join(dist, name))
@@ -156,6 +166,9 @@ func writeChecksums(dist string, targets []Target) error {
 		content := fmt.Sprintf("%s  nrcc\n", sum)
 		if err := os.WriteFile(sidecarPath, []byte(content), ChecksumFileMode); err != nil {
 			return fmt.Errorf("write %s: %w", sidecarPath, err)
+		}
+		if err := os.Chmod(sidecarPath, ChecksumFileMode); err != nil {
+			return fmt.Errorf("set the mode of %s: %w", sidecarPath, err)
 		}
 	}
 
