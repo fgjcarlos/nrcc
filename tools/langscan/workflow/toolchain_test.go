@@ -18,7 +18,10 @@ func TestPatchedGoToolchainContract(t *testing.T) {
 	}{
 		{"pr.yml", 3},
 		{"security.yml", 1},
-		{"release.yml", 1},
+		// The release workflow resolves the plan, evaluates the required
+		// checks and packages the binaries: three jobs need the patched
+		// compiler.
+		{"release.yml", 3},
 		{"language-policy.yml", 1},
 	} {
 		t.Run(tc.file, func(t *testing.T) {
