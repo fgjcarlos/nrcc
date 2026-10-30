@@ -59,22 +59,30 @@ func runBuild(args []string) error {
 		return err
 	}
 
-	if err := buildBinaries(*source, *dist, parsed, supportedTargets()); err != nil {
+	// The dist directory is resolved against the current directory, not
+	// against the module root, so the build and the verification always
+	// agree on where the artifacts live.
+	distDir, err := filepath.Abs(*dist)
+	if err != nil {
+		return fmt.Errorf("resolve the dist directory: %w", err)
+	}
+
+	if err := buildBinaries(*source, distDir, parsed, supportedTargets()); err != nil {
 		return err
 	}
 
-	return writeChecksums(*dist, supportedTargets())
+	return writeChecksums(distDir, supportedTargets())
 }
 
 // buildBinaries cross-compiles every supported target into the dist
 // directory.
-func buildBinaries(source, dist string, version Version, targets []Target) error {
-	if err := os.MkdirAll(dist, 0o755); err != nil {
+func buildBinaries(source, outputDir string, version Version, targets []Target) error {
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		return fmt.Errorf("create dist directory: %w", err)
 	}
 
 	for _, target := range targets {
-		if err := buildBinary(source, dist, version, target); err != nil {
+		if err := buildBinary(source, outputDir, version, target); err != nil {
 			return err
 		}
 	}
@@ -83,8 +91,11 @@ func buildBinaries(source, dist string, version Version, targets []Target) error
 }
 
 // buildBinary cross-compiles one target.
-func buildBinary(source, dist string, version Version, target Target) error {
-	output := filepath.Join(dist, target.Binary)
+//
+// The output path is absolute because the build runs inside the module
+// root, which is not necessarily the current directory.
+func buildBinary(source, outputDir string, version Version, target Target) error {
+	output := filepath.Join(outputDir, target.Binary)
 
 	args := []string{
 		"build",

@@ -308,9 +308,10 @@ jobs:
 
       # The optional Docker Hub login and the Docker Hub image target share
       # one condition: without both credentials the pipeline neither logs
-      # in nor publishes the docker.io image.
+      # in nor publishes the docker.io image. A dry run never authenticates
+      # against a registry it will not publish to.
       - name: Log in to Docker Hub (only with credentials)
-        if: ${{ env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != '' }}
+        if: ${{ env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != '' && needs.plan.outputs.dry_run == 'false' }}
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # pin to commit (v4.0.0)
         with:
           registry: docker.io
@@ -430,7 +431,17 @@ jobs:
             exit 1
           fi
 
-          echo "The produced image is healthy."
+          # The health check of the image queries /healthz; the endpoint
+          # itself has to answer with 200.
+          healthz_code="$(docker exec nrcc-release-verification wget -q -S -O /dev/null http://localhost:3001/healthz 2>&1 |
+            awk '/  HTTP\//{code=$2} END{print code}')"
+          if [ "${healthz_code}" != "200" ]; then
+            echo "::error::the produced image answered /healthz with '${healthz_code:-unknown}', expected 200."
+            docker rm -f nrcc-release-verification || true
+            exit 1
+          fi
+
+          echo "The produced image is healthy and /healthz answered ${healthz_code}."
           docker rm -f nrcc-release-verification
 
   # ── Post-release smoke test of the public install URL ───────────────────────

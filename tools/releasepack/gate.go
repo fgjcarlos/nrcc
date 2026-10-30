@@ -27,6 +27,9 @@ type checkRun struct {
 	Name       string `json:"name"`
 	Status     string `json:"status"`
 	Conclusion string `json:"conclusion"`
+	// RunAttempt counts the attempts of the same check: a re-run of a
+	// failed job carries a higher attempt than the failure it replaces.
+	RunAttempt int `json:"run_attempt"`
 	App        struct {
 		Slug string `json:"slug"`
 	} `json:"app"`
@@ -172,8 +175,12 @@ func evaluateGate(names []string, runs []checkRun, statuses []statusContext) []g
 }
 
 // evaluateCheck evaluates one required check name.
+//
+// Only the latest attempt of a check counts: a re-run of a failed job
+// replaces the failure it retries. Every run of that latest attempt must
+// pass, so a matrix job with several legs still needs all of them.
 func evaluateCheck(name string, runs []checkRun, statuses []statusContext) gateResult {
-	matches := matchingRuns(name, runs)
+	matches := latestAttempts(matchingRuns(name, runs))
 	if len(matches) == 0 {
 		return evaluateStatus(name, statuses)
 	}
@@ -192,6 +199,28 @@ func evaluateCheck(name string, runs []checkRun, statuses []statusContext) gateR
 		detail = fmt.Sprintf("success (%d check runs)", len(matches))
 	}
 	return gateResult{Name: name, Passed: true, Detail: detail}
+}
+
+// latestAttempts keeps the runs of the highest attempt of a check.
+func latestAttempts(runs []checkRun) []checkRun {
+	if len(runs) == 0 {
+		return nil
+	}
+
+	highest := runs[0].RunAttempt
+	for _, run := range runs[1:] {
+		if run.RunAttempt > highest {
+			highest = run.RunAttempt
+		}
+	}
+
+	latest := make([]checkRun, 0, len(runs))
+	for _, run := range runs {
+		if run.RunAttempt == highest {
+			latest = append(latest, run)
+		}
+	}
+	return latest
 }
 
 // matchingRuns returns the check runs that carry the given name.

@@ -146,3 +146,42 @@ func TestSplitList(t *testing.T) {
 		}
 	}
 }
+
+func TestEvaluateGate_AcceptsRerunOfAFailedCheck(t *testing.T) {
+	runs := []checkRun{
+		{Name: "Lint (golangci-lint)", Status: "completed", Conclusion: "failure", RunAttempt: 1},
+		{Name: "Lint (golangci-lint)", Status: "completed", Conclusion: "success", RunAttempt: 2},
+	}
+
+	results := evaluateGate([]string{"Lint (golangci-lint)"}, runs, nil)
+
+	if !results[0].Passed {
+		t.Fatalf("expected the re-run to satisfy the gate, got %q", results[0].Detail)
+	}
+}
+
+func TestEvaluateGate_RejectsFailedLatestAttempt(t *testing.T) {
+	runs := []checkRun{
+		{Name: "Lint (golangci-lint)", Status: "completed", Conclusion: "success", RunAttempt: 1},
+		{Name: "Lint (golangci-lint)", Status: "completed", Conclusion: "failure", RunAttempt: 2},
+	}
+
+	results := evaluateGate([]string{"Lint (golangci-lint)"}, runs, nil)
+
+	if results[0].Passed {
+		t.Fatal("expected the latest attempt to decide the gate")
+	}
+}
+
+func TestEvaluateGate_RequiresEveryMatrixLegOfTheLatestAttempt(t *testing.T) {
+	runs := []checkRun{
+		{Name: "Backend (Go 1.26.9)", Status: "completed", Conclusion: "success", RunAttempt: 1},
+		{Name: "Backend (Go 1.26.9)", Status: "completed", Conclusion: "failure", RunAttempt: 1},
+	}
+
+	results := evaluateGate([]string{"Backend (Go 1.26.9)"}, runs, nil)
+
+	if results[0].Passed {
+		t.Fatal("expected a failing matrix leg to fail the gate")
+	}
+}

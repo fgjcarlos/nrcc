@@ -71,7 +71,14 @@ func TestVerifyArtifacts_RejectsTamperedChecksum(t *testing.T) {
 	if len(fields) != 2 {
 		t.Fatalf("expected two fields in %s, got %q", ChecksumFileName, string(content))
 	}
-	tamperedHash := "0" + fields[0][1:]
+	// The digest changes with every build, so the tamper flips the last
+	// hex digit to a different one instead of forcing a fixed prefix.
+	last := fields[0][len(fields[0])-1]
+	replacement := byte('0')
+	if last == '0' {
+		replacement = '1'
+	}
+	tamperedHash := fields[0][:len(fields[0])-1] + string(replacement)
 	tampered := strings.Replace(string(content), fields[0], tamperedHash, 1)
 	if err := os.WriteFile(path, []byte(tampered), ChecksumFileMode); err != nil {
 		t.Fatalf("unexpected error: %v", err)

@@ -97,6 +97,15 @@ The list mirrors the job names of the CI workflows. Renaming a job in
 CI renames it here: both changes belong in the same commit, otherwise the
 gate blocks every publication.
 
+Two rules of the evaluation are worth knowing:
+
+- A check that was skipped or that reported no conclusion counts as
+  satisfied, exactly as GitHub counts it for a required status check. A
+  job that the fork guard skips therefore never blocks a publication.
+- Only the latest attempt of a check counts: re-running a failed job
+  replaces the failure it retries. Every leg of the latest attempt of a
+  matrix job still has to pass.
+
 ## Dry run
 
 The packaging path runs locally without publishing anything. It is the same
@@ -149,7 +158,6 @@ to publish without a tag, and it is a maintainer action.
   installed on a clean prefix and must report the release version, and the
   produced image is started and must become healthy — its `/healthz`
   endpoint has to answer with `200`.
-
 The local dry run performs the same four checks.
 
 ## Cutting a release

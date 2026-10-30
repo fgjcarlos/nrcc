@@ -32,9 +32,11 @@ readonly DEFAULT_VERSION="0.0.0-dev.1"
 # the local dry run never talks to a registry.
 readonly PLAN_IMAGE="ghcr.io/fgjcarlos/nrcc"
 
-# The local image tag and container name used by the image verification.
+# The local image tag and the container name used by the image verification.
+# The container name carries the process id so a dry run never touches a
+# container of another run.
 readonly IMAGE_TAG="nrcc:release-verification"
-readonly CONTAINER_NAME="nrcc-release-verification"
+readonly CONTAINER_NAME="nrcc-release-verification-$$"
 
 # The maximum time the produced container may take to become healthy.
 readonly HEALTH_TIMEOUT_SECONDS=120
@@ -249,9 +251,8 @@ fi
 log "The image reported ${image_reported}."
 
 step "Starting the produced image"
-# A leftover container of a previous run would make the start fail, so it is
-# removed first. The name belongs to this script.
-docker rm -f "${CONTAINER_NAME}" >/dev/null 2>&1 || true
+# The container name is unique per run, so no container of another run is
+# touched.
 container_started="true"
 docker run -d --name "${CONTAINER_NAME}" \
   -e NRCC_ENCRYPTION_KEY=release-verification-encryption-key-not-a-secret \
@@ -285,5 +286,8 @@ if [ "${healthz_code}" != "200" ]; then
 fi
 log "healthz HTTP status: ${healthz_code}"
 
-# The container is removed by the cleanup trap.
+# The container is removed by the cleanup trap. The dist directory and the
+# local image tag stay behind on purpose: they are the artifacts the dry
+# run produced and they are safe to delete.
 log "Dry run finished: the artifacts were packaged and verified, nothing was published."
+log "The artifacts stay in ${dist_dir}/ and the image stays tagged ${IMAGE_TAG}."
