@@ -23,11 +23,29 @@ import (
 var Version string = "dev"
 
 func main() {
+	// The release pipeline reads the version of a produced artifact, so the
+	// binary answers "--version" without starting the server. Everything
+	// else stays server-only (ADR 0003 / Docker-first).
+	if versionRequested(os.Args[1:]) {
+		fmt.Println(Version)
+		return
+	}
+
 	// Initialize UI (pterm configuration)
 	ui.Init()
 
 	// The nrcc binary is server-only (ADR 0003 / Docker-first).
 	runServer()
+}
+
+// versionRequested reports whether the command line asks for the version.
+func versionRequested(args []string) bool {
+	for _, arg := range args {
+		if arg == "--version" || arg == "-version" {
+			return true
+		}
+	}
+	return false
 }
 
 func runServer() {

@@ -14,6 +14,12 @@
 # ref: node:26-slim — pinned to digest for supply-chain integrity.
 # Dependabot (docker ecosystem, weekly) bumps the digest when upstream
 # changes. See issue #593 and auditoria/devops-security.md §2.1.
+# Release metadata. The release workflow passes these build arguments so
+# the image carries the same version as the published binaries; a local
+# build keeps the "dev" default.
+ARG VERSION=dev
+ARG VCS_REF=unknown
+
 FROM node:26-slim@sha256:ec7758ee051e457b468b32bde57b0879010b325bb9862718e9615225ce4aaae1 AS builder
 
 RUN npm install -g pnpm@11.12.0 --no-audit --no-fund
@@ -30,6 +36,8 @@ RUN pnpm build
 # Dependabot (docker ecosystem, weekly) bumps the digest when upstream
 # changes. See issue #593 and auditoria/devops-security.md §2.1.
 FROM golang:1.26.9-alpine@sha256:3082400e369fa24d5fc60bca20edab3f6d604e0c5a690ec66b295eff4dd87ade AS go-builder
+ARG VERSION=dev
+ARG VCS_REF=unknown
 WORKDIR /build
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod \
@@ -38,15 +46,19 @@ COPY --from=builder /build/frontend/dist ./frontend/dist
 COPY . .
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o nrcc .
+    CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w -X main.Version=${VERSION}" -o nrcc .
 
 # ref: nodered/node-red:5.0.4-24-minimal — community image, pinned to
 # digest. Dependabot (docker ecosystem, weekly) bumps the digest when
 # upstream changes. See issue #593 and auditoria/devops-security.md §2.1.
 FROM nodered/node-red:5.0.7-24-minimal@sha256:828be222da3c61b10eebb85d5192d1da98e3e5d59c2fc1d7e9cd7958e0a69314 AS runtime
+ARG VERSION=dev
+ARG VCS_REF=unknown
 LABEL org.opencontainers.image.title="nrcc" \
       org.opencontainers.image.description="Node-RED Control Center — all-in-one" \
-      org.opencontainers.image.source="https://github.com/fgjcarlos/nrcc"
+      org.opencontainers.image.source="https://github.com/fgjcarlos/nrcc" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${VCS_REF}"
 # Run the entrypoint as root so it can chown the runtime volume, then
 # drop to `node-red` inside the entrypoint script before exec'ing nrcc.
 # The nrcc binary itself does not perform privilege drop; see

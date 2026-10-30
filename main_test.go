@@ -6,6 +6,29 @@ import (
 	"testing"
 )
 
+func TestVersionRequested(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		expected bool
+	}{
+		{name: "no arguments", args: nil, expected: false},
+		{name: "long flag", args: []string{"--version"}, expected: true},
+		{name: "single dash flag", args: []string{"-version"}, expected: true},
+		{name: "flag after other arguments", args: []string{"--data-dir", "/tmp", "--version"}, expected: true},
+		{name: "unrelated flag", args: []string{"--help"}, expected: false},
+		{name: "value that contains the flag", args: []string{"--data-dir=--version"}, expected: false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := versionRequested(test.args); got != test.expected {
+				t.Fatalf("expected %v for %v, got %v", test.expected, test.args, got)
+			}
+		})
+	}
+}
+
 func TestResolveJWTSecret_UsesEnvVar(t *testing.T) {
 	t.Setenv("JWT_SECRET", "my-real-production-secret-that-is-long-enough")
 	secret, err := resolveJWTSecret(t.TempDir())
