@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Align the release packaging with the supported platforms and the publication
+  channels: publish Linux-only artifacts (`linux/amd64` and `linux/arm64`),
+  publish to Docker Hub only when its credentials are
+  configured, keep prereleases out of `latest` and out of the latest GitHub
+  release, gate every publication on the required checks of the tagged commit,
+  and add a local dry run (`scripts/release/dry-run.sh`) that packages and
+  verifies the artifacts — checksums, version metadata and installation —
+  without publishing them.
 - Align the frontend on Tailwind CSS 4 with its Vite integration and daisyUI 5,
   preserving the corporate themes and setting the styling browser floor to Safari
   16.4, Chrome 111, and Firefox 128. The Tailwind 3 braces advisory route is removed.

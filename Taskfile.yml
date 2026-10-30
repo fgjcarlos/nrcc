@@ -51,6 +51,11 @@ tasks:
     cmds:
       - go test ./...
 
+  release:dry-run:
+    desc: Package and verify the release artifacts locally (no publication)
+    cmds:
+      - bash scripts/release/dry-run.sh {{.CLI_ARGS}}
+
   clean:
     desc: Remove the image and stopped containers
     cmds:

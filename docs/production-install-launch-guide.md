@@ -66,32 +66,47 @@ Expected result:
 
 ## Release / test tag checklist
 
-The `.github/workflows/release.yml` workflow runs on push of `v*` tags.
+The `.github/workflows/release.yml` workflow runs on push of `v*` tags. The
+release contract it implements is described in
+[the release contract](operations/release.md).
 
-1. Choose a test version, for example `v0.1.0` or the next available version.
-2. Create the annotated tag locally:
+1. Run the dry run before tagging. It packages and verifies the artifacts
+   locally without publishing anything:
 
-```bash
-git tag -a v0.1.0 -m "Test release v0.1.0"
-```
+   ```bash
+   scripts/release/dry-run.sh
+   # or
+   task release:dry-run
+   ```
 
-3. Push the tag:
+2. Choose a test version, for example `v0.1.0` or the next available version.
+3. Create the annotated tag locally:
 
-```bash
-git push origin v0.1.0
-```
+   ```bash
+   git tag -a v0.1.0 -m "Test release v0.1.0"
+   ```
 
-4. Go to `GitHub → Actions` and confirm the `Release` workflow completes successfully.
-5. Go to `GitHub → Releases` and verify that the release exists for that tag.
-6. Confirm the release attaches at least:
+4. Push the tag:
+
+   ```bash
+   git push origin v0.1.0
+   ```
+
+5. Go to `GitHub → Actions` and confirm the `Release` workflow completes successfully.
+6. Go to `GitHub → Releases` and verify that the release exists for that tag.
+7. Confirm the release attaches exactly:
    - `nrcc-linux-amd64`
    - `nrcc-linux-arm64`
-   - `nrcc-linux-armv7`
-   - `nrcc-darwin-amd64`
-   - `nrcc-darwin-arm64`
-   - `nrcc-windows-amd64.exe`
    - `SHA256SUMS`
    - `*.sha256`
+
+   nrcc is Linux-only (ADR 0004), so no macOS or Windows binary is
+   published.
+8. Download the artifacts and verify the checksums:
+
+   ```bash
+   sha256sum -c SHA256SUMS
+   ```
 
 ## Installer and `nrcc install` validation checklist
 
