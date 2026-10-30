@@ -46,6 +46,7 @@ jobs:
       metadata_tags: ${{ steps.plan.outputs.metadata_tags }}
       labels: ${{ steps.plan.outputs.labels }}
       platforms: ${{ steps.plan.outputs.platforms }}
+      revision: ${{ steps.plan.outputs.revision }}
       dry_run: ${{ steps.plan.outputs.dry_run }}
       publish: ${{ steps.plan.outputs.publish }}
     steps:
@@ -107,8 +108,26 @@ jobs:
             --format github \
             "${plan_args[@]}" >> "${GITHUB_OUTPUT}"
 
+          # The resolved plan is published in the run summary: the
+          # registries and the channels of this release are an observation
+          # of the run, not a claim in the workflow file.
+          go run ./tools/releasepack plan \
+            --version "${version}" \
+            --revision "${revision}" \
+            --created "${created}" \
+            --format json \
+            "${plan_args[@]}" > plan.json
+          {
+            echo "## Release plan"
+            echo ""
+            echo '```json'
+            cat plan.json
+            echo '```'
+          } >> "${GITHUB_STEP_SUMMARY}"
+
           {
             echo "dry_run=${dry_run}"
+            echo "revision=${revision}"
             if [ "${dry_run}" = "true" ]; then
               echo "publish=false"
             else
@@ -239,8 +258,10 @@ jobs:
           set -Eeuo pipefail
           # The published binary must install and report the release
           # version on a clean prefix.
-          install -m 0755 dist/nrcc-linux-amd64 /usr/local/bin/nrcc
-          reported="$(nrcc --version)"
+          prefix="$(mktemp -d)"
+          trap 'rm -rf "${prefix}"' EXIT
+          install -D -m 0755 dist/nrcc-linux-amd64 "${prefix}/bin/nrcc"
+          reported="$("${prefix}/bin/nrcc" --version)"
           if [ "${reported}" != "${VERSION}" ]; then
             echo "::error::nrcc --version reported '${reported}', expected '${VERSION}'."
             exit 1
@@ -303,6 +324,9 @@ jobs:
           images: ${{ needs.plan.outputs.images }}
           # The tags come from the release plan: a stable version owns
           # "latest", a prerelease owns "candidate" and never "latest".
+          # The automatic flavour is disabled so no tag is published that
+          # the plan does not contain.
+          flavor: latest=false
           tags: ${{ needs.plan.outputs.metadata_tags }}
           labels: ${{ needs.plan.outputs.labels }}
 
@@ -339,9 +363,20 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             VERSION=${{ needs.plan.outputs.version }}
-            VCS_REF=${{ github.sha }}
+            VCS_REF=${{ needs.plan.outputs.revision }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Fetch the published image for verification
+        if: ${{ needs.plan.outputs.dry_run == 'false' }}
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          set -Eeuo pipefail
+          # The publication pushed a multi-architecture image; the host
+          # pulls the released version tag and verifies that artifact.
+          docker pull "${GHCR_IMAGE}:${VERSION}"
+          docker tag "${GHCR_IMAGE}:${VERSION}" nrcc:release-verification
 
       - name: Verify the image version metadata
         env:
