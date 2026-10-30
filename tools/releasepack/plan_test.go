@@ -123,6 +123,9 @@ func TestWriteGitHubOutput_EmitsHeredocEntries(t *testing.T) {
 		"images<<EOF\n",
 		"tags<<EOF\n1.2.3\n1.2\nlatest\nEOF\n",
 		"metadata_tags<<EOF\n",
+		"labels<<EOF\n",
+		"org.opencontainers.image.version=1.2.3\n",
+		"platforms=linux/amd64,linux/arm64,linux/arm/v7\n",
 	} {
 		if !strings.Contains(output, expected) {
 			t.Fatalf("expected the output to contain %q, got:\n%s", expected, output)

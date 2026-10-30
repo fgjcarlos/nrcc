@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -61,16 +62,36 @@ func runPlan(args []string) error {
 	}
 }
 
+// formatLabels renders the OCI labels as the newline separated
+// "key=value" list that docker/metadata-action consumes.
+func formatLabels(labels map[string]string) string {
+	keys := make([]string, 0, len(labels))
+	for key := range labels {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	rendered := make([]string, 0, len(keys))
+	for _, key := range keys {
+		rendered = append(rendered, fmt.Sprintf("%s=%s", key, labels[key]))
+	}
+	return strings.Join(rendered, "\n")
+}
+
+// formatPlatforms renders the container platforms of the target set.
+func formatPlatforms(targets []Target) string {
+	platforms := make([]string, 0, len(targets))
+	for _, target := range targets {
+		platforms = append(platforms, target.Platform)
+	}
+	return strings.Join(platforms, ",")
+}
+
 // writeGitHubOutput writes the plan as GitHub Actions output entries.
 //
 // Multi-line values use the heredoc form so the entries can be appended to
 // the GITHUB_OUTPUT file verbatim.
 func writeGitHubOutput(out *os.File, plan Plan) error {
-	labels, err := json.Marshal(plan.Labels)
-	if err != nil {
-		return fmt.Errorf("encode labels: %w", err)
-	}
-
 	entries := []struct {
 		key   string
 		value string
@@ -81,7 +102,8 @@ func writeGitHubOutput(out *os.File, plan Plan) error {
 		{key: "prerelease", value: strconv.FormatBool(plan.Prerelease)},
 		{key: "tags", value: strings.Join(plan.Tags, "\n")},
 		{key: "metadata_tags", value: strings.Join(plan.MetadataTags, "\n")},
-		{key: "labels", value: string(labels)},
+		{key: "labels", value: formatLabels(plan.Labels)},
+		{key: "platforms", value: formatPlatforms(plan.Targets)},
 	}
 
 	for _, entry := range entries {

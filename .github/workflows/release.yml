@@ -1,22 +1,273 @@
 name: Release
 
+# The release contract of issue #884:
+#   - the published artifacts are the Linux targets of ADR 0004 only,
+#   - GHCR is always published, Docker Hub only when its credentials exist,
+#   - a stable version owns "latest", a prerelease owns "candidate",
+#   - publication is gated on the required checks of the tagged commit,
+#   - the same packaging path runs as a dry run without publishing.
 on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Package and verify the artifacts without publishing them"
+        type: boolean
+        default: true
+      version:
+        description: "Version to package (defaults to the dispatched ref name)"
+        type: string
+        required: false
 
 env:
-  IMAGE: ghcr.io/${{ github.repository_owner }}/nrcc
+  GO_VERSION: "1.26.9"
+  NODE_VERSION: "22"
+  PNPM_VERSION: "11.12.0"
+  GHCR_IMAGE: ghcr.io/${{ github.repository_owner }}/nrcc
+  DOCKERHUB_IMAGE: docker.io/${{ github.repository_owner }}/nrcc
 
 jobs:
-  # ── Build & push multi-arch Docker image ────────────────────────────────────
+  # ── Resolve the release plan ───────────────────────────────────────────────
+  # Single source of truth for the version, the publication channel, the
+  # image targets and the Docker tags. The plan comes from
+  # tools/releasepack, the same implementation the local dry run uses.
+  plan:
+    name: Resolve release plan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+      channel: ${{ steps.plan.outputs.channel }}
+      prerelease: ${{ steps.plan.outputs.prerelease }}
+      images: ${{ steps.plan.outputs.images }}
+      metadata_tags: ${{ steps.plan.outputs.metadata_tags }}
+      labels: ${{ steps.plan.outputs.labels }}
+      platforms: ${{ steps.plan.outputs.platforms }}
+      dry_run: ${{ steps.plan.outputs.dry_run }}
+      publish: ${{ steps.plan.outputs.publish }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # pin to commit (v7.0.0)
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # pin to commit (v7.0.0)
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: go.sum
+
+      - name: Resolve the plan
+        id: plan
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+          DRY_RUN_INPUT: ${{ inputs.dry_run }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          set -Eeuo pipefail
+
+          version="${REQUESTED_VERSION:-${GITHUB_REF_NAME}}"
+
+          # A dispatched run packages without publishing unless the operator
+          # explicitly asks for a publication.
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            dry_run="true"
+            if [ "${DRY_RUN_INPUT}" = "false" ]; then
+              dry_run="false"
+            fi
+          else
+            dry_run="false"
+          fi
+
+          # Docker Hub is optional: it is published only when both
+          # credentials exist. The image targets follow the very same
+          # condition, so the pipeline never pushes to a registry it did
+          # not log in to.
+          images=("${GHCR_IMAGE}")
+          if [ -n "${DOCKERHUB_USERNAME}" ] && [ -n "${DOCKERHUB_TOKEN}" ]; then
+            images+=("${DOCKERHUB_IMAGE}")
+          else
+            echo "Docker Hub credentials are not configured — publishing to ${GHCR_IMAGE} only."
+          fi
+
+          plan_args=()
+          for image in "${images[@]}"; do
+            plan_args+=(--image "${image}")
+          done
+
+          created="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          revision="$(git rev-parse HEAD)"
+
+          go run ./tools/releasepack plan \
+            --version "${version}" \
+            --revision "${revision}" \
+            --created "${created}" \
+            --format github \
+            "${plan_args[@]}" >> "${GITHUB_OUTPUT}"
+
+          {
+            echo "dry_run=${dry_run}"
+            if [ "${dry_run}" = "true" ]; then
+              echo "publish=false"
+            else
+              echo "publish=true"
+            fi
+          } >> "${GITHUB_OUTPUT}"
+
+          echo "Planned release ${version} (channel: $(grep '^channel=' "${GITHUB_OUTPUT}" | cut -d= -f2), dry run: ${dry_run})."
+
+  # ── Gate the publication on the required checks ────────────────────────────
+  # The gate evaluates the check results of the exact tagged commit. A
+  # missing, unfinished or failed required check blocks the publication.
+  gate:
+    name: Gate on required checks
+    needs: [plan]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: read
+      statuses: read
+    outputs:
+      publish: ${{ steps.gate.outputs.publish }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # pin to commit (v7.0.0)
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # pin to commit (v7.0.0)
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: go.sum
+
+      - name: Evaluate the required checks of the release commit
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ needs.plan.outputs.dry_run }}
+          # The required checks of the release contract. The list mirrors
+          # the job names of the CI workflows that run on main; rename a
+          # job there and rename it here in the same commit.
+          REQUIRED_CHECKS: >-
+            Backend (Go 1.26.9),
+            Frontend (Node 22),
+            OpenAPI Spec,
+            Lint (golangci-lint),
+            Docker stack acceptance (#434),
+            govulncheck,
+            pnpm audit,
+            Trivy container scan
+        run: |
+          set -Eeuo pipefail
+
+          if [ "${DRY_RUN}" = "true" ]; then
+            echo "Dry run — the required-check gate is not evaluated."
+            echo "publish=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          commit="$(git rev-parse "${GITHUB_REF_NAME}^{commit}")"
+          echo "Release commit: ${commit}"
+
+          gh api "repos/${GITHUB_REPOSITORY}/commits/${commit}/check-runs?per_page=100" > checks.json
+          gh api "repos/${GITHUB_REPOSITORY}/commits/${commit}/status" > statuses.json
+
+          go run ./tools/releasepack gate \
+            --required "${REQUIRED_CHECKS}" \
+            --checks checks.json \
+            --statuses statuses.json
+
+          echo "publish=true" >> "${GITHUB_OUTPUT}"
+
+  # ── Build & publish the Linux binaries ─────────────────────────────────────
+  binaries:
+    name: Release binaries
+    needs: [plan, gate]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # pin to commit (v7.0.0)
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # pin to commit (v7.0.0)
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: go.sum
+
+      - name: Setup pnpm via corepack
+        run: |
+          corepack enable
+          corepack prepare pnpm@${{ env.PNPM_VERSION }} --activate
+          pnpm --version
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # pin to commit (v7.0.0)
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - name: Package the Linux binaries
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          set -Eeuo pipefail
+          go run ./tools/releasepack build --version "${VERSION}" --dist dist
+
+      - name: Verify the packaged artifacts
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          set -Eeuo pipefail
+          go run ./tools/releasepack verify --version "${VERSION}" --dist dist
+
+      - name: Install and run the produced binary
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          set -Eeuo pipefail
+          # The published binary must install and report the release
+          # version on a clean prefix.
+          install -m 0755 dist/nrcc-linux-amd64 /usr/local/bin/nrcc
+          reported="$(nrcc --version)"
+          if [ "${reported}" != "${VERSION}" ]; then
+            echo "::error::nrcc --version reported '${reported}', expected '${VERSION}'."
+            exit 1
+          fi
+          echo "nrcc --version reported ${reported}."
+
+      - name: Upload binaries to GitHub Release
+        if: needs.gate.outputs.publish == 'true'
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64  # pin to commit (v3.0.0)
+        with:
+          files: dist/*
+          generate_release_notes: true
+          # A candidate release never replaces the latest release.
+          prerelease: ${{ needs.plan.outputs.prerelease }}
+          make_latest: ${{ needs.plan.outputs.prerelease == 'false' }}
+
+  # ── Build & push the multi-arch Docker image ──────────────────────────────
   docker:
     name: Docker multi-arch build & push
+    needs: [plan, gate]
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # pin to commit (v7.0.0)
@@ -34,116 +285,118 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Log in to Docker Hub (if secrets present)
+      # The optional Docker Hub login and the Docker Hub image target share
+      # one condition: without both credentials the pipeline neither logs
+      # in nor publishes the docker.io image.
+      - name: Log in to Docker Hub (only with credentials)
         if: ${{ env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != '' }}
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # pin to commit (v4.0.0)
         with:
           registry: docker.io
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ env.DOCKERHUB_TOKEN }}
 
       - name: Extract metadata (tags, labels)
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302  # pin to commit (v6.0.0)
         with:
-          images: |
-            ${{ env.IMAGE }}
-            docker.io/fgjcarlos/nrcc
-          flavor: latest=auto
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest
+          images: ${{ needs.plan.outputs.images }}
+          # The tags come from the release plan: a stable version owns
+          # "latest", a prerelease owns "candidate" and never "latest".
+          tags: ${{ needs.plan.outputs.metadata_tags }}
+          labels: ${{ needs.plan.outputs.labels }}
+
+      - name: Resolve the build tags
+        id: tags
+        env:
+          DRY_RUN: ${{ needs.plan.outputs.dry_run }}
+          RELEASE_TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          set -Eeuo pipefail
+          if [ "${DRY_RUN}" = "true" ]; then
+            # A dry run loads the image locally; it never publishes the
+            # release tags.
+            echo "value=nrcc:release-verification" >> "${GITHUB_OUTPUT}"
+          else
+            {
+              echo "value<<EOF"
+              echo "${RELEASE_TAGS}"
+              echo "EOF"
+            } >> "${GITHUB_OUTPUT}"
+          fi
 
       - name: Build and push
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # pin to commit (v7.0.0)
         with:
           context: .
           file: ./Dockerfile
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          # A dry run builds the host architecture only, so the image can
+          # be inspected and started locally.
+          platforms: ${{ needs.plan.outputs.dry_run == 'true' && 'linux/amd64' || needs.plan.outputs.platforms }}
+          push: ${{ needs.gate.outputs.publish == 'true' }}
+          load: ${{ needs.plan.outputs.dry_run == 'true' }}
+          tags: ${{ steps.tags.outputs.value }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ needs.plan.outputs.version }}
+            VCS_REF=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # ── Cross-compile binaries & attach to GitHub Release ───────────────────────
-  binaries:
-    name: Release binaries
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # pin to commit (v7.0.0)
-
-      - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # pin to commit (v7.0.0)
-        with:
-          go-version: "1.26.9"
-          cache-dependency-path: go.sum
-
-      - name: Setup pnpm via corepack
-        run: |
-          corepack enable
-          corepack prepare pnpm@11.12.0 --activate
-          pnpm --version
-
-      - name: Set up Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # pin to commit (v7.0.0)
-        with:
-          node-version: "22"
-          cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
-
-      - name: Build frontend
-        working-directory: frontend
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm build
-
-      - name: Build binaries
+      - name: Verify the image version metadata
         env:
-          VERSION: ${{ github.ref_name }}
+          VERSION: ${{ needs.plan.outputs.version }}
         run: |
-          mkdir -p dist
-          LDFLAGS="-s -w -X main.Version=${VERSION}"
+          set -Eeuo pipefail
+          label="$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.version" }}' nrcc:release-verification)"
+          if [ "${label}" != "${VERSION}" ]; then
+            echo "::error::the image carries version '${label}', expected '${VERSION}'."
+            exit 1
+          fi
+          echo "The image carries version ${label}."
 
-          # Linux (static — Alpine/glibc compatible)
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64  go build -tags netgo -ldflags="${LDFLAGS} -extldflags=-static" -o dist/nrcc-linux-amd64 .
-          CGO_ENABLED=0 GOOS=linux GOARCH=arm64  go build -tags netgo -ldflags="${LDFLAGS} -extldflags=-static" -o dist/nrcc-linux-arm64 .
-          # Pin GOARM=7 so the armv7 ABI matches the linux/arm/v7 Docker image and does
-          # not silently regress to GOARM=6 if built with an older toolchain default.
-          CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build -tags netgo -ldflags="${LDFLAGS} -extldflags=-static" -o dist/nrcc-linux-armv7 .
-
-          # macOS
-          GOOS=darwin  GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o dist/nrcc-darwin-amd64 .
-          GOOS=darwin  GOARCH=arm64 go build -ldflags="${LDFLAGS}" -o dist/nrcc-darwin-arm64 .
-
-          # Windows
-          GOOS=windows GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o dist/nrcc-windows-amd64.exe .
-
-          ls -lh dist/
-
-      - name: Generate checksums
-        working-directory: dist
+      - name: Verify the image reports the release version
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
         run: |
-          # Generate combined SHA256SUMS file
-          sha256sum * > SHA256SUMS
+          set -Eeuo pipefail
+          reported="$(docker run --rm --entrypoint /usr/local/bin/nrcc nrcc:release-verification --version)"
+          if [ "${reported}" != "${VERSION}" ]; then
+            echo "::error::the image reported version '${reported}', expected '${VERSION}'."
+            exit 1
+          fi
+          echo "The image reported version ${reported}."
 
-          # Generate per-binary sidecar files with normalized filename
-          for binary in nrcc-*; do
-            sha256sum "$binary" | sed 's/nrcc-.*/nrcc/' > "$binary.sha256"
+      - name: Verify the produced image installs and runs
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          set -Eeuo pipefail
+          # The produced artifact must install and serve: the stack starts
+          # and answers the health endpoint.
+          docker run -d --name nrcc-release-verification \
+            -e NRCC_ENCRYPTION_KEY=release-verification-encryption-key-not-a-secret \
+            -e JWT_SECRET=release-verification-jwt-secret-not-a-production-value \
+            nrcc:release-verification
+
+          status=""
+          for _ in $(seq 1 60); do
+            status="$(docker inspect --format '{{ .State.Health.Status }}' nrcc-release-verification 2>/dev/null || echo unknown)"
+            if [ "${status}" = "healthy" ]; then
+              break
+            fi
+            sleep 2
           done
 
-          ls -lh SHA256SUMS *.sha256
+          if [ "${status}" != "healthy" ]; then
+            echo "::error::the produced image did not become healthy (status: ${status})."
+            docker logs nrcc-release-verification || true
+            docker rm -f nrcc-release-verification || true
+            exit 1
+          fi
 
-      - name: Upload binaries to GitHub Release
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64  # pin to commit (v3.0.0)
-        with:
-          files: dist/*
-          generate_release_notes: true
+          echo "The produced image is healthy."
+          docker rm -f nrcc-release-verification
 
   # ── Post-release smoke test of the public install URL ───────────────────────
   # NON-BLOCKING for now: get.nrcc.dev (GitHub Pages custom domain) is not live
