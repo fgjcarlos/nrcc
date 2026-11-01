@@ -50,7 +50,7 @@ func TestPatchedGoToolchainContract(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		want := "FROM golang:1.27.3-alpine@sha256:f2c872bcee949b7be9c490efd02b48a8a2fbf947cdf533f1c58525ec9d8170fd AS go-builder"
+		want := "FROM golang:1.27.3-alpine@sha256:d200d2dd76b03a99b52651fd1325aff7dcd35422c35c01bac56571b0507f3deb AS go-builder"
 		builders := regexp.MustCompile(`(?m)^FROM golang:[^\r\n]+`).FindAllString(string(body), -1)
 		if len(builders) != 1 || builders[0] != want {
 			t.Fatalf("unexpected Go builder: %v; want %s", builders, want)
