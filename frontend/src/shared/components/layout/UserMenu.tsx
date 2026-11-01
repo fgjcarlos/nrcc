@@ -71,22 +71,30 @@ export function UserMenu({ user, onLogout, logoutBusy = false }: UserMenuProps) 
   return (
     <div ref={containerRef} className="relative">
       {/* Avatar trigger button */}
+      {/* The accessible name comes from the visible content (WCAG 2.5.3
+          label in name): an author label that omits the rendered initials
+          or the role breaks the label-content-name-mismatch rule. The
+          action hint is appended as visually hidden text. */}
       <button
         type="button"
         aria-haspopup="true"
         aria-expanded={open}
-        aria-label={`${user.username} — open user menu`}
         onClick={() => setOpen(!open)}
         className="flex w-full items-center gap-3 rounded-xl p-3 hover:bg-base-300/50 transition-colors duration-150"
       >
         <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${avatarColor.bg} ${avatarColor.text}`}>
           {initials}
         </span>
+        {' '}
         <span className="min-w-0 flex-1 text-left">
           <span className="block truncate text-sm font-semibold text-base-content">{user.username}</span>
+          {' '}
           <span className="block text-xs text-base-content/50 capitalize">{user.role}</span>
         </span>
+        {' '}
+        <span className="sr-only">{t('common:openUserMenu')}</span>
         <ChevronDown
+          aria-hidden="true"
           className={`h-4 w-4 shrink-0 text-base-content/40 transition-transform duration-150 ${open ? 'rotate-180' : ''}`}
         />
       </button>

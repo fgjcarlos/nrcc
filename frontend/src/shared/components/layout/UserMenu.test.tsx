@@ -34,4 +34,22 @@ describe('UserMenu profile navigation', () => {
 
     expect(await screen.findByText('Profile route')).toBeInTheDocument()
   })
+
+  // WCAG 2.5.3 (label in name): the visible text of the trigger has to be
+  // part of its accessible name. An author label that drops the rendered
+  // initials or the role breaks the axe label-content-name-mismatch rule,
+  // so the name is asserted against the whole visible text here.
+  it('keeps the visible trigger text inside the accessible name', () => {
+    render(
+      <MemoryRouter initialEntries={['/dashboard']}>
+        <Routes>
+          <Route path="/dashboard" element={<UserMenu user={user} onLogout={logout} />} />
+        </Routes>
+      </MemoryRouter>
+    )
+
+    expect(
+      screen.getByRole('button', { name: /^OP operator viewer Open user menu$/i }),
+    ).toBeInTheDocument()
+  })
 })

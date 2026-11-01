@@ -49,6 +49,7 @@
   "productShortName": "Command Center",
   "productFullName": "Node-RED Control Center",
   "signedInAs": "Signed in as",
+  "openUserMenu": "Open user menu",
   "profile": "Profile",
   "signingOut": "Signing out…",
   "signOut": "Sign out",
