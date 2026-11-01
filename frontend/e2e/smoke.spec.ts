@@ -28,7 +28,7 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
     // Slice D moved the same Restart/Open actions into NodeRedHealthTile.
     await expect(page.getByRole('button', { name: 'Restart' })).toBeVisible()
     // exact:true disambiguates the NodeRedHealthTile Open button from the
-    // user-menu trigger (whose aria-label contains 'open user menu').
+    // user-menu trigger (whose accessible name contains 'Open user menu').
     await expect(page.getByRole('button', { name: 'Open', exact: true })).toBeVisible()
   })
 
@@ -94,7 +94,7 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
 
     // /profile is reached from the UserMenu, not the sidebar.
     await page.goto('/overview')
-    await page.getByRole('button', { name: /open user menu/ }).click()
+    await page.getByRole('button', { name: /open user menu/i }).click()
     await page.getByRole('menuitem', { name: 'Profile' }).click()
     await expect(page.getByRole('heading', { name: 'Profile' })).toBeVisible()
   })

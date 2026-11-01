@@ -29,7 +29,7 @@ test.describe('NRCC auth boundaries', () => {
 
   test('logout clears the session and protected routes redirect again afterwards', async ({ page }) => {
     await login(page)
-    await page.getByRole('button', { name: /open user menu/ }).click()
+    await page.getByRole('button', { name: /open user menu/i }).click()
     await page.getByRole('menuitem', { name: 'Sign out' }).click()
     await expect(page).toHaveURL(/\/login$/)
 

@@ -49,6 +49,7 @@
   "productShortName": "Centro de Control",
   "productFullName": "Centro de Control Node-RED",
   "signedInAs": "Conectado como",
+  "openUserMenu": "Abrir menú de usuario",
   "profile": "Perfil",
   "signingOut": "Cerrando sesión…",
   "signOut": "Cerrar sesión",
