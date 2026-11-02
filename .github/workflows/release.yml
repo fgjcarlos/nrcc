@@ -1,82 +1,128 @@
 name: Release
 
+# ── Release publication policy (#884) ───────────────────────────────────────
+#
+# Two entry points, one policy:
+#
+#   * `push` of a `v*` tag publishes the release (images + GitHub
+#     release).
+#   * `workflow_dispatch` is ALWAYS a dry run. It packages and verifies
+#     the artifacts and exercises the image build and smoke test, but it
+#     never authenticates against a registry, never pushes an image and
+#     never creates a GitHub release. There is deliberately no boolean
+#     input that could turn a manual run into a publication.
+#
+# Gates:
+#
+#   * The PR and Security workflows are re-run as reusable workflows at
+#     the exact triggering SHA (`github.sha`). Packaging and publication
+#     wait for both of them. No commit-status API lookup and no check
+#     name guessing is involved.
+#   * The version must be strict semver; malformed tags such as `v1.2`
+#     or `v1.2.3.4` are rejected before anything is built.
+#
+# The version, channel and registry policy itself lives in
+# scripts/release/metadata.py so it can be unit tested
+# (scripts/release/test_workflow.py).
+
 on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to package and verify (dry run). Examples: v1.2.3, v1.2.3-rc.1"
+        required: true
+        type: string
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
 
 env:
   IMAGE: ghcr.io/${{ github.repository_owner }}/nrcc
+  DOCKERHUB_IMAGE: docker.io/fgjcarlos/nrcc
 
 jobs:
-  # ── Build & push multi-arch Docker image ────────────────────────────────────
-  docker:
-    name: Docker multi-arch build & push
+  # ── Resolve and validate the release version ──────────────────────────────
+  version:
+    name: Resolve release version
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-
+    outputs:
+      version: ${{ steps.policy.outputs.version }}
+      semver: ${{ steps.policy.outputs.semver }}
+      prerelease: ${{ steps.policy.outputs.prerelease }}
+      make_latest: ${{ steps.policy.outputs.make_latest }}
+      publish: ${{ steps.policy.outputs.publish }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # pin to commit (v7.0.0)
-
-      - name: Set up QEMU (for cross-arch emulation)
-        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1  # pin to commit (v4.0.0)
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # pin to commit (v4.0.0)
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6  # pin to commit (v4.0.0)
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.sha }}
 
-      - name: Log in to Docker Hub (if secrets present)
-        if: ${{ env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != '' }}
-        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6  # pin to commit (v4.0.0)
-        with:
-          registry: docker.io
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Run release policy tests
+        run: python3 scripts/release/test_workflow.py
 
-      - name: Extract metadata (tags, labels)
-        id: meta
-        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302  # pin to commit (v6.0.0)
-        with:
-          images: |
-            ${{ env.IMAGE }}
-            docker.io/fgjcarlos/nrcc
-          flavor: latest=auto
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest
+      - name: Validate version and compute release policy
+        id: policy
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          set -Eeuo pipefail
+          case "$EVENT_NAME" in
+            push)
+              # A tag push publishes — the tag must be strict semver.
+              python3 scripts/release/metadata.py --tag "$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+              ;;
+            workflow_dispatch)
+              # A manual run is always a dry run, whatever the version.
+              python3 scripts/release/metadata.py --version "$REQUESTED_VERSION" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "unsupported release trigger: $EVENT_NAME" >&2
+              exit 1
+              ;;
+          esac
 
-      - name: Build and push
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # pin to commit (v7.0.0)
-        with:
-          context: .
-          file: ./Dockerfile
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+  # ── Re-run the branch-required checks at the exact triggering SHA ────────
+  pr-checks:
+    name: PR validation (reusable)
+    needs: version
+    uses: ./.github/workflows/pr.yml
+    permissions:
+      contents: read
 
-  # ── Cross-compile binaries & attach to GitHub Release ───────────────────────
-  binaries:
-    name: Release binaries
+  security-checks:
+    name: Security checks (reusable)
+    needs: version
+    uses: ./.github/workflows/security.yml
+    permissions:
+      contents: read
+      # The reused Security workflow uploads a SARIF report to the
+      # Security tab, which needs this permission in the caller.
+      security-events: write
+
+  # ── Cross-compile binaries & attach them to the GitHub release ───────────
+  package:
+    name: Package and verify release artifacts
+    needs: [version, pr-checks, security-checks]
     runs-on: ubuntu-latest
     permissions:
       contents: write
-
+    env:
+      RELEASE_VERSION: ${{ needs.version.outputs.version }}
+      OUTPUT_DIR: ${{ github.workspace }}/dist
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # pin to commit (v7.0.0)
+        with:
+          ref: ${{ github.sha }}
 
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # pin to commit (v7.0.0)
@@ -103,49 +149,178 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm build
 
-      - name: Build binaries
-        env:
-          VERSION: ${{ github.ref_name }}
-        run: |
-          mkdir -p dist
-          LDFLAGS="-s -w -X main.Version=${VERSION}"
+      # The packaging script owns the supported Linux targets and the
+      # checksum manifest; the workflow only hands over the version and
+      # the output directory.
+      - name: Build release artifacts
+        run: bash scripts/release/package.sh "$RELEASE_VERSION" "$OUTPUT_DIR"
 
-          # Linux (static — Alpine/glibc compatible)
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64  go build -tags netgo -ldflags="${LDFLAGS} -extldflags=-static" -o dist/nrcc-linux-amd64 .
-          CGO_ENABLED=0 GOOS=linux GOARCH=arm64  go build -tags netgo -ldflags="${LDFLAGS} -extldflags=-static" -o dist/nrcc-linux-arm64 .
-          # Pin GOARM=7 so the armv7 ABI matches the linux/arm/v7 Docker image and does
-          # not silently regress to GOARM=6 if built with an older toolchain default.
-          CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build -tags netgo -ldflags="${LDFLAGS} -extldflags=-static" -o dist/nrcc-linux-armv7 .
+      # Verification covers checksums, the embedded Go build metadata and
+      # an isolated installation of the produced binaries.
+      - name: Verify release artifacts
+        run: bash scripts/release/verify.sh "$RELEASE_VERSION" "$OUTPUT_DIR"
 
-          # macOS
-          GOOS=darwin  GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o dist/nrcc-darwin-amd64 .
-          GOOS=darwin  GOARCH=arm64 go build -ldflags="${LDFLAGS}" -o dist/nrcc-darwin-arm64 .
+      - name: Upload verified binary artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: nrcc-${{ needs.version.outputs.version }}
+          path: dist/*
+          if-no-files-found: error
 
-          # Windows
-          GOOS=windows GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o dist/nrcc-windows-amd64.exe .
-
-          ls -lh dist/
-
-      - name: Generate checksums
-        working-directory: dist
-        run: |
-          # Generate combined SHA256SUMS file
-          sha256sum * > SHA256SUMS
-
-          # Generate per-binary sidecar files with normalized filename
-          for binary in nrcc-*; do
-            sha256sum "$binary" | sed 's/nrcc-.*/nrcc/' > "$binary.sha256"
-          done
-
-          ls -lh SHA256SUMS *.sha256
-
-      - name: Upload binaries to GitHub Release
+      - name: Publish GitHub release
+        if: needs.version.outputs.publish == 'true'
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64  # pin to commit (v3.0.0)
         with:
+          tag_name: ${{ github.ref_name }}
           files: dist/*
           generate_release_notes: true
+          # A prerelease is marked as such and never becomes `latest`.
+          prerelease: ${{ needs.version.outputs.prerelease }}
+          make_latest: ${{ needs.version.outputs.make_latest }}
 
-  # ── Post-release smoke test of the public install URL ───────────────────────
+  # ── Build, verify and push the multi-arch Docker image ───────────────────
+  image:
+    name: Build, verify and publish container image
+    needs: [version, pr-checks, security-checks]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      RELEASE_VERSION: ${{ needs.version.outputs.version }}
+      # The optional DockerHub credentials are optional: when they are
+      # missing, the DockerHub target is neither published nor logged
+      # into. The very same flag drives both decisions.
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # pin to commit (v7.0.0)
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up QEMU (for cross-arch emulation)
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1  # pin to commit (v4.0.0)
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # pin to commit (v4.0.0)
+
+      - name: Detect optional DockerHub credentials
+        id: dockerhub
+        run: |
+          set -Eeuo pipefail
+          if [ -n "${DOCKERHUB_USERNAME:-}" ] && [ -n "${DOCKERHUB_TOKEN:-}" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # The tags and labels come from the policy module, so the channel
+      # rules (no `latest` and no floating `major.minor` tag for a
+      # prerelease) cannot drift away from the tested policy.
+      - name: Compute image metadata
+        id: meta
+        env:
+          DOCKERHUB_AVAILABLE: ${{ steps.dockerhub.outputs.available }}
+        run: |
+          set -Eeuo pipefail
+          python3 scripts/release/metadata.py \
+            --version "$RELEASE_VERSION" \
+            --image "$IMAGE" \
+            --dockerhub-image "$DOCKERHUB_IMAGE" \
+            --dockerhub-available "$DOCKERHUB_AVAILABLE" \
+            --revision "$GITHUB_SHA" \
+            >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GitHub Container Registry
+        if: needs.version.outputs.publish == 'true'
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6  # pin to commit (v4.0.0)
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub (only when the optional secrets are present)
+        if: needs.version.outputs.publish == 'true' && steps.dockerhub.outputs.available == 'true'
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6  # pin to commit (v4.0.0)
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # A single-platform build is loaded into the local daemon so the
+      # produced artifact can be inspected and started before anything is
+      # pushed to a registry.
+      - name: Build image for verification
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # pin to commit (v7.0.0)
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          build-args: VERSION=${{ needs.version.outputs.version }}
+          load: true
+          tags: nrcc:release-verify
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+
+      - name: Verify image version metadata
+        env:
+          EXPECTED_VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -Eeuo pipefail
+          actual=$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.version" }}' nrcc:release-verify)
+          if [ "$actual" != "$EXPECTED_VERSION" ]; then
+            echo "image version label is '$actual', expected '$EXPECTED_VERSION'" >&2
+            exit 1
+          fi
+          echo "image version label: $actual"
+
+      - name: Smoke test the built image
+        run: |
+          set -Eeuo pipefail
+          container=""
+          cleanup() {
+            if [ -n "$container" ]; then
+              docker logs "$container" || true
+              docker rm -f -v "$container" >/dev/null
+            fi
+          }
+          trap cleanup EXIT
+          container=$(docker run -d -e NRCC_MANAGE_NODE_RED=false nrcc:release-verify)
+          healthy=false
+          for attempt in $(seq 1 60); do
+            if [ "$(docker inspect --format '{{.State.Running}}' "$container")" != true ]; then
+              echo "container exited before becoming healthy" >&2
+              exit 1
+            fi
+            if docker exec "$container" wget -qO- http://127.0.0.1:3001/healthz; then
+              healthy=true
+              break
+            fi
+            sleep 2
+          done
+          if [ "$healthy" != true ]; then
+            echo "container did not answer /healthz" >&2
+            exit 1
+          fi
+          docker logs "$container" 2>&1 | grep -F "Version: $RELEASE_VERSION"
+          echo "container is healthy and reported version $RELEASE_VERSION"
+
+      - name: Build and push multi-arch image
+        if: needs.version.outputs.publish == 'true'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # pin to commit (v7.0.0)
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          build-args: VERSION=${{ needs.version.outputs.version }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── Post-release smoke test of the public install URL ─────────────────────
   # NON-BLOCKING for now: get.nrcc.dev (GitHub Pages custom domain) is not live
   # yet — there is no docs/CNAME and the host does not resolve. This job surfaces
   # a warning in the Actions log without failing the release. Once DNS + Pages +
@@ -153,7 +328,8 @@ jobs:
   smoke-install-url:
     name: Install URL smoke (non-blocking)
     runs-on: ubuntu-latest
-    needs: [binaries]
+    needs: [version, package]
+    if: needs.version.outputs.publish == 'true'
     continue-on-error: true
     permissions:
       contents: read

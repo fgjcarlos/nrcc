@@ -4,10 +4,17 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Reused by the release workflow to re-run the branch-required checks
+  # at the exact triggering SHA instead of trusting unrelated statuses
+  # (#884).
+  workflow_call:
 
-# Cancel previous runs on the same PR when new commits land
+# Cancel previous runs on the same PR when new commits land.
+# The group is workflow specific on purpose: a reusable call inherits the
+# caller workflow name, so a shared group would make the release run
+# cancel one of its own check workflows (#884).
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: pr-validation-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
@@ -31,6 +38,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # pin to commit (v7.0.0)
+        with:
+          # Pin the checkout to the exact triggering SHA so a reusable
+          # call always validates the candidate commit (#884).
+          ref: ${{ github.sha }}
 
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # pin to commit (v7.0.0)
@@ -83,6 +94,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # pin to commit (v7.0.0)
+        with:
+          # Pin the checkout to the exact triggering SHA so a reusable
+          # call always validates the candidate commit (#884).
+          ref: ${{ github.sha }}
 
       - name: Setup pnpm via corepack
         run: |
@@ -129,6 +144,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # pin to commit (v7.0.0)
+        with:
+          # Pin the checkout to the exact triggering SHA so a reusable
+          # call always validates the candidate commit (#884).
+          ref: ${{ github.sha }}
 
       - name: Set up Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # pin to commit (v7.0.0)
@@ -149,6 +168,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # pin to commit (v7.0.0)
+        with:
+          # Pin the checkout to the exact triggering SHA so a reusable
+          # call always validates the candidate commit (#884).
+          ref: ${{ github.sha }}
 
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # pin to commit (v7.0.0)
@@ -175,3 +198,23 @@ jobs:
           # Repo-wide gate, not a ratchet: the prior ~72 findings were cleaned
           # up in #396. Keep CI exit 0 = green.
           only-new-issues: false
+
+  # ── Release publication policy (#884) ─────────────────────────────────────
+  # The release workflow decides what may be published (strict semver,
+  # prerelease channels, optional DockerHub target). Its rules live in
+  # scripts/release/metadata.py and are asserted by a standard library
+  # test suite, so a change to the publication policy cannot pass CI
+  # unnoticed.
+  release-policy:
+    name: Release policy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # pin to commit (v7.0.0)
+        with:
+          # Pin the checkout to the exact triggering SHA so a reusable
+          # call always validates the candidate commit (#884).
+          ref: ${{ github.sha }}
+
+      - name: Run release policy tests
+        run: python3 scripts/release/test_workflow.py
