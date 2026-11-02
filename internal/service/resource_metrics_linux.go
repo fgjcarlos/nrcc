@@ -60,9 +60,9 @@ func collectHostResources() ResourceMetrics {
 	var info syscall.Sysinfo_t
 	if err := syscall.Sysinfo(&info); err == nil && info.Totalram > 0 {
 		metrics.MemoryAvailable = true
-		metrics.MemoryTotal = uint64(info.Totalram)
-		metrics.MemoryFree = uint64(info.Freeram)
-		metrics.MemoryUsed = uint64(info.Totalram - info.Freeram)
+		metrics.MemoryTotal = uint64(info.Totalram)               //nolint:unconvert // Sysinfo_t RAM counters are uint32 on ARMv7.
+		metrics.MemoryFree = uint64(info.Freeram)                 //nolint:unconvert // Sysinfo_t RAM counters are uint32 on ARMv7.
+		metrics.MemoryUsed = uint64(info.Totalram - info.Freeram) //nolint:unconvert // Sysinfo_t RAM counters are uint32 on ARMv7.
 	}
 	if total, free, used, ok := diskUsage("/"); ok {
 		metrics.DiskAvailable = true
