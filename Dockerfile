@@ -30,6 +30,10 @@ RUN pnpm build
 # Dependabot (docker ecosystem, weekly) bumps the digest when upstream
 # changes. See issue #593 and auditoria/devops-security.md §2.1.
 FROM golang:1.27.3-alpine@sha256:d200d2dd76b03a99b52651fd1325aff7dcd35422c35c01bac56571b0507f3deb AS go-builder
+# VERSION is embedded in the binary (main.Version) and mirrored by the
+# OCI org.opencontainers.image.version label in the runtime stage. The
+# default keeps local builds on the "dev" version.
+ARG VERSION=dev
 WORKDIR /build
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod \
@@ -38,15 +42,19 @@ COPY --from=builder /build/frontend/dist ./frontend/dist
 COPY . .
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o nrcc .
+    CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w -X main.Version=${VERSION}" -o nrcc .
 
 # ref: nodered/node-red:5.0.4-24-minimal — community image, pinned to
 # digest. Dependabot (docker ecosystem, weekly) bumps the digest when
 # upstream changes. See issue #593 and auditoria/devops-security.md §2.1.
 FROM nodered/node-red:5.0.9-24-minimal@sha256:db4067af09d4ecdf1ff1eb1cf80e3ec2ad0504c68d1d47a36c8e8b4ebb9fa055 AS runtime
+# Same build argument as the go-builder stage: the label must agree with
+# the version embedded in the binary.
+ARG VERSION=dev
 LABEL org.opencontainers.image.title="nrcc" \
       org.opencontainers.image.description="Node-RED Control Center — all-in-one" \
-      org.opencontainers.image.source="https://github.com/fgjcarlos/nrcc"
+      org.opencontainers.image.source="https://github.com/fgjcarlos/nrcc" \
+      org.opencontainers.image.version="${VERSION}"
 # Run the entrypoint as root so it can chown the runtime volume, then
 # drop to `node-red` inside the entrypoint script before exec'ing nrcc.
 # The nrcc binary itself does not perform privilege drop; see

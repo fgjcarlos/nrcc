@@ -6,9 +6,15 @@ on:
     branches: [main]
   schedule:
     - cron: "0 6 * * 1" # Monday 06:00 UTC
+  # Reused by the release workflow to re-run the security checks at the
+  # exact triggering SHA instead of trusting unrelated statuses (#884).
+  workflow_call:
 
+# The group is workflow specific on purpose: a reusable call inherits the
+# caller workflow name, so a shared group would make the release run
+# cancel one of its own check workflows (#884).
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: security-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
@@ -23,6 +29,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # pin to commit (v7.0.0)
+        with:
+          # Pin the checkout to the exact triggering SHA so a reusable
+          # call always validates the candidate commit (#884).
+          ref: ${{ github.sha }}
 
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # pin to commit (v7.0.0)
@@ -51,6 +61,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # pin to commit (v7.0.0)
+        with:
+          # Pin the checkout to the exact triggering SHA so a reusable
+          # call always validates the candidate commit (#884).
+          ref: ${{ github.sha }}
 
       - name: Setup pnpm via corepack
         run: |
@@ -78,6 +92,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # pin to commit (v7.0.0)
+        with:
+          # Pin the checkout to the exact triggering SHA so a reusable
+          # call always validates the candidate commit (#884).
+          ref: ${{ github.sha }}
 
       - name: Build image for scanning
         # Single Dockerfile now — same target as compose's local build.
@@ -96,6 +114,7 @@ jobs:
 
       - name: Upload SARIF to GitHub Security
         uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370  # pin to commit (v4.38.2)
+        # Reusable calls retain the triggering event (push or dispatch).
         if: always()
         with:
           sarif_file: trivy-results.sarif

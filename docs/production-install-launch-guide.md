@@ -1,242 +1,222 @@
-# Production installation and launch guide
+# Production install and launch (Linux, Docker-first)
 
-## Goal
+nrcc ships in two supported production forms, both built from the same source
+and carrying the same version:
 
-Deploy the `nrcc` bootstrap installer so that `https://get.nrcc.dev/install.sh` is served via GitHub Pages and the following end-to-end flow works:
+| Form | Use it when | Version is visible in |
+| --- | --- | --- |
+| Container image (recommended) | You run the canonical stack | `org.opencontainers.image.version` label, startup banner |
+| Static Linux binary | You already own the host stack | `go version -m <binary>`, startup banner |
 
-```bash
-curl -fsSL https://get.nrcc.dev/install.sh | sh
-sudo nrcc install
-```
+There is **no `nrcc install` command and no `nrcc --version` flag**. The `nrcc`
+binary is a server-only process (see [ADR 0003 — Docker-first](../adr/0003-docker-first-one-stack-per-node-red.md)),
+and the project is Linux-only at compile time (see [ADR 0004 — Linux-only build](../adr/0004-linux-only-build.md)).
+This guide replaces the older bootstrap-installer checklist, which described a
+CLI installer and Darwin/Windows binaries that the project does not ship.
 
-## Prerequisites
-
-- Admin access to the `fgjcarlos/nrcc` repository.
-- Access to GitHub Pages for the repository.
-- Access to the `nrcc.dev` DNS provider.
-- Confirm that the following files already exist on the published branch:
-  - `docs/index.html`
-  - `docs/install.sh`
-  - `docs/CNAME`
-  - `.github/workflows/release.yml`
-- A Linux or macOS host available to validate the final installation.
-- `curl` available on the test machine.
-
-## GitHub Pages checklist
-
-1. Go to `GitHub → fgjcarlos/nrcc → Settings → Pages`.
-2. Under `Build and deployment`, select:
-   - `Source`: `Deploy from a branch`
-   - `Branch`: `main`
-   - `Folder`: `/docs`
-3. Save the configuration.
-4. Confirm that GitHub detects the custom domain `get.nrcc.dev`.
-5. Wait for Pages to publish the site.
-6. Verify that the Pages URL responds before validating the final custom domain.
-
-Notes:
-
-- `docs/CNAME` must contain exactly `get.nrcc.dev`.
-- If Pages shows domain warnings, they normally disappear once DNS has propagated correctly.
-
-## DNS and CNAME checklist
-
-1. Go to the `nrcc.dev` DNS control panel.
-2. Create or update the record:
-
-```dns
-Type:        CNAME
-Name:        get
-Destination: fgjcarlos.github.io
-```
-
-3. Remove any conflicting records for `get.nrcc.dev` (duplicate `A`, `AAAA`, or `CNAME` records).
-4. Wait for DNS propagation.
-5. Verify resolution:
+## Quick path — container image (recommended)
 
 ```bash
-dig +short get.nrcc.dev
-dig +short CNAME get.nrcc.dev
+git clone https://github.com/fgjcarlos/nrcc.git
+cd nrcc
+printf 'NRCC_ENCRYPTION_KEY=%s\n' "$(openssl rand -hex 32)" > .env
+docker compose up -d --build
 ```
 
-Expected result:
+Then open:
 
-- `dig +short CNAME get.nrcc.dev` should return `fgjcarlos.github.io.` or equivalent.
-- Full resolution may take several minutes depending on TTL and DNS provider.
+- nrcc UI and API — <http://localhost:3001>
+- Node-RED editor — <http://localhost:1880>
+- Health probe — <http://localhost:3001/healthz> (returns `200`)
 
-## Release / test tag checklist
+Ports are bound to `127.0.0.1` by default. Change `NRCC_HOST_PORT` /
+`NODE_RED_HOST_PORT` (or the port bindings in `docker-compose.yml`) to expose
+them elsewhere.
 
-The `.github/workflows/release.yml` workflow runs on push of `v*` tags.
+`NRCC_ENCRYPTION_KEY` is mandatory — Compose refuses to start without it, so
+encrypted environment variables are never stored in plaintext. `JWT_SECRET` is
+optional; when it is absent the container generates and persists one under
+`/data`.
 
-1. Choose a test version, for example `v0.1.0` or the next available version.
-2. Create the annotated tag locally:
+### Bootstrap convenience script
+
+`docs/install.sh` in the repository clones a revision and runs
+`docker compose up -d --build`:
 
 ```bash
-git tag -a v0.1.0 -m "Test release v0.1.0"
+curl -fsSL https://get.nrcc.dev/install.sh | sh   # when the custom domain is published
 ```
 
-3. Push the tag:
+Treat it as a convenience wrapper around the Compose path above, not as a
+supported installer: it needs Git and a reachable Docker daemon, and the
+`get.nrcc.dev` DNS/Pages host may not be live in every environment.
+
+## Quick path — static Linux binary
 
 ```bash
-git push origin v0.1.0
+# 1. download and check the artifact
+curl -fsSLO https://github.com/fgjcarlos/nrcc/releases/download/v1.2.3/nrcc-linux-amd64
+curl -fsSLO https://github.com/fgjcarlos/nrcc/releases/download/v1.2.3/nrcc-linux-amd64.sha256
+# the sidecar records the digest under the normalized file name "nrcc",
+# so compare the digest directly (or check it from a directory that
+# contains a file named "nrcc")
+cat nrcc-linux-amd64.sha256
+sha256sum nrcc-linux-amd64   # must print the same digest
+
+# 2. install it into a bin directory on PATH
+sudo install -m 0755 nrcc-linux-amd64 /usr/local/bin/nrcc
+
+# 3. run it with isolated state
+sudo install -d -m 0750 /var/lib/nrcc
+sudo env DATA_DIR=/var/lib/nrcc PORT=3001 NRCC_MANAGE_NODE_RED=false \
+  /usr/local/bin/nrcc
 ```
 
-4. Go to `GitHub → Actions` and confirm the `Release` workflow completes successfully.
-5. Go to `GitHub → Releases` and verify that the release exists for that tag.
-6. Confirm the release attaches at least:
-   - `nrcc-linux-amd64`
-   - `nrcc-linux-arm64`
-   - `nrcc-linux-armv7`
-   - `nrcc-darwin-amd64`
-   - `nrcc-darwin-arm64`
-   - `nrcc-windows-amd64.exe`
-   - `SHA256SUMS`
-   - `*.sha256`
+The startup banner prints the version, the listen port and the data directory:
 
-## Installer and `nrcc install` validation checklist
+```
+┌─ nrcc ─────────────────────────────┐
+│ Version: v1.2.3                    │
+│ Listening on: :3001                │
+│ Data directory: /var/lib/nrcc      │
+└────────────────────────────────────┘
+```
 
-### Remote bootstrap validation
+`NRCC_MANAGE_NODE_RED=false` disables the managed Node-RED child process, which
+is what you want when Node-RED is provided by another supervisor. Leave it
+enabled (the default) only when `node-red` is on `PATH`.
 
-1. Confirm the published script responds:
+## What a release publishes
+
+| Artifact | Target | Notes |
+| --- | --- | --- |
+| `nrcc-linux-amd64` | `linux/amd64` | static (`CGO_ENABLED=0`) |
+| `nrcc-linux-arm64` | `linux/arm64` | static (`CGO_ENABLED=0`) |
+| `nrcc-linux-armv7` | `linux/arm` v7 | static (`CGO_ENABLED=0`, `GOARM=7`) |
+| `SHA256SUMS` | — | digest manifest over the three binaries |
+| `nrcc-linux-<arch>.sha256` | — | per-binary sidecar using the normalized `nrcc` filename |
+
+No Darwin or Windows binaries are published: the codebase uses Linux-only
+syscalls, so those targets cannot compile.
+
+## Verify a downloaded release
+
+1. Check the manifest and the sidecars against the bytes on disk:
+
+   ```bash
+   # the manifest names the published files, so it can be checked directly
+   sha256sum -c SHA256SUMS            # add --ignore-missing for a partial download
+   ```
+
+   Each sidecar names the normalized file `nrcc` (the convention the install
+   scripts rely on), so its digest is checked either against a file named
+   `nrcc` or by comparing the two digest strings directly:
+
+   ```bash
+   cat nrcc-linux-amd64.sha256        # <digest>  nrcc
+   sha256sum nrcc-linux-amd64          # must print the same digest
+   ```
+
+2. Check the version and the target embedded in the binary:
+
+   ```bash
+   go version -m /usr/local/bin/nrcc
+   ```
+
+   The output must show `GOOS=linux`, the expected `GOARCH` (`GOARM=7` for the
+   `armv7` build), `CGO_ENABLED=0`, and the version in the build flags:
+
+   ```
+   build   -ldflags="-s -w -X main.Version=v1.2.3 -extldflags=-static"
+   build   CGO_ENABLED=0
+   build   GOARCH=amd64
+   build   GOOS=linux
+   ```
+
+3. Start the binary and confirm the banner and the health endpoint (see the
+   Quick path above).
+
+## Package and verify locally
+
+Both scripts are self-contained and take the version and the output directory:
 
 ```bash
-curl -fsSL https://get.nrcc.dev/install.sh | sed -n '1,20p'
+# build the three Linux artifacts plus SHA256SUMS and the sidecars
+scripts/release/package.sh v1.2.3 dist
+
+# verify checksums, embedded build metadata and an isolated install/start
+scripts/release/verify.sh v1.2.3 dist
 ```
 
-2. Validate installation on a clean or controlled machine:
+`package.sh` reuses an existing `frontend/dist` and builds it with `pnpm` when
+it is missing (set `NRCC_SKIP_FRONTEND_BUILD=1` to fail instead). `verify.sh`
+re-computes the checksums, reads the Go build metadata out of every binary,
+installs the native artifact into a temporary directory, starts an isolated
+server, probes `/healthz`, checks the banner, and then removes the temporary
+state and stops the process.
+
+The focused test suite for both scripts is standard-library only:
 
 ```bash
-curl -fsSL https://get.nrcc.dev/install.sh | sh
+python3 scripts/release/test_package.py
 ```
 
-3. Confirm the binary was installed:
+## Docker image versioning
+
+The image build takes the version as a build argument that defaults to `dev`:
 
 ```bash
-which nrcc
-nrcc --version
+docker build --build-arg VERSION=v1.2.3 -t nrcc:1.2.3 .
 ```
 
-4. Validate pinned version:
+The same value is used twice and the two must agree:
+
+- embedded in the binary — `-X main.Version=${VERSION}`;
+- published as the OCI label — `org.opencontainers.image.version="${VERSION}"`.
+
+Inspect the label of a built image with:
 
 ```bash
-NRCC_VERSION=v0.1.0 curl -fsSL https://get.nrcc.dev/install.sh | sh
-nrcc --version
+docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.version" }}' nrcc:1.2.3
 ```
 
-### `nrcc install` validation
+## Operator checklist
 
-1. Run:
+- [ ] `NRCC_ENCRYPTION_KEY` is set before `docker compose up`.
+- [ ] The stack is reachable on `http://localhost:3001` and `/healthz` returns `200`.
+- [ ] Node-RED is reachable on `http://localhost:1880`.
+- [ ] The persistent `/data` volume is backed up (it holds the settings, users and secrets).
+- [ ] For the binary path: the digest in `SHA256SUMS` and in the `*.sha256` sidecar matches the installed artifact.
+- [ ] For the binary path: `go version -m` reports the expected version and target.
+- [ ] The startup banner reports the version you intended to deploy.
 
-```bash
-sudo nrcc install
-```
+## Troubleshooting
 
-2. Confirm the service is installed and started.
+### The checksum does not match
 
-   On a clean Linux VM, validate each Node-RED mode:
-   - `native`: if `node` or `npm` are missing, the installer must install them before running `npm install -g node-red`.
-   - `docker`: if `docker` is missing, the installer must install Docker and verify `docker info` before creating the Node-RED container.
-   - `skip`: must not install Node-RED or any Node-RED-specific dependencies.
-   - `--with-portless`: if Portless is enabled and `node`/`npm` are missing, must set up Node.js/npm before installing Portless.
+Re-download the artifact: the manifest, the sidecar and the binary must come
+from the same release. Confirm the sidecar carries the digest under the
+normalized `nrcc` filename and that the digest was compared against the file
+you actually installed.
 
-3. Verify status:
+### `go version -m` reports a different version
 
-```bash
-systemctl status nrcc
-```
+The binary was rebuilt locally, or the wrong artifact was downloaded. Compare
+`-X main.Version=…` in the build flags with the release tag you expect.
 
-4. Open `http://localhost:3001`.
-5. Complete the initial admin user setup.
+### The binary exits immediately
 
-If you are not using `systemd`, verify at minimum that the downloaded binary starts and that the next step shown by the installer is consistent with your target platform.
+Check that `DATA_DIR` exists and is writable, that `PORT` is free, and that
+`node-red` is on `PATH` unless `NRCC_MANAGE_NODE_RED=false` is set. The banner
+and any error are written to standard output.
 
-## Verifying that `get.nrcc.dev` works
+### The image label and the binary disagree
 
-Use these checks in order:
+The image was built without `--build-arg VERSION=…` (or with a different
+value). Rebuild it with the argument and re-check the label and the banner.
 
-1. DNS:
+## Next steps
 
-```bash
-dig +short CNAME get.nrcc.dev
-```
-
-2. HTTP response from the site:
-
-```bash
-curl -I https://get.nrcc.dev/
-```
-
-3. Installer response:
-
-```bash
-curl -I https://get.nrcc.dev/install.sh
-```
-
-4. Expected installer content:
-
-```bash
-curl -fsSL https://get.nrcc.dev/install.sh | grep 'REPO="fgjcarlos/nrcc"'
-```
-
-5. End-to-end flow:
-
-```bash
-curl -fsSL https://get.nrcc.dev/install.sh | sh
-sudo nrcc install
-```
-
-Expected results:
-
-- `https://get.nrcc.dev/` serves the installation landing page.
-- `https://get.nrcc.dev/install.sh` returns the correct shell script.
-- The installer resolves the latest release from GitHub and downloads the matching binary.
-
-## Basic troubleshooting
-
-### GitHub Pages is not publishing
-
-- Check `Settings → Pages` and confirm `main + /docs`.
-- Confirm that `docs/index.html` exists on the published branch.
-- Confirm that `docs/CNAME` contains exactly `get.nrcc.dev`.
-- Wait a few minutes and retry; Pages does not always update immediately.
-
-### `get.nrcc.dev` does not resolve or resolves incorrectly
-
-- Verify the record is `CNAME get → fgjcarlos.github.io`.
-- Remove duplicate or conflicting records for the `get` subdomain.
-- Check propagation with `dig` from more than one network if needed.
-
-### `curl https://get.nrcc.dev/install.sh` returns 404
-
-- Confirm that GitHub Pages is publishing the `/docs` folder.
-- Confirm the file is named exactly `docs/install.sh`.
-- Confirm the Pages deployment has completed.
-
-### Installer cannot find the latest version
-
-- Verify that a published GitHub Release exists.
-- Verify the tag follows the `v*` pattern to trigger the workflow.
-- Test with `NRCC_VERSION=<tag>` to isolate whether the issue is with `latest` resolution.
-
-### Installer fails checksum verification
-
-- Verify the release includes `*.sha256` and `SHA256SUMS` files.
-- Confirm the `.sha256` sidecars point to the normalised `nrcc` filename expected by the script.
-
-### `sudo nrcc install` fails
-
-- Check permissions, host dependencies, and whether `systemd` is available.
-- Run `nrcc --help` and `nrcc install --help` to review available flags.
-- Manually verify the downloaded binary runs before attempting service installation.
-
-## Next steps after validation
-
-1. Create the real launch release if the test was successful.
-2. Update the example version in documentation if needed.
-3. Add validation of `get.nrcc.dev/install.sh` to the operational release checklist.
-4. Consider an automated post-release check to verify:
-   - `https://get.nrcc.dev/`
-   - `https://get.nrcc.dev/install.sh`
-   - installation with `NRCC_VERSION=<tag>`
-
-> Reminder for the project owner: this rollout guide assumes the operator is doing a self-hosted install of a beta release. There is no external "official announcement" planned for beta hardening; this document is the operator-facing checklist, not a release-readiness declaration.
+1. Publish the release and let the release workflow attach the artifacts above.
+2. Deploy through the Compose path for the canonical stack.
+3. Keep this guide aligned with the ADRs when the deployment model changes.
