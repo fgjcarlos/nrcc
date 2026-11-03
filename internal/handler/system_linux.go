@@ -14,5 +14,5 @@ func getSystemStats() (uptime uint64, memTotal, memFree uint64) {
 		return 0, 0, 0
 	}
 	// #nosec G115 -- uptime is non-negative since boot; RAM counters are unsigned on all Linux architectures.
-	return uint64(sysinfo.Uptime), uint64(sysinfo.Totalram), uint64(sysinfo.Freeram)
+	return uint64(sysinfo.Uptime), uint64(sysinfo.Totalram), uint64(sysinfo.Freeram) //nolint:unconvert // Sysinfo_t RAM counters are uint32 on ARMv7.
 }
