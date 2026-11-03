@@ -69,6 +69,16 @@ One stack = one NRCC + one Node-RED + one persistent volume. Distinct host ports
 
 ### 1. Bring up the stack
 
+For a ready-to-use install from the latest published release, run:
+
+```sh
+curl -fsSL https://get.nrcc.dev/install.sh | sh
+```
+
+The installer prepares the encryption key, starts the stack and waits until it is ready. It also supports explicit versions; see the [production install guide](docs/production-install-launch-guide.md).
+
+To configure the stack manually:
+
 ```bash
 git clone https://github.com/fgjcarlos/nrcc.git
 cd nrcc
