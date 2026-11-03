@@ -1,0 +1,50 @@
+# Issue 885 — make the documented shell installation boot a ready stack
+Branch: `fix/885-installer-boot-ready`; base: `origin/main` (`b124209`); delivery: single PR opened by the parent after verification; forecast: ~450 authored lines.
+Checks: POSIX-shell behavior test (Go), `go test ./...`, shell syntax check under `dash` and `bash`, native review per work-unit when due. No publication, no tag, no release authorized.
+
+## Specs
+S1. "Use a portable POSIX shell script or consistently require/invoke Bash."
+S2. "Generate or require real encryption/signing material securely before Compose interpolation; preserve existing operator configuration."
+S3. "Pass version selection to the installing process and prefer an explicit release contract."
+S4. "Wait for health/readiness and provide useful failure logs."
+S5. "Test the exact public command on a clean host without relying on undeclared shell/env prerequisites."
+
+### Observed defects (verbatim from issue #885)
+- "docs/install.sh: 6: set: Illegal option -o pipefail"
+- "the script does not create .env/key before docker compose up, and Compose requires NRCC_ENCRYPTION_KEY"
+- "NRCC_VERSION=... curl ... | sh assigns the variable to curl only"
+- "default installation uses main and does not wait for readiness"
+
+### Pinned contract (the behavior the worker implements)
+- Script shell: `#!/bin/sh` with `set -eu` only. No `set -o pipefail`, no bashisms (`[[`, `local` arrays, `source`, process substitution).
+- Public command (unchanged entry point, working contract):
+  - latest published release: `curl -fsSL https://get.nrcc.dev/install.sh | sh`
+  - explicit version: `curl -fsSL https://get.nrcc.dev/install.sh | sh -s -- v1.2.3`
+  - explicit version via environment: `NRCC_VERSION=v1.2.3 sh -c "$(curl -fsSL https://get.nrcc.dev/install.sh)"`
+  - `NRCC_VERSION=... curl … | sh` is NOT a supported form (the assignment binds to `curl`), and the docs must not present it.
+- Version resolution order: positional argument → `NRCC_VERSION` environment → latest published release tag → `main` with a visible warning. The default must resolve to a release tag, not the moving `main` branch.
+- Encryption material (S2), resolved before `docker compose up`:
+  - `NRCC_ENCRYPTION_KEY` already exported in the environment wins and is reused as-is;
+  - an existing `$INSTALL_DIR/.env` that already defines `NRCC_ENCRYPTION_KEY` is preserved verbatim (other lines in that file are preserved too);
+  - otherwise generate 32 random bytes as 64 hex characters (`openssl rand -hex 32`, fallback `/dev/urandom` + `od`/`tr`) and write it into `$INSTALL_DIR/.env` (file created if absent) with mode `0600`;
+  - the key value must never be printed to stdout or stderr.
+- Readiness (S4): after `docker compose up -d --build` succeeds, wait until the stack reports healthy. Container health is read with `docker inspect --format '{{.State.Health.Status}}'` on the container id reported by `docker compose ps -q`; when no health status is exposed, fall back to probing `http://127.0.0.1:${NRCC_HOST_PORT:-3001}/healthz` with `curl` when available. Timeout is `NRCC_READY_TIMEOUT` seconds (default 300).
+- Failure diagnostics (S4): when `docker compose up` fails or readiness times out, the script prints `docker compose ps` and `docker compose logs --tail=50` and exits non-zero.
+- Preflight (S1/S5): `docker` and `git` must exist and the Docker daemon must be reachable; the script must not assume any other shell or environment prerequisite.
+- S5 test: a deterministic automated test runs the real `docs/install.sh` under `/bin/sh` (dash on Ubuntu CI) and under `bash`, in a clean environment, with stub `git`, `docker`, and `curl` executables on `PATH`. It asserts: successful exit; `.env` created with a 64-hex-character `NRCC_ENCRYPTION_KEY` and mode `0600`; an existing `.env` key preserved; `NRCC_VERSION` reaching the clone as the requested ref; the default resolving to a release tag rather than `main`; the key never appearing in the installer output; `docker compose up` failure producing non-zero exit plus `docker compose logs` output; readiness timeout producing non-zero exit plus diagnostics.
+
+## Tasks
+- T1 [S1,S2,S3,S4,S5] route: delegated writer (`luna-6`, one behavior unit: installer + its test + the docs that describe it); commit: `fix(installer): boot a ready stack from the documented shell command`. Rewrite `docs/install.sh` as POSIX `sh` per the pinned contract; add the Go behavior test package `internal/installer`; update `docs/production-install-launch-guide.md`, `README.md` and `CONTRIBUTING.md` to the supported command forms. Risk: item 5 (installation/release environment) and item 2 (secret material handling).
+- T2 [S1-S5] route: inline integration plus native review when due; commit: none (tracking closeout only). Run the focused test, the Go suite, `dash -n`/`bash -n` syntax checks, reconcile evidence against every `S#`, open the pull request, and close the feature document.
+
+### Delivery strategy
+Single pull request (the user asked to open the PR at the end of the work). Source slice boundary: `origin/main`..`ab9d778` — three commits, 502 authored changed lines (`fix(installer)` 153, `test(installer)` 287, `docs(installer)` 62). The slice is slightly above the ~400 authored-line advisory budget because the installer behavior and its behavior test are one unit and neither may be split from the other; the repository precedent (#884) accepted a larger single-PR slice with an explicit rationale. No chained pull request and no `size:exception` label are used.
+
+## Log
+L1. User: "Realiza un plan para resolver la issue #885 y delega en luna-6 las tareas, al finalizar abre PR"
+L2. Issue #885 is open, labeled `status:approved`, `bug`, `area: devops`; P1, required before the first public release. Acceptance criteria copied verbatim above; observed defects copied verbatim above.
+L3. Baseline: `origin/main` at `b124209` (merge of the #884 release-packaging PR). Branch `fix/885-installer-boot-ready` created from that commit; no other open PR in the repository.
+L4. Delegation target: no `luna-6` agent existed, so a project-scoped agent definition was created at `.pi/agents/luna-6.md` (model `openai-codex/gpt-6-luna`, thinking high, writer tools). It is a local agent profile and stays untracked, outside the pull request.
+L5. Verification budget: Go test package `internal/installer` (new) plus the existing Go suite; no Docker daemon is required for the focused test because `docker`, `git` and `curl` are stubbed. The real Docker acceptance script (`scripts/acceptance/docker-stacks.sh`) is not extended: the installer contract is a host-shell contract, and the stack behavior it boots is already covered there.
+L6. Repository conventions: all artifacts in English (AGENTS.md); commits use Conventional Commit messages; one work-unit per commit under the ~400 authored-line review budget.
+L7. Parent integration of the delegated unit. Defects found in the delivered implementation and corrected: (a) the re-install path copied the new clone over the previous checkout, merging Git state and leaving stale files in the Docker build context — it now swaps the directory (previous checkout replaced, operator `.env` restored with `cp -p`) and refuses a directory that is not an nrcc install (no `.env`/`docker-compose.yml`) instead of overwriting it; (b) an existing but empty `NRCC_ENCRYPTION_KEY` was preserved, and Compose refuses to start with an empty value (`:?` form) — it is now replaced by a generated key while every other `.env` line is preserved; (c) readiness now selects the first container id reported by `docker compose ps -q` instead of passing a multi-line id list to `docker inspect`. RED proof against the delivered implementation: `replaces_an_empty_existing_key` and `reinstall_replaces_the_checkout_and_keeps_the_operator_env` failed under `/bin/sh` and bash (`empty key kept: "OTHER=value\nNRCC_ENCRYPTION_KEY=\nLAST=line\n"`, `previous checkout was merged instead of replaced`); GREEN after the correction: 18/18 subtests pass. Baseline defect reproduction from the issue: `dash docs/install.sh` (origin/main) exits 2 with `set: Illegal option -o pipefail`, and the baseline script never prepares `.env` although `docker-compose.yml` requires `NRCC_ENCRYPTION_KEY` with the `:?` form. Toolchain: Go 1.27.0, `/bin/sh` → dash, shellcheck 0.11.0 clean (`shellcheck -s sh docs/install.sh`), `go vet ./internal/installer/` clean, `gofmt` clean, `go run ./tools/langscan .` → no findings. The repository-wide `golangci-lint` gate could not run locally: the installed binary was built with Go 1.26 and refuses the Go 1.27 module; CI runs it with Go 1.27.3.
