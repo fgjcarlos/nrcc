@@ -38,7 +38,7 @@ S5. "Test the exact public command on a clean host without relying on undeclared
 - T2 [S1-S5] route: inline integration plus native review when due; commit: none (tracking closeout only). Run the focused test, the Go suite, `dash -n`/`bash -n` syntax checks, reconcile evidence against every `S#`, open the pull request, and close the feature document.
 
 ### Delivery strategy
-Single pull request (the user asked to open the PR at the end of the work). Source slice boundary: `origin/main`..`ab9d778` — three commits, 502 authored changed lines (`fix(installer)` 153, `test(installer)` 287, `docs(installer)` 62). The slice is slightly above the ~400 authored-line advisory budget because the installer behavior and its behavior test are one unit and neither may be split from the other; the repository precedent (#884) accepted a larger single-PR slice with an explicit rationale. No chained pull request and no `size:exception` label are used.
+Single pull request (the user asked to open the PR at the end of the work). Final slice boundary: `origin/main`..`09135a2` — five commits, 554 authored changed lines (`fix(installer)` 153, `test(installer)` 287, `docs(installer)` 62, ODD tracking 52). The slice is above the ~400 authored-line advisory budget because the installer behavior and its behavior test are one unit and neither may be split from the other; the repository precedent (#884) accepted a larger single-PR slice with an explicit rationale. No chained pull request and no `size:exception` label are used. Delivered as PR #953 (`type:bug`).
 
 ## Log
 L1. User: "Realiza un plan para resolver la issue #885 y delega en luna-6 las tareas, al finalizar abre PR"
