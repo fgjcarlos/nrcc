@@ -73,6 +73,7 @@ func TestInstallScriptContract(t *testing.T) {
 					t.Fatalf("installer failed: %v\n%s", result.err, result.output)
 				}
 				path := filepath.Join(h.installDir, ".env")
+				//nolint:gosec // G304: the path is a test-controlled fixture.
 				got, err := os.ReadFile(path)
 				if err != nil {
 					t.Fatal(err)
@@ -413,6 +414,7 @@ func (h *harness) readLog() string {
 
 func assertKeyFile(t *testing.T, path string) {
 	t.Helper()
+	//nolint:gosec // G304: the path is a test-controlled fixture.
 	b, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
