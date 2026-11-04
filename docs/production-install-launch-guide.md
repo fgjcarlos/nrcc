@@ -83,7 +83,11 @@ lines before exiting non-zero.
 Running the installer again over an existing install replaces the checkout
 with the selected revision and keeps the operator's `.env`. A directory that
 is not an nrcc install is refused, so an unrelated `INSTALL_DIR` is never
-overwritten.
+overwritten. Reinstalls are only allowed when the directory carries the
+`.nrcc-install` marker written by the installer, or when you pass
+`NRCC_REPLACE_EXISTING=1` explicitly. If a reinstall fails before the new
+stack is ready, the previous checkout is kept as `<INSTALL_DIR>.previous.<pid>`
+and the installer prints the exact `rm`/`mv` command that rolls back to it.
 
 ## Quick path — static Linux binary
 

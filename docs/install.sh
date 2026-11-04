@@ -36,11 +36,18 @@ if [ -z "$VERSION" ]; then
 	fi
 fi
 
-# Re-installing over an existing nrcc install keeps the operator's .env and
-# replaces the checkout, so the new revision is never merged into the old one.
+# Re-installing over an existing nrcc install keeps the operator's .env (and
+# docker-compose.override.yml) and replaces the checkout, so the new revision
+# is never merged into the old one. The previous checkout is only deleted once
+# the replacement is verified ready, so a failed reinstall can be rolled back.
 if [ -d "$INSTALL_DIR" ]; then
 	if [ ! -f "$INSTALL_DIR/.env" ] || [ ! -f "$INSTALL_DIR/docker-compose.yml" ]; then
 		echo "Error: $INSTALL_DIR already exists and is not an nrcc install. Set INSTALL_DIR to a new path." >&2
+		exit 1
+	fi
+	if [ ! -f "$INSTALL_DIR/.nrcc-install" ] && [ "${NRCC_REPLACE_EXISTING:-0}" != "1" ]; then
+		echo "Error: $INSTALL_DIR has no .nrcc-install marker, so it was not created by this installer." >&2
+		echo "Refusing to replace it. Re-run with NRCC_REPLACE_EXISTING=1 to replace it anyway (everything except .env and docker-compose.override.yml is deleted)." >&2
 		exit 1
 	fi
 	CLONE_DIR="${INSTALL_DIR}.clone.$$"
@@ -50,11 +57,15 @@ if [ -d "$INSTALL_DIR" ]; then
 	mv "$INSTALL_DIR" "$PREVIOUS_DIR"
 	mv "$CLONE_DIR" "$INSTALL_DIR"
 	cp -p "$PREVIOUS_DIR/.env" "$INSTALL_DIR/.env"
-	rm -rf "$PREVIOUS_DIR"
+	if [ -f "$PREVIOUS_DIR/docker-compose.override.yml" ]; then
+		cp -p "$PREVIOUS_DIR/docker-compose.override.yml" "$INSTALL_DIR/docker-compose.override.yml"
+	fi
+	printf 'nrcc install\n' >"$INSTALL_DIR/.nrcc-install"
 else
 	echo "→ Cloning $REPO @ $VERSION into $INSTALL_DIR"
 	mkdir -p "$(dirname "$INSTALL_DIR")"
 	git clone --depth 1 --branch "$VERSION" "https://github.com/$REPO.git" "$INSTALL_DIR"
+	printf 'nrcc install\n' >"$INSTALL_DIR/.nrcc-install"
 fi
 
 cd "$INSTALL_DIR"
@@ -104,6 +115,12 @@ ensure_encryption_key() {
 		mv "$env_tmp" "$env_file"
 	else
 		touch "$env_file"
+		# The key must land on its own line: when the file does not end with a
+		# newline, append one first or the assignment merges into the previous
+		# value and Compose interpolation breaks.
+		if [ -s "$env_file" ] && [ -n "$(tail -c 1 "$env_file")" ]; then
+			printf '\n' >>"$env_file"
+		fi
 		printf 'NRCC_ENCRYPTION_KEY=%s\n' "$key" >>"$env_file"
 	fi
 	chmod 600 "$env_file"
@@ -114,24 +131,73 @@ if [ -z "${NRCC_ENCRYPTION_KEY:-}" ]; then
 	ensure_encryption_key .env
 fi
 
+# A failed reinstall keeps the previous checkout on disk until the replacement
+# is verified, so this hint can always recover the working install.
+restore_previous() {
+	if [ -n "${PREVIOUS_DIR:-}" ] && [ -d "$PREVIOUS_DIR" ]; then
+		echo "The previous checkout was kept at $PREVIOUS_DIR." >&2
+		echo "To roll back: rm -rf '$INSTALL_DIR' && mv '$PREVIOUS_DIR' '$INSTALL_DIR'" >&2
+	fi
+}
+
 echo "→ Building and starting stack"
 if ! docker compose up -d --build; then
+	restore_previous
 	docker compose ps || true
 	docker compose logs --tail=50 || true
 	exit 1
 fi
 
-# Report success only once the stack is ready: container health first, the
-# published health endpoint as fallback when no healthcheck is exposed.
+# Report success only once the stack is ready: every container's health first,
+# the published health endpoint as fallback when no healthcheck is exposed.
 READY_TIMEOUT="${NRCC_READY_TIMEOUT:-300}"
+case "$READY_TIMEOUT" in
+	''|*[!0-9]*)
+		echo "Error: NRCC_READY_TIMEOUT must be a number of seconds, got '$READY_TIMEOUT'." >&2
+		exit 1
+		;;
+esac
+
+# Aggregate health over every container Compose reports: unhealthy wins, then
+# all healthy, then anything still starting, and nohealth when no container
+# exposes a health status at all.
+compose_health() {
+	saw_status=0
+	all_healthy=1
+	# Container ids are word-split deliberately.
+	# shellcheck disable=SC2046
+	for id in $(docker compose ps -q 2>/dev/null); do
+		status=$(docker inspect --format '{{.State.Health.Status}}' "$id" 2>/dev/null || true)
+		case "$status" in
+			'')
+				continue
+				;;
+			unhealthy)
+				echo unhealthy
+				return 0
+				;;
+			healthy)
+				saw_status=1
+				;;
+			*)
+				saw_status=1
+				all_healthy=0
+				;;
+		esac
+	done
+	if [ "$saw_status" -eq 0 ]; then
+		echo nohealth
+	elif [ "$all_healthy" -eq 1 ]; then
+		echo healthy
+	else
+		echo pending
+	fi
+}
+
 ELAPSED=0
 READY=0
 while [ "$ELAPSED" -le "$READY_TIMEOUT" ]; do
-	CONTAINER_ID=$(docker compose ps -q 2>/dev/null | head -n 1)
-	STATUS=""
-	if [ -n "$CONTAINER_ID" ]; then
-		STATUS=$(docker inspect --format '{{.State.Health.Status}}' "$CONTAINER_ID" 2>/dev/null || true)
-	fi
+	STATUS=$(compose_health)
 	case "$STATUS" in
 		healthy)
 			READY=1
@@ -141,7 +207,7 @@ while [ "$ELAPSED" -le "$READY_TIMEOUT" ]; do
 			break
 			;;
 	esac
-	if [ -z "$STATUS" ] && command -v curl >/dev/null 2>&1 &&
+	if [ "$STATUS" = nohealth ] && command -v curl >/dev/null 2>&1 &&
 		curl -fsS "http://127.0.0.1:${NRCC_HOST_PORT:-3001}/healthz" >/dev/null 2>&1; then
 		READY=1
 		break
@@ -153,10 +219,16 @@ while [ "$ELAPSED" -le "$READY_TIMEOUT" ]; do
 	ELAPSED=$((ELAPSED + 1))
 done
 if [ "$READY" -ne 1 ]; then
+	restore_previous
 	echo "Error: nrcc did not become ready within ${READY_TIMEOUT} seconds." >&2
 	docker compose ps || true
 	docker compose logs --tail=50 || true
 	exit 1
+fi
+
+# The replacement is verified, so the previous checkout is no longer needed.
+if [ -n "${PREVIOUS_DIR:-}" ]; then
+	rm -rf "$PREVIOUS_DIR"
 fi
 
 echo ""

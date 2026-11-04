@@ -106,6 +106,118 @@ func TestInstallScriptContract(t *testing.T) {
 				if string(got) != "NRCC_ENCRYPTION_KEY=operator-secret\n" {
 					t.Fatalf(".env changed: %q", got)
 				}
+				leftovers, err := filepath.Glob(h.installDir + ".previous.*")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(leftovers) != 0 {
+					t.Fatalf("verified reinstall left previous checkouts behind: %v", leftovers)
+				}
+			})
+			t.Run("refuses to replace an unmarked directory", func(t *testing.T) {
+				h := newHarness(t, script, shell)
+				h.writeExistingInstall("OTHER=value\nNRCC_ENCRYPTION_KEY=operator-secret\n")
+				if err := os.Remove(filepath.Join(h.installDir, ".nrcc-install")); err != nil {
+					t.Fatal(err)
+				}
+				result := h.run(t, nil)
+				if result.err == nil {
+					t.Fatalf("expected refusal for an unmarked directory, got success:\n%s", result.output)
+				}
+				if !strings.Contains(result.output, ".nrcc-install") {
+					t.Fatalf("expected marker guidance in the refusal:\n%s", result.output)
+				}
+				got, err := os.ReadFile(filepath.Join(h.installDir, ".env"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if string(got) != "OTHER=value\nNRCC_ENCRYPTION_KEY=operator-secret\n" {
+					t.Fatalf("refused install still modified .env: %q", got)
+				}
+				if strings.Contains(h.readLog(), "git clone") {
+					t.Fatalf("refused install still cloned:\n%s", h.readLog())
+				}
+			})
+			t.Run("explicit consent replaces an unmarked directory", func(t *testing.T) {
+				h := newHarness(t, script, shell)
+				h.writeExistingInstall("NRCC_ENCRYPTION_KEY=operator-secret\n")
+				if err := os.Remove(filepath.Join(h.installDir, ".nrcc-install")); err != nil {
+					t.Fatal(err)
+				}
+				result := h.run(t, map[string]string{"NRCC_REPLACE_EXISTING": "1"})
+				if result.err != nil {
+					t.Fatalf("installer failed: %v\n%s", result.err, result.output)
+				}
+				got, err := os.ReadFile(filepath.Join(h.installDir, ".env"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if string(got) != "NRCC_ENCRYPTION_KEY=operator-secret\n" {
+					t.Fatalf(".env changed: %q", got)
+				}
+			})
+			t.Run("appends the key on a new line when .env lacks a trailing newline", func(t *testing.T) {
+				h := newHarness(t, script, shell)
+				h.writeExistingInstall("OTHER=value")
+				result := h.run(t, nil)
+				if result.err != nil {
+					t.Fatalf("installer failed: %v\n%s", result.err, result.output)
+				}
+				path := filepath.Join(h.installDir, ".env")
+				got, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !strings.Contains(string(got), "OTHER=value\n") {
+					t.Fatalf("previous value merged with the key assignment: %q", got)
+				}
+				assertKeyFile(t, path)
+			})
+			t.Run("compose failure retains the previous checkout for rollback", func(t *testing.T) {
+				h := newHarness(t, script, shell)
+				h.writeExistingInstall("NRCC_ENCRYPTION_KEY=operator-secret\n")
+				h.set("DOCKER_MODE", "up-fail")
+				result := h.run(t, nil)
+				if result.err == nil || !strings.Contains(result.output, "DIAGNOSTIC LOGS") {
+					t.Fatalf("expected failed exit and compose logs, got %v\n%s", result.err, result.output)
+				}
+				if !strings.Contains(result.output, "previous checkout was kept") {
+					t.Fatalf("expected rollback guidance:\n%s", result.output)
+				}
+				leftovers, err := filepath.Glob(h.installDir + ".previous.*")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(leftovers) != 1 {
+					t.Fatalf("previous checkout not retained exactly once: %v", leftovers)
+				}
+				if _, err := os.Stat(filepath.Join(leftovers[0], "docker-compose.yml")); err != nil {
+					t.Fatalf("retained checkout incomplete: %v", err)
+				}
+			})
+			t.Run("readiness timeout retains the previous checkout", func(t *testing.T) {
+				h := newHarness(t, script, shell)
+				h.writeExistingInstall("NRCC_ENCRYPTION_KEY=operator-secret\n")
+				h.set("DOCKER_MODE", "unhealthy")
+				result := h.run(t, map[string]string{"NRCC_READY_TIMEOUT": "0"})
+				if result.err == nil || !strings.Contains(result.output, "previous checkout was kept") {
+					t.Fatalf("expected failed exit with rollback guidance, got %v\n%s", result.err, result.output)
+				}
+			})
+			t.Run("rejects a non-numeric ready timeout", func(t *testing.T) {
+				h := newHarness(t, script, shell)
+				result := h.run(t, map[string]string{"NRCC_READY_TIMEOUT": "abc"})
+				if result.err == nil || !strings.Contains(result.output, "NRCC_READY_TIMEOUT") {
+					t.Fatalf("expected invalid timeout to be rejected, got %v\n%s", result.err, result.output)
+				}
+			})
+			t.Run("waits for every container to be healthy", func(t *testing.T) {
+				h := newHarness(t, script, shell)
+				h.set("DOCKER_MODE", "partial-health")
+				result := h.run(t, map[string]string{"NRCC_READY_TIMEOUT": "0"})
+				if result.err == nil || !strings.Contains(result.output, "DIAGNOSTIC LOGS") {
+					t.Fatalf("readiness accepted a stack with an unhealthy container:\n%s", result.output)
+				}
 			})
 			t.Run("positional version overrides environment", func(t *testing.T) {
 				h := newHarness(t, script, shell)
@@ -186,9 +298,9 @@ printf 'docker' >> "$CALL_LOG"; for arg do printf ' %s' "$arg" >> "$CALL_LOG"; d
 case "$1 $2" in
   'info ') exit 0;;
   'compose up') [ "${DOCKER_MODE:-}" != up-fail ] || exit 1;;
-  'compose ps') if [ "${3:-}" = -q ]; then echo container-id; else echo 'DIAGNOSTIC PS'; fi;;
+  'compose ps') if [ "${3:-}" = -q ]; then if [ "${DOCKER_MODE:-}" = partial-health ]; then echo id1; echo id2; else echo container-id; fi; else echo 'DIAGNOSTIC PS'; fi;;
   'compose logs') echo 'DIAGNOSTIC LOGS';;
-  inspect*) [ "${DOCKER_MODE:-}" = unhealthy ] && echo starting || echo healthy;;
+  inspect*) if [ "${DOCKER_MODE:-}" = partial-health ]; then [ "$4" = id2 ] && echo starting || echo healthy; else [ "${DOCKER_MODE:-}" = unhealthy ] && echo starting || echo healthy; fi;;
 esac
 `)
 	h.writeStub("curl", `#!/bin/sh
@@ -198,8 +310,8 @@ case "$*" in *releases/latest*) echo '{"tag_name":"v9.8.7"}';; *healthz*) [ "${D
 }
 
 // writeExistingInstall prepares a previous nrcc install so the re-install path
-// is exercised: an operator .env plus the compose file that identifies the
-// directory as an nrcc install.
+// is exercised: an operator .env plus the compose file and the ownership
+// marker written by a previous run of this installer.
 func (h *harness) writeExistingInstall(env string) {
 	h.t.Helper()
 	if err := os.MkdirAll(h.installDir, 0700); err != nil {
@@ -209,6 +321,9 @@ func (h *harness) writeExistingInstall(env string) {
 		h.t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(h.installDir, "docker-compose.yml"), []byte("services: {}\n"), 0600); err != nil {
+		h.t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(h.installDir, ".nrcc-install"), []byte("nrcc install\n"), 0600); err != nil {
 		h.t.Fatal(err)
 	}
 }
