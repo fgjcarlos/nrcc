@@ -38,8 +38,10 @@ fi
 
 # Re-installing over an existing nrcc install keeps the operator's .env (and
 # docker-compose.override.yml) and replaces the checkout, so the new revision
-# is never merged into the old one. The previous checkout is only deleted once
-# the replacement is verified ready, so a failed reinstall can be rolled back.
+# is never merged into the old one. The checkout is never deleted: a failed
+# reinstall rolls back from the .previous.$$ copy, and a verified one is kept
+# at INSTALL_DIR.previous for the operator to delete (a preserved compose
+# override may bind-mount data beneath it).
 if [ -d "$INSTALL_DIR" ]; then
 	if [ ! -f "$INSTALL_DIR/.env" ] || [ ! -f "$INSTALL_DIR/docker-compose.yml" ]; then
 		echo "Error: $INSTALL_DIR already exists and is not an nrcc install. Set INSTALL_DIR to a new path." >&2
@@ -47,7 +49,7 @@ if [ -d "$INSTALL_DIR" ]; then
 	fi
 	if [ ! -f "$INSTALL_DIR/.nrcc-install" ] && [ "${NRCC_REPLACE_EXISTING:-0}" != "1" ]; then
 		echo "Error: $INSTALL_DIR has no .nrcc-install marker, so it was not created by this installer." >&2
-		echo "Refusing to replace it. Re-run with NRCC_REPLACE_EXISTING=1 to replace it anyway (everything except .env and docker-compose.override.yml is deleted)." >&2
+		echo "Refusing to replace it. Re-run with NRCC_REPLACE_EXISTING=1 to replace it anyway (the replaced checkout is kept at ${INSTALL_DIR}.previous for rollback)." >&2
 		exit 1
 	fi
 	CLONE_DIR="${INSTALL_DIR}.clone.$$"
@@ -158,15 +160,23 @@ case "$READY_TIMEOUT" in
 		;;
 esac
 
-# Aggregate health over every container Compose reports: unhealthy wins, then
-# all healthy, then anything still starting, and nohealth when no container
-# exposes a health status at all.
+# Aggregate health over every container Compose reports: a stopped container
+# fails immediately (an exited service must not look ready just because it is
+# invisible to a running-only listing), then unhealthy wins, then all healthy,
+# then anything still starting, and nohealth when no container exposes a
+# health status at all.
 compose_health() {
 	saw_status=0
 	all_healthy=1
-	# Container ids are word-split deliberately.
+	# Container ids are word-split deliberately. --all includes stopped
+	# containers, which a plain `ps -q` listing would hide.
 	# shellcheck disable=SC2046
-	for id in $(docker compose ps -q 2>/dev/null); do
+	for id in $(docker compose ps -q --all 2>/dev/null); do
+		state=$(docker inspect --format '{{.State.Status}}' "$id" 2>/dev/null || true)
+		if [ "$state" != running ]; then
+			echo unhealthy
+			return 0
+		fi
 		status=$(docker inspect --format '{{.State.Health.Status}}' "$id" 2>/dev/null || true)
 		case "$status" in
 			'')
@@ -208,7 +218,7 @@ while [ "$ELAPSED" -le "$READY_TIMEOUT" ]; do
 			;;
 	esac
 	if [ "$STATUS" = nohealth ] && command -v curl >/dev/null 2>&1 &&
-		curl -fsS "http://127.0.0.1:${NRCC_HOST_PORT:-3001}/healthz" >/dev/null 2>&1; then
+		curl --connect-timeout 5 --max-time 10 -fsS "http://127.0.0.1:${NRCC_HOST_PORT:-3001}/healthz" >/dev/null 2>&1; then
 		READY=1
 		break
 	fi
@@ -226,9 +236,15 @@ if [ "$READY" -ne 1 ]; then
 	exit 1
 fi
 
-# The replacement is verified, so the previous checkout is no longer needed.
-if [ -n "${PREVIOUS_DIR:-}" ]; then
-	rm -rf "$PREVIOUS_DIR"
+# The replacement is verified. The previous checkout is not deleted: readiness
+# alone cannot prove the operator no longer needs it (a preserved compose
+# override may bind-mount a data directory beneath the old checkout that the
+# new checkout lacks). It moves under a stable name, replacing only older
+# .previous copies created by this installer.
+if [ -n "${PREVIOUS_DIR:-}" ] && [ -d "$PREVIOUS_DIR" ]; then
+	rm -rf "${INSTALL_DIR}.previous"
+	mv "$PREVIOUS_DIR" "${INSTALL_DIR}.previous"
+	echo "Previous checkout kept at ${INSTALL_DIR}.previous; delete it once the upgrade is confirmed."
 fi
 
 echo ""
