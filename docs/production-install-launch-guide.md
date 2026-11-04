@@ -38,18 +38,56 @@ encrypted environment variables are never stored in plaintext. `JWT_SECRET` is
 optional; when it is absent the container generates and persists one under
 `/data`.
 
-### Bootstrap convenience script
+### Bootstrap installer
 
-`docs/install.sh` in the repository clones a revision and runs
-`docker compose up -d --build`:
+The canonical POSIX shell installer clones the selected revision, prepares
+`NRCC_ENCRYPTION_KEY` before Compose starts, and waits for the stack to become
+healthy (or for `/healthz` to respond when container health is unavailable).
+It requires Git, Docker, and a reachable Docker daemon.
 
-```bash
-curl -fsSL https://get.nrcc.dev/install.sh | sh   # when the custom domain is published
+Supported command forms:
+
+```sh
+# Latest published release
+curl -fsSL https://get.nrcc.dev/install.sh | sh
+
+# Explicit version as a positional argument
+curl -fsSL https://get.nrcc.dev/install.sh | sh -s -- v1.2.3
+
+# Explicit version through the installer process environment
+NRCC_VERSION=v1.2.3 sh -c "$(curl -fsSL https://get.nrcc.dev/install.sh)"
 ```
 
-Treat it as a convenience wrapper around the Compose path above, not as a
-supported installer: it needs Git and a reachable Docker daemon, and the
-`get.nrcc.dev` DNS/Pages host may not be live in every environment.
+`NRCC_VERSION=… curl … | sh` is **not** supported: the assignment binds to
+`curl`, not to the installer. The custom domain is published from GitHub
+Pages; when it is not live yet, fetch the same script from the repository:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/fgjcarlos/nrcc/main/docs/install.sh | sh
+```
+
+Version selection is positional argument, then `NRCC_VERSION`, then the latest
+published GitHub release for `NRCC_REPO` (default `fgjcarlos/nrcc`). If that
+release cannot be resolved, the installer visibly warns and falls back to
+`main`. `NRCC_REPO` and `INSTALL_DIR` can be overridden.
+
+An exported `NRCC_ENCRYPTION_KEY` is used as-is. Otherwise an existing
+`$INSTALL_DIR/.env` key and all other lines are preserved; if no key exists,
+the installer creates a 32-byte random key (64 hexadecimal characters) in
+`.env` with mode `0600`. An existing but empty key is replaced, because
+Compose refuses to start without one. After `docker compose up -d --build`,
+it waits up to `NRCC_READY_TIMEOUT` seconds (default 300). Compose startup
+failures and readiness timeouts print `docker compose ps` and the last 50 log
+lines before exiting non-zero.
+
+Running the installer again over an existing install replaces the checkout
+with the selected revision and keeps the operator's `.env`. A directory that
+is not an nrcc install is refused, so an unrelated `INSTALL_DIR` is never
+overwritten. Reinstalls are only allowed when the directory carries the
+`.nrcc-install` marker written by the installer, or when you pass
+`NRCC_REPLACE_EXISTING=1` explicitly. If a reinstall fails before the new
+stack is ready, the previous checkout is kept as `<INSTALL_DIR>.previous.<pid>`
+and the installer prints the exact `rm`/`mv` command that rolls back to it.
 
 ## Quick path — static Linux binary
 

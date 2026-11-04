@@ -83,7 +83,7 @@ If the bug involves backups, configuration, or anything that touches stored stat
 
 - **Go**: idiomatic Go, `gofmt`, `go vet`. The CI lint gate is `golangci-lint run --config=.golangci.yml ./...` and it is repo-wide (not a ratchet) — a green CI requires zero findings. Run it locally before pushing: `golangci-lint run --config=.golangci.yml ./...`. Tests follow table-driven patterns where useful.
 - **TypeScript / React**: feature-folders under `frontend/src/features/`, shared primitives under `frontend/src/shared/`. Avoid `any` — if you reach for it, that's a signal to reshape the type. Tests use Vitest + Testing Library; mocks for `useAuth` go through the helpers in `features/auth/__test-utils__/`.
-- **Installer script**: `docs/install.sh` is the canonical installer, served by GitHub Pages at `get.nrcc.dev/install.sh`. Edit that file directly; the URL is the contract.
+- **Installer script**: `docs/install.sh` is the canonical POSIX `sh` installer, served by GitHub Pages at `get.nrcc.dev/install.sh`. Edit that file directly; the URL is the contract. Keep it portable to `/bin/sh` (no Bash-only syntax).
 
 ## Security
 
