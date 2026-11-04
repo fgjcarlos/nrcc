@@ -3,8 +3,11 @@ package service
 import (
 	"context"
 	"errors"
+	"os"
 	"os/exec"
-	"sync"
+	"path/filepath"
+	"strconv"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -77,58 +80,62 @@ func TestNpmInstallHonorsTimeout(t *testing.T) {
 	}
 }
 
-// TestNpmInstallKillsChildOnCancel is a stricter companion to
-// TestNpmInstallHonorsContextCancel that asserts the OS-level child is gone,
-// not just that the Go function returned. It polls `pgrep` (Linux) for the
-// spawned `sleep` PID; if the PID is still alive after the cancel returns,
-// the test fails. The previous implementation passed the Go-level cancel but
-// the npm child continued running.
+// TestNpmInstallKillsChildOnCancel asserts cancellation reaps the exact
+// subprocess started by the npm fixture, without scanning unrelated processes.
 func TestNpmInstallKillsChildOnCancel(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping child-PID check in short mode")
 	}
-	sleepBin, err := exec.LookPath("sleep")
-	if err != nil {
+	if _, err := exec.LookPath("sleep"); err != nil {
 		t.Skip("sleep binary not available")
 	}
 
-	pm := &NpmPackageManager{
-		WorkDir: t.TempDir(),
-		Bin:     sleepBin,
+	workDir := t.TempDir()
+	pidFile := filepath.Join(workDir, "child.pid")
+	fixture := filepath.Join(workDir, "npm-fixture.sh")
+	script := "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo 1.0.0; exit 0; fi\nprintf '%s' \"$$\" > \"$NRCC_TEST_CHILD_PIDFILE\"\nexec sleep 30\n"
+	//nolint:gosec // G306: the npm fixture must stay 0700 to run as an executable.
+	if err := os.WriteFile(fixture, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
 	}
+	t.Setenv("NRCC_TEST_CHILD_PIDFILE", pidFile)
+	pm := &NpmPackageManager{WorkDir: workDir, Bin: fixture}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		time.Sleep(50 * time.Millisecond)
-		cancel()
-	}()
-
-	// Spawn from a goroutine so we can wait for Install to return.
-	var installErr error
-	var installOnce sync.Once
-	done := make(chan struct{})
-	go func() {
-		installOnce.Do(func() { installErr = pm.Install(ctx, "30") })
-		close(done)
-	}()
-
-	<-done
-
-	// At this point Install has returned. We can't directly inspect the child
-	// PID because exec.Command hides it, but we know the only `sleep 30`
-	// process on the system should be gone. If a `sleep 30` is still listed
-	// by `pgrep`, the child was orphaned.
-	if pid, _ := exec.LookPath("pgrep"); pid != "" {
-		// #nosec G204 -- test fixture: pid is resolved from $PATH for pgrep and args are fixed.
-		out, _ := exec.Command(pid, "-f", "sleep 30").Output()
-		if len(out) > 0 {
-			t.Fatalf("child `sleep 30` still alive after Install returned; pgrep output: %q", string(out))
+	done := make(chan error, 1)
+	go func() { done <- pm.Install(ctx, "node-red") }()
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		if _, err := os.Stat(pidFile); err == nil {
+			break
 		}
+		if time.Now().After(deadline) {
+			cancel()
+			t.Fatal("npm fixture did not publish its child PID")
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
-	// Even without pgrep, we confirm the Go-level cancel propagated by checking
-	// the error category.
-	if installErr == nil {
-		t.Fatal("Install: expected error from cancellation, got nil")
+	//nolint:gosec // G304: the path is a test-controlled fixture inside t.TempDir().
+	pidBytes, err := os.ReadFile(pidFile)
+	if err != nil {
+		cancel()
+		t.Fatal(err)
+	}
+	pid, err := strconv.Atoi(string(pidBytes))
+	if err != nil || pid <= 0 {
+		cancel()
+		t.Fatalf("invalid fixture child PID %q", pidBytes)
+	}
+	cancel()
+	if err := <-done; err == nil {
+		t.Fatal("Install: expected error from cancelled context, got nil")
+	}
+	process, err := os.FindProcess(pid)
+	if err != nil {
+		t.Fatalf("find fixture child PID %d: %v", pid, err)
+	}
+	if err := process.Signal(syscall.Signal(0)); err == nil {
+		t.Fatalf("fixture child PID %d is still alive after Install returned", pid)
 	}
 }
 
