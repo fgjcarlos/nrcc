@@ -167,6 +167,7 @@ func TestInstallScriptContract(t *testing.T) {
 					t.Fatalf("installer failed: %v\n%s", result.err, result.output)
 				}
 				path := filepath.Join(h.installDir, ".env")
+				//nolint:gosec // G304: the path is a test-controlled fixture.
 				got, err := os.ReadFile(path)
 				if err != nil {
 					t.Fatal(err)
@@ -359,6 +360,7 @@ func (h *harness) writeExistingInstall(env string) {
 
 func (h *harness) writeStub(name, body string) {
 	h.t.Helper()
+	//nolint:gosec // G306: stub executables must stay 0700 to run on PATH.
 	if err := os.WriteFile(filepath.Join(h.bin, name), []byte(body), 0700); err != nil {
 		h.t.Fatal(err)
 	}
