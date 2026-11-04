@@ -1,3 +1,4 @@
+import { createServer } from 'node:net'
 import { expect, request as playwrightRequest, test, type APIRequestContext, type Page } from '@playwright/test'
 
 const nrccURL = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:3001'
@@ -241,16 +242,26 @@ test.describe.configure({ mode: 'serial' })
 test.beforeAll(async () => {
   nrcc = await playwrightRequest.newContext({ baseURL: nrccURL })
   nodeRed = await playwrightRequest.newContext({ baseURL: nodeRedURL })
+  // A missing stack is an environment limitation only outside CI. In CI the
+  // acceptance job must fail loudly: a skipped suite reports success without
+  // exercising any configuration-safety gate.
+  let unavailableReason = ''
   try {
     const [nrccStatus, nodeRedStatus] = await Promise.all([
       nrcc.get('/api/auth/status', { timeout: 2_000 }),
       nodeRed.get('/flows', { timeout: 2_000 }),
     ])
     if (!nrccStatus.ok() || nodeRedStatus.status() === 0) {
-      test.skip(true, `Real-stack acceptance unavailable: NRCC HTTP ${nrccStatus.status()}, Node-RED HTTP ${nodeRedStatus.status()}`)
+      unavailableReason = `NRCC HTTP ${nrccStatus.status()}, Node-RED HTTP ${nodeRedStatus.status()}`
     }
   } catch (error) {
-    test.skip(true, `Real-stack acceptance unavailable: ${error instanceof Error ? error.message : String(error)}`)
+    unavailableReason = error instanceof Error ? error.message : String(error)
+  }
+  if (unavailableReason) {
+    if (process.env.CI) {
+      throw new Error(`Real-stack acceptance requires a live stack: ${unavailableReason}`)
+    }
+    test.skip(true, `Real-stack acceptance unavailable: ${unavailableReason}`)
   }
   await ensureAdmin()
   try {
@@ -337,7 +348,7 @@ test('invalid raw settings are rejected without restarting healthy Node-RED', as
   await expect(await nodeRed.get('/flows', { headers: nodeRedProbeHeaders })).toBeOK()
 })
 
-test('rejected runtime settings preserve the previous live configuration', async () => {
+test('a runtime failure rolls back to the previous live configuration', async () => {
   const headers = await authHeaders()
   const readSettings = async () => {
     const response = await nrcc.get('/api/settings/raw', { headers })
@@ -361,23 +372,51 @@ test('rejected runtime settings preserve the previous live configuration', async
   const exportMarker = 'module.exports ='
   const exportIndex = beforeSettings.content.lastIndexOf(exportMarker)
   expect(exportIndex, 'live settings source has a module.exports assignment').toBeGreaterThanOrEqual(0)
-  const rejectedContent = `${beforeSettings.content.slice(0, exportIndex)}throw new Error('issue 887 runtime rollback fixture');\n${beforeSettings.content.slice(exportIndex)}`
-  const rejected = await nrcc.post('/api/config/apply/raw', {
-    headers,
-    data: {
-      expectedRevision: beforeSettings.revision.fingerprint,
-      content: rejectedContent,
-    },
+  // The candidate must survive the sandbox validation and reach the runtime,
+  // so it fails there instead of at the validation stage. Occupying a port
+  // makes Node-RED fail its readiness probe after the restart, which is the
+  // path that drives the rollback.
+  const blocker = createServer((socket) => socket.destroy())
+  await new Promise<void>((resolve, reject) => {
+    blocker.once('error', reject)
+    blocker.listen(0, '127.0.0.1', resolve)
   })
-  expect(rejected.status()).toBe(400)
+  const address = blocker.address()
+  const occupiedPort = typeof address === 'object' && address !== null ? address.port : 0
+  expect(occupiedPort, 'the blocker socket reports its port').toBeGreaterThan(0)
+  const failingContent = beforeSettings.content.replace(/uiPort:\s*\d+/, `uiPort: ${occupiedPort}`)
+  expect(failingContent, 'the live settings source carries a uiPort to replace').not.toBe(beforeSettings.content)
+
+  let rejected: Awaited<ReturnType<typeof nrcc.post>>
+  try {
+    rejected = await nrcc.post('/api/config/apply/raw', {
+      headers,
+      data: {
+        expectedRevision: beforeSettings.revision.fingerprint,
+        content: failingContent,
+      },
+      // The runtime failure path retries the readiness probe before it rolls
+      // back, so the apply legitimately takes longer than a default request.
+      timeout: 90_000,
+    })
+  } finally {
+    // Every accepted connection is destroyed immediately, so close() never
+    // waits on a socket the readiness probe still holds open.
+    await new Promise<void>((resolve) => blocker.close(() => resolve()))
+  }
+  // The apply reached the runtime and failed there, not at validation.
+  expect(rejected.status()).toBe(500)
   const failure = await rejected.json() as { error?: { code?: string; message?: string } }
-  expect(failure.error?.code).toBe('VALIDATION_ERROR')
-  expect(failure.error?.message).toMatch(/sandbox runtime error|settings readiness port is ambiguous/)
+  expect(failure.error?.code).toBe('RUNTIME_READINESS_FAILED')
 
   const afterSettings = await readSettings()
   expect(afterSettings.content).toBe(beforeSettings.content)
   expect(afterSettings.revision.fingerprint).toBe(beforeSettings.revision.fingerprint)
-  expect(await readRuntime()).toEqual(beforeRuntime)
+  // The runtime recovered on the restored configuration.
+  await expect.poll(async () => (await readRuntime()).status, {
+    timeout: 30_000,
+    message: 'Node-RED must run again on the rolled-back configuration',
+  }).toBe('running')
   await expect(await nodeRed.get('/flows', { headers: nodeRedProbeHeaders })).toBeOK()
 })
 
