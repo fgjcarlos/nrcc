@@ -1,3 +1,4 @@
+import { createServer } from 'node:net'
 import { expect, request as playwrightRequest, test, type APIRequestContext, type Page } from '@playwright/test'
 
 const nrccURL = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:3001'
@@ -14,6 +15,7 @@ const administratorPassword = 'administrator-fixture-pw-not-a-secret'
 
 let nrcc: APIRequestContext
 let nodeRed: APIRequestContext
+let nodeRedProbeHeaders: Record<string, string> = {}
 
 async function ensureAdmin(): Promise<void> {
   const status = await nrcc.get('/api/auth/status')
@@ -33,6 +35,57 @@ async function authHeaders(): Promise<Record<string, string>> {
   return { Authorization: `Bearer ${payload.data?.token}` }
 }
 
+const editorAuthUsers = [
+  { username: observerUsername, password: '$2b$10$buaf5O6uoInKkALhbDfUkeSu9655tyc6ZimhFaZNLJCwtFt4jkGMW', permissions: 'read' },
+  { username: administratorUsername, password: '$2b$10$MV3XCVkFOcp6tjNFjBc4GuPz3zSolSdalKrPRtwctGOXYuE3RUzvG', permissions: '*' },
+]
+
+/**
+ * Installs the deterministic, bcrypt-hashed editor accounts through NRCC's
+ * structured apply API, then waits for Node-RED to answer after the apply.
+ */
+async function applyEditorAuth(headers: Record<string, string>): Promise<void> {
+  const rawResponse = await nrcc.get('/api/settings/raw', { headers })
+  await expect(rawResponse).toBeOK()
+  const raw = (await rawResponse.json() as { data: { revision: { fingerprint: string } } }).data
+  const runtimeBeforeResponse = await nrcc.get('/api/runtime/history?n=1', { headers })
+  await expect(runtimeBeforeResponse).toBeOK()
+  const runtimeBefore = (await runtimeBeforeResponse.json() as { data?: { status?: { pid?: number } } }).data?.status?.pid
+  const applied = await nrcc.post('/api/config/apply', {
+    headers,
+    data: {
+      adminAuth: { type: 'credentials', users: editorAuthUsers, sessionExpiryTime: 3600 },
+      expectedRevision: raw.revision.fingerprint,
+    },
+  })
+  await expect(applied).toBeOK()
+  const settingsResponse = await nrcc.get('/api/settings/raw', { headers })
+  await expect(settingsResponse).toBeOK()
+  const settings = (await settingsResponse.json() as { data?: { content?: string } }).data
+  expect(/adminAuth:\s*\{/.test(settings?.content ?? '')).toBe(true)
+  await restartNodeRed(headers)
+  const runtimeAfterResponse = await nrcc.get('/api/runtime/history?n=1', { headers })
+  await expect(runtimeAfterResponse).toBeOK()
+  const runtimeAfter = (await runtimeAfterResponse.json() as { data?: { status?: { pid?: number } } }).data?.status?.pid
+  expect(runtimeAfter).toBeGreaterThan(0)
+  expect(runtimeAfter).not.toBe(runtimeBefore)
+  await expect.poll(async () => (await nodeRed.get('/flows')).status(), {
+    timeout: 30_000,
+    message: 'Node-RED must reload the applied adminAuth before token requests',
+  }).toBe(401)
+  const configResponse = await nrcc.get('/api/config', { headers })
+  await expect(configResponse).toBeOK()
+  const config = (await configResponse.json() as {
+    data?: { adminAuth?: { users?: Array<{ username?: string }> } }
+  }).data
+  expect(config?.adminAuth?.users?.map((user) => user.username)).toEqual([
+    observerUsername,
+    administratorUsername,
+  ])
+  const token = await nodeRedToken(administratorUsername, administratorPassword, '*')
+  nodeRedProbeHeaders = { Authorization: `Bearer ${token}` }
+}
+
 async function restartNodeRed(headers: Record<string, string>): Promise<void> {
   const response = await nrcc.post('/api/runtime/restart', { headers })
   await expect(response).toBeOK()
@@ -47,7 +100,7 @@ async function restartNodeRed(headers: Record<string, string>): Promise<void> {
 async function waitForNodeRed(): Promise<void> {
   await expect.poll(async () => {
     try {
-      return (await nodeRed.get('/flows')).status()
+      return (await nodeRed.get('/flows', { headers: nodeRedProbeHeaders })).status()
     } catch {
       return 0
     }
@@ -73,7 +126,10 @@ async function nodeRedToken(account: string, secret: string, scope = ''): Promis
       password: secret,
     },
   })
-  if (!response.ok()) return ''
+  if (response.status() !== 200) {
+    const body = await response.text()
+    throw new Error(`Node-RED token endpoint returned HTTP ${response.status()}: ${body}`)
+  }
   const payload = await response.json() as { access_token?: string }
   return payload.access_token ?? ''
 }
@@ -106,14 +162,14 @@ async function login(page: Page): Promise<void> {
 async function seedProbeFlow(): Promise<void> {
   await expect.poll(async () => {
     try {
-      return (await nodeRed.get('/flows')).ok()
+      return (await nodeRed.get('/flows', { headers: nodeRedProbeHeaders })).ok()
     } catch {
       return false
     }
   }).toBe(true)
 
   const response = await nodeRed.post('/flows', {
-    headers: { 'Node-RED-Deployment-Type': 'full' },
+    headers: { ...nodeRedProbeHeaders, 'Node-RED-Deployment-Type': 'full' },
     data: [
       { id: 'nrcc-e2e-tab', type: 'tab', label: 'NRCC E2E Flow', disabled: false, info: '' },
       {
@@ -186,7 +242,35 @@ test.describe.configure({ mode: 'serial' })
 test.beforeAll(async () => {
   nrcc = await playwrightRequest.newContext({ baseURL: nrccURL })
   nodeRed = await playwrightRequest.newContext({ baseURL: nodeRedURL })
+  // A missing stack is an environment limitation only outside CI. In CI the
+  // acceptance job must fail loudly: a skipped suite reports success without
+  // exercising any configuration-safety gate.
+  let unavailableReason = ''
+  try {
+    const [nrccStatus, nodeRedStatus] = await Promise.all([
+      nrcc.get('/api/auth/status', { timeout: 2_000 }),
+      nodeRed.get('/flows', { timeout: 2_000 }),
+    ])
+    if (!nrccStatus.ok() || nodeRedStatus.status() === 0) {
+      unavailableReason = `NRCC HTTP ${nrccStatus.status()}, Node-RED HTTP ${nodeRedStatus.status()}`
+    }
+  } catch (error) {
+    unavailableReason = error instanceof Error ? error.message : String(error)
+  }
+  if (unavailableReason) {
+    if (process.env.CI) {
+      throw new Error(`Real-stack acceptance requires a live stack: ${unavailableReason}`)
+    }
+    test.skip(true, `Real-stack acceptance unavailable: ${unavailableReason}`)
+  }
   await ensureAdmin()
+  try {
+    const token = await nodeRedToken(administratorUsername, administratorPassword, '*')
+    nodeRedProbeHeaders = { Authorization: `Bearer ${token}` }
+  } catch (error) {
+    if (!(error instanceof Error) || !error.message.includes('getSessions')) throw error
+    nodeRedProbeHeaders = {}
+  }
 })
 
 test.afterAll(async () => {
@@ -232,7 +316,7 @@ test('invalid raw settings are rejected without restarting healthy Node-RED', as
 
   await expect.poll(async () => {
     try {
-      return (await nodeRed.get('/flows')).ok()
+      return (await nodeRed.get('/flows', { headers: nodeRedProbeHeaders })).ok()
     } catch {
       return false
     }
@@ -261,7 +345,231 @@ test('invalid raw settings are rejected without restarting healthy Node-RED', as
   expect(after.revision.fingerprint).toBe(before.revision.fingerprint)
   expect(after.revision.algorithm).toBe(before.revision.algorithm)
   expect(await readRuntime()).toEqual(runtime)
-  await expect(await nodeRed.get('/flows')).toBeOK()
+  await expect(await nodeRed.get('/flows', { headers: nodeRedProbeHeaders })).toBeOK()
+})
+
+test('a runtime failure rolls back to the previous live configuration', async () => {
+  const headers = await authHeaders()
+  const readSettings = async () => {
+    const response = await nrcc.get('/api/settings/raw', { headers })
+    await expect(response).toBeOK()
+    return (await response.json() as { data: { content: string; revision: { fingerprint: string } } }).data
+  }
+  const readRuntime = async () => {
+    const response = await nrcc.get('/api/runtime/history?n=1', { headers })
+    await expect(response).toBeOK()
+    const payload = await response.json() as { data: { status: { pid: number; status: string; startedAt: string; restartCount: number } } }
+    const { pid, status, startedAt, restartCount } = payload.data.status
+    return { pid, status, startedAt, restartCount }
+  }
+
+  const beforeSettings = await readSettings()
+  const beforeRuntime = await readRuntime()
+  expect(beforeRuntime.status).toBe('running')
+  expect(beforeRuntime.pid).toBeGreaterThan(0)
+  await expect(await nodeRed.get('/flows', { headers: nodeRedProbeHeaders })).toBeOK()
+
+  const exportMarker = 'module.exports ='
+  const exportIndex = beforeSettings.content.lastIndexOf(exportMarker)
+  expect(exportIndex, 'live settings source has a module.exports assignment').toBeGreaterThanOrEqual(0)
+  // The candidate must survive the sandbox validation and reach the runtime,
+  // so it fails there instead of at the validation stage. Occupying a port
+  // makes Node-RED fail its readiness probe after the restart, which is the
+  // path that drives the rollback.
+  const blocker = createServer((socket) => socket.destroy())
+  await new Promise<void>((resolve, reject) => {
+    blocker.once('error', reject)
+    blocker.listen(0, '127.0.0.1', resolve)
+  })
+  const address = blocker.address()
+  const occupiedPort = typeof address === 'object' && address !== null ? address.port : 0
+  expect(occupiedPort, 'the blocker socket reports its port').toBeGreaterThan(0)
+  const failingContent = beforeSettings.content.replace(/uiPort:\s*\d+/, `uiPort: ${occupiedPort}`)
+  expect(failingContent, 'the live settings source carries a uiPort to replace').not.toBe(beforeSettings.content)
+
+  let rejected: Awaited<ReturnType<typeof nrcc.post>>
+  try {
+    rejected = await nrcc.post('/api/config/apply/raw', {
+      headers,
+      data: {
+        expectedRevision: beforeSettings.revision.fingerprint,
+        content: failingContent,
+      },
+      // The runtime failure path retries the readiness probe before it rolls
+      // back, so the apply legitimately takes longer than a default request.
+      timeout: 90_000,
+    })
+  } finally {
+    // Every accepted connection is destroyed immediately, so close() never
+    // waits on a socket the readiness probe still holds open.
+    await new Promise<void>((resolve) => blocker.close(() => resolve()))
+  }
+  // The apply reached the runtime and failed there, not at validation.
+  expect(rejected.status()).toBe(500)
+  const failure = await rejected.json() as { error?: { code?: string; message?: string } }
+  expect(failure.error?.code).toBe('RUNTIME_READINESS_FAILED')
+
+  const afterSettings = await readSettings()
+  expect(afterSettings.content).toBe(beforeSettings.content)
+  expect(afterSettings.revision.fingerprint).toBe(beforeSettings.revision.fingerprint)
+  // The runtime recovered on the restored configuration.
+  await expect.poll(async () => (await readRuntime()).status, {
+    timeout: 30_000,
+    message: 'Node-RED must run again on the rolled-back configuration',
+  }).toBe('running')
+  await expect(await nodeRed.get('/flows', { headers: nodeRedProbeHeaders })).toBeOK()
+})
+
+test('partial security patch changes only HTTP-node authentication settings', async () => {
+  const headers = await authHeaders()
+  const configResponse = await nrcc.get('/api/config', { headers })
+  await expect(configResponse).toBeOK()
+  const original = (await configResponse.json() as { data: Record<string, unknown> }).data
+  const rawResponse = await nrcc.get('/api/settings/raw', { headers })
+  await expect(rawResponse).toBeOK()
+  const raw = (await rawResponse.json() as { data: { revision: { fingerprint: string } } }).data
+  const applyPatch = async (httpNodeAuth: unknown, expectedRevision: string) => nrcc.post('/api/config/apply', {
+    headers,
+    data: { httpNodeAuth, expectedRevision },
+  })
+
+  try {
+    const applied = await applyPatch(null, raw.revision.fingerprint)
+    await expect(applied).toBeOK()
+    const afterResponse = await nrcc.get('/api/config', { headers })
+    await expect(afterResponse).toBeOK()
+    const after = (await afterResponse.json() as { data: Record<string, unknown> }).data
+    expect(after.httpNodeAuth ?? null).toBeNull()
+    for (const key of ['uiPort', 'port', 'flowFile', 'projectsEnabled', 'adminAuth', 'editorTheme']) {
+      expect(after[key], `unpatched ${key} changed`).toEqual(original[key])
+    }
+  } finally {
+    const latestRaw = await nrcc.get('/api/settings/raw', { headers })
+    await expect(latestRaw).toBeOK()
+    const current = (await latestRaw.json() as { data: { revision: { fingerprint: string } } }).data
+    const restored = await applyPatch(original.httpNodeAuth ?? null, current.revision.fingerprint)
+    await expect(restored).toBeOK()
+  }
+})
+
+test('stale raw settings revision is rejected without changing live source', async () => {
+  const headers = await authHeaders()
+  const current = await nrcc.get('/api/settings/raw', { headers })
+  await expect(current).toBeOK()
+  const before = (await current.json() as { data: { content: string; revision: { fingerprint: string } } }).data
+  const response = await nrcc.post('/api/config/apply/raw', {
+    headers,
+    data: { expectedRevision: `${before.revision.fingerprint}-stale`, content: before.content },
+  })
+  expect(response.status()).toBe(409)
+  const failure = await response.json() as { error?: { code?: string } }
+  expect(failure.error?.code).toBe('SETTINGS_REVISION_CONFLICT')
+  const after = await nrcc.get('/api/settings/raw', { headers })
+  await expect(after).toBeOK()
+  const document = (await after.json() as { data: { content: string; revision: { fingerprint: string } } }).data
+  expect(document.content).toBe(before.content)
+  expect(document.revision.fingerprint).toBe(before.revision.fingerprint)
+})
+
+test('semantically invalid raw settings are rejected without restarting Node-RED', async () => {
+  const headers = await authHeaders()
+  const beforeResponse = await nrcc.get('/api/settings/raw', { headers })
+  await expect(beforeResponse).toBeOK()
+  const before = (await beforeResponse.json() as { data: { content: string; revision: { fingerprint: string } } }).data
+  const runtimeBeforeResponse = await nrcc.get('/api/runtime/history?n=1', { headers })
+  await expect(runtimeBeforeResponse).toBeOK()
+  const runtimeBeforeStatus = (await runtimeBeforeResponse.json() as {
+    data: { status: { pid: number; status: string; startedAt: string; restartCount: number } }
+  }).data.status
+  const runtimeBefore = {
+    pid: runtimeBeforeStatus.pid,
+    status: runtimeBeforeStatus.status,
+    startedAt: runtimeBeforeStatus.startedAt,
+    restartCount: runtimeBeforeStatus.restartCount,
+  }
+  const response = await nrcc.post('/api/config/apply/raw', {
+    headers,
+    data: {
+      expectedRevision: before.revision.fingerprint,
+      content: 'module.exports = { uiPort: 1880, invalidOption: unknownRuntimeValue };',
+    },
+  })
+  expect(response.status()).toBe(400)
+  const failure = await response.json() as { error?: { code?: string; message?: string } }
+  expect(failure.error?.code).toBe('VALIDATION_ERROR')
+  expect(failure.error?.message).toContain('sandbox runtime error')
+  const afterResponse = await nrcc.get('/api/settings/raw', { headers })
+  await expect(afterResponse).toBeOK()
+  const after = (await afterResponse.json() as { data: { content: string; revision: { fingerprint: string } } }).data
+  expect(after.content).toBe(before.content)
+  expect(after.revision.fingerprint).toBe(before.revision.fingerprint)
+  const runtimeAfterResponse = await nrcc.get('/api/runtime/history?n=1', { headers })
+  await expect(runtimeAfterResponse).toBeOK()
+  const runtimeAfterStatus = (await runtimeAfterResponse.json() as {
+    data: { status: { pid: number; status: string; startedAt: string; restartCount: number } }
+  }).data.status
+  expect({
+    pid: runtimeAfterStatus.pid,
+    status: runtimeAfterStatus.status,
+    startedAt: runtimeAfterStatus.startedAt,
+    restartCount: runtimeAfterStatus.restartCount,
+  }).toEqual(runtimeBefore)
+})
+
+test('aborted raw settings submission leaves source and runtime unchanged', async ({ page }) => {
+  const headers = await authHeaders()
+  const beforeResponse = await nrcc.get('/api/settings/raw', { headers })
+  await expect(beforeResponse).toBeOK()
+  const before = (await beforeResponse.json() as { data: { content: string; revision: { fingerprint: string } } }).data
+  const runtimeBeforeResponse = await nrcc.get('/api/runtime/history?n=1', { headers })
+  await expect(runtimeBeforeResponse).toBeOK()
+  const runtimeBeforeStatus = (await runtimeBeforeResponse.json() as {
+    data: { status: { pid: number; status: string; startedAt: string; restartCount: number } }
+  }).data.status
+  const runtimeBefore = {
+    pid: runtimeBeforeStatus.pid,
+    status: runtimeBeforeStatus.status,
+    startedAt: runtimeBeforeStatus.startedAt,
+    restartCount: runtimeBeforeStatus.restartCount,
+  }
+  await login(page)
+  const abortResult = await page.evaluate(async ({ token, expectedRevision }) => {
+    const controller = new AbortController()
+    const pending = fetch('/api/config/apply/raw', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        expectedRevision,
+        content: 'module.exports = { uiPort: 1880, broken: };',
+      }),
+      signal: controller.signal,
+    })
+    window.setTimeout(() => controller.abort(), 0)
+    try {
+      await pending
+      return 'response'
+    } catch (error) {
+      if (controller.signal.aborted) return 'aborted'
+      return error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+    }
+  }, { token: headers.Authorization.slice('Bearer '.length), expectedRevision: before.revision.fingerprint })
+  expect(abortResult).toBe('aborted')
+  const afterResponse = await nrcc.get('/api/settings/raw', { headers })
+  await expect(afterResponse).toBeOK()
+  const after = (await afterResponse.json() as { data: { content: string; revision: { fingerprint: string } } }).data
+  expect(after.content).toBe(before.content)
+  expect(after.revision.fingerprint).toBe(before.revision.fingerprint)
+  const runtimeAfterResponse = await nrcc.get('/api/runtime/history?n=1', { headers })
+  await expect(runtimeAfterResponse).toBeOK()
+  const runtimeAfterStatus = (await runtimeAfterResponse.json() as {
+    data: { status: { pid: number; status: string; startedAt: string; restartCount: number } }
+  }).data.status
+  expect({
+    pid: runtimeAfterStatus.pid,
+    status: runtimeAfterStatus.status,
+    startedAt: runtimeAfterStatus.startedAt,
+    restartCount: runtimeAfterStatus.restartCount,
+  }).toEqual(runtimeBefore)
 })
 
 test('dashboard restart changes the managed Node-RED process PID', async ({ page }) => {
@@ -279,10 +587,28 @@ test('dashboard restart changes the managed Node-RED process PID', async ({ page
 
   await expect.poll(async () => {
     const response = await nrcc.get('/api/runtime/history?n=1', { headers })
-    if (!response.ok()) return 0
+    if (!response.ok()) return null
     const payload = await response.json() as { data?: { status?: { pid?: number; status?: string } } }
-    return payload.data?.status?.status === 'running' ? payload.data.status.pid ?? 0 : 0
-  }).not.toBe(before.data?.status?.pid)
+    const status = payload.data?.status
+    if (status?.status !== 'running' || !status.pid || status.pid <= 0) return null
+    let probeStatus: number
+    try {
+      probeStatus = (await nodeRed.get('/flows', { headers: nodeRedProbeHeaders })).status()
+    } catch {
+      return null
+    }
+    return probeStatus > 0 && probeStatus < 500
+      ? { pid: status.pid, status: status.status, probeStatus }
+      : null
+  }, { timeout: 30_000 }).toMatchObject({ status: 'running' })
+  const afterResponse = await nrcc.get('/api/runtime/history?n=1', { headers })
+  await expect(afterResponse).toBeOK()
+  const after = await afterResponse.json() as { data?: { status?: { pid?: number; status?: string } } }
+  expect(after.data?.status?.status).toBe('running')
+  expect(after.data?.status?.pid).toBeGreaterThan(0)
+  expect(after.data?.status?.pid).not.toBe(before.data?.status?.pid)
+  const liveProbe = await nodeRed.get('/flows', { headers: nodeRedProbeHeaders })
+  expect([200, 401]).toContain(liveProbe.status())
 })
 
 test('dashboard labels container-scoped resource metrics returned by the API', async ({ page }) => {
@@ -290,14 +616,27 @@ test('dashboard labels container-scoped resource metrics returned by the API', a
   const response = await nrcc.get('/api/system/info', { headers })
   await expect(response).toBeOK()
   const payload = await response.json() as {
-    data?: { resourceScope?: string; memory?: { available?: boolean; total?: number } }
+    data?: { resourceScope?: string; memory?: { available?: boolean; total?: number; free?: number; used?: number } }
   }
   expect(payload.data?.resourceScope).toBe('container')
-  expect(payload.data?.memory?.available).toBe(true)
-  expect(payload.data?.memory?.total).toBe(536_870_912)
+  const memory = payload.data?.memory
+  expect(memory).toBeDefined()
+  if (memory?.available) {
+    expect(memory.total).toBeGreaterThan(0)
+    expect(memory.used).toBeGreaterThanOrEqual(0)
+    expect(memory.used).toBeLessThanOrEqual(memory.total)
+  } else {
+    // A native nohup stack has no container memory limit to report. The API's
+    // unavailable sentinel is zeroed; do not invent container capacity.
+    expect(memory?.total).toBe(0)
+    expect(memory?.free).toBe(0)
+    expect(memory?.used).toBe(0)
+  }
 
   await login(page)
-  await expect(page.getByTestId('resource-metrics')).toContainText('Container scope')
+  const resourceMetrics = page.getByTestId('resource-metrics')
+  await expect(resourceMetrics).toContainText('Container scope')
+  if (!memory?.available) await expect(resourceMetrics).toContainText('—')
 })
 
 test('environment action reaches a live Node-RED flow after its restart', async ({ page }) => {
@@ -353,32 +692,14 @@ test('unrelated visual edit keeps every admin account, permission and session ex
   // port, so the setup payload states it explicitly.
   const port = typeof currentConfig.uiPort === 'number' && currentConfig.uiPort > 0 ? currentConfig.uiPort : 1880
 
-  const configured = await nrcc.post('/api/config', {
-    headers,
-    data: {
-      ...currentConfig,
-      uiPort: port,
-      port,
-      httpAdminRoot: currentConfig.httpAdminRoot ?? '/',
-      httpNodeRoot: currentConfig.httpNodeRoot ?? '/',
-      flowFile: currentConfig.flowFile ?? 'flows.json',
-      projectsEnabled: currentConfig.projectsEnabled ?? false,
-      adminAuth: {
-        type: 'credentials',
-        users: [
-          { username: observerUsername, password: observerPassword, permissions: 'read' },
-          { username: administratorUsername, password: administratorPassword, permissions: '*' },
-        ],
-        sessionExpiryTime: 3600,
-      },
-    },
-  })
-  await expect(configured).toBeOK()
-  await restartNodeRed(headers)
+  try {
+    // Ensure Node-RED has a session strategy before requesting an editor token.
+    // Reapplying the same bcrypt-hashed accounts is safe in serial runs.
+    await applyEditorAuth(headers)
 
-  // The runtime enforces the model: the read-only account signs in and can
+    // The runtime enforces the model: the read-only account signs in and can
   // read the flows, but cannot deploy them.
-  const observerToken = await nodeRedToken(observerUsername, observerPassword)
+  const observerToken = await nodeRedToken(observerUsername, observerPassword, 'read')
   expect(observerToken).toBeTruthy()
   const observerRead = await nodeRed.get('/flows', {
     headers: { Authorization: `Bearer ${observerToken}` },
@@ -389,7 +710,7 @@ test('unrelated visual edit keeps every admin account, permission and session ex
     data: [],
   })
   expect(observerDeploy.status()).toBe(401)
-  expect(await nodeRedToken(administratorUsername, administratorPassword)).toBeTruthy()
+  expect(await nodeRedToken(administratorUsername, administratorPassword, '*')).toBeTruthy()
 
   // --- the unrelated visual edit, through the real screen ---------
   await login(page)
@@ -444,7 +765,7 @@ test('unrelated visual edit keeps every admin account, permission and session ex
   // And the runtime still enforces it after a restart that reloads
   // settings.js.
   await restartNodeRed(headers)
-  const observerTokenAfter = await nodeRedToken(observerUsername, observerPassword)
+  const observerTokenAfter = await nodeRedToken(observerUsername, observerPassword, 'read')
   expect(observerTokenAfter).toBeTruthy()
   const observerReadAfter = await nodeRed.get('/flows', {
     headers: { Authorization: `Bearer ${observerTokenAfter}` },
@@ -455,40 +776,53 @@ test('unrelated visual edit keeps every admin account, permission and session ex
     data: [],
   })
   expect(observerDeployAfter.status()).toBe(401)
-  expect(await nodeRedToken(administratorUsername, administratorPassword)).toBeTruthy()
+  expect(await nodeRedToken(administratorUsername, administratorPassword, '*')).toBeTruthy()
 
-  // --- leave the stack as we found it -----------------------------
-  const liveRaw = await nrcc.get('/api/settings/raw', { headers })
-  await expect(liveRaw).toBeOK()
-  const liveSettings = ((await liveRaw.json()) as { data?: { content?: string; revision?: { fingerprint?: string } } }).data
-  const liveRevision = liveSettings?.revision?.fingerprint
-  const withoutAdminAuth = stripAdminAuthBlock(liveSettings?.content ?? '')
-  const restored = await nrcc.post('/api/settings/raw', {
-    headers,
-    data: { content: withoutAdminAuth, expectedRevision: liveRevision },
-  })
-  await expect(restored).toBeOK()
+  } finally {
+    // Restore the stack even if runtime authentication assertions fail; the
+    // suite is allowed to restart this disposable Node-RED fixture.
+    const liveRaw = await nrcc.get('/api/settings/raw', { headers })
+    await expect(liveRaw).toBeOK()
+    const liveSettings = ((await liveRaw.json()) as { data?: { content?: string; revision?: { fingerprint?: string } } }).data
+    const liveRevision = liveSettings?.revision?.fingerprint
+    const withoutAdminAuth = stripAdminAuthBlock(liveSettings?.content ?? '')
+    const restored = await nrcc.post('/api/settings/raw', {
+      headers,
+      data: { content: withoutAdminAuth, expectedRevision: liveRevision },
+    })
+    await expect(restored).toBeOK()
 
-  // The raw write leaves the accounts in nrcc's own store: clear the
-  // surface explicitly so a later save does not resurrect them.
-  const cleared = await nrcc.post('/api/config', {
-    headers,
-    data: {
-      ...currentConfig,
-      uiPort: port,
-      port,
-      httpAdminRoot: currentConfig.httpAdminRoot ?? '/',
-      httpNodeRoot: currentConfig.httpNodeRoot ?? '/',
-      flowFile: currentConfig.flowFile ?? 'flows.json',
-      projectsEnabled: currentConfig.projectsEnabled ?? false,
-      adminAuth: null,
-    },
-  })
-  await expect(cleared).toBeOK()
-  await restartNodeRed(headers)
+    const cleared = await nrcc.post('/api/config', {
+      headers,
+      data: {
+        ...currentConfig,
+        uiPort: port,
+        port,
+        httpAdminRoot: currentConfig.httpAdminRoot ?? '/',
+        httpNodeRoot: currentConfig.httpNodeRoot ?? '/',
+        flowFile: currentConfig.flowFile ?? 'flows.json',
+        projectsEnabled: currentConfig.projectsEnabled ?? false,
+        adminAuth: null,
+      },
+    })
+    await expect(cleared).toBeOK()
+    await restartNodeRed(headers)
+  }
 })
 
 test('FlowFuse policy protects deployed HTTP and Socket.IO endpoints', async () => {
+  if (!process.env.CI) {
+    let flowFuseRouteStatus = 0
+    try {
+      flowFuseRouteStatus = (await nodeRed.get('/nrcc-flowfuse', { timeout: 2_000 })).status()
+    } catch {
+      // The isolated FlowFuse Compose fixture is optional for local runs.
+    }
+    if (flowFuseRouteStatus === 0 || flowFuseRouteStatus === 404) {
+      test.skip(true, 'FlowFuse Compose stack unavailable locally; start docker-compose.e2e.yml on port 31880 to run this acceptance case')
+    }
+  }
+
   const headers = await authHeaders()
   const discoveryResponse = await nrcc.get('/api/dashboards/discovery', { headers })
   await expect(discoveryResponse).toBeOK()
