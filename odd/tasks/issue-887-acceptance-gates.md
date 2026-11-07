@@ -36,7 +36,8 @@ T1 | S1 | frontend e2e real-stack config transaction | stack.spec.ts scenarios: 
 T2 | S2 | frontend e2e restart gate | Strengthen restart PID polling helper: pid>0, status 'running', pid changed, successful live probe. | commit: 8b5e0bf
 T3 | S3 | frontend e2e a11y | Fix reduced-motion duration parsing; add mouse and keyboard restore confirmation. | commit: 985f13f
 T4 | S4 | Go test fixtures | Dedicated subprocess fixture/PID (no global pgrep), version-check deps injected before service init, wait polling shutdown before cleanup, fix TempDir race. | commit: 35baf8a
-T5 | S5,S6 | gates & evidence | Run `cd frontend && npm test -- --run`, `npm run test:e2e` (or document env limitations with skips annotated), `go test ./...`; retain Playwright traces/reports; record results. | commit: bc59b4a
+T5 | S5,S6 | gates & evidence | Run `cd frontend && npm test -- --run`, `npm run test:e2e` (or document env limitations with skips annotated), `go test ./...`; retain Playwright traces/reports; record results. | commits: bc59b4a, 052f0ec
+T6 | S5,S6 | review correction workflow | Fix R4-001/R4-002, verify the correction, and finish provider-issued targeted validation. | commit: 052f0ec; validation blocked by stale provider binding
 
 ## Log
 
@@ -78,3 +79,13 @@ L8. Delivery: four work-unit commits on branch fix/887-acceptance-gates
     origin/main (d82849e). Total 666 authored changed lines; the repo's
     merged history already contains larger single PRs (#952: 2865 lines),
     so the change ships as one PR for issue #887 rather than a chain.
+L9. Review correction (parent): R4-001 and R4-002 fixed in 052f0ec. The
+    stack suite passed (12 runnable tests, 1 FlowFuse environment skip),
+    frontend unit tests passed (86 files, 587 tests), TypeScript check passed,
+    and lint passed with one pre-existing warning. Simulated CI with an
+    unavailable stack failed as required. Pushed 052f0ec to PR #954; GitHub
+    reports the branch head at that commit. Provider targeted validation has
+    not run: gentle_review_capture rejected the exact current binding multiple
+    times as missing or stale without mutation. A subsequent bound status
+    returned unrelated/empty candidate scope and no collect binding, so native
+    review cannot be advanced safely from this session.
