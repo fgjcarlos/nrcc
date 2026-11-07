@@ -47,7 +47,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 # ref: nodered/node-red:5.0.4-24-minimal — community image, pinned to
 # digest. Dependabot (docker ecosystem, weekly) bumps the digest when
 # upstream changes. See issue #593 and auditoria/devops-security.md §2.1.
-FROM nodered/node-red:5.0.9-24-minimal@sha256:db4067af09d4ecdf1ff1eb1cf80e3ec2ad0504c68d1d47a36c8e8b4ebb9fa055 AS runtime
+FROM nodered/node-red:5.0.9-24-minimal@sha256:fc51fc5fa0bf12be8f52ed49645618e6c27a74953ce21c7eeec2e165d520d01c AS runtime
 # Same build argument as the go-builder stage: the label must agree with
 # the version embedded in the binary.
 ARG VERSION=dev
