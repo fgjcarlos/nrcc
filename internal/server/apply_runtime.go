@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -27,12 +28,12 @@ func serverApplyResolver(detect func() model.HostStatus, processManager func() *
 			// Authority remains pinned to this ProcessManager; each Ready call
 			// reads the active settings path so recovery probes restored config.
 			nodeRed = model.NodeRedEnvironment{Detected: true, Mode: model.InstallationModeNative, ManagedByNRCC: true, Running: true}
-			readinessResolver = func() (string, error) { return settingsReadinessURL(req.Path) }
+			readinessResolver = func() (string, error) { return managedSettingsReadinessURL(req.Path, pm) }
 		case nodeRed.Mode == model.InstallationModeNative && nodeRed.ManagedByNRCC:
 			if _, err := applyCandidatePort(req); err != nil {
 				return nil, err
 			}
-			readinessResolver = func() (string, error) { return settingsReadinessURL(req.Path) }
+			readinessResolver = func() (string, error) { return managedSettingsReadinessURL(req.Path, pm) }
 		case nodeRed.Mode == model.InstallationModeDocker:
 			port, err := applyCandidatePort(req)
 			if err != nil {
@@ -51,7 +52,25 @@ func serverApplyResolver(detect func() model.HostStatus, processManager func() *
 	}
 }
 
-func settingsReadinessURL(path string) (string, error) {
+var errSettingsPortMissing = errors.New("apply: settings must define exactly one static uiPort")
+
+func managedSettingsReadinessURL(path string, pm *service.ProcessManager) (string, error) {
+	if pm == nil {
+		return settingsReadinessURL(path)
+	}
+	// The ProcessManager records the effective --port at Start time from its
+	// merged OS, stored-variable, and .env layers. Use that launch authority;
+	// do not inspect `/proc` or re-read env files that may have changed since.
+	if port := pm.EffectiveRuntimePort(); port > 0 {
+		return settingsReadinessURL(path, port)
+	}
+	return settingsReadinessURL(path)
+}
+
+func settingsReadinessURL(path string, runtimePort ...int) (string, error) {
+	if len(runtimePort) > 0 && (runtimePort[0] < 1 || runtimePort[0] > 65535) {
+		return "", fmt.Errorf("apply: managed Node-RED runtime port %d is outside 1-65535", runtimePort[0])
+	}
 	// #nosec G304 -- path is the active settings.js path inside the operator-supplied dataDir; not request-derived.
 	content, err := os.ReadFile(path)
 	if err != nil {
@@ -59,7 +78,19 @@ func settingsReadinessURL(path string) (string, error) {
 	}
 	port, err := staticSettingsPort(string(content))
 	if err != nil {
-		return "", err
+		if !errors.Is(err, errSettingsPortMissing) {
+			return "", err
+		}
+		if len(runtimePort) == 0 {
+			return "", err
+		}
+		port = runtimePort[0]
+		// A missing setting is safe only when ProcessManager supplies the
+		// effective port used for the live runtime. Never guess a listener.
+
+	} else if len(runtimePort) > 0 {
+		// CLI --port is the effective listener override, including NODE_RED_PORT.
+		port = runtimePort[0]
 	}
 	return fmt.Sprintf("http://127.0.0.1:%d/settings", port), nil
 }
@@ -112,12 +143,15 @@ func staticSettingsPort(content string) (int, error) {
 		if !ok {
 			continue
 		}
+		if keyed.Computed {
+			return 0, fmt.Errorf("apply: computed settings property makes readiness port ambiguous")
+		}
 		name := propertyName(keyed.Key)
 		if name != "uiPort" {
 			continue
 		}
 		count++
-		if keyed.Kind != ast.PropertyKindValue || keyed.Computed {
+		if keyed.Kind != ast.PropertyKindValue {
 			return 0, fmt.Errorf("apply: settings uiPort is not a static property")
 		}
 		number, ok := keyed.Value.(*ast.NumberLiteral)
@@ -129,6 +163,9 @@ func staticSettingsPort(content string) (int, error) {
 			return 0, fmt.Errorf("apply: settings uiPort literal is outside 1-65535")
 		}
 		port = int(parsed)
+	}
+	if count == 0 {
+		return 0, errSettingsPortMissing
 	}
 	if count != 1 {
 		return 0, fmt.Errorf("apply: settings must define exactly one static uiPort")

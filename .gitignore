@@ -58,5 +58,6 @@ docker-compose.*.yml
 # Playwright output directories (HTML report is CI-only; test-results is
 # written locally on any failure — keep these out of git status).
 frontend/playwright-report/
+frontend/playwright-report-stack/
 frontend/test-results/
 frontend/blob-report/

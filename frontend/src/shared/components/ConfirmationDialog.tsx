@@ -187,7 +187,7 @@ export function ConfirmationDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className={`relative surface-panel border ${styles.border} w-full max-w-md mx-4 overflow-hidden shadow-glow`}
+        className={`relative z-[60] surface-panel border ${styles.border} w-full max-w-md mx-4 overflow-hidden shadow-glow`}
       >
         {/* Header */}
         <div className="flex items-start justify-between border-b ghost-divider modal-inner p-6">

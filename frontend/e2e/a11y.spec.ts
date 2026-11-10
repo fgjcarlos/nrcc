@@ -109,10 +109,10 @@ test.describe('Issue #766 slice G W4 — WCAG 2.1 AA gate', () => {
       document.body.appendChild(probe)
       const raw = window.getComputedStyle(probe).animationDuration
       probe.remove()
-      const [value, unit] = raw.split(/^([0-9.eE+-]+)([a-z]*)$/)
-      const n = Number(value)
-      if (unit === 's') return n * 1000
-      return n
+      const match = raw.trim().match(/^([0-9.eE+-]+)(ms|s)$/)
+      if (!match) return Number.NaN
+      const value = Number(match[1])
+      return match[2] === 's' ? value * 1000 : value
     })
 
     // The accessibility-safe sentinel is 0.001ms; allow a generous
@@ -121,5 +121,30 @@ test.describe('Issue #766 slice G W4 — WCAG 2.1 AA gate', () => {
     expect(durationMs).toBeLessThanOrEqual(1)
 
     await context.close()
+  })
+
+  test('restore confirmation supports mouse and keyboard without bypassing hit testing', async ({ page }) => {
+    await login(page)
+    await page.goto('/backups')
+    await page.locator('button[title="Restore"]').first().click()
+    await expect(page.getByText('Restaurar backup')).toBeVisible()
+    const confirmation = page.locator('input[placeholder="backup-001"]')
+    await confirmation.fill('backup-001', { timeout: 3_000 })
+    await expect(confirmation).toHaveValue('backup-001')
+    const confirmButton = page.getByRole('button', { name: 'Confirm', exact: true })
+    await expect(confirmButton).toBeEnabled()
+    await confirmButton.click({ timeout: 3_000 })
+    await expect(page.getByText('Restore dry path completed in test mode')).toBeVisible()
+  })
+
+  test('restore confirmation can be completed with the keyboard', async ({ page }) => {
+    await login(page)
+    await page.goto('/backups')
+    await page.locator('button[title="Restore"]').first().click()
+    await expect(page.getByText('Restaurar backup')).toBeVisible()
+    const confirmation = page.locator('input[placeholder="backup-001"]')
+    await confirmation.fill('backup-001')
+    await confirmation.press('Enter')
+    await expect(page.getByText('Restore dry path completed in test mode')).toBeVisible()
   })
 })
