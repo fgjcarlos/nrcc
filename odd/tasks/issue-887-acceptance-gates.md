@@ -41,7 +41,7 @@ T6 | S5,S6 | review correction workflow | Fix R4-001/R4-002, verify the correcti
 
 T7 | S1,S5,S6 | CI rollback fixture and backend recovery (complete) | Fix default-settings readiness recovery and portable runtime failure injection, retaining rollback assertions and regression coverage. | commit: f8cfc48
 T8 | S1,S5,S6 | independent verification (targeted recheck passed) | Verify shared readiness runtime-port semantics and regression risk (item 3). | commit: f8cfc48
-T9 | S5,S6 | delivery (slice committed; acceptance green locally) | Record correction evidence, commit bounded slice, update PR #954, and observe CI. | commit: f8cfc48 (code), docs commit (this document)
+T9 | S5,S6 | delivery (slice committed; hosted CI green) | Record correction evidence, commit bounded slice, update PR #954, and observe CI. | commit: f8cfc48 (code), docs commit (this document)
 
 T10 | S1,S5,S6 | visual-save HTTP500 diagnosis (not reproduced: no cause found) | Reproduce the reported save failure in isolated Docker state, retain logs/traces, and correct only the demonstrated cause. | commit: none (no cause demonstrated)
 
@@ -202,3 +202,23 @@ L24. User (verbatim): "Lo primero, el del slice" authorizes committing the
     passes 86 files / 587 tests (2 skipped); `git diff --check` clean.
     Slice committed as f8cfc48 (5 files, 296 insertions, 37 deletions) and
     the branch is pushed to PR #954 for a fresh acceptance run.
+L25. Hosted CI on the pushed head is green: run 42895843928
+    ("Docker stack acceptance (#434)") passed in 5m44s, the gate that failed
+    at 66ea06b, and run 42895843896 passed "Backend (Go 1.27.3)",
+    "Frontend (Node 22)", "Lint (golangci-lint)", "OpenAPI Spec" and
+    "Release policy". All 20 reported checks pass, none failing or skipped;
+    GitHub reports the PR as MERGEABLE with mergeStateStatus BLOCKED only
+    because reviewDecision is REVIEW_REQUIRED.
+    Native review: the parent started the ordinary review for this target
+    (lineage review-e10d8c755d5bc2f1, tier medium, lenses review-risk,
+    review-resilience and review-reliability, 13 changed paths, 1179
+    original changed lines, correction budget 200). The provider's collect
+    route rejects every offered binding without mutation or authority burn
+    — the reviewer group returns "Provider collectBinding collides with a
+    different registered route" and the single-slot capture returns
+    "capture-route-registration-rejected / selector-mismatch" — while
+    STATUS keeps re-offering the same three materialize bindings. The
+    native review outcome for this exact candidate is therefore recorded as
+    unavailable (explicit); no native approval is claimed. The
+    risk-gated plan applies: writer self-verification (L24) stands and no
+    separate verifier runs.
