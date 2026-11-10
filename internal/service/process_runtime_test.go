@@ -1,7 +1,10 @@
 package service
 
 import (
+	"net"
+	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -144,6 +147,57 @@ func TestResolveNodeRedRuntime_SettingsRelative(t *testing.T) {
 	if rt.SettingsPath != want {
 		t.Errorf("SettingsPath = %q, want %q", rt.SettingsPath, want)
 	}
+}
+
+// TestProcessManagerEffectiveRuntimePortUsesLastLaunchEnvironment verifies
+// that the launched port honors dotenv-over-OS precedence and remains a
+// snapshot after the dotenv file changes.
+func TestProcessManagerEffectiveRuntimePortUsesLastLaunchEnvironment(t *testing.T) {
+	osPort := unusedRuntimePortForTest(t)
+	dotenvPort := unusedRuntimePortForTest(t)
+	dataDir := t.TempDir()
+	t.Setenv("NODE_RED_PORT", strconv.Itoa(osPort))
+	if err := os.WriteFile(filepath.Join(dataDir, ".env"), []byte("NODE_RED_PORT="+strconv.Itoa(dotenvPort)+"\n"), 0o600); err != nil {
+		t.Fatalf("write .env fixture: %v", err)
+	}
+
+	launcher := filepath.Join(t.TempDir(), "node-red-fixture")
+	// #nosec G306 -- test fixture: the launcher must be executable by the shell to act as a fake Node-RED binary.
+	if err := os.WriteFile(launcher, []byte("#!/bin/sh\nexec /bin/sleep 60\n"), 0o700); err != nil {
+		t.Fatalf("write Node-RED process fixture: %v", err)
+	}
+	pm := NewProcessManager(launcher, dataDir)
+	if err := pm.Start(); err != nil {
+		t.Fatalf("start ProcessManager fixture: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := pm.Stop(); err != nil {
+			t.Errorf("stop ProcessManager fixture: %v", err)
+		}
+	})
+
+	if got := pm.EffectiveRuntimePort(); got != dotenvPort {
+		t.Fatalf("EffectiveRuntimePort() = %d, want .env override %d over OS %d", got, dotenvPort, osPort)
+	}
+	if err := os.WriteFile(filepath.Join(dataDir, ".env"), []byte("NODE_RED_PORT=1881\n"), 0o600); err != nil {
+		t.Fatalf("change .env fixture after launch: %v", err)
+	}
+	if got := pm.EffectiveRuntimePort(); got != dotenvPort {
+		t.Fatalf("EffectiveRuntimePort() changed after launch to %d, want launched port %d", got, dotenvPort)
+	}
+}
+
+func unusedRuntimePortForTest(t *testing.T) int {
+	t.Helper()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("reserve test port: %v", err)
+	}
+	port := listener.Addr().(*net.TCPAddr).Port
+	if err := listener.Close(); err != nil {
+		t.Fatalf("release test port: %v", err)
+	}
+	return port
 }
 
 // TestResolveNodeRedRuntime_PortBoundary accepts port 1 and 65535.
