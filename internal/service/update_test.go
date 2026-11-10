@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -82,30 +83,68 @@ func TestNewUpdateService(t *testing.T) {
 	}
 }
 
-// TestGetCachedStatus_Empty tests that GetCachedStatus now performs an initial check on startup
-// This ensures the UI never shows "unknown" on first page load
-func TestGetCachedStatus_Empty(t *testing.T) {
+// TestNewUpdateServiceUsesInjectedVersionCommands proves constructor-time
+// version checks use test-owned npm and Node-RED executables from PATH.
+func TestNewUpdateServiceUsesInjectedVersionCommands(t *testing.T) {
+	root := t.TempDir()
+	binDir := filepath.Join(root, "usr", "local", "bin")
+	nodeRedTarget := filepath.Join(root, "usr", "local", "lib", "node_modules", "node-red", "bin", "node-red.js")
+	if err := os.MkdirAll(binDir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(nodeRedTarget), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	callsFile := filepath.Join(root, "version-check-calls")
+	nodeRedScript := "#!/bin/sh\nprintf 'Node-RED v4.0.1\\n'\n"
+	npmScript := "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"" + callsFile + "\"\ncase \"$1\" in\n  list) printf '%s\\n' '{\"dependencies\":{\"node-red\":{\"version\":\"4.0.1\"}}}' ;;\n  view) printf '4.0.2\\n' ;;\n  *) exit 2 ;;\nesac\n"
+	//nolint:gosec // G306: the version-check fixture must stay 0700 to run as an executable.
+	if err := os.WriteFile(nodeRedTarget, []byte(nodeRedScript), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	npmPath := filepath.Join(binDir, "npm")
+	//nolint:gosec // G306: the version-check fixture must stay 0700 to run as an executable.
+	if err := os.WriteFile(npmPath, []byte(npmScript), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(nodeRedTarget, filepath.Join(binDir, "node-red")); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	svc := NewUpdateService(filepath.Join(root, "data"))
+	status := svc.GetCachedStatus()
+	if status.CurrentVersion != "4.0.1" || status.LatestVersion != "4.0.2" || !status.UpdateAvailable {
+		t.Fatalf("constructor status = %+v, want injected versions 4.0.1 and 4.0.2", status)
+	}
+	//nolint:gosec // G304: the path is a test-controlled fixture inside t.TempDir().
+	calls, err := os.ReadFile(callsFile)
+	if err != nil {
+		t.Fatalf("read injected version-check calls: %v", err)
+	}
+	if strings.TrimSpace(string(calls)) != "view node-red version" {
+		t.Fatalf("constructor did not use only the injected npm fixture: %q", calls)
+	}
+}
+
+// TestGetCachedStatus_UsesSeededCache verifies startup reads an existing
+// cache without requiring a registry or managed-runtime check.
+func TestGetCachedStatus_UsesSeededCache(t *testing.T) {
 	tmpDir := t.TempDir()
-
-	// Create a mock service with controlled version functions
+	// Seed a valid cache before construction. An empty cache makes the
+	// constructor perform a real npm check before this test can install its
+	// controlled version functions.
+	cacheStore := store.NewJSONStore[model.UpdateCacheEntry](filepath.Join(tmpDir, updateCacheFile))
+	if err := cacheStore.Write(model.UpdateCacheEntry{CurrentVersion: "4.0.1", LatestVersion: "4.0.1"}); err != nil {
+		t.Fatal(err)
+	}
 	svc := NewUpdateService(tmpDir)
-
-	// Override the version functions to return controlled values for this test
-	svc.getInstalledVersionFn = func(ctx context.Context) string {
-		return "4.0.1"
-	}
-	svc.getLatestVersionFn = func(ctx context.Context) (string, error) {
-		return "4.0.1", nil
-	}
+	svc.getInstalledVersionFn = func(context.Context) string { return "4.0.1" }
+	svc.getLatestVersionFn = func(context.Context) (string, error) { return "4.0.1", nil }
 
 	status := svc.GetCachedStatus()
-
-	// After initialization, cache should be populated (not empty)
-	if status.CurrentVersion == "" {
-		t.Error("Expected CurrentVersion to be populated after initialization")
-	}
-	if status.LatestVersion == "" {
-		t.Error("Expected LatestVersion to be populated after initialization")
+	if status.CurrentVersion != "4.0.1" || status.LatestVersion != "4.0.1" {
+		t.Fatalf("cached status = %+v, want seeded controlled versions", status)
 	}
 }
 
@@ -357,11 +396,23 @@ func newOfflinePollingService(t *testing.T) *UpdateService {
 	return svc
 }
 
+// registerPollingCleanup ensures a started service drains before t.TempDir's
+// earlier-registered cleanup removes its backing files. The once guard lets
+// tests stop explicitly and still retain the cleanup safety net.
+func registerPollingCleanup(t *testing.T, svc *UpdateService) func() {
+	t.Helper()
+	var once sync.Once
+	stop := func() { once.Do(svc.Stop) }
+	t.Cleanup(stop)
+	return stop
+}
+
 func TestStartStop(t *testing.T) {
 	for _, cancelCaller := range []bool{false, true} {
 		t.Run(fmt.Sprintf("cancelCaller=%t", cancelCaller), func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
 				svc := newOfflinePollingService(t)
+				stop := registerPollingCleanup(t, svc)
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				entered := make(chan struct{})
@@ -384,7 +435,7 @@ func TestStartStop(t *testing.T) {
 				}
 				stopped := make(chan struct{})
 				go func() {
-					svc.Stop()
+					stop()
 					close(stopped)
 				}()
 				synctest.Wait() // Stop has either returned or blocked on the active worker.
@@ -410,13 +461,14 @@ func TestStartStop(t *testing.T) {
 func TestUpdateStopBeforeStart(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		svc := newOfflinePollingService(t)
-		svc.Stop() // Must return without waiting for a worker that was never started.
+		registerPollingCleanup(t, svc)() // Must return without waiting for a worker that was never started.
 	})
 }
 
 func TestUpdateStartCanceledContext(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		svc := newOfflinePollingService(t)
+		stop := registerPollingCleanup(t, svc)
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 		svc.getInstalledVersionFn = func(context.Context) string {
@@ -425,7 +477,7 @@ func TestUpdateStartCanceledContext(t *testing.T) {
 		}
 		svc.Start(ctx)
 		synctest.Wait()
-		svc.Stop()
+		stop()
 	})
 }
 
