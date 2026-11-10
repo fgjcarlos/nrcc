@@ -1,4 +1,3 @@
-import { createServer } from 'node:net'
 import { expect, request as playwrightRequest, test, type APIRequestContext, type Page } from '@playwright/test'
 
 const nrccURL = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:3001'
@@ -372,38 +371,33 @@ test('a runtime failure rolls back to the previous live configuration', async ()
   const exportMarker = 'module.exports ='
   const exportIndex = beforeSettings.content.lastIndexOf(exportMarker)
   expect(exportIndex, 'live settings source has a module.exports assignment').toBeGreaterThanOrEqual(0)
-  // The candidate must survive the sandbox validation and reach the runtime,
-  // so it fails there instead of at the validation stage. Occupying a port
-  // makes Node-RED fail its readiness probe after the restart, which is the
-  // path that drives the rollback.
-  const blocker = createServer((socket) => socket.destroy())
-  await new Promise<void>((resolve, reject) => {
-    blocker.once('error', reject)
-    blocker.listen(0, '127.0.0.1', resolve)
-  })
-  const address = blocker.address()
-  const occupiedPort = typeof address === 'object' && address !== null ? address.port : 0
-  expect(occupiedPort, 'the blocker socket reports its port').toBeGreaterThan(0)
-  const failingContent = beforeSettings.content.replace(/uiPort:\s*\d+/, `uiPort: ${occupiedPort}`)
-  expect(failingContent, 'the live settings source carries a uiPort to replace').not.toBe(beforeSettings.content)
-
-  let rejected: Awaited<ReturnType<typeof nrcc.post>>
-  try {
-    rejected = await nrcc.post('/api/config/apply/raw', {
-      headers,
-      data: {
-        expectedRevision: beforeSettings.revision.fingerprint,
-        content: failingContent,
-      },
-      // The runtime failure path retries the readiness probe before it rolls
-      // back, so the apply legitimately takes longer than a default request.
-      timeout: 90_000,
-    })
-  } finally {
-    // Every accepted connection is destroyed immediately, so close() never
-    // waits on a socket the readiness probe still holds open.
-    await new Promise<void>((resolve) => blocker.close(() => resolve()))
+  // Binding Node-RED to another loopback address leaves the process healthy
+  // but makes the canonical 127.0.0.1 readiness probe fail. Unlike a host
+  // socket blocker, this injection works when Node-RED shares a Docker
+  // container/network namespace with NRCC. Default settings omit uiPort;
+  // Node-RED's documented default is 1880, which the candidate states so it
+  // passes the static candidate-port gate without changing the saved source.
+  let failingContent = beforeSettings.content
+  if (!/^\s*uiPort:\s*\d+\s*,?\s*$/m.test(failingContent)) {
+    failingContent = failingContent.replace(/(module\.exports\s*=\s*\{)/, '$1\n    uiPort: 1880,')
   }
+  const closingBrace = failingContent.lastIndexOf('}')
+  expect(closingBrace, 'live settings source has an exported object').toBeGreaterThan(0)
+  const settingsBeforeClosingBrace = failingContent.slice(0, closingBrace).trimEnd()
+  const separator = settingsBeforeClosingBrace.endsWith(',') ? '' : ','
+  failingContent = `${settingsBeforeClosingBrace}${separator}\n    uiHost: '127.0.0.2'\n${failingContent.slice(closingBrace)}`
+  expect(failingContent, 'candidate binds away from the readiness probe').not.toBe(beforeSettings.content)
+
+  const rejected = await nrcc.post('/api/config/apply/raw', {
+    headers,
+    data: {
+      expectedRevision: beforeSettings.revision.fingerprint,
+      content: failingContent,
+    },
+    // The runtime failure path retries the readiness probe before it rolls
+    // back, so the apply legitimately takes longer than a default request.
+    timeout: 90_000,
+  })
   // The apply reached the runtime and failed there, not at validation.
   expect(rejected.status()).toBe(500)
   const failure = await rejected.json() as { error?: { code?: string; message?: string } }

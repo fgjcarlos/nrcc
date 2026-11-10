@@ -49,6 +49,7 @@ type ProcessManager struct {
 	currentCmd   *exec.Cmd
 	running      bool
 	externalMode bool // true when attaching to a pre-existing Node-RED process
+	runtimePort  int  // port resolved for the most recent successful Start; guarded by mu
 	startedAt    time.Time
 	restartCount int
 	lastError    error
@@ -100,6 +101,18 @@ func (pm *ProcessManager) CumulativeRestarts() int {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 	return pm.cumulativeRestarts
+}
+
+// EffectiveRuntimePort returns the port resolved for the most recent
+// successful ProcessManager.Start. It is the value passed to Node-RED's
+// --port option after OS, stored-variable, and .env precedence is applied.
+// The last launch value is retained so readiness checks do not re-read a
+// changed .env file or inspect process metadata. Zero means Start has not
+// succeeded yet.
+func (pm *ProcessManager) EffectiveRuntimePort() int {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+	return pm.runtimePort
 }
 
 // closedChan returns an already-closed channel used as a sentinel.
@@ -249,12 +262,17 @@ func (pm *ProcessManager) startLocked(resetCounter bool) error {
 	if err != nil {
 		return fmt.Errorf("invalid Node-RED runtime: %w", err)
 	}
+	runtimePort, err := strconv.Atoi(rt.Port)
+	if err != nil {
+		return fmt.Errorf("invalid resolved Node-RED runtime port %q: %w", rt.Port, err)
+	}
 
 	// Check if Node-RED is already running externally on the configured port
 	if isPortInUse(rt.Port) {
 		// Attach to existing instance
 		pm.externalMode = true
 		pm.running = true
+		pm.runtimePort = runtimePort
 		// Try to find the PID for status reporting
 		running, pid := processRunning("node-red")
 		if running {
@@ -309,6 +327,7 @@ func (pm *ProcessManager) startLocked(resetCounter bool) error {
 	doneCh := make(chan struct{})
 
 	pm.currentCmd = cmd
+	pm.runtimePort = runtimePort
 	pm.stopCh = stopCh
 	pm.doneCh = doneCh
 	pm.running = true
