@@ -222,3 +222,20 @@ L25. Hosted CI on the pushed head is green: run 42895843928
     unavailable (explicit); no native approval is claimed. The
     risk-gated plan applies: writer self-verification (L24) stands and no
     separate verifier runs.
+L26. The final documentation commit changed the candidate again, so the
+    parent started a second native review for it (lineage
+    review-f771b1ed9ddb2a0b, tier medium, same three lenses, 1199 original
+    changed lines, correction budget 200). The provider's collect route
+    rejects it the same way, and this time the rejection is independent of
+    any transcription: the exact provider-owned collect input, read
+    verbatim from the provider's own status, is refused by the single-slot
+    route as "missing or stale for current STATUS", and the reviewer-group
+    route refuses every array shape the host can emit. No authority was
+    burned, no reviewer ran, and no native approval is claimed; the native
+    review outcome for this candidate is recorded as unavailable. The
+    reviewer-group route also requires the three bindings as one flat
+    array, which this host's argument emission cannot produce, so the
+    native review cannot be advanced from this session. Further native
+    attempts for this feature need an explicit human request after the
+    provider route is repaired; the hosted CI and the parent's gate re-run
+    (L24) remain the verification evidence for the slice.
