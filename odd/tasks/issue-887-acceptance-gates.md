@@ -47,6 +47,14 @@ T10 | S1,S5,S6 | visual-save HTTP500 diagnosis (not reproduced: no cause found) 
 
 T11 | S1,S5,S6 | CI lint gate on the pending slice | The pending Go test additions trip gosec (G114, G306 x2) under the CI-pinned golangci-lint v2.14.0. Replace the timeout-less fixture listener with an explicit http.Server and annotate the two executable launcher fixtures. | commit: f8cfc48
 
+T12 | S2 | restart helper | `restartNodeRed` in stack.spec.ts requires pid>0, status running, changed pid and a live probe (same contract as the dashboard restart test); `applyEditorAuth` inherits the running check. | commit: abce08e
+T13 | S1 | source preservation | Visual-save scenario asserts the raw settings.js outside the edited key survives byte for byte (marker/unmanaged content before and after). | commits: abce08e, d24e722 (client timeout fix, L30-L31)
+T14 | S1 | cancellation | Real-stack scenario: a valid changed candidate reaches the confirmation dialog and is cancelled with the mouse and with the keyboard; no apply request, no write, no restart. The HTTP-abort test is renamed to what it proves. | commit: abce08e
+T15 | S4 | Go constructor injection | Every empty-cache `NewUpdateService` call site in update_test.go and internal/handler/updates_test.go gets its version-check dependencies (seeded cache or fixture PATH) before construction. | in progress, uncommitted, unverified (L32)
+T16 | S5 | CI evidence retention | pr.yml and acceptance.yml upload Playwright reports and traces (`if: always()`), with distinct folders for the default and FlowFuse stack runs. | commit: 067c91b
+T17 | S5,S6 | evidence documentation | Document the acceptance scenarios, which suites are mocked fixtures and which are real-runtime evidence, the skipped cases and the environment limitations. | commit: d0b02a2
+T18 | S6 | required gate | After the slice is green, add "Docker stack acceptance (#434)" to the required status checks of main (user decision L29). | commit: none (repository setting)
+
 ## Log
 
 L1. User (verbatim): "Crea un plan para resolver la issue #887, luego delega en
@@ -239,3 +247,68 @@ L26. The final documentation commit changed the candidate again, so the
     attempts for this feature need an explicit human request after the
     provider route is repaired; the hosted CI and the parent's gate re-run
     (L24) remain the verification evidence for the slice.
+L27. User (verbatim): "Resuelve la issue #887". PR #954 (edc996d8) and
+    PR #897 merged with "Refs #887", so the issue stayed open.
+L28. Read-only audit of main 2fb76c3 (explorer task mwc4u9qc-1-m3lh) against
+    the six acceptance criteria: criterion 3 satisfied; gaps remain in
+    criterion 1 (no byte-level source preservation check; the abort test
+    submits invalid content, so it passes even when the abort does nothing),
+    criterion 2 (`restartNodeRed`, stack.spec.ts:88, checks no pid, status or
+    pid change), criterion 4 (empty-cache `NewUpdateService` calls run a real
+    version check before mocks), criterion 5 (no CI job uploads Playwright
+    reports/traces; mocked vs real-runtime evidence undocumented) and
+    criterion 6 (no documented acceptance scenario list; the branch
+    protection of main requires only Frontend, Lint, govulncheck, pnpm audit
+    and Backend, not "Docker stack acceptance (#434)").
+L29. User decisions: (1) "Hacerlo requerido en main (Recomendado)" — add
+    "Docker stack acceptance (#434)" to the required checks of main;
+    (2) "Cancelar en el diálogo (Recomendado)" — cancellation means the user
+    cancels the confirmation dialog; scenario covers mouse and keyboard, no
+    request, no write, no restart. No backend abort semantics are added.
+L30. Real-stack run after T12-T14: 12 passed; the visual-save scenario failed
+    because the "Configuration saved successfully" toast never appeared.
+    Diagnosis (worker mwc5i1ri-3-fck6) found a product defect, independent of
+    the preservation probes (reproduced without them through the API). The UI
+    sends `POST /api/config` with the shared 10 s axios default
+    (frontend/src/shared/lib/api.ts:13). The backend write + restart +
+    readiness took 12-14.7 s on this stack (readiness budget 30 s,
+    internal/service/apply_readiness.go:45-53). The browser aborts at 10 s; the
+    apply runs on the request context (internal/handler/config.go:191), so it
+    rolls back and logs status=500. This explains the unreproduced HTTP 500
+    of L15/L21: the save passes or fails depending on whether it finishes
+    under 10 s. With probes and no client timeout the save returned 200 and
+    every probe survived byte for byte.
+L31. Parent decision: fix the client side only — a per-request timeout that
+    covers the backend budget for the config/settings apply calls, with unit
+    tests (precedent: L7). No backend abort semantics are added (L29).
+L32. Evidence and stop point (2026-11-11). Committed on branch
+    test/issue-887-real-stack-acceptance (not pushed, no PR yet): d24e722
+    (client timeout fix), abce08e (T12-T14 stack.spec.ts), 067c91b (T16 CI
+    artifacts), d0b02a2 (T17 docs). Checks observed: real-stack suite with the
+    rebuilt image, FlowFuse excluded as in CI, 13 passed / 0 failed / 0
+    skipped (the visual save POST /api/config returned 200 in 11985 ms);
+    `pnpm test -- --run` 86 files, 592 passed, 2 skipped; `tsc --noEmit`
+    clean; `pnpm lint` 0 errors (1 pre-existing warning in FormFields.tsx);
+    actionlint v1.7.12 clean on pr.yml and acceptance.yml; langscan no
+    findings. The FlowFuse case was not run locally.
+    Slice boundary: these four commits hold 475 authored lines. As in L8,
+    the feature ships as one PR with one commit per work unit.
+    User (verbatim): "tenemos que cerar por hoy". T15 worker
+    mwc54850-2-txav was cancelled mid-run on the user's stop. Its edits stay
+    UNCOMMITTED and UNVERIFIED in the worktree: internal/service/update.go,
+    update_test.go, update_history_test.go, update_shutdown_test.go,
+    internal/handler/updates_test.go, updates_integration_test.go (+237/-61).
+    The user approved extending the surfaces to update_history_test.go,
+    update_shutdown_test.go and updates_integration_test.go (option A). The
+    worker reported RED: the host npm/node-red were invoked by
+    empty-cache constructions.
+    Resume with: review that diff and confirm the RED regression test exists.
+    Then run `go test ./internal/service/ ./internal/handler/ -count=1` (if
+    the thread budget runs out, use `-p 1 -parallel 2`), `go vet`, `gofmt -l`
+    and golangci-lint v2.14.0, and commit T15. Push, open the PR with
+    "Closes #887" and observe CI, including "Docker stack acceptance (#434)".
+    Once it is green, run T18 (add that check to the required checks of
+    main).
+    Also pending outside this feature: stash@{0} holds the L19 log entry of
+    the stale local branch fix/issue-884-release-packaging (#884 landed via
+    PR #952); its disposition awaits the user.
