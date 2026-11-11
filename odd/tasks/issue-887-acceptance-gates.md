@@ -53,7 +53,7 @@ T14 | S1 | cancellation | Real-stack scenario: a valid changed candidate reaches
 T15 | S4 | Go constructor injection | Every empty-cache `NewUpdateService` call site in update_test.go and internal/handler/updates_test.go gets its version-check dependencies (seeded cache or fixture PATH) before construction. | commit: 339e3a7
 T16 | S5 | CI evidence retention | pr.yml and acceptance.yml upload Playwright reports and traces (`if: always()`), with distinct folders for the default and FlowFuse stack runs. | commit: 067c91b
 T17 | S5,S6 | evidence documentation | Document the acceptance scenarios, which suites are mocked fixtures and which are real-runtime evidence, the skipped cases and the environment limitations. | commit: d0b02a2
-T18 | S6 | required gate | After the slice is green, add "Docker stack acceptance (#434)" to the required status checks of main (user decision L29). | commit: none (repository setting)
+T18 | S6 | required gate | After the slice is green, add "Docker stack acceptance (#434)" to the required status checks of main (user decision L29). | done 2026-11-11 (repository setting, L36)
 
 ## Log
 
@@ -352,3 +352,15 @@ L35. PR #962 opened ("Closes #887"). Native review lineage
     passes on #963. Its Frontend and Docker acceptance checks fail on the
     same runner DNS outage. Next: once the runners resolve again, rerun the
     failed jobs, merge #963 (user decision), rebase #962, rerun CI, then T18.
+L36. User (verbatim): "opcion 2 y el stash incluyelo se sube". PR #963 was
+    merged with --admin (8de386d4); GitHub refuses self-approval, so --admin
+    also bypassed the review requirement. #962 was updated with main by a
+    merge (f173eba, no force push). Hosted CI on #962: 20 of 20 checks pass,
+    including "Docker stack acceptance (#434)" and govulncheck. T18 done: the
+    required status checks of main are now Frontend (Node 22), Lint
+    (golangci-lint), govulncheck, pnpm audit, Docker stack acceptance (#434)
+    and Backend (Go 1.27.4). The bump renamed the Backend job, so the stale
+    required context "Backend (Go 1.27.3)" was replaced; otherwise no PR
+    could merge. #962 is MERGEABLE except for REVIEW_REQUIRED. The #884
+    stash was committed as 1781dc5 and the branch
+    fix/issue-884-release-packaging was pushed.
