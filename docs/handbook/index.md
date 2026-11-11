@@ -40,7 +40,8 @@ handbook/
 ├── contributing/
 │   ├── style.md             ← English source policy + commit + PR hygiene
 │   ├── parser-renderer-contract.md
-│   └── testing-fixtures.md
+│   ├── testing-fixtures.md
+│   └── acceptance-evidence.md ← test evidence classes, real-stack scenarios
 ├── operator/
 │   ├── playbook.md          ← task-oriented guides
 │   ├── troubleshooting.md   ← symptom → diagnosis → recovery
