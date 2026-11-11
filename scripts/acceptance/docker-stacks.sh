@@ -22,6 +22,9 @@
 #   7. Logging configuration     — send a logging-only patch through the
 #      real apply API and prove the live Node-RED runs with the
 #      submitted log level.
+#   8. Operational settings      — recreate a stack with EDGE_MODE and
+#      NRCC_CORS_ORIGINS in the host environment and prove the live API
+#      applies them, while the default stack keeps deny-all CORS (#888).
 # Scenario 1 also seeds root-owned backup/node_modules volumes, proves uid 1000
 # writes both after startup, and proves nrcc retains no capabilities.
 #
@@ -43,12 +46,14 @@ COMPOSE_FILE="${REPO_ROOT}/docker-compose.yml"
 NRCC_IMAGE="${NRCC_IMAGE:-ghcr.io/fgjcarlos/nrcc:latest}"
 
 # #664: NRCC_ENCRYPTION_KEY is required by the :? form in
-# docker-compose.yml. Set a fixture for the acceptance environment
-# so a local developer can run the script without exporting anything;
-# CI overrides with a matching value via the workflow env block. The
-# fixture is well-known and never reused outside this script.
-export NRCC_ENCRYPTION_KEY="${NRCC_ENCRYPTION_KEY:-acceptance-fixture-encryption-key-not-a-secret}"
+# docker-compose.yml. The value below is only a seed: set_compose_env derives
+# a distinct key per Compose project, so no two stacks share a secret store
+# (#888). A local developer can run the script without exporting anything;
+# CI supplies the same well-known seed via the workflow env block. The
+# fixture is never reused outside this script.
+ACCEPTANCE_KEY_SEED="${NRCC_ENCRYPTION_KEY:-acceptance-fixture-encryption-key-not-a-secret}"
 # nosecret (acceptance fixture; not a real credential)
+export NRCC_ENCRYPTION_KEY="$ACCEPTANCE_KEY_SEED"
 
 # Stack A (canonical) — defaults work on a developer host.
 PROJECT_A="${PROJECT_A:-nrcc-acc-a}"
@@ -126,18 +131,32 @@ compose_call() {
 
 # Compose override via env so we don't mutate the canonical compose file.
 # Re-exports COMPOSE_PROJECT_NAME so every nested `docker compose` call
-# without -p also targets the right project.
+# without -p also targets the right project. Each project gets its own host
+# ports and its own NRCC_ENCRYPTION_KEY derived from the seed (#888); the
+# JWT secret is generated inside each project's own /data volume.
 #
-# ponytail: the image override is a documented knob only — the canonical
-# docker-compose.yml hard-codes the image tag, so callers must retag the
-# image before invoking the script (the acceptance workflow does this
-# via `docker buildx bake --load release`). Add image-override via env
-# interpolation in compose when a second image flavor appears.
+# The canonical docker-compose.yml builds the image locally (`build:`), so
+# NRCC_IMAGE is informational here: the acceptance workflow builds the image
+# with `docker compose build` before invoking the script.
 set_compose_env() {
   local project="$1" api_port="$2" nr_port="$3"
   export COMPOSE_PROJECT_NAME="$project"
   export NRCC_HOST_PORT="$api_port"
   export NODE_RED_HOST_PORT="$nr_port"
+  export NRCC_ENCRYPTION_KEY="${ACCEPTANCE_KEY_SEED}-${project}"
+}
+
+# Print the resolved container NRCC_ENCRYPTION_KEY and the published host
+# ports of one project, as Compose would create them.
+resolved_stack_identity() {
+  local project="$1" api_port="$2" nr_port="$3"
+  (
+    set_compose_env "$project" "$api_port" "$nr_port"
+    docker compose -p "$project" -f "$COMPOSE_FILE" config --format json \
+      | jq -r '.services.nrcc
+               | "key=\(.environment.NRCC_ENCRYPTION_KEY)",
+                 (.ports[] | "port=\(.host_ip):\(.published)")'
+  )
 }
 
 # HTTP probe against the API or Node-RED. Returns 0 on 2xx, 1 otherwise.
@@ -427,6 +446,25 @@ scenario_2_isolation() {
         | grep -q '/var/run/docker.sock'; then
       fail "scenario 2: stack B references the Docker socket"
     fi
+  fi
+
+  # #888: the two stacks must not share a secret store or a host port.
+  # Compare what Compose resolves for each project, not the script's inputs.
+  if [[ "$DRY_RUN" != "1" ]]; then
+    local ident_a ident_b shared
+    ident_a="$(resolved_stack_identity "$PROJECT_A" "$HOST_API_A" "$HOST_NR_A")" \
+      || fail "scenario 2: could not resolve stack A compose config"
+    ident_b="$(resolved_stack_identity "$PROJECT_B" "$HOST_API_B" "$HOST_NR_B")" \
+      || fail "scenario 2: could not resolve stack B compose config"
+    [[ "$(grep -c '^port=' <<<"$ident_a")" == "2" && "$(grep -c '^port=' <<<"$ident_b")" == "2" ]] \
+      || fail "scenario 2: expected two published ports per stack"
+    if printf '%s\n%s\n' "$ident_a" "$ident_b" | grep -Eqx 'key=(null)?'; then
+      fail "scenario 2: a stack resolved an empty NRCC_ENCRYPTION_KEY"
+    fi
+    shared="$(comm -12 <(sort -u <<<"$ident_a") <(sort -u <<<"$ident_b"))"
+    [[ -z "$shared" ]] \
+      || fail "scenario 2: stacks A and B share resolved settings: ${shared}"
+    ok "scenarios A/B encryption keys and host ports distinct"
   fi
 
   # Cross-check: the two stacks must not share any named volume.
@@ -863,6 +901,65 @@ scenario_7_logging_configuration() {
 }
 
 # ── Driver ──────────────────────────────────────────────────────────────────
+# Scenario 8 — forwarded operational settings take effect (#888).
+# Stack A runs with the defaults (no CORS origins, edge mode off). Stack B is
+# recreated with EDGE_MODE and NRCC_CORS_ORIGINS set in the host environment,
+# which is how a host .env reaches the container through Compose
+# interpolation; the change needs the container to be recreated (`up -d`).
+
+# Print the Access-Control-Allow-Origin header the API returns for an Origin
+# (empty when the origin is not allowed).
+cors_allow_origin() {
+  local api_port="$1" origin="$2"
+  curl -sS -o /dev/null -D - --max-time 10 -H "Origin: ${origin}" \
+    "http://localhost:${api_port}/healthz" \
+    | tr -d '\r' | sed -n 's/^[Aa]ccess-[Cc]ontrol-[Aa]llow-[Oo]rigin: *//p'
+}
+
+scenario_8_operational_settings() {
+  log "scenario 8: forwarded operational settings reach the live container"
+  local origin="https://acceptance.example"
+  if [[ "$DRY_RUN" == "1" ]]; then
+    ok "scenario 8: SKIPPED in dry-run (needs live containers)"
+    return 0
+  fi
+
+  local token_a info_a
+  token_a="$(login_api "$HOST_API_A")" || fail "scenario 8: login to A failed"
+  info_a="$(api_call_authed GET "http://localhost:${HOST_API_A}/api/system/info" "$token_a")" \
+    || fail "scenario 8: stack A system info failed"
+  [[ "$(jq -r '.data.edgeMode' <<<"$info_a")" == "false" ]] \
+    || fail "scenario 8: stack A edgeMode is not false by default"
+  [[ -z "$(cors_allow_origin "$HOST_API_A" "$origin")" ]] \
+    || fail "scenario 8: stack A allowed a cross-origin request with no NRCC_CORS_ORIGINS"
+  ok "stack A keeps the defaults (edge mode off, cross-origin denied)"
+
+  (
+    set_compose_env "$PROJECT_B" "$HOST_API_B" "$HOST_NR_B"
+    export EDGE_MODE=true NRCC_CORS_ORIGINS="$origin"
+    compose_call "$PROJECT_B" up -d --wait --wait-timeout "$TIMEOUT_NODE"
+  ) || fail "scenario 8: could not recreate stack B with operational settings"
+  http_get "http://localhost:${HOST_API_B}/healthz" \
+    || fail "scenario 8: stack B /healthz did not respond after recreate"
+
+  local bootstrap_b token_b info_b
+  bootstrap_b="$(http_post_json "http://localhost:${HOST_API_B}/api/auth/setup" \
+    "{\"username\":\"${BOOTSTRAP_USER}\",\"password\":\"${BOOTSTRAP_PASS}\"}")" \
+    || fail "scenario 8: bootstrap B failed"
+  assert_contains "$bootstrap_b" "success" "stack B bootstrap response"
+  token_b="$(login_api "$HOST_API_B")" || fail "scenario 8: login to B failed"
+  info_b="$(api_call_authed GET "http://localhost:${HOST_API_B}/api/system/info" "$token_b")" \
+    || fail "scenario 8: stack B system info failed"
+  [[ "$(jq -r '.data.edgeMode' <<<"$info_b")" == "true" ]] \
+    || fail "scenario 8: EDGE_MODE=true did not reach stack B"
+  [[ "$(cors_allow_origin "$HOST_API_B" "$origin")" == "$origin" ]] \
+    || fail "scenario 8: stack B did not allow the configured origin"
+  [[ -z "$(cors_allow_origin "$HOST_API_B" "https://other.example")" ]] \
+    || fail "scenario 8: stack B allowed an origin outside NRCC_CORS_ORIGINS"
+
+  ok "scenario 8: PASS (EDGE_MODE and NRCC_CORS_ORIGINS take effect through Compose)"
+}
+
 main() {
   log "acceptance suite starting"
   log "  image=${NRCC_IMAGE}"
@@ -889,6 +986,7 @@ main() {
   scenario_5_entrypoint_umask
   scenario_6_security_patch
   scenario_7_logging_configuration
+  scenario_8_operational_settings
 
   log "acceptance suite: ALL SCENARIOS PASSED"
 }
