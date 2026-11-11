@@ -98,17 +98,7 @@ func runServer() {
 		}
 	}
 
-	// Parse CORS configuration from environment
-	corsCfg := middleware.CORSConfig{
-		AllowUnsafeWildcard: os.Getenv("NRCC_CORS_UNSAFE_WILDCARD") == "true",
-	}
-	if origins := os.Getenv("NRCC_CORS_ORIGINS"); origins != "" {
-		for _, o := range strings.Split(origins, ",") {
-			if trimmed := strings.TrimSpace(o); trimmed != "" {
-				corsCfg.AllowedOrigins = append(corsCfg.AllowedOrigins, trimmed)
-			}
-		}
-	}
+	corsCfg := corsConfigFromEnv()
 
 	// Set embedded filesystem in server package
 	server.SetEmbedFS(frontendFS)
@@ -214,4 +204,19 @@ func resolveJWTSecret(dataDir string) (string, error) {
 
 	ui.Warn("JWT_SECRET not set — generated a random secret at " + secretPath)
 	return generated, nil
+}
+
+// corsConfigFromEnv reads the CORS bootstrap settings. Compose forwards an
+// unset host value as the empty string (#888), so empty behaves like unset:
+// no allowed origins (deny all cross-origin requests) and no wildcard.
+func corsConfigFromEnv() middleware.CORSConfig {
+	cfg := middleware.CORSConfig{
+		AllowUnsafeWildcard: os.Getenv("NRCC_CORS_UNSAFE_WILDCARD") == "true",
+	}
+	for _, o := range strings.Split(os.Getenv("NRCC_CORS_ORIGINS"), ",") {
+		if trimmed := strings.TrimSpace(o); trimmed != "" {
+			cfg.AllowedOrigins = append(cfg.AllowedOrigins, trimmed)
+		}
+	}
+	return cfg
 }
