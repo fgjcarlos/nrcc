@@ -85,25 +85,85 @@ async function applyEditorAuth(headers: Record<string, string>): Promise<void> {
   nodeRedProbeHeaders = { Authorization: `Bearer ${token}` }
 }
 
-async function restartNodeRed(headers: Record<string, string>): Promise<void> {
-  const response = await nrcc.post('/api/runtime/restart', { headers })
+type RuntimeStatus = { pid: number; status: string; startedAt: string; restartCount: number }
+
+async function readRuntimeStatus(headers: Record<string, string>): Promise<RuntimeStatus> {
+  const response = await nrcc.get('/api/runtime/history?n=1', { headers })
   await expect(response).toBeOK()
-  await waitForNodeRed()
+  return (await response.json() as { data: { status: RuntimeStatus } }).data.status
+}
+
+/** The fields that identify one managed process; `uptime` advances on its own. */
+function runtimeIdentity(status: RuntimeStatus): RuntimeStatus {
+  return { pid: status.pid, status: status.status, startedAt: status.startedAt, restartCount: status.restartCount }
+}
+
+async function readRawSettings(headers: Record<string, string>): Promise<{ content: string; revision: { fingerprint: string } }> {
+  const response = await nrcc.get('/api/settings/raw', { headers })
+  await expect(response).toBeOK()
+  return (await response.json() as { data: { content: string; revision: { fingerprint: string } } }).data
 }
 
 /**
- * Waits until Node-RED answers again. Once `adminAuth` is enabled the
- * unauthenticated `/flows` probe answers 401, so "the listener is up" is
- * signalled by any HTTP status, not by a 2xx.
+ * Describes why the managed runtime does not yet satisfy `want`, or returns
+ * the status once it does. A status lookup failure, a stopped or starting
+ * runtime and a missing PID all report as "not yet", never as success.
  */
-async function waitForNodeRed(): Promise<void> {
+async function runtimeState(headers: Record<string, string>): Promise<RuntimeStatus | string> {
+  const response = await nrcc.get('/api/runtime/history?n=1', { headers })
+  if (!response.ok()) return `runtime status lookup answered ${response.status()}`
+  const status = (await response.json() as { data?: { status?: RuntimeStatus } }).data?.status
+  if (!status) return 'runtime status missing'
+  if (status.status !== 'running') return `runtime status is ${status.status}`
+  if (!(status.pid > 0)) return `runtime pid is ${status.pid}`
+  return status
+}
+
+/** Waits until the managed runtime is running with a positive PID. */
+async function waitForRunningRuntime(headers: Record<string, string>): Promise<RuntimeStatus> {
+  let running: RuntimeStatus | undefined
   await expect.poll(async () => {
+    const state = await runtimeState(headers)
+    if (typeof state === 'string') return state
+    running = state
+    return 'running'
+  }, { timeout: 30_000, message: 'the managed runtime must be running before a restart is measured' }).toBe('running')
+  return running as RuntimeStatus
+}
+
+/**
+ * A restart is proven only by all four observations together: a running
+ * status, a positive PID, a PID different from the one before the restart,
+ * and a live Node-RED probe that answers 200 (or 401 once `adminAuth` is
+ * enabled and the probe carries no token). A stopped runtime, an unavailable
+ * status (PID 0), the previous process or an unreachable listener can never
+ * satisfy it.
+ */
+async function expectRestartedRuntime(headers: Record<string, string>, previousPid: number): Promise<RuntimeStatus> {
+  expect(previousPid, 'the PID before the restart must identify a live process').toBeGreaterThan(0)
+  let restarted: RuntimeStatus | undefined
+  await expect.poll(async () => {
+    const state = await runtimeState(headers)
+    if (typeof state === 'string') return state
+    if (state.pid === previousPid) return `runtime pid ${state.pid} did not change`
+    let probeStatus: number
     try {
-      return (await nodeRed.get('/flows', { headers: nodeRedProbeHeaders })).status()
+      probeStatus = (await nodeRed.get('/flows', { headers: nodeRedProbeHeaders })).status()
     } catch {
-      return 0
+      return 'live Node-RED probe unreachable'
     }
-  }, { timeout: 30_000 }).toBeGreaterThan(0)
+    if (probeStatus !== 200 && probeStatus !== 401) return `live Node-RED probe answered ${probeStatus}`
+    restarted = state
+    return 'restarted'
+  }, { timeout: 30_000, message: 'the restart must produce a new running process that answers a live probe' }).toBe('restarted')
+  return restarted as RuntimeStatus
+}
+
+async function restartNodeRed(headers: Record<string, string>): Promise<RuntimeStatus> {
+  const before = await waitForRunningRuntime(headers)
+  const response = await nrcc.post('/api/runtime/restart', { headers })
+  await expect(response).toBeOK()
+  return expectRestartedRuntime(headers, before.pid)
 }
 
 /**
@@ -234,6 +294,32 @@ function stripAdminAuthBlock(content: string): string {
   if (end >= lines.length) return content
   lines.splice(start, end - start + 1)
   return lines.join('\n')
+}
+
+// Unmanaged source the visual-save scenario seeds into settings.js. The
+// source-patch contract (internal/service/source_patch.go) guarantees that
+// comments, unknown keys and content outside module.exports survive a
+// managed edit byte for byte.
+const preservationHeader = '// nrcc-887 source preservation probe: header comment\n'
+const preservationBody = [
+  '    // nrcc-887 source preservation probe: line comment',
+  '    /* nrcc-887 source preservation probe: block comment */',
+  "    nrccSourcePreservationProbe: function () { return 'issue-887' },",
+].join('\n') + '\n'
+
+function insertPreservationProbes(content: string): string {
+  const opening = /module\.exports\s*=\s*\{[^\n]*\n/.exec(content)
+  if (!opening) throw new Error('settings.js must expose a module.exports object literal')
+  const at = opening.index + opening[0].length
+  return preservationHeader + content.slice(0, at) + preservationBody + content.slice(at)
+}
+
+function removePreservationProbes(content: string): string {
+  return content.replace(preservationHeader, '').replace(preservationBody, '')
+}
+
+function sourceBeforeExports(content: string): string {
+  return content.slice(0, content.indexOf('module.exports'))
 }
 
 test.describe.configure({ mode: 'serial' })
@@ -510,7 +596,11 @@ test('semantically invalid raw settings are rejected without restarting Node-RED
   }).toEqual(runtimeBefore)
 })
 
-test('aborted raw settings submission leaves source and runtime unchanged', async ({ page }) => {
+// This case only proves that a client-side abort of an invalid candidate
+// surfaces as an abort and leaves no partial write behind. It does not prove
+// that the server honours an abort of a valid candidate: the product defines
+// cancellation as dismissing the review panel, covered by the next test.
+test('client-aborted invalid raw submission leaves source and runtime unchanged', async ({ page }) => {
   const headers = await authHeaders()
   const beforeResponse = await nrcc.get('/api/settings/raw', { headers })
   await expect(beforeResponse).toBeOK()
@@ -566,6 +656,60 @@ test('aborted raw settings submission leaves source and runtime unchanged', asyn
   }).toEqual(runtimeBefore)
 })
 
+// Cancellation of the configuration transaction: a valid, changed candidate
+// reaches the review panel and the operator dismisses it, once with the mouse
+// and once with the keyboard. Neither dismissal may send a write, change the
+// live source or restart the runtime, and the unsaved edit stays in the form.
+test('cancelled configuration review sends no write and leaves source and runtime unchanged', async ({ page }) => {
+  const headers = await authHeaders()
+  const sourceBefore = await readRawSettings(headers)
+  const runtimeBefore = await waitForRunningRuntime(headers)
+  const cancelledTitle = 'NRCC issue 887 cancelled edit'
+  expect(sourceBefore.content).not.toContain(cancelledTitle)
+
+  await login(page)
+  const writes: string[] = []
+  page.on('request', (request) => {
+    const path = new URL(request.url()).pathname
+    if (request.method() !== 'GET' && /^\/api\/(config|settings|runtime)\b/.test(path)) {
+      writes.push(`${request.method()} ${path}`)
+    }
+  })
+  await page.getByTestId('app-sidebar').getByRole('link', { name: 'Configuration' }).click()
+  await page.getByRole('button', { name: 'Editor Theme' }).click()
+  // The view resets the form when the saved config arrives, so the edit is
+  // re-applied until it sticks.
+  await expect(async () => {
+    await page.getByLabel('Page Title').fill(cancelledTitle)
+    await page.waitForTimeout(300)
+    expect(await page.getByLabel('Page Title').inputValue()).toBe(cancelledTitle)
+  }).toPass({ timeout: 30_000 })
+
+  const panel = page.getByTestId('review-changes-panel')
+  const footerCancel = panel.locator('footer').getByRole('button', { name: 'Cancel', exact: true })
+
+  // Mouse: a real pointer click on the footer Cancel button.
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(panel).toBeVisible()
+  await expect(panel.getByTestId('review-changes-panel-apply')).toBeEnabled()
+  await footerCancel.click()
+  await expect(panel).toBeHidden()
+
+  // Keyboard: focus starts on Cancel, and Escape dismisses the panel.
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(panel).toBeVisible()
+  await expect(footerCancel).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(panel).toBeHidden()
+
+  await expect(page.getByLabel('Page Title')).toHaveValue(cancelledTitle)
+  expect(writes).toEqual([])
+  const sourceAfter = await readRawSettings(headers)
+  expect(sourceAfter.content).toBe(sourceBefore.content)
+  expect(sourceAfter.revision.fingerprint).toBe(sourceBefore.revision.fingerprint)
+  expect(runtimeIdentity(await readRuntimeStatus(headers))).toEqual(runtimeIdentity(runtimeBefore))
+})
+
 test('dashboard restart changes the managed Node-RED process PID', async ({ page }) => {
   const headers = await authHeaders()
   const beforeResponse = await nrcc.get('/api/runtime/history?n=1', { headers })
@@ -579,30 +723,10 @@ test('dashboard restart changes the managed Node-RED process PID', async ({ page
   await page.getByRole('button', { name: 'Yes, restart' }).click()
   await expect(page.getByText('Node-RED restarted')).toBeVisible()
 
-  await expect.poll(async () => {
-    const response = await nrcc.get('/api/runtime/history?n=1', { headers })
-    if (!response.ok()) return null
-    const payload = await response.json() as { data?: { status?: { pid?: number; status?: string } } }
-    const status = payload.data?.status
-    if (status?.status !== 'running' || !status.pid || status.pid <= 0) return null
-    let probeStatus: number
-    try {
-      probeStatus = (await nodeRed.get('/flows', { headers: nodeRedProbeHeaders })).status()
-    } catch {
-      return null
-    }
-    return probeStatus > 0 && probeStatus < 500
-      ? { pid: status.pid, status: status.status, probeStatus }
-      : null
-  }, { timeout: 30_000 }).toMatchObject({ status: 'running' })
-  const afterResponse = await nrcc.get('/api/runtime/history?n=1', { headers })
-  await expect(afterResponse).toBeOK()
-  const after = await afterResponse.json() as { data?: { status?: { pid?: number; status?: string } } }
-  expect(after.data?.status?.status).toBe('running')
-  expect(after.data?.status?.pid).toBeGreaterThan(0)
-  expect(after.data?.status?.pid).not.toBe(before.data?.status?.pid)
-  const liveProbe = await nodeRed.get('/flows', { headers: nodeRedProbeHeaders })
-  expect([200, 401]).toContain(liveProbe.status())
+  const after = await expectRestartedRuntime(headers, before.data?.status?.pid ?? 0)
+  expect(after.status).toBe('running')
+  expect(after.pid).toBeGreaterThan(0)
+  expect(after.pid).not.toBe(before.data?.status?.pid)
 })
 
 test('dashboard labels container-scoped resource metrics returned by the API', async ({ page }) => {
@@ -706,6 +830,16 @@ test('unrelated visual edit keeps every admin account, permission and session ex
   expect(observerDeploy.status()).toBe(401)
   expect(await nodeRedToken(administratorUsername, administratorPassword, '*')).toBeTruthy()
 
+  // --- unmanaged source the visual edit must not touch -----------
+  const unseeded = await readRawSettings(headers)
+  const seeded = await nrcc.post('/api/settings/raw', {
+    headers,
+    data: { content: insertPreservationProbes(unseeded.content), expectedRevision: unseeded.revision.fingerprint },
+  })
+  await expect(seeded).toBeOK()
+  const seededSource = (await readRawSettings(headers)).content
+  expect(seededSource).toContain(preservationBody)
+
   // --- the unrelated visual edit, through the real screen ---------
   await login(page)
   await page.getByTestId('app-sidebar').getByRole('link', { name: 'Configuration' }).click()
@@ -755,6 +889,11 @@ test('unrelated visual edit keeps every admin account, permission and session ex
   expect(raw).toContain(observerUsername)
   expect(raw).toContain(administratorUsername)
   expect(raw).toContain('sessionExpiryTime')
+  // Source preservation: the unmanaged comments, the unknown key with its
+  // function value and everything before module.exports are byte-identical.
+  const savedSource = (await readRawSettings(headers)).content
+  expect(savedSource).toContain(preservationBody)
+  expect(sourceBeforeExports(savedSource)).toBe(sourceBeforeExports(seededSource))
 
   // And the runtime still enforces it after a restart that reloads
   // settings.js.
@@ -779,7 +918,7 @@ test('unrelated visual edit keeps every admin account, permission and session ex
     await expect(liveRaw).toBeOK()
     const liveSettings = ((await liveRaw.json()) as { data?: { content?: string; revision?: { fingerprint?: string } } }).data
     const liveRevision = liveSettings?.revision?.fingerprint
-    const withoutAdminAuth = stripAdminAuthBlock(liveSettings?.content ?? '')
+    const withoutAdminAuth = removePreservationProbes(stripAdminAuthBlock(liveSettings?.content ?? ''))
     const restored = await nrcc.post('/api/settings/raw', {
       headers,
       data: { content: withoutAdminAuth, expectedRevision: liveRevision },
