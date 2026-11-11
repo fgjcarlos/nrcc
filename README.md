@@ -21,7 +21,7 @@ NRCC is for solo operators, small teams, and integrators who run one Node-RED in
 - **Visual configuration of Node-RED `settings.js`** — typed catalog of high-value settings (#762), source-preserving advanced escape hatches (#764), transactional apply (#758) with backups (#431) and atomic rollback. See [`docs/control-plane.md`](docs/control-plane.md) for the full roadmap traceability table.
 - **Access administration** — NRCC users and roles (#759), separate surface for Node-RED `adminAuth` (#760), Dashboard authentication (#761).
 - **Instance management** — lifecycle, live logs, environment, npm library, flow import/export, system metrics.
-- **Backup and restore** — in-volume timestamped snapshots (default) and optional Restic off-host encrypted backups (#432).
+- **Backup and restore** — in-volume timestamped snapshots. Restic off-host encrypted backups are deferred (#432).
 
 NRCC configures. It does **not**:
 
@@ -95,24 +95,20 @@ The full env contract (every variable, defaults, restart requirements, per-stack
 
 ### 2. Add a second instance
 
-```yaml
-  nrcc-b:
-    build: .
-    ports:
-      - "127.0.0.1:3002:3001"
-      - "127.0.0.1:1881:1880"
-    environment:
-      PORT: "3001"
-      DATA_DIR: /data
-      JWT_SECRET: "<a different random string>"
-      NRCC_ENCRYPTION_KEY: "<a different random string>"
-    volumes:
-      - nrcc_data_b:/data
-      - nrcc_backups_b:/data/backups
-      - nrcc_node_modules_b:/data/node_modules
+Each stack is one container with one NRCC and one Node-RED. Run a second stack from the same compose file under its own project name, with its own settings file:
+
+```bash
+umask 077
+cat > stack-b.conf <<EOF
+NRCC_ENCRYPTION_KEY=$(openssl rand -base64 48)
+JWT_SECRET=$(openssl rand -base64 48)
+NRCC_HOST_PORT=3002
+NODE_RED_HOST_PORT=1881
+EOF
+docker compose -p nrcc-b --env-file stack-b.conf up -d --build
 ```
 
-Two stacks on the same host MUST differ on `PORT`, `NODE_RED_PORT`, `DATA_DIR` (volume), `JWT_SECRET`, and `NRCC_ENCRYPTION_KEY`. The env contract enforces this.
+Two stacks on the same host MUST differ on the Compose project name (it namespaces the volumes), `NRCC_HOST_PORT`, `NODE_RED_HOST_PORT`, `NRCC_ENCRYPTION_KEY`, and `JWT_SECRET`. The in-container `PORT`, `NODE_RED_PORT` and `DATA_DIR` are pinned and identical. The acceptance suite checks this for its own stacks; on an operator's host nothing enforces it yet. See [Per-stack guarantees](docs/configuration/env-contract.md#per-stack-guarantees).
 
 ## Configuration
 
@@ -120,16 +116,15 @@ All configuration is via environment variables. The shipped `.env.example` rejec
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `PORT` | `3001` | NRCC HTTP port |
-| `DATA_DIR` | `/data` | Where NRCC stores config, users, sessions, backups |
+| `NRCC_ENCRYPTION_KEY` | none | **Required**: Compose refuses to start without it (#664). Encrypts the persisted env store |
 | `JWT_SECRET` | (auto-generated, persisted) | JWT signing secret |
-| `NRCC_ENCRYPTION_KEY` | empty (encryption disabled) | Encrypts the persisted env store (required from #664) |
-| `NODE_RED_PORT` | `1880` | Node-RED editor port |
-| `NODE_RED_USER_DIR` | `<DATA_DIR>` | Where Node-RED keeps flows, `settings.js`, `node_modules` |
-| `NRCC_BACKUP_DIR` | `<DATA_DIR>/backups` | Local backup snapshot root |
-| `NRCC_RESTIC_REPO` + `_BINARY` + `_PASSWORD` + `_PASSWORD_FILE` + `_CACHE_DIR` | empty | Off-host backups (all five required to enable, #432) |
-| `NRCC_CORS_ORIGINS` | `*` | CORS allowed origins |
+| `NRCC_HOST_PORT` / `NODE_RED_HOST_PORT` | `3001` / `1880` | Host ports of the NRCC UI and the Node-RED editor (Compose only) |
+| `NRCC_CORS_ORIGINS` | empty (deny all cross-origin requests) | Comma-separated allowed origins |
+| `NRCC_TRUSTED_PROXIES` | empty | CIDRs/IPs trusted for forwarded headers |
 | `EDGE_MODE` | `false` | Resource-safe defaults (ADR 0002) |
+| `NRCC_METRICS_PUBLIC` | `false` | Serve `/metrics` without authentication |
+
+The compose file forwards these and the other documented operational settings from `.env`; run `docker compose up -d` after a change. In-container `PORT`, `DATA_DIR` and the Node-RED paths are pinned. Restic (`NRCC_RESTIC_*`) is deferred (#432) and not forwarded. See [Compose forwarding](docs/configuration/env-contract.md#compose-forwarding).
 
 > **Operator self-check.** Before public exposure: set strong `JWT_SECRET` and `NRCC_ENCRYPTION_KEY`, persist `DATA_DIR` on durable storage, place NRCC behind a reverse proxy with HTTPS, and restrict `NRCC_CORS_ORIGINS`.
 

@@ -15,7 +15,7 @@ The unit of deployment is a single Docker Compose service containing exactly one
 NRCC binary supervising one Node-RED process:
 
 ```text
-Compose service: nodered
+Compose service: nrcc
 ┌────────────────────────────────────────────────────────┐
 │  Container: nrcc                                        │
 │  ┌──────────────────┐   ┌───────────────────────────┐   │

@@ -17,8 +17,8 @@ The canonical `docker-compose.yml` forwards only a subset of the documented env 
 ## Tasks
 
 - [x] T1 — S1, S2, S6: forward supported settings in `docker-compose.yml`; static + `docker compose config` contract test; extract and test the CORS env parsing. Route: inline. Commit: 03e926d
-- [x] T2 — S2, S5, S6: acceptance suite uses a distinct encryption key per stack, asserts no shared key / host port, and adds scenario 8 (live EDGE_MODE + CORS effect after `up -d` recreate). Route: inline. Commit: (this commit)
-- [ ] T3 — S3, S4: reconcile env-contract, docker-stack, README, architecture docs (Compose forwarding, Restic deferred, encryption, topology, multi-stack). Route: inline. Commit: —
+- [x] T2 — S2, S5, S6: acceptance suite uses a distinct encryption key per stack, asserts no shared key / host port, and adds scenario 8 (live EDGE_MODE + CORS effect after `up -d` recreate). Route: inline. Commit: 15f66f7
+- [x] T3 — S3, S4: reconcile env-contract, docker-stack, README, architecture docs (Compose forwarding, Restic deferred, encryption, topology, multi-stack). Route: inline. Commit: (this commit)
 - [ ] T4 — S7: hand the `.env.example` snippet to the user. Route: user. Commit: —
 
 ## Log
