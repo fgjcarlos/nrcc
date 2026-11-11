@@ -92,9 +92,17 @@ workflow artifacts, kept for 14 days:
 ## Gates before publication
 
 `Docker stack acceptance (#434)` is a required status check on `main`, next to
-the Frontend, Backend, Lint, govulncheck and pnpm audit checks. A change cannot
-merge into `main` unless the real-runtime scenarios above pass on its exact
-head.
+the Frontend, Backend, Lint, govulncheck and pnpm audit checks. A pull request
+from a branch of this repository cannot merge into `main` unless the
+real-runtime scenarios above pass on its exact head.
+
+Two exceptions remain:
+
+- **Fork pull requests.** `acceptance.yml` skips them, and GitHub counts a
+  job skipped by its `if:` condition as passed. A fork PR labelled
+  `safe-to-test` can therefore merge without a real-runtime run.
+- **Administrator bypass.** Branch protection does not apply to
+  administrators, so a merge with `--admin` skips every required check.
 
 ## Running the real-runtime suite locally
 

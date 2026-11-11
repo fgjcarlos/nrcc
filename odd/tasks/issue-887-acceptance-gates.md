@@ -364,3 +364,14 @@ L36. User (verbatim): "opcion 2 y el stash incluyelo se sube". PR #963 was
     could merge. #962 is MERGEABLE except for REVIEW_REQUIRED. The #884
     stash was committed as 1781dc5 and the branch
     fix/issue-884-release-packaging was pushed.
+L37. Independent verification of the main protection (gentle-ai-verify
+    mwcd7bdw-4-cs49, Risk item 5): PASS. The six required contexts exist and
+    match job names that run for same-repository PRs to main. No required job
+    has a path filter. strict true, 1 review, enforce_admins false. No
+    ruleset adds anything. Advisory, recorded in the docs: GitHub counts a job
+    skipped by `if:` as passed, so a fork PR labelled `safe-to-test` can merge
+    without the real-stack run (acceptance.yml has no safe-to-test override),
+    and an admin merge bypasses every required check. The handbook sentence
+    was narrowed to same-repository PRs and names both exceptions. A
+    safe-to-test override for acceptance.yml is follow-up work and was not
+    done here.
