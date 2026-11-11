@@ -47,6 +47,14 @@ T10 | S1,S5,S6 | visual-save HTTP500 diagnosis (not reproduced: no cause found) 
 
 T11 | S1,S5,S6 | CI lint gate on the pending slice | The pending Go test additions trip gosec (G114, G306 x2) under the CI-pinned golangci-lint v2.14.0. Replace the timeout-less fixture listener with an explicit http.Server and annotate the two executable launcher fixtures. | commit: f8cfc48
 
+T12 | S2 | restart helper | `restartNodeRed` in stack.spec.ts requires pid>0, status running, changed pid and a live probe (same contract as the dashboard restart test); `applyEditorAuth` inherits the running check. | commit: abce08e
+T13 | S1 | source preservation | Visual-save scenario asserts the raw settings.js outside the edited key survives byte for byte (marker/unmanaged content before and after). | commits: abce08e, d24e722 (client timeout fix, L30-L31)
+T14 | S1 | cancellation | Real-stack scenario: a valid changed candidate reaches the confirmation dialog and is cancelled with the mouse and with the keyboard; no apply request, no write, no restart. The HTTP-abort test is renamed to what it proves. | commit: abce08e
+T15 | S4 | Go constructor injection | Every empty-cache `NewUpdateService` call site in update_test.go and internal/handler/updates_test.go gets its version-check dependencies (seeded cache or fixture PATH) before construction. | commit: 339e3a7
+T16 | S5 | CI evidence retention | pr.yml and acceptance.yml upload Playwright reports and traces (`if: always()`), with distinct folders for the default and FlowFuse stack runs. | commit: 067c91b
+T17 | S5,S6 | evidence documentation | Document the acceptance scenarios, which suites are mocked fixtures and which are real-runtime evidence, the skipped cases and the environment limitations. | commit: d0b02a2
+T18 | S6 | required gate | After the slice is green, add "Docker stack acceptance (#434)" to the required status checks of main (user decision L29). | done 2026-11-11 (repository setting, L36)
+
 ## Log
 
 L1. User (verbatim): "Crea un plan para resolver la issue #887, luego delega en
@@ -239,3 +247,131 @@ L26. The final documentation commit changed the candidate again, so the
     attempts for this feature need an explicit human request after the
     provider route is repaired; the hosted CI and the parent's gate re-run
     (L24) remain the verification evidence for the slice.
+L27. User (verbatim): "Resuelve la issue #887". PR #954 (edc996d8) and
+    PR #897 merged with "Refs #887", so the issue stayed open.
+L28. Read-only audit of main 2fb76c3 (explorer task mwc4u9qc-1-m3lh) against
+    the six acceptance criteria: criterion 3 satisfied; gaps remain in
+    criterion 1 (no byte-level source preservation check; the abort test
+    submits invalid content, so it passes even when the abort does nothing),
+    criterion 2 (`restartNodeRed`, stack.spec.ts:88, checks no pid, status or
+    pid change), criterion 4 (empty-cache `NewUpdateService` calls run a real
+    version check before mocks), criterion 5 (no CI job uploads Playwright
+    reports/traces; mocked vs real-runtime evidence undocumented) and
+    criterion 6 (no documented acceptance scenario list; the branch
+    protection of main requires only Frontend, Lint, govulncheck, pnpm audit
+    and Backend, not "Docker stack acceptance (#434)").
+L29. User decisions: (1) "Hacerlo requerido en main (Recomendado)" — add
+    "Docker stack acceptance (#434)" to the required checks of main;
+    (2) "Cancelar en el diálogo (Recomendado)" — cancellation means the user
+    cancels the confirmation dialog; scenario covers mouse and keyboard, no
+    request, no write, no restart. No backend abort semantics are added.
+L30. Real-stack run after T12-T14: 12 passed; the visual-save scenario failed
+    because the "Configuration saved successfully" toast never appeared.
+    Diagnosis (worker mwc5i1ri-3-fck6) found a product defect, independent of
+    the preservation probes (reproduced without them through the API). The UI
+    sends `POST /api/config` with the shared 10 s axios default
+    (frontend/src/shared/lib/api.ts:13). The backend write + restart +
+    readiness took 12-14.7 s on this stack (readiness budget 30 s,
+    internal/service/apply_readiness.go:45-53). The browser aborts at 10 s; the
+    apply runs on the request context (internal/handler/config.go:191), so it
+    rolls back and logs status=500. This explains the unreproduced HTTP 500
+    of L15/L21: the save passes or fails depending on whether it finishes
+    under 10 s. With probes and no client timeout the save returned 200 and
+    every probe survived byte for byte.
+L31. Parent decision: fix the client side only — a per-request timeout that
+    covers the backend budget for the config/settings apply calls, with unit
+    tests (precedent: L7). No backend abort semantics are added (L29).
+L32. Evidence and stop point (2026-11-11). Committed on branch
+    test/issue-887-real-stack-acceptance (not pushed, no PR yet): d24e722
+    (client timeout fix), abce08e (T12-T14 stack.spec.ts), 067c91b (T16 CI
+    artifacts), d0b02a2 (T17 docs). Checks observed: real-stack suite with the
+    rebuilt image, FlowFuse excluded as in CI, 13 passed / 0 failed / 0
+    skipped (the visual save POST /api/config returned 200 in 11985 ms);
+    `pnpm test -- --run` 86 files, 592 passed, 2 skipped; `tsc --noEmit`
+    clean; `pnpm lint` 0 errors (1 pre-existing warning in FormFields.tsx);
+    actionlint v1.7.12 clean on pr.yml and acceptance.yml; langscan no
+    findings. The FlowFuse case was not run locally.
+    Slice boundary: these four commits hold 475 authored lines. As in L8,
+    the feature ships as one PR with one commit per work unit.
+    User (verbatim): "tenemos que cerar por hoy". T15 worker
+    mwc54850-2-txav was cancelled mid-run on the user's stop. Its edits stay
+    UNCOMMITTED and UNVERIFIED in the worktree: internal/service/update.go,
+    update_test.go, update_history_test.go, update_shutdown_test.go,
+    internal/handler/updates_test.go, updates_integration_test.go (+237/-61).
+    The user approved extending the surfaces to update_history_test.go,
+    update_shutdown_test.go and updates_integration_test.go (option A). The
+    worker reported RED: the host npm/node-red were invoked by
+    empty-cache constructions.
+    Resume with: review that diff and confirm the RED regression test exists.
+    Then run `go test ./internal/service/ ./internal/handler/ -count=1` (if
+    the thread budget runs out, use `-p 1 -parallel 2`), `go vet`, `gofmt -l`
+    and golangci-lint v2.14.0, and commit T15. Push, open the PR with
+    "Closes #887" and observe CI, including "Docker stack acceptance (#434)".
+    Once it is green, run T18 (add that check to the required checks of
+    main).
+    Also pending outside this feature: stash@{0} holds the L19 log entry of
+    the stale local branch fix/issue-884-release-packaging (#884 landed via
+    PR #952); its disposition awaits the user.
+L33. Missing proof at the stop: the close declared "Risk: item 3" (the new
+    CONFIG_APPLY_TIMEOUT_MS applies to configService.updateConfig,
+    configService.applyConfig — also used by securityCenterHelpers.ts:44 —
+    and settingsService.saveRaw, which several screens share). No independent
+    gentle-ai-verify ran, because the user stopped for the day. Resume by
+    launching gentle-ai-verify on d24e722 with that Risk line, before the PR
+    is published.
+L34. User (verbatim): "continua". Independent verification
+    (gentle-ai-verify mwc8mtgx-1-odz1) of the Risk item 3 change d24e722:
+    PASS. Every caller of updateConfig, applyConfig and saveRaw keeps its
+    pending and disabled state until the response arrives; mutations are not
+    retried; the 401 refresh resends with the same timeout; no UI timer
+    assumes 10 s; vitest on configuration and security: 19 files, 127 passed,
+    2 skipped; tsc clean. Advisory, pre-existing: the presets confirm dialog
+    (AdvancedSettings.tsx:203) has no pending guard; the backend answers a
+    second save with APPLY_IN_FLIGHT. T15 diff verdict: no defect, and no
+    assertion removed (counts of t.Fatal and t.Error equal or higher). It was
+    unverified in the verifier sandbox (GOPROXY=off). The parent then ran:
+    `gofmt -l` on the 6 changed files is clean; `go vet ./internal/service/
+    ./internal/handler/` passes; `go test ./internal/handler/ -count=1`
+    ok (452 s); `go test ./internal/service/ -count=1 -timeout 30m
+    -parallel 4` ok (615 s). A first run with `-p 1 -parallel 2` hit the
+    600 s default timeout, which is an environment limit, not a test failure
+    (CI uses -timeout 20m). golangci-lint was not run locally; the required
+    "Lint (golangci-lint)" check covers it. T15 committed as 339e3a7.
+L35. PR #962 opened ("Closes #887"). Native review lineage
+    review-4407a171fa3fbeb1 (tier high; resilience, readability and
+    reliability lenses): approved, acknowledgement completed (authority
+    burned). It left 10 non-blocking advisory findings (R2-001..R2-006,
+    R3-001..R3-004) for later work. Hosted CI on #962: 17 checks pass.
+    "Frontend (Node 22)" and "Docker stack acceptance (#434)" failed twice
+    in the runner's `playwright install --with-deps` step ("Temporary failure
+    resolving 'security.ubuntu.com'"), a GitHub runner DNS outage
+    independent of the change. "govulncheck" fails on main too
+    (GO-2026-6859, net/http, fixed in go1.27.4). User decision: "PR aparte
+    con el bump (Recomendado)". PR #963 (d630622, chore/go-1.27.4-govulncheck)
+    bumps the toolchain. Independent verification passed, and govulncheck
+    passes on #963. Its Frontend and Docker acceptance checks fail on the
+    same runner DNS outage. Next: once the runners resolve again, rerun the
+    failed jobs, merge #963 (user decision), rebase #962, rerun CI, then T18.
+L36. User (verbatim): "opcion 2 y el stash incluyelo se sube". PR #963 was
+    merged with --admin (8de386d4); GitHub refuses self-approval, so --admin
+    also bypassed the review requirement. #962 was updated with main by a
+    merge (f173eba, no force push). Hosted CI on #962: 20 of 20 checks pass,
+    including "Docker stack acceptance (#434)" and govulncheck. T18 done: the
+    required status checks of main are now Frontend (Node 22), Lint
+    (golangci-lint), govulncheck, pnpm audit, Docker stack acceptance (#434)
+    and Backend (Go 1.27.4). The bump renamed the Backend job, so the stale
+    required context "Backend (Go 1.27.3)" was replaced; otherwise no PR
+    could merge. #962 is MERGEABLE except for REVIEW_REQUIRED. The #884
+    stash was committed as 1781dc5 and the branch
+    fix/issue-884-release-packaging was pushed.
+L37. Independent verification of the main protection (gentle-ai-verify
+    mwcd7bdw-4-cs49, Risk item 5): PASS. The six required contexts exist and
+    match job names that run for same-repository PRs to main. No required job
+    has a path filter. strict true, 1 review, enforce_admins false. No
+    ruleset adds anything. Advisory, recorded in the docs: GitHub counts a job
+    skipped by `if:` as passed, so a fork PR labelled `safe-to-test` can merge
+    without the real-stack run (acceptance.yml has no safe-to-test override),
+    and an admin merge bypasses every required check. The handbook sentence
+    was narrowed to same-repository PRs and names both exceptions. A
+    safe-to-test override for acceptance.yml is follow-up work and was not
+    done here.

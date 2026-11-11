@@ -128,7 +128,22 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
 
       - name: E2E smoke tests
+        id: fixture-e2e
         run: pnpm test:e2e
+
+      # Issue #887: keep the evidence of the mocked-fixture browser suite. These
+      # tests run against API mocks (e2e/helpers.ts installApiMocks), so their
+      # report proves UI behaviour only, never runtime behaviour.
+      - name: Upload fixture E2E report and traces
+        if: always() && steps.fixture-e2e.outcome != 'skipped'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # pin to commit (v4.6.2)
+        with:
+          name: playwright-fixture-e2e-node-${{ matrix.node-version }}
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Build
         run: pnpm build

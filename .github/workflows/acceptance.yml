@@ -82,11 +82,30 @@ jobs:
         run: docker compose up -d --wait --wait-timeout 180
 
       - name: Playwright against default NRCC and Node-RED stack
+        id: default-stack-e2e
         working-directory: frontend
         env:
           E2E_BASE_URL: http://127.0.0.1:3001
           E2E_NODE_RED_URL: http://127.0.0.1:1880
         run: pnpm exec playwright test --config playwright.stack.config.ts --grep-invert "FlowFuse policy protects deployed HTTP and Socket.IO endpoints"
+
+      # Issue #887: keep the real-runtime evidence (HTML report, traces of
+      # failed tests, skip annotations) of the default stack run before the
+      # FlowFuse run reuses the same output folders.
+      - name: Upload default stack acceptance report and traces
+        if: always() && steps.default-stack-e2e.outcome != 'skipped'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # pin to commit (v4.6.2)
+        with:
+          name: playwright-stack-acceptance-default
+          path: |
+            frontend/playwright-report-stack/
+            frontend/test-results/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Clear Playwright output before the FlowFuse run
+        if: always()
+        run: rm -rf frontend/playwright-report-stack frontend/test-results
 
       - name: Stop real browser-acceptance stack
         if: always()
@@ -100,11 +119,23 @@ jobs:
         run: docker compose -p nrcc-flowfuse-e2e -f docker-compose.e2e.yml up -d --build --wait --wait-timeout 180
 
       - name: Playwright FlowFuse stack acceptance
+        id: flowfuse-stack-e2e
         working-directory: frontend
         env:
           E2E_BASE_URL: http://127.0.0.1:3301
           E2E_NODE_RED_URL: http://127.0.0.1:31880
         run: pnpm exec playwright test --config playwright.stack.config.ts --grep "FlowFuse policy protects deployed HTTP and Socket.IO endpoints"
+
+      - name: Upload FlowFuse stack acceptance report and traces
+        if: always() && steps.flowfuse-stack-e2e.outcome != 'skipped'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # pin to commit (v4.6.2)
+        with:
+          name: playwright-stack-acceptance-flowfuse
+          path: |
+            frontend/playwright-report-stack/
+            frontend/test-results/
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Upload FlowFuse compose logs on failure
         if: failure()

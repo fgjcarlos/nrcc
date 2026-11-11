@@ -107,8 +107,18 @@ const (
 	updateBackupsFile   = "update_backups.json"
 )
 
-// NewUpdateService creates a new update service
+// NewUpdateService creates a new update service. When the persisted cache is
+// empty it runs one synchronous version check with the production npm and
+// managed-executable lookups.
 func NewUpdateService(dataDir string) *UpdateService {
+	return newUpdateService(dataDir, nil)
+}
+
+// newUpdateService builds the service. A non-nil configure runs after the
+// production version-check functions are installed and before the cache is
+// loaded or the initial check runs, so tests can replace those dependencies
+// before any subprocess can start.
+func newUpdateService(dataDir string, configure func(*UpdateService)) *UpdateService {
 	s := &UpdateService{
 		dataDir:      dataDir,
 		stopChan:     make(chan struct{}),
@@ -139,6 +149,9 @@ func NewUpdateService(dataDir string) *UpdateService {
 		return version
 	}
 	s.getLatestVersionFn = s.getLatestVersionInternal
+	if configure != nil {
+		configure(s)
+	}
 
 	// Load cache from disk if it exists
 	if s.store.Exists() {

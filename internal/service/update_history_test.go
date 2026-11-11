@@ -9,7 +9,7 @@ import (
 // TestUpdateService_History is part of the #292 fix: update history must reflect
 // the real applied-update backup catalog, not a hardcoded empty list.
 func TestUpdateService_History(t *testing.T) {
-	svc := NewUpdateService(t.TempDir())
+	svc := newTestUpdateService(t, t.TempDir())
 
 	if h := svc.History(); len(h) != 0 {
 		t.Fatalf("empty catalog should yield no history, got %d", len(h))

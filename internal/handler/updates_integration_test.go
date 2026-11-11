@@ -24,6 +24,7 @@ import (
 // Scenario: Backup created successfully (Spec: update-backup / Requirement 1)
 func TestIntegration_BackupCreateFlow_6_1(t *testing.T) {
 	tmpDir := t.TempDir()
+	installFakeNPM(t)
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
@@ -73,6 +74,7 @@ func TestIntegration_BackupCreateFlow_6_1(t *testing.T) {
 // Note: This is tested at service layer; handler just passes through state.
 func TestIntegration_BackupFailureBlocks_6_2(t *testing.T) {
 	tmpDir := t.TempDir()
+	installFakeNPM(t)
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
@@ -104,6 +106,7 @@ func TestIntegration_BackupFailureBlocks_6_2(t *testing.T) {
 // Scenario: Concurrent update rejected (Spec: update-state-tracking / Requirement 1)
 func TestIntegration_ConcurrencyGuard_6_3(t *testing.T) {
 	tmpDir := t.TempDir()
+	installFakeNPM(t)
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
@@ -140,6 +143,7 @@ func TestIntegration_ConcurrencyGuard_6_3(t *testing.T) {
 // Scenario: Catalog at limit (Spec: update-backup / Requirement 2)
 func TestIntegration_BackupCatalogTrimming_6_4(t *testing.T) {
 	tmpDir := t.TempDir()
+	installFakeNPM(t)
 	svc := service.NewUpdateService(tmpDir)
 
 	// Manually append 5 backups to simulate catalog at limit
@@ -225,6 +229,7 @@ func TestIntegration_BackupCatalogTrimming_6_4(t *testing.T) {
 // Scenario: State transitions during successful apply (Spec: update-state-tracking / Requirement 1)
 func TestIntegration_StateTransitions_6_5(t *testing.T) {
 	tmpDir := t.TempDir()
+	installFakeNPM(t)
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
@@ -268,6 +273,7 @@ func TestIntegration_StateTransitions_6_5(t *testing.T) {
 // Scenario: State endpoint returns current state (Spec: update-state-tracking / Requirement 2)
 func TestIntegration_StateEndpointPolling_6_6(t *testing.T) {
 	tmpDir := t.TempDir()
+	installFakeNPM(t)
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
@@ -335,6 +341,7 @@ func TestIntegration_StateEndpointPolling_6_6(t *testing.T) {
 // Scenario: Request while not idle (Spec: node-red-update / Requirement 1)
 func TestIntegration_ConcurrentApplyRejection_6_7(t *testing.T) {
 	tmpDir := t.TempDir()
+	installFakeNPM(t)
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
@@ -370,6 +377,7 @@ func TestIntegration_ConcurrentApplyRejection_6_7(t *testing.T) {
 // This test simulates the complete flow: check → backup → apply → complete
 func TestIntegration_FullFlowScenario_6_8(t *testing.T) {
 	tmpDir := t.TempDir()
+	installFakeNPM(t)
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
@@ -441,6 +449,7 @@ func TestIntegration_FullFlowScenario_6_8(t *testing.T) {
 // Scenario: State survives browser refresh (Spec: update-state-tracking / Requirement 1)
 func TestIntegration_BrowserRefreshRecovery(t *testing.T) {
 	tmpDir := t.TempDir()
+	installFakeNPM(t)
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
@@ -490,6 +499,7 @@ func TestIntegration_BrowserRefreshRecovery(t *testing.T) {
 // Tests that all endpoints return proper ApiResponse structure
 func TestIntegration_ApiResponseStructure(t *testing.T) {
 	tmpDir := t.TempDir()
+	installFakeNPM(t)
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
@@ -535,6 +545,7 @@ func TestIntegration_ApiResponseStructure(t *testing.T) {
 // Helper: simulates polling behavior for state endpoint
 func TestIntegration_PollingBehavior(t *testing.T) {
 	tmpDir := t.TempDir()
+	installFakeNPM(t)
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 
@@ -569,6 +580,7 @@ func TestIntegration_PollingBehavior(t *testing.T) {
 // TestIntegration_ErrorRecovery tests system behavior after errors
 func TestIntegration_ErrorRecovery(t *testing.T) {
 	tmpDir := t.TempDir()
+	installFakeNPM(t)
 	svc := service.NewUpdateService(tmpDir)
 	handler := NewUpdateHandler(svc)
 

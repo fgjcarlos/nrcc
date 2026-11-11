@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
 	"strings"
@@ -68,10 +71,161 @@ func (m *mockRunner) Run(ctx context.Context, name string, args ...string) ([]by
 	return m.output, m.err
 }
 
+var errOfflineVersionCheck = errors.New("version check unavailable in tests")
+
+// newTestUpdateService builds a service whose version-check dependencies are
+// offline stubs installed before the constructor's initial empty-cache check,
+// so construction never runs npm or node-red from the host PATH. The stubs
+// report the same state as a host without npm: an unknown installed version
+// and a failed registry lookup. Tests replace them as needed afterwards.
+func newTestUpdateService(t *testing.T, dataDir string) *UpdateService {
+	t.Helper()
+	return newUpdateService(dataDir, useOfflineVersionChecks)
+}
+
+func useOfflineVersionChecks(s *UpdateService) {
+	s.getInstalledVersionFn = func(context.Context) string { return "unknown" }
+	s.getLatestVersionFn = func(context.Context) (string, error) { return "", errOfflineVersionCheck }
+}
+
+// newCachedTestUpdateService builds a service over a cache that already holds
+// versions. Any constructor version check fails the test, which proves startup
+// served the persisted cache. The offline stubs are restored afterwards.
+func newCachedTestUpdateService(t *testing.T, dataDir string) *UpdateService {
+	t.Helper()
+	svc := newUpdateService(dataDir, func(s *UpdateService) {
+		s.getInstalledVersionFn = func(context.Context) string {
+			t.Error("constructor ran an installed-version check despite a seeded cache")
+			return "unknown"
+		}
+		s.getLatestVersionFn = func(context.Context) (string, error) {
+			t.Error("constructor ran a registry check despite a seeded cache")
+			return "", errOfflineVersionCheck
+		}
+	})
+	useOfflineVersionChecks(svc)
+	return svc
+}
+
+// seedUpdateCache writes entry through the production cache store, so the
+// constructor reads it instead of running a version check.
+func seedUpdateCache(t *testing.T, dataDir string, entry model.UpdateCacheEntry) {
+	t.Helper()
+	cacheStore := store.NewJSONStore[model.UpdateCacheEntry](filepath.Join(dataDir, updateCacheFile))
+	if err := cacheStore.Write(entry); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestUpdateTestHelpersNeverRunHostVersionChecks is the issue #887 regression:
+// services built by this suite's helpers receive their version-check
+// dependencies before initialization, so the constructor never reaches npm or
+// node-red on PATH. The final NewUpdateService call is the positive control
+// that proves the recording fixture is reachable through PATH.
+func TestUpdateTestHelpersNeverRunHostVersionChecks(t *testing.T) {
+	root := t.TempDir()
+	binDir := filepath.Join(root, "bin")
+	if err := os.MkdirAll(binDir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	recorder := filepath.Join(root, "host-version-check-calls")
+	for _, name := range []string{"npm", "node-red"} {
+		script := "#!/bin/sh\nprintf '%s\\n' \"" + name + " $*\" >> \"" + recorder + "\"\nexit 1\n"
+		//nolint:gosec // G306: the recording fixture must stay 0700 to run as an executable.
+		if err := os.WriteFile(filepath.Join(binDir, name), []byte(script), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	newTestUpdateService(t, t.TempDir())
+	seeded := t.TempDir()
+	seedUpdateCache(t, seeded, model.UpdateCacheEntry{CurrentVersion: "4.0.0", LatestVersion: "4.0.0"})
+	newCachedTestUpdateService(t, seeded)
+	newOfflinePollingService(t)
+
+	//nolint:gosec // G304: the path is a test-controlled fixture inside t.TempDir().
+	if calls, err := os.ReadFile(recorder); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("test helpers reached host version commands: %q (read error: %v)", calls, err)
+	}
+
+	NewUpdateService(t.TempDir())
+	if _, err := os.Stat(recorder); err != nil {
+		t.Fatalf("positive control: production constructor did not reach the PATH fixture: %v", err)
+	}
+}
+
+// TestUpdateServiceConstructionsInjectVersionChecks keeps the issue #887 fix
+// in place for future tests. In the service and handler test suites, a direct
+// NewUpdateService call must follow a PATH fixture in the same function
+// (t.Setenv("PATH", ...) or installFakeNPM). Every other construction uses
+// newTestUpdateService or newCachedTestUpdateService.
+func TestUpdateServiceConstructionsInjectVersionChecks(t *testing.T) {
+	calledName := func(call *ast.CallExpr) string {
+		switch fun := call.Fun.(type) {
+		case *ast.Ident:
+			return fun.Name
+		case *ast.SelectorExpr:
+			return fun.Sel.Name
+		}
+		return ""
+	}
+	isPathFixture := func(call *ast.CallExpr) bool {
+		switch calledName(call) {
+		case "installFakeNPM":
+			return true
+		case "Setenv":
+			if len(call.Args) == 0 {
+				return false
+			}
+			lit, ok := call.Args[0].(*ast.BasicLit)
+			return ok && lit.Value == `"PATH"`
+		}
+		return false
+	}
+	fset := token.NewFileSet()
+	var offenders []string
+	for _, dir := range []string{".", filepath.Join("..", "handler")} {
+		paths, err := filepath.Glob(filepath.Join(dir, "*_test.go"))
+		if err != nil || len(paths) == 0 {
+			t.Fatalf("list test files in %s: %v (%d files)", dir, err, len(paths))
+		}
+		for _, path := range paths {
+			file, err := parser.ParseFile(fset, path, nil, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, decl := range file.Decls {
+				fn, ok := decl.(*ast.FuncDecl)
+				if !ok || fn.Body == nil {
+					continue
+				}
+				fixtureSeen := false
+				// ast.Inspect visits calls in source order.
+				ast.Inspect(fn.Body, func(n ast.Node) bool {
+					call, ok := n.(*ast.CallExpr)
+					if !ok {
+						return true
+					}
+					if isPathFixture(call) {
+						fixtureSeen = true
+					} else if calledName(call) == "NewUpdateService" && !fixtureSeen {
+						offenders = append(offenders, fset.Position(call.Pos()).String())
+					}
+					return true
+				})
+			}
+		}
+	}
+	if len(offenders) > 0 {
+		t.Fatalf("NewUpdateService called before its version-check dependencies are injected:\n%s", strings.Join(offenders, "\n"))
+	}
+}
+
 // TestNewUpdateService tests basic initialization
 func TestNewUpdateService(t *testing.T) {
 	tmpDir := t.TempDir()
-	svc := NewUpdateService(tmpDir)
+	svc := newTestUpdateService(t, tmpDir)
 
 	if svc == nil {
 		t.Fatal("NewUpdateService should not return nil")
@@ -131,16 +285,10 @@ func TestNewUpdateServiceUsesInjectedVersionCommands(t *testing.T) {
 // cache without requiring a registry or managed-runtime check.
 func TestGetCachedStatus_UsesSeededCache(t *testing.T) {
 	tmpDir := t.TempDir()
-	// Seed a valid cache before construction. An empty cache makes the
-	// constructor perform a real npm check before this test can install its
-	// controlled version functions.
-	cacheStore := store.NewJSONStore[model.UpdateCacheEntry](filepath.Join(tmpDir, updateCacheFile))
-	if err := cacheStore.Write(model.UpdateCacheEntry{CurrentVersion: "4.0.1", LatestVersion: "4.0.1"}); err != nil {
-		t.Fatal(err)
-	}
-	svc := NewUpdateService(tmpDir)
-	svc.getInstalledVersionFn = func(context.Context) string { return "4.0.1" }
-	svc.getLatestVersionFn = func(context.Context) (string, error) { return "4.0.1", nil }
+	// Seed a valid cache before construction; the cached helper fails the test
+	// if the constructor runs any version check instead of reading it.
+	seedUpdateCache(t, tmpDir, model.UpdateCacheEntry{CurrentVersion: "4.0.1", LatestVersion: "4.0.1"})
+	svc := newCachedTestUpdateService(t, tmpDir)
 
 	status := svc.GetCachedStatus()
 	if status.CurrentVersion != "4.0.1" || status.LatestVersion != "4.0.1" {
@@ -151,7 +299,7 @@ func TestGetCachedStatus_UsesSeededCache(t *testing.T) {
 // TestCompareVersions tests version comparison logic
 func TestCompareVersions(t *testing.T) {
 	tmpDir := t.TempDir()
-	svc := NewUpdateService(tmpDir)
+	svc := newTestUpdateService(t, tmpDir)
 
 	tests := []struct {
 		v1       string
@@ -194,12 +342,14 @@ func TestForceCheckValidatesLatestNpmOutput(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			svc := NewUpdateService(t.TempDir())
+			svc := newTestUpdateService(t, t.TempDir())
 			var runnerErr error
 			if tt.name == "runner error" {
 				runnerErr = errors.New("runner failed")
 			}
 			svc.runner = &mockRunner{output: []byte(tt.output), err: runnerErr}
+			// Exercise the production npm-output parser through the mock runner.
+			svc.getLatestVersionFn = svc.getLatestVersionInternal
 			svc.getInstalledVersionFn = func(context.Context) string { return "4.0.0" }
 			got, err := svc.ForceCheck(context.Background())
 			if err != nil {
@@ -218,7 +368,7 @@ func TestCachedStatusSuppressesInvalidLatestVersion(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, updateCacheFile), []byte(`{"currentVersion":"4.0.0","latestVersion":"5.0.7\nnpm notice polluted","updateAvailable":true}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	status := NewUpdateService(dir).GetCachedStatus()
+	status := newCachedTestUpdateService(t, dir).GetCachedStatus()
 	encoded, err := json.Marshal(status)
 	if err != nil {
 		t.Fatal(err)
@@ -229,7 +379,7 @@ func TestCachedStatusSuppressesInvalidLatestVersion(t *testing.T) {
 }
 
 func TestUpdateCapabilityRejectsUnknownCurrentVersion(t *testing.T) {
-	svc := NewUpdateService(t.TempDir())
+	svc := newTestUpdateService(t, t.TempDir())
 	svc.getInstalledVersionFn = func(context.Context) string { return "unknown" }
 	svc.getLatestVersionFn = func(context.Context) (string, error) { return "5.0.0", nil }
 	entry := svc.performCheckInternal(context.Background())
@@ -239,7 +389,7 @@ func TestUpdateCapabilityRejectsUnknownCurrentVersion(t *testing.T) {
 }
 
 func TestCachedStatusDerivesRuntimeCapabilityWithoutCheckingRegistry(t *testing.T) {
-	svc := NewUpdateService(t.TempDir())
+	svc := newTestUpdateService(t, t.TempDir())
 	svc.cacheMu.Lock()
 	svc.cache = model.UpdateCacheEntry{CurrentVersion: "4.0.0", LatestVersion: "5.0.0", UpdateAvailable: true, Strategy: string(StrategyNpmGlobal), CanInplaceApply: true}
 	svc.cacheMu.Unlock()
@@ -266,7 +416,7 @@ func TestCachedStatusRejectsUnknownVersionFromOldCache(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, updateCacheFile), []byte(`{"currentVersion":"unknown","latestVersion":"5.0.0","updateAvailable":true}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	status := NewUpdateService(dir).GetCachedStatus()
+	status := newCachedTestUpdateService(t, dir).GetCachedStatus()
 	if status.UpdateAvailable || status.CanInplaceApply {
 		t.Fatalf("old cached status must reject unknown current version: %+v", status)
 	}
@@ -275,7 +425,7 @@ func TestCachedStatusRejectsUnknownVersionFromOldCache(t *testing.T) {
 // TestForceCheck_Success tests a successful force check
 func TestForceCheck_Success(t *testing.T) {
 	tmpDir := t.TempDir()
-	svc := NewUpdateService(tmpDir)
+	svc := newTestUpdateService(t, tmpDir)
 
 	// Setup mock functions
 	svc.getInstalledVersionFn = func(ctx context.Context) string {
@@ -313,7 +463,7 @@ func TestForceCheck_Success(t *testing.T) {
 // TestForceCheck_Error tests force check with an error
 func TestForceCheck_Error(t *testing.T) {
 	tmpDir := t.TempDir()
-	svc := NewUpdateService(tmpDir)
+	svc := newTestUpdateService(t, tmpDir)
 
 	// Setup mock functions
 	svc.getInstalledVersionFn = func(ctx context.Context) string {
@@ -345,7 +495,7 @@ func TestForceCheck_Error(t *testing.T) {
 // TestCacheWritten tests that cache is written to disk after ForceCheck
 func TestCacheWritten(t *testing.T) {
 	tmpDir := t.TempDir()
-	svc := NewUpdateService(tmpDir)
+	svc := newTestUpdateService(t, tmpDir)
 
 	// Setup mock functions
 	svc.getInstalledVersionFn = func(ctx context.Context) string {
@@ -370,7 +520,7 @@ func TestCacheWritten(t *testing.T) {
 	}
 
 	// Verify we can read it back
-	newSvc := NewUpdateService(tmpDir)
+	newSvc := newCachedTestUpdateService(t, tmpDir)
 	status := newSvc.GetCachedStatus()
 
 	if status.CurrentVersion != "3.0.0" {
@@ -386,11 +536,8 @@ func TestCacheWritten(t *testing.T) {
 func newOfflinePollingService(t *testing.T) *UpdateService {
 	t.Helper()
 	dir := t.TempDir()
-	cacheStore := store.NewJSONStore[model.UpdateCacheEntry](filepath.Join(dir, updateCacheFile))
-	if err := cacheStore.Write(model.UpdateCacheEntry{CurrentVersion: "4.0.0", LatestVersion: "4.0.0"}); err != nil {
-		t.Fatal(err)
-	}
-	svc := NewUpdateService(dir)
+	seedUpdateCache(t, dir, model.UpdateCacheEntry{CurrentVersion: "4.0.0", LatestVersion: "4.0.0"})
+	svc := newCachedTestUpdateService(t, dir)
 	svc.getInstalledVersionFn = func(context.Context) string { return "4.0.0" }
 	svc.getLatestVersionFn = func(context.Context) (string, error) { return "4.1.0", nil }
 	return svc
@@ -449,7 +596,7 @@ func TestStartStop(t *testing.T) {
 
 				// Read immediately after Stop, before bubble teardown can join a
 				// leftover worker: persisted results must already be complete.
-				status := NewUpdateService(svc.dataDir).GetCachedStatus()
+				status := newCachedTestUpdateService(t, svc.dataDir).GetCachedStatus()
 				if status.CurrentVersion != "4.0.0" || status.LatestVersion != "4.1.0" || !status.UpdateAvailable || status.CheckedAt.IsZero() {
 					t.Errorf("Stop() returned before polling cache persistence: %+v", status)
 				}
@@ -484,7 +631,7 @@ func TestUpdateStartCanceledContext(t *testing.T) {
 // TestConcurrentForceCheck tests that concurrent force checks don't run concurrently
 func TestConcurrentForceCheck(t *testing.T) {
 	tmpDir := t.TempDir()
-	svc := NewUpdateService(tmpDir)
+	svc := newTestUpdateService(t, tmpDir)
 
 	checkCount := 0
 	svc.getInstalledVersionFn = func(ctx context.Context) string {
@@ -520,7 +667,7 @@ func TestConcurrentForceCheck(t *testing.T) {
 // TestSanitizeErrorMessage tests error message sanitization
 func TestSanitizeErrorMessage(t *testing.T) {
 	tmpDir := t.TempDir()
-	svc := NewUpdateService(tmpDir)
+	svc := newTestUpdateService(t, tmpDir)
 
 	tests := []struct {
 		input    error
@@ -566,7 +713,7 @@ func TestSanitizeErrorMessage(t *testing.T) {
 // TestGetFlowState tests the GetFlowState getter method
 func TestGetFlowState(t *testing.T) {
 	tmpDir := t.TempDir()
-	svc := NewUpdateService(tmpDir)
+	svc := newTestUpdateService(t, tmpDir)
 
 	// Initially should be Idle
 	state := svc.GetFlowState()
@@ -600,7 +747,7 @@ func (failingBackupCreator) CreateTyped(model.BackupType, string) (model.Backup,
 
 func TestCreateBackup(t *testing.T) {
 	tmpDir := t.TempDir()
-	svc := NewUpdateService(tmpDir)
+	svc := newTestUpdateService(t, tmpDir)
 	svc.SetBackupCreator(NewBackupService(tmpDir))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -645,7 +792,7 @@ func TestCreateBackup(t *testing.T) {
 // engine is wired in, rather than fabricating a placeholder entry.
 func TestCreateBackup_FailsWithoutBackupCreator(t *testing.T) {
 	tmpDir := t.TempDir()
-	svc := NewUpdateService(tmpDir)
+	svc := newTestUpdateService(t, tmpDir)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -659,7 +806,7 @@ func TestCreateBackup_FailsWithoutBackupCreator(t *testing.T) {
 // error so the caller can abort the update.
 func TestCreateBackup_PropagatesError(t *testing.T) {
 	tmpDir := t.TempDir()
-	svc := NewUpdateService(tmpDir)
+	svc := newTestUpdateService(t, tmpDir)
 	svc.SetBackupCreator(failingBackupCreator{})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -673,7 +820,7 @@ func TestCreateBackup_PropagatesError(t *testing.T) {
 // TestAppendBackup tests backup catalog persistence and trimming
 func TestAppendBackup(t *testing.T) {
 	tmpDir := t.TempDir()
-	svc := NewUpdateService(tmpDir)
+	svc := newTestUpdateService(t, tmpDir)
 
 	// Add 5 backups
 	for i := 1; i <= 5; i++ {
@@ -729,7 +876,7 @@ func TestAppendBackup(t *testing.T) {
 // TestApplyUpdateWithBackup_CannotStartIfNotIdle tests that 409-like error is returned
 func TestApplyUpdateWithBackup_CannotStartIfNotIdle(t *testing.T) {
 	tmpDir := t.TempDir()
-	svc := NewUpdateService(tmpDir)
+	svc := newTestUpdateService(t, tmpDir)
 
 	// Manually set state to Applying to simulate in-progress update
 	svc.setFlowState(model.UpdateFlowState{
@@ -752,7 +899,7 @@ func TestApplyUpdateWithBackup_CannotStartIfNotIdle(t *testing.T) {
 // TestApplyUpdateWithBackup_ConcurrencyGuard tests that only one update can proceed
 func TestApplyUpdateWithBackup_ConcurrencyGuard(t *testing.T) {
 	tmpDir := t.TempDir()
-	svc := NewUpdateService(tmpDir)
+	svc := newTestUpdateService(t, tmpDir)
 
 	// Override ApplyUpdate to block for a bit
 	blockChan := make(chan struct{})
@@ -789,7 +936,7 @@ func TestApplyUpdateWithBackup_ConcurrencyGuard(t *testing.T) {
 // TestApplyUpdateWithBackup_SuccessfulFlow tests successful flow: BackingUp → Applying → Completed
 func TestApplyUpdateWithBackup_SuccessfulFlow(t *testing.T) {
 	tmpDir := t.TempDir()
-	svc := NewUpdateService(tmpDir)
+	svc := newTestUpdateService(t, tmpDir)
 	pm, _ := npmGlobalProcessManager(t)
 	svc.SetProcessManager(pm)
 	svc.SetBackupCreator(NewBackupService(tmpDir))
@@ -839,7 +986,7 @@ func TestApplyUpdateWithBackup_SuccessfulFlow(t *testing.T) {
 
 func TestApplyUpdateWithBackupReportsImageUnsupportedCode(t *testing.T) {
 	dir := t.TempDir()
-	svc := NewUpdateService(dir)
+	svc := newTestUpdateService(t, dir)
 	_, executable := imageLocalProcessManager(t)
 	svc.SetProcessManager(NewProcessManager(executable, dir))
 	svc.SetBackupCreator(NewBackupService(dir))
@@ -857,7 +1004,7 @@ func TestApplyUpdateWithBackupReportsImageUnsupportedCode(t *testing.T) {
 // TestApplyUpdateWithBackup_NpmFailure tests failure during npm update phase
 func TestApplyUpdateWithBackup_NpmFailure(t *testing.T) {
 	tmpDir := t.TempDir()
-	svc := NewUpdateService(tmpDir)
+	svc := newTestUpdateService(t, tmpDir)
 	pm, _ := npmGlobalProcessManager(t)
 	svc.SetProcessManager(pm)
 	svc.SetBackupCreator(NewBackupService(tmpDir))
@@ -910,7 +1057,7 @@ func TestApplyUpdateWithBackup_NpmFailure(t *testing.T) {
 // the flow must end in Failed/backup_failed.
 func TestApplyUpdateWithBackup_AbortsWhenBackupFails(t *testing.T) {
 	tmpDir := t.TempDir()
-	svc := NewUpdateService(tmpDir)
+	svc := newTestUpdateService(t, tmpDir)
 	svc.SetBackupCreator(failingBackupCreator{})
 
 	svc.getInstalledVersionFn = func(ctx context.Context) string { return "4.0.1" }
@@ -975,7 +1122,7 @@ func (s *sequenceRunner) Run(ctx context.Context, name string, args ...string) (
 
 func TestApplyUpdate_PinsResolvedVersion(t *testing.T) {
 	tmpDir := t.TempDir()
-	svc := NewUpdateService(tmpDir)
+	svc := newTestUpdateService(t, tmpDir)
 	pm, _ := npmGlobalProcessManager(t)
 	svc.SetProcessManager(pm)
 
@@ -1023,7 +1170,7 @@ func TestApplyUpdate_PinsResolvedVersion(t *testing.T) {
 
 func TestApplyUpdate_RejectsWithoutResolvedVersion(t *testing.T) {
 	tmpDir := t.TempDir()
-	svc := NewUpdateService(tmpDir)
+	svc := newTestUpdateService(t, tmpDir)
 
 	// Clear cache so LatestVersion is empty
 	svc.cacheMu.Lock()
@@ -1040,7 +1187,7 @@ func TestApplyUpdate_RejectsWithoutResolvedVersion(t *testing.T) {
 
 func TestApplyUpdate_BlocksOnAuditFailure(t *testing.T) {
 	tmpDir := t.TempDir()
-	svc := NewUpdateService(tmpDir)
+	svc := newTestUpdateService(t, tmpDir)
 	pm, _ := npmGlobalProcessManager(t)
 	svc.SetProcessManager(pm)
 
@@ -1079,7 +1226,7 @@ func TestApplyUpdate_BlocksOnAuditFailure(t *testing.T) {
 // be invoked with the -g flag.
 func TestApplyUpdate_DoesNotUseGlobalAuditFlag(t *testing.T) {
 	tmpDir := t.TempDir()
-	svc := NewUpdateService(tmpDir)
+	svc := newTestUpdateService(t, tmpDir)
 	pm, _ := npmGlobalProcessManager(t)
 	svc.SetProcessManager(pm)
 
@@ -1124,7 +1271,7 @@ func TestApplyUpdate_DoesNotUseGlobalAuditFlag(t *testing.T) {
 // must NOT be reported as a critical vulnerability and must NOT block the update.
 func TestApplyUpdate_AllowsWhenAuditCannotRun(t *testing.T) {
 	tmpDir := t.TempDir()
-	svc := NewUpdateService(tmpDir)
+	svc := newTestUpdateService(t, tmpDir)
 	pm, _ := npmGlobalProcessManager(t)
 	svc.SetProcessManager(pm)
 
@@ -1158,7 +1305,7 @@ func TestApplyUpdate_AllowsWhenAuditCannotRun(t *testing.T) {
 // exit for high/moderate findings but zero criticals) does not block the update.
 func TestApplyUpdate_AllowsWhenNoCriticals(t *testing.T) {
 	tmpDir := t.TempDir()
-	svc := NewUpdateService(tmpDir)
+	svc := newTestUpdateService(t, tmpDir)
 	pm, _ := npmGlobalProcessManager(t)
 	svc.SetProcessManager(pm)
 
@@ -1209,7 +1356,7 @@ func TestParseCriticalCount(t *testing.T) {
 }
 
 func TestGetInstalledVersion_ParsesCanonicalNodeREDOutput(t *testing.T) {
-	svc := NewUpdateService(t.TempDir())
+	svc := newTestUpdateService(t, t.TempDir())
 	pm, _ := imageLocalProcessManager(t)
 	svc.SetProcessManager(pm)
 	svc.runner = &mockRunner{output: []byte("Node-RED v5.0.7\nNode.js v24.20.0\nLinux\n")}
@@ -1224,7 +1371,7 @@ func TestGetInstalledVersion_ParsesCanonicalNodeREDOutput(t *testing.T) {
 }
 
 func TestGetInstalledVersion_PrefersManagedExecutable(t *testing.T) {
-	svc := NewUpdateService(t.TempDir())
+	svc := newTestUpdateService(t, t.TempDir())
 	pm, executable := imageLocalProcessManager(t)
 	svc.SetProcessManager(pm)
 	runner := &mockRunner{output: []byte("v4.0.9\n")}
@@ -1247,7 +1394,7 @@ func TestGetInstalledVersion_PrefersManagedExecutable(t *testing.T) {
 }
 
 func TestGetInstalledVersion_ImageLocalFailureIsTypedWithoutNpmFallback(t *testing.T) {
-	svc := NewUpdateService(t.TempDir())
+	svc := newTestUpdateService(t, t.TempDir())
 	pm, _ := imageLocalProcessManager(t)
 	svc.SetProcessManager(pm)
 	runner := &mockRunner{err: errors.New("version command failed")}
@@ -1263,7 +1410,7 @@ func TestGetInstalledVersion_ImageLocalFailureIsTypedWithoutNpmFallback(t *testi
 }
 
 func TestGetInstalledVersion_FallsBackToNpmGlobalWhenStrategyPermits(t *testing.T) {
-	svc := NewUpdateService(t.TempDir())
+	svc := newTestUpdateService(t, t.TempDir())
 	pm, executable := npmGlobalProcessManager(t)
 	svc.SetProcessManager(pm)
 	runner := &sequenceRunner{results: []struct {
@@ -1294,7 +1441,7 @@ func TestGetInstalledVersion_FallsBackToNpmGlobalWhenStrategyPermits(t *testing.
 }
 
 func TestApplyUpdate_RejectsImageLocal(t *testing.T) {
-	svc := NewUpdateService(t.TempDir())
+	svc := newTestUpdateService(t, t.TempDir())
 	pm, _ := imageLocalProcessManager(t)
 	svc.SetProcessManager(pm)
 	svc.cacheMu.Lock()
@@ -1313,7 +1460,7 @@ func TestApplyUpdate_RejectsImageLocal(t *testing.T) {
 }
 
 func TestApplyUpdate_VerifiesVersionDelta(t *testing.T) {
-	svc := NewUpdateService(t.TempDir())
+	svc := newTestUpdateService(t, t.TempDir())
 	pm, _ := npmGlobalProcessManager(t)
 	svc.SetProcessManager(pm)
 	svc.cacheMu.Lock()
@@ -1335,7 +1482,7 @@ func TestApplyUpdate_VerifiesVersionDelta(t *testing.T) {
 }
 
 func TestApplyUpdate_RejectsExternal(t *testing.T) {
-	svc := NewUpdateService(t.TempDir())
+	svc := newTestUpdateService(t, t.TempDir())
 	svc.SetProcessManager(NewProcessManager(filepath.Join(t.TempDir(), "opt", "node-red"), t.TempDir()))
 	svc.cacheMu.Lock()
 	svc.cache.LatestVersion = "4.0.9"

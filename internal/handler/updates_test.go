@@ -507,13 +507,17 @@ func TestUpdateHandler_PostApply_ConcurrencyLogic_DocumentedBehavior(t *testing.
 	t.Log("Concurrency behavior is verified at service layer; handler just checks state and returns 409")
 }
 
+// installFakeNPM must run before service.NewUpdateService: its
+// empty-cache version check resolves npm and node-red from PATH, so both must
+// be test-owned executables rather than the host installation.
 func installFakeNPM(t *testing.T) {
 	t.Helper()
 	binDir := t.TempDir()
-	npmPath := filepath.Join(binDir, "npm")
-	// #nosec G306 -- test fixture: the file must be executable by the shell to act as a fake npm binary.
-	if err := os.WriteFile(npmPath, []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
-		t.Fatalf("failed to write fake npm: %v", err)
+	for _, name := range []string{"npm", "node-red"} {
+		// #nosec G306 -- test fixture: the file must be executable by the shell to shadow the host binary.
+		if err := os.WriteFile(filepath.Join(binDir, name), []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
+			t.Fatalf("failed to write fake %s: %v", name, err)
+		}
 	}
 	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 }

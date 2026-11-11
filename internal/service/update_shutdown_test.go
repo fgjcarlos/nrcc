@@ -34,7 +34,7 @@ func (b *blockingRunner) Run(ctx context.Context, name string, args ...string) (
 // cancels that root, killing the runner within 1s.
 func TestApplyUpdate_RespectsShutdownCancel(t *testing.T) {
 	tmpDir := t.TempDir()
-	svc := NewUpdateService(tmpDir)
+	svc := newTestUpdateService(t, tmpDir)
 	pm, _ := npmGlobalProcessManager(t)
 	svc.SetProcessManager(pm)
 
@@ -85,7 +85,7 @@ func TestApplyUpdate_RespectsShutdownCancel(t *testing.T) {
 // nil-check + applyMu). A second call after the first should be a no-op.
 func TestShutdownIsIdempotent(t *testing.T) {
 	tmpDir := t.TempDir()
-	svc := NewUpdateService(tmpDir)
+	svc := newTestUpdateService(t, tmpDir)
 
 	for i := 0; i < 3; i++ {
 		if err := svc.Shutdown(context.Background()); err != nil {
