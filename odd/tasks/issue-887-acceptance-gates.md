@@ -312,3 +312,10 @@ L32. Evidence and stop point (2026-11-11). Committed on branch
     Also pending outside this feature: stash@{0} holds the L19 log entry of
     the stale local branch fix/issue-884-release-packaging (#884 landed via
     PR #952); its disposition awaits the user.
+L33. Missing proof at the stop: the close declared "Risk: item 3" (the new
+    CONFIG_APPLY_TIMEOUT_MS applies to configService.updateConfig,
+    configService.applyConfig — also used by securityCenterHelpers.ts:44 —
+    and settingsService.saveRaw, which several screens share). No independent
+    gentle-ai-verify ran, because the user stopped for the day. Resume by
+    launching gentle-ai-verify on d24e722 with that Risk line, before the PR
+    is published.
