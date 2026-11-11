@@ -337,3 +337,18 @@ L34. User (verbatim): "continua". Independent verification
     600 s default timeout, which is an environment limit, not a test failure
     (CI uses -timeout 20m). golangci-lint was not run locally; the required
     "Lint (golangci-lint)" check covers it. T15 committed as 339e3a7.
+L35. PR #962 opened ("Closes #887"). Native review lineage
+    review-4407a171fa3fbeb1 (tier high; resilience, readability and
+    reliability lenses): approved, acknowledgement completed (authority
+    burned). It left 10 non-blocking advisory findings (R2-001..R2-006,
+    R3-001..R3-004) for later work. Hosted CI on #962: 17 checks pass.
+    "Frontend (Node 22)" and "Docker stack acceptance (#434)" failed twice
+    in the runner's `playwright install --with-deps` step ("Temporary failure
+    resolving 'security.ubuntu.com'"), a GitHub runner DNS outage
+    independent of the change. "govulncheck" fails on main too
+    (GO-2026-6859, net/http, fixed in go1.27.4). User decision: "PR aparte
+    con el bump (Recomendado)". PR #963 (d630622, chore/go-1.27.4-govulncheck)
+    bumps the toolchain. Independent verification passed, and govulncheck
+    passes on #963. Its Frontend and Docker acceptance checks fail on the
+    same runner DNS outage. Next: once the runners resolve again, rerun the
+    failed jobs, merge #963 (user decision), rebase #962, rerun CI, then T18.
