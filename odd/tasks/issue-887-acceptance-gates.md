@@ -50,7 +50,7 @@ T11 | S1,S5,S6 | CI lint gate on the pending slice | The pending Go test additio
 T12 | S2 | restart helper | `restartNodeRed` in stack.spec.ts requires pid>0, status running, changed pid and a live probe (same contract as the dashboard restart test); `applyEditorAuth` inherits the running check. | commit: abce08e
 T13 | S1 | source preservation | Visual-save scenario asserts the raw settings.js outside the edited key survives byte for byte (marker/unmanaged content before and after). | commits: abce08e, d24e722 (client timeout fix, L30-L31)
 T14 | S1 | cancellation | Real-stack scenario: a valid changed candidate reaches the confirmation dialog and is cancelled with the mouse and with the keyboard; no apply request, no write, no restart. The HTTP-abort test is renamed to what it proves. | commit: abce08e
-T15 | S4 | Go constructor injection | Every empty-cache `NewUpdateService` call site in update_test.go and internal/handler/updates_test.go gets its version-check dependencies (seeded cache or fixture PATH) before construction. | in progress, uncommitted, unverified (L32)
+T15 | S4 | Go constructor injection | Every empty-cache `NewUpdateService` call site in update_test.go and internal/handler/updates_test.go gets its version-check dependencies (seeded cache or fixture PATH) before construction. | commit: 339e3a7
 T16 | S5 | CI evidence retention | pr.yml and acceptance.yml upload Playwright reports and traces (`if: always()`), with distinct folders for the default and FlowFuse stack runs. | commit: 067c91b
 T17 | S5,S6 | evidence documentation | Document the acceptance scenarios, which suites are mocked fixtures and which are real-runtime evidence, the skipped cases and the environment limitations. | commit: d0b02a2
 T18 | S6 | required gate | After the slice is green, add "Docker stack acceptance (#434)" to the required status checks of main (user decision L29). | commit: none (repository setting)
@@ -319,3 +319,21 @@ L33. Missing proof at the stop: the close declared "Risk: item 3" (the new
     gentle-ai-verify ran, because the user stopped for the day. Resume by
     launching gentle-ai-verify on d24e722 with that Risk line, before the PR
     is published.
+L34. User (verbatim): "continua". Independent verification
+    (gentle-ai-verify mwc8mtgx-1-odz1) of the Risk item 3 change d24e722:
+    PASS. Every caller of updateConfig, applyConfig and saveRaw keeps its
+    pending and disabled state until the response arrives; mutations are not
+    retried; the 401 refresh resends with the same timeout; no UI timer
+    assumes 10 s; vitest on configuration and security: 19 files, 127 passed,
+    2 skipped; tsc clean. Advisory, pre-existing: the presets confirm dialog
+    (AdvancedSettings.tsx:203) has no pending guard; the backend answers a
+    second save with APPLY_IN_FLIGHT. T15 diff verdict: no defect, and no
+    assertion removed (counts of t.Fatal and t.Error equal or higher). It was
+    unverified in the verifier sandbox (GOPROXY=off). The parent then ran:
+    `gofmt -l` on the 6 changed files is clean; `go vet ./internal/service/
+    ./internal/handler/` passes; `go test ./internal/handler/ -count=1`
+    ok (452 s); `go test ./internal/service/ -count=1 -timeout 30m
+    -parallel 4` ok (615 s). A first run with `-p 1 -parallel 2` hit the
+    600 s default timeout, which is an environment limit, not a test failure
+    (CI uses -timeout 20m). golangci-lint was not run locally; the required
+    "Lint (golangci-lint)" check covers it. T15 committed as 339e3a7.
