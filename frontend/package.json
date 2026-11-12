@@ -22,6 +22,9 @@
     "i18n:coverage": "node scripts/i18n-coverage.mjs",
     "check:contrast": "node scripts/check-contrast-tokens.mjs",
     "check:contrast:strict": "node scripts/check-contrast-tokens.mjs --strict",
+    "check:contrast:report": "node scripts/check-contrast-tokens.mjs --report",
+    "test:contrast": "node scripts/check-contrast-tokens.test.mjs",
+    "test:tailwind-vars": "node scripts/tailwind-ds-vars.test.mjs",
     "test:css": "node scripts/tailwind-alignment.test.mjs",
     "test:appearance": "node scripts/tailwind-appearance.test.mjs",
     "gen:api": "openapi-typescript ../docs/openapi.yaml -o src/shared/api/schema.ts"

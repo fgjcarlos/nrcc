@@ -16,7 +16,7 @@ describe('NodeRedVersionChip', () => {
     renderChip('5.0.7');
     const chip = screen.getByTestId('node-red-version-chip');
     expect(chip.className).toMatch(/bg-ds-success/);
-    expect(chip.className).toMatch(/text-ds-success/);
+    expect(chip.className).toMatch(/text-ds-on-tint-success/);
     expect(chip).toHaveTextContent(/5\.0\.7/);
   });
 

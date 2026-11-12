@@ -131,13 +131,13 @@ export function UpdatesView() {
                 </span>
               ) : hasError ? (
                 <span
-                  className="rounded-full bg-error/15 px-2 py-1 text-xs text-error-content"
+                  className="rounded-full bg-error/15 px-2 py-1 text-xs text-ds-on-tint-error"
                   title={status?.error}
                 >
                   {t('updates:error')}
                 </span>
               ) : hasUpdate ? (
-                <span className="rounded-full bg-success/15 px-2 py-1 text-xs text-success-content">
+                <span className="rounded-full bg-success/15 px-2 py-1 text-xs text-ds-on-tint-success">
                   {t('updates:updateAvailable')}
                 </span>
               ) : (
@@ -152,7 +152,7 @@ export function UpdatesView() {
             {/* Error message */}
             {hasError && (
               <div className="mt-4 p-3 rounded-lg bg-error/10 border border-error/20">
-                <p className="text-sm text-error-content">{status?.error}</p>
+                <p className="text-sm text-ds-on-tint-error">{status?.error}</p>
               </div>
             )}
 
@@ -214,7 +214,7 @@ export function UpdatesView() {
                   {flowState?.state === 'Applying' && flowState?.backupId && (
                     <div className="mt-2 p-2 rounded-lg bg-success/10 border border-success/20 flex items-start gap-2">
                       <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0 mt-0.5" />
-                      <p className="text-xs text-success-content">
+                      <p className="text-xs text-ds-on-tint-success">
                         {t('updates:backupCompleted', { id: flowState.backupId.substring(0, 8) })}
                       </p>
                     </div>
@@ -229,8 +229,8 @@ export function UpdatesView() {
                 <div className="p-4 rounded-lg bg-success/10 border border-success/20 flex items-start gap-3">
                   <CheckCircle2 className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-medium text-success-content">{t('updates:completed')}</p>
-                    <p className="text-sm text-success-content/80 mt-1">
+                    <p className="font-medium text-ds-on-tint-success">{t('updates:completed')}</p>
+                    <p className="text-sm text-ds-on-tint-success mt-1">
                       {t('updates:completedDetail', { version: status?.latestVersion ?? t('updates:unknown') })}
                     </p>
                   </div>
@@ -244,8 +244,8 @@ export function UpdatesView() {
                 <div className="p-4 rounded-lg bg-error/10 border border-error/20 flex items-start gap-3">
                   <AlertCircle className="w-5 h-5 text-error flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-medium text-error-content">{t('updates:updateFailed')}</p>
-                    <p className="text-sm text-error-content/80 mt-1">
+                    <p className="font-medium text-ds-on-tint-error">{t('updates:updateFailed')}</p>
+                    <p className="text-sm text-ds-on-tint-error mt-1">
                       {flowState?.error === 'image_unsupported'
                         ? t('updates:image_unsupported')
                         : flowState?.error === 'external_unsupported'
@@ -336,12 +336,12 @@ export function UpdatesView() {
                     <td className="px-2 py-3 text-sm text-base-content">{entry.appliedBy}</td>
                     <td className="py-3 px-2">
                       {entry.status === 'success' ? (
-                        <span className="rounded-full bg-success/15 px-2 py-1 text-xs text-success-content">
+                        <span className="rounded-full bg-success/15 px-2 py-1 text-xs text-ds-on-tint-success">
                           {t('common:ok')}
                         </span>
                       ) : (
                         <span
-                          className="rounded-full bg-error/15 px-2 py-1 text-xs text-error-content"
+                          className="rounded-full bg-error/15 px-2 py-1 text-xs text-ds-on-tint-error"
                           title={entry.errorMessage}
                         >
                           {t('updates:error')}

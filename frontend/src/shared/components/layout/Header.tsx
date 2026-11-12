@@ -43,12 +43,15 @@ export function Header() {
     >
       <div className="flex min-h-14 items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
+          {/* `drawer-button` lets daisyUI draw the keyboard focus ring of the
+              transparent drawer checkbox on this visible label (#889). */}
           <label
             htmlFor="sidebar-drawer"
-            className="btn btn-ghost btn-square btn-sm rounded-xl border border-border/70 bg-base-300/45 text-base-content/80 lg:hidden"
-            aria-label="Abrir navegación principal"
+            className="drawer-button btn btn-ghost btn-square btn-sm rounded-xl border border-border/70 bg-base-300/45 text-base-content/80 lg:hidden"
           >
-            <Menu className="w-5 h-5" />
+            {/* The accessible name lives on the drawer checkbox (Layout.tsx);
+                axe prohibits aria-label on a <label> element. */}
+            <Menu className="w-5 h-5" aria-hidden="true" />
           </label>
           <div className="flex min-w-0 items-center gap-3">
             <NrccMark tone="accent" size="md" />

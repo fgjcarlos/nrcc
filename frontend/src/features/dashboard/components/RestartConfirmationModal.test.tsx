@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -76,5 +77,57 @@ describe('RestartConfirmationModal (#704 portal)', () => {
     await actor.click(screen.getByRole('button', { name: /^yes, restart$/i }))
     expect(onConfirm).toHaveBeenCalledTimes(1)
     expect(onCancel).not.toHaveBeenCalled()
+  })
+
+  describe('keyboard behaviour (#889)', () => {
+    function Harness({ onCancel = vi.fn(), onConfirm = vi.fn() }: { onCancel?: () => void; onConfirm?: () => void }) {
+      const [open, setOpen] = useState(false)
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>Open restart</button>
+          <RestartConfirmationModal
+            isOpen={open}
+            onCancel={() => { onCancel(); setOpen(false) }}
+            onConfirm={() => { onConfirm(); setOpen(false) }}
+          />
+        </>
+      )
+    }
+
+    it('moves initial focus to the non-destructive Cancel action', async () => {
+      const actor = userEvent.setup()
+      render(<Harness />)
+      await actor.click(screen.getByRole('button', { name: 'Open restart' }))
+      expect(screen.getByRole('button', { name: /cancel/i })).toHaveFocus()
+    })
+
+    it('Escape cancels without confirming and returns focus to the trigger', async () => {
+      const actor = userEvent.setup()
+      const onCancel = vi.fn()
+      const onConfirm = vi.fn()
+      render(<Harness onCancel={onCancel} onConfirm={onConfirm} />)
+      const trigger = screen.getByRole('button', { name: 'Open restart' })
+      await actor.click(trigger)
+      await actor.keyboard('{Escape}')
+      expect(onCancel).toHaveBeenCalledTimes(1)
+      expect(onConfirm).not.toHaveBeenCalled()
+      expect(screen.queryByRole('dialog')).toBeNull()
+      expect(trigger).toHaveFocus()
+    })
+
+    it('keeps Tab and Shift+Tab inside the dialog', async () => {
+      const actor = userEvent.setup()
+      render(<Harness />)
+      await actor.click(screen.getByRole('button', { name: 'Open restart' }))
+      const cancel = screen.getByRole('button', { name: /cancel/i })
+      const confirm = screen.getByRole('button', { name: /^yes, restart$/i })
+      expect(cancel).toHaveFocus()
+      await actor.tab()
+      expect(confirm).toHaveFocus()
+      await actor.tab()
+      expect(cancel).toHaveFocus()
+      await actor.tab({ shift: true })
+      expect(confirm).toHaveFocus()
+    })
   })
 })

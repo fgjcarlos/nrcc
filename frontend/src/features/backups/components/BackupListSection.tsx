@@ -35,9 +35,9 @@ const typeLabels: Record<BackupSummary['type'], string> = {
 };
 
 const typeStyles: Record<BackupSummary['type'], string> = {
-  manual: 'bg-success/15 text-success-content',
-  auto: 'bg-info/15 text-info-content',
-  'pre-restore': 'bg-warning/15 text-warning-content',
+  manual: 'bg-success/15 text-ds-on-tint-success',
+  auto: 'bg-info/15 text-ds-on-tint-info',
+  'pre-restore': 'bg-warning/15 text-ds-on-tint-warning',
 };
 
 export function BackupListSection(props: BackupListSectionProps) {

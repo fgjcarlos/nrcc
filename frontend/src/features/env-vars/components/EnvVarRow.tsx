@@ -29,9 +29,9 @@ export function EnvVarRow({ envVar, onDelete, onToggleSecret, onEdit, showSecret
       </td>
       <td className="px-4 py-3">
         <span className={`rounded-full px-2 py-1 text-xs ${
-          envVar.type === 'secret' ? 'bg-error/15 text-error-content' :
-          envVar.type === 'boolean' ? 'bg-info/15 text-info-content' :
-          envVar.type === 'number' ? 'bg-success/15 text-success-content' :
+          envVar.type === 'secret' ? 'bg-error/15 text-ds-on-tint-error' :
+          envVar.type === 'boolean' ? 'bg-info/15 text-ds-on-tint-info' :
+          envVar.type === 'number' ? 'bg-success/15 text-ds-on-tint-success' :
           'bg-base-300/70 text-base-content'
         }`}>{envVar.type}</span>
         {envVar.type === 'secret' && (

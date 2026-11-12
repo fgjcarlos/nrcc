@@ -8,39 +8,52 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Theme-aware palette: every ds-* colour resolves through a CSS
+        // variable declared in both the corporateDark and corporateLight
+        // blocks of src/index.css (issue #889). Guarded by
+        // scripts/tailwind-ds-vars.test.mjs.
+
         // Brand (Signal Prime Red)
-        'ds-brand-primary': '#d4472b',
-        'ds-brand-hover': '#f05a3d',
-        'ds-brand-dim': '#8f2f1f',
+        'ds-brand-primary': 'var(--ds-brand-primary)',
+        'ds-brand-hover': 'var(--ds-brand-hover)',
+        'ds-brand-dim': 'var(--ds-brand-dim)',
 
         // Accent (Signal Prime Cyan)
-        'ds-accent-primary': '#0089b4',
-        'ds-accent-hover': '#22b4df',
-        'ds-accent-dim': '#075a73',
+        'ds-accent-primary': 'var(--ds-accent-primary)',
+        'ds-accent-hover': 'var(--ds-accent-hover)',
+        'ds-accent-dim': 'var(--ds-accent-dim)',
 
-        // Backgrounds (Dark Mode)
-        'ds-bg-void': '#07090d',
-        'ds-bg-base': '#0f1419',
-        'ds-bg-surface': '#141b23',
-        'ds-bg-elevated': '#1a2332',
-        'ds-bg-overlay': '#223044',
+        // Backgrounds
+        'ds-bg-void': 'var(--ds-bg-void)',
+        'ds-bg-base': 'var(--ds-bg-base)',
+        'ds-bg-surface': 'var(--ds-bg-surface)',
+        'ds-bg-elevated': 'var(--ds-bg-elevated)',
+        'ds-bg-overlay': 'var(--ds-bg-overlay)',
 
-        // Borders (Dark Mode)
-        'ds-border-subtle': '#263241',
-        'ds-border-default': '#39485c',
-        'ds-border-strong': '#4a5f7c',
+        // Borders (the --ds-border-* CSS tokens carry different values,
+        // so the utilities use dedicated --ds-ui-border-* variables)
+        'ds-border-subtle': 'var(--ds-ui-border-subtle)',
+        'ds-border-default': 'var(--ds-ui-border-default)',
+        'ds-border-strong': 'var(--ds-ui-border-strong)',
 
-        // Text (Dark Mode)
-        'ds-text-primary': '#f5f7fa',
-        'ds-text-secondary': '#d8dee8',
-        'ds-text-tertiary': '#9aa7b8',
-        'ds-text-muted': '#6f7d90',
+        // Text
+        'ds-text-primary': 'var(--ds-text-primary)',
+        'ds-text-secondary': 'var(--ds-text-secondary)',
+        'ds-text-tertiary': 'var(--ds-text-tertiary)',
+        'ds-text-muted': 'var(--ds-text-muted)',
 
         // Semantic Signals
-        'ds-success': '#16a36a',
-        'ds-warning': '#e8a811',
-        'ds-danger': '#e54233',
-        'ds-info': '#2c9edb',
+        'ds-success': 'var(--ds-success)',
+        'ds-warning': 'var(--ds-warning)',
+        'ds-danger': 'var(--ds-danger)',
+        'ds-info': 'var(--ds-info)',
+
+        // On-tint text: theme-aware labels on translucent semantic tints
+        'ds-on-tint-primary': 'var(--ds-on-tint-primary)',
+        'ds-on-tint-success': 'var(--ds-on-tint-success)',
+        'ds-on-tint-info': 'var(--ds-on-tint-info)',
+        'ds-on-tint-warning': 'var(--ds-on-tint-warning)',
+        'ds-on-tint-error': 'var(--ds-on-tint-error)',
       },
       fontFamily: {
          sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],

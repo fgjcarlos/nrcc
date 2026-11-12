@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { type EnvVar } from '@/features/env-vars/services/envService';
 import { useT } from '@/i18n';
+import { useModalKeyboard } from '@/shared/hooks/useModalKeyboard';
 
 export function EnvVarModal({
   formData,
@@ -36,14 +37,11 @@ export function EnvVarModal({
     };
   }, []);
 
-  // Close on Escape, matching ConfirmationDialog's keyboard behavior.
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCancel();
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onCancel]);
+  // Escape closes, Tab stays inside the dialog, focus moves in on open and
+  // returns to the invoking control on close (ConfirmationDialog contract).
+  // The modal is only mounted while open.
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalKeyboard({ isOpen: true, containerRef: dialogRef, onEscape: onCancel });
 
   // Validate form on formData changes. Depends on the active language
   // instead of the t() reference so the effect re-runs only when the
@@ -110,7 +108,7 @@ export function EnvVarModal({
             value={formData.value}
             onChange={(e) => setFormData({ ...formData, value: e.target.value })}
             placeholder={editing ? '(leave empty to keep current)' : ''}
-            className="glass-panel h-12 w-full rounded-xl border-0 px-3 text-base-content focus:outline-none"
+            className="glass-panel h-12 w-full rounded-xl border-0 px-3 text-base-content focus:outline-none focus-visible:ring-2 focus-visible:ring-ds-accent-primary"
             required={isRequired}
           />
         );
@@ -141,7 +139,7 @@ export function EnvVarModal({
             value={formData.value}
             onChange={(e) => setFormData({ ...formData, value: e.target.value })}
             placeholder={editing ? '(leave empty to keep current)' : ''}
-            className="glass-panel h-12 w-full rounded-xl border-0 px-3 text-base-content focus:outline-none"
+            className="glass-panel h-12 w-full rounded-xl border-0 px-3 text-base-content focus:outline-none focus-visible:ring-2 focus-visible:ring-ds-accent-primary"
             required={isRequired}
           />
         );
@@ -154,7 +152,7 @@ export function EnvVarModal({
             value={formData.value}
             onChange={(e) => setFormData({ ...formData, value: e.target.value })}
             placeholder={editing ? '(leave empty to keep current)' : ''}
-            className="glass-panel h-12 w-full rounded-xl border-0 px-3 text-base-content focus:outline-none"
+            className="glass-panel h-12 w-full rounded-xl border-0 px-3 text-base-content focus:outline-none focus-visible:ring-2 focus-visible:ring-ds-accent-primary"
             required={isRequired}
           />
         );
@@ -167,8 +165,10 @@ export function EnvVarModal({
   return createPortal(
     <div className="modal-overlay" onClick={onCancel}>
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
+        tabIndex={-1}
         aria-labelledby="env-var-modal-title"
         className="surface-panel max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto border border-border p-6 shadow-glow"
         onClick={(e) => e.stopPropagation()}

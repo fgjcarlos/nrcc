@@ -124,8 +124,30 @@ jobs:
       - name: Test
         run: pnpm test --run
 
+      # Accessibility evidence (#889): the static WCAG AA contrast guard is
+      # strict by default and fails the job on any documented pair below
+      # its threshold, in both themes. Its own behavioural tests and the
+      # theme-variable contract for Tailwind ds-* colours run first.
+      - name: Contrast auditor and theme-token tests
+        run: |
+          pnpm test:contrast
+          pnpm test:tailwind-vars
+
+      - name: WCAG AA contrast guard (both themes)
+        run: pnpm check:contrast
+
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
+
+      # Appearance evidence (#889), kept separate from accessibility
+      # evidence: these pin the built CSS contract and computed styles
+      # (2 themes x 2 viewports). A failure here means the look changed,
+      # not that a WCAG rule broke; the contrast guard and axe e2e cover
+      # accessibility.
+      - name: Appearance regression (built CSS and computed styles)
+        run: |
+          pnpm test:css
+          pnpm test:appearance
 
       - name: E2E smoke tests
         id: fixture-e2e

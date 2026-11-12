@@ -168,9 +168,9 @@ export function EnvVarsView() {
           data-testid="node-red-sync-status"
           className={`rounded-lg border px-4 py-3 text-sm ${
             nodeRedSyncState === 'error'
-              ? 'border-error/30 bg-error/10 text-error-content'
+              ? 'border-error/30 bg-error/10 text-ds-on-tint-error'
               : nodeRedSyncState === 'unavailable'
-                ? 'border-warning/30 bg-warning/10 text-warning-content'
+                ? 'border-warning/30 bg-warning/10 text-ds-on-tint-warning'
                 : 'border-info/30 bg-info/10 text-base-content'
           }`}
         >

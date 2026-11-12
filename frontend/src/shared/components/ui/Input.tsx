@@ -45,6 +45,8 @@ export const Input = ({
           'flex w-full rounded-md px-3 py-2 text-sm',
           'bg-base-300 text-base-content placeholder:text-base-content/50',
           'border-none outline-none',
+          // Solid keyboard-focus indicator; the glow below is only a soft tint.
+          'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent-primary',
           'transition-all duration-200',
           'file:border-0 file:bg-transparent file:text-sm file:font-medium',
           'focus:ring-1 focus:ring-primary input-focus-glow',
