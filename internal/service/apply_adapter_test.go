@@ -89,6 +89,8 @@ func newRecordingDockerService() *DockerService {
 }
 
 // TestSelectApplyAdapter_Matrix locks in the dispatch table documented
+// on SelectApplyAdapter. Every combination of (Mode, ManagedByNRCC)
+// with a nodered-5 adapter must resolve to the documented ApplyAdapter
 // name; any other combination must yield ErrUnsupportedAdapter.
 func TestSelectApplyAdapter_Matrix(t *testing.T) {
 	cases := []struct {
