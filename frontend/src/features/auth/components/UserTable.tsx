@@ -48,7 +48,7 @@ export function UserTable({
                   <span
                     className={`rounded-full px-2 py-1 text-xs ${
                       user.role === 'admin'
-                        ? 'bg-info/15 text-info-content'
+                        ? 'bg-info/15 text-ds-on-tint-info'
                         : 'bg-base-300/70 text-base-content/70'
                     }`}
                   >
@@ -104,7 +104,7 @@ export function UserTable({
                   <span
                     className={`inline-block rounded-full px-2 py-1 text-xs ${
                       user.role === 'admin'
-                        ? 'bg-info/15 text-info-content'
+                        ? 'bg-info/15 text-ds-on-tint-info'
                         : 'bg-base-300/70 text-base-content/70'
                     }`}
                   >

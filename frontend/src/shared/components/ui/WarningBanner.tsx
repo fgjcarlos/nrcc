@@ -16,7 +16,7 @@ export function WarningBanner({ message, className }: WarningBannerProps) {
     <div
       role="alert"
       className={cn(
-        'flex items-center justify-between gap-2 rounded-2xl border border-warning/20 bg-warning/10 px-4 py-3 text-warning-content',
+        'flex items-center justify-between gap-2 rounded-2xl border border-warning/20 bg-warning/10 px-4 py-3 text-ds-on-tint-warning',
         className
       )}
     >

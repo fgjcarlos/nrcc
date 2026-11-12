@@ -9,7 +9,8 @@
  *   1. happy path (every pair AA) → exits 0 in the default and --report modes
  *   2. text drift → exits 1 by default (strict), 0 with --report
  *   3. small button labels are text (4.5:1), not UI components (3:1)
- *   4. text is audited on every documented surface, not only base-100
+ *   4. text is audited on every documented surface, not only base-100,
+ *      and chip/badge labels on their 18% tint over every surface
  *   5. missing token → exits 2 in every mode
  *   6. calculator identity check on known values
  *
@@ -50,6 +51,11 @@ const PASSING = {
     'ds-text-secondary': '#d8dee8',
     'ds-text-muted': '#9aa7b8',
     'ds-brand-hover': '#1e40af',
+    'ds-on-tint-primary': '#f5f7fa',
+    'ds-on-tint-success': '#f5f7fa',
+    'ds-on-tint-info': '#f5f7fa',
+    'ds-on-tint-warning': '#f5f7fa',
+    'ds-on-tint-error': '#f5f7fa',
   },
   corporateLight: {
     'color-base-100': '#f6f7f9',
@@ -74,6 +80,11 @@ const PASSING = {
     'ds-text-secondary': '#263241',
     'ds-text-muted': '#5a6577',
     'ds-brand-hover': '#1e40af',
+    'ds-on-tint-primary': '#10151c',
+    'ds-on-tint-success': '#10151c',
+    'ds-on-tint-info': '#10151c',
+    'ds-on-tint-warning': '#10151c',
+    'ds-on-tint-error': '#10151c',
   },
 };
 
@@ -177,6 +188,17 @@ withFixture({ corporateDark: { 'ds-text-muted': '#6f7d90' } }, (workdir) => {
   assert(run.stderr.includes('muted text on ds-bg-surface'), 'surface pair reported', run.stderr);
   assert(run.stderr.includes('muted text on ds-bg-overlay'), 'overlay pair reported', run.stderr);
   assert(!run.stderr.includes('muted text on base-100'), 'passing base-100 pair is not reported as drift', run.stderr);
+});
+
+withFixture({ corporateLight: { 'ds-on-tint-warning': '#c98905' } }, (workdir) => {
+  // Amber text on its own 18% tint over white ≈ 2.4:1.
+  const run = runScript(workdir);
+  assert(run.status === 1, 'tinted chip label drift → exits 1', `status=${run.status}`);
+  assert(
+    run.stderr.includes('warning chip label on ds-bg-surface') && run.stderr.includes('warning 18% tint over ds-bg-surface'),
+    'tinted chip label → names the composite background',
+    run.stderr,
+  );
 });
 
 // ── 5. Missing token exits 2 in every mode ───────────────────────

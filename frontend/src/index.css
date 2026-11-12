@@ -32,25 +32,25 @@
      --color-base-300:          #141b23;
      --color-base-content:      #f5f7fa;
 
-     --color-primary:           #d4472b;
+     --color-primary:           #cf452a;
      --color-primary-content:   #ffffff;
 
      --color-secondary:         #141b23;
      --color-secondary-content: #d8dee8;
 
      --color-accent:            #0089b4;
-     --color-accent-content:    #f5f7fa;
+     --color-accent-content:    #07090d;
 
      --color-neutral:           #1a2332;
      --color-neutral-content:   #f5f7fa;
 
      --color-info:              #0089b4;
-     --color-info-content:      #ffffff;
+     --color-info-content:      #07090d;
      --color-success:           #16a36a;
-     --color-success-content:   #ffffff;
+     --color-success-content:   #07090d;
      --color-warning:           #e8a811;
      --color-warning-content:   #07090d;
-     --color-error:             #e54233;
+     --color-error:             #d53d2f;
      --color-error-content:     #ffffff;
 
      /* Signal Prime Dark Custom Tokens */
@@ -64,10 +64,17 @@
      --ds-border-strong:        #39485c;
      --ds-text-primary:         #f5f7fa;
      --ds-text-secondary:       #d8dee8;
-     --ds-text-muted:           #6f7d90;
+     --ds-text-muted:           #8e99a8;
+
+     /* On-tint text: labels drawn on translucent semantic tints */
+     --ds-on-tint-primary:      #e48b79;
+     --ds-on-tint-success:      #5cbf97;
+     --ds-on-tint-info:         #5db4cf;
+     --ds-on-tint-warning:      #e8aa16;
+     --ds-on-tint-error:        #ee867c;
 
      /* Button Hover State Tokens */
-     --ds-brand-hover:          #f05a3d;
+     --ds-brand-hover:          #b83d26;
 
     --radius-selector: .375rem;
     --radius-field:    .25rem;
@@ -115,7 +122,7 @@
 
      --color-info:              #1679b7;
      --color-info-content:      #ffffff;
-     --color-success:           #0f8f5f;
+     --color-success:           #0e8558;
      --color-success-content:   #ffffff;
      --color-warning:           #c98905;
      --color-warning-content:   #10151c;
@@ -133,10 +140,17 @@
      --ds-border-strong:        #b7c3d1;
      --ds-text-primary:         #10151c;
      --ds-text-secondary:       #263241;
-     --ds-text-muted:           #6f7d90;
+     --ds-text-muted:           #5a6577;
+
+     /* On-tint text: labels drawn on translucent semantic tints */
+     --ds-on-tint-primary:      #a03521;
+     --ds-on-tint-success:      #0b6a46;
+     --ds-on-tint-info:         #116091;
+     --ds-on-tint-warning:      #805703;
+     --ds-on-tint-error:        #a62b22;
 
      /* Button Hover State Tokens */
-     --ds-brand-hover:          #d4472b;
+     --ds-brand-hover:          #a53722;
 
     --radius-selector: .5rem;
     --radius-field:    .25rem;
@@ -634,8 +648,8 @@
 /* ── LIGHT: Primary (Signal Prime red) ─────────────────────────── */
 [data-theme="corporateLight"] .btn-primary {
   @apply border-0 text-white font-semibold;
-  background: #bd3f27;
-  box-shadow: 0 12px 24px color-mix(in srgb, #bd3f27 24%, transparent);
+  background: var(--color-primary);
+  box-shadow: 0 12px 24px color-mix(in srgb, var(--color-primary) 24%, transparent);
 }
 
 [data-theme="corporateLight"] .btn-primary:hover {
@@ -701,7 +715,7 @@
 
 [data-theme="corporateLight"] .btn-success {
   @apply border-0 text-white font-medium;
-  background-color: #0f8f5f;
+  background-color: var(--color-success);
 }
 
 [data-theme="corporateLight"] .btn-success:hover:not(:disabled) {
@@ -954,32 +968,32 @@ aside.bg-base-100 {
 /* ── Badge theme-aware styling with Signal Prime colors ───── */
 [data-theme="corporateDark"] .badge {
   background: linear-gradient(180deg, var(--ds-bg-elevated), var(--ds-bg-surface));
-  border: 1px solid color-mix(in srgb, #d4472b 35%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 35%, transparent);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.32);
 }
 
 [data-theme="corporateDark"] .badge-primary {
-  background: color-mix(in srgb, #d4472b 18%, transparent);
-  color: #f05a3d;
-  border: 1px solid color-mix(in srgb, #d4472b 35%, transparent);
+  background: color-mix(in srgb, var(--color-primary) 18%, transparent);
+  color: var(--ds-on-tint-primary);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 35%, transparent);
 }
 
 [data-theme="corporateDark"] .badge-success {
-  background: color-mix(in srgb, #16a36a 18%, transparent);
-  color: #16a36a;
-  border: 1px solid color-mix(in srgb, #16a36a 35%, transparent);
+  background: color-mix(in srgb, var(--color-success) 18%, transparent);
+  color: var(--ds-on-tint-success);
+  border: 1px solid color-mix(in srgb, var(--color-success) 35%, transparent);
 }
 
 [data-theme="corporateDark"] .badge-warning {
-  background: color-mix(in srgb, #e8a811 18%, transparent);
-  color: #e8a811;
-  border: 1px solid color-mix(in srgb, #e8a811 35%, transparent);
+  background: color-mix(in srgb, var(--color-warning) 18%, transparent);
+  color: var(--ds-on-tint-warning);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 35%, transparent);
 }
 
 [data-theme="corporateDark"] .badge-error {
-  background: color-mix(in srgb, #e54233 18%, transparent);
-  color: #e54233;
-  border: 1px solid color-mix(in srgb, #e54233 35%, transparent);
+  background: color-mix(in srgb, var(--color-error) 18%, transparent);
+  color: var(--ds-on-tint-error);
+  border: 1px solid color-mix(in srgb, var(--color-error) 35%, transparent);
 }
 
 [data-theme="corporateLight"] .badge {
@@ -989,27 +1003,27 @@ aside.bg-base-100 {
 }
 
 [data-theme="corporateLight"] .badge-primary {
-  background: color-mix(in srgb, #bd3f27 18%, transparent);
-  color: #bd3f27;
-  border: 1px solid color-mix(in srgb, #bd3f27 35%, transparent);
+  background: color-mix(in srgb, var(--color-primary) 18%, transparent);
+  color: var(--ds-on-tint-primary);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 35%, transparent);
 }
 
 [data-theme="corporateLight"] .badge-success {
-  background: color-mix(in srgb, #0f8f5f 18%, transparent);
-  color: #0f8f5f;
-  border: 1px solid color-mix(in srgb, #0f8f5f 35%, transparent);
+  background: color-mix(in srgb, var(--color-success) 18%, transparent);
+  color: var(--ds-on-tint-success);
+  border: 1px solid color-mix(in srgb, var(--color-success) 35%, transparent);
 }
 
 [data-theme="corporateLight"] .badge-warning {
-  background: color-mix(in srgb, #c98905 18%, transparent);
-  color: #c98905;
-  border: 1px solid color-mix(in srgb, #c98905 35%, transparent);
+  background: color-mix(in srgb, var(--color-warning) 18%, transparent);
+  color: var(--ds-on-tint-warning);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 35%, transparent);
 }
 
 [data-theme="corporateLight"] .badge-error {
-  background: color-mix(in srgb, #c93429 18%, transparent);
-  color: #c93429;
-  border: 1px solid color-mix(in srgb, #c93429 35%, transparent);
+  background: color-mix(in srgb, var(--color-error) 18%, transparent);
+  color: var(--ds-on-tint-error);
+  border: 1px solid color-mix(in srgb, var(--color-error) 35%, transparent);
 }
 
 .divider {

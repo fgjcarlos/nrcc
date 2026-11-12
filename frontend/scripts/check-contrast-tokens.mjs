@@ -118,6 +118,15 @@ function relativeLuminance({ r, g, b }) {
   );
 }
 
+/** Alpha-composite `percent`% of colour `top` over opaque `bottom` (sRGB). */
+function composite(top, percent, bottom) {
+  const a = parseHex(top);
+  const b = parseHex(bottom);
+  const p = percent / 100;
+  const channel = (x, y) => Math.round(x * p + y * (1 - p)).toString(16).padStart(2, '0');
+  return `#${channel(a.r, b.r)}${channel(a.g, b.g)}${channel(a.b, b.b)}`;
+}
+
 function contrastRatio(hexA, hexB) {
   const la = relativeLuminance(parseHex(hexA));
   const lb = relativeLuminance(parseHex(hexB));
@@ -169,11 +178,28 @@ const SOLID_LABELS = [
   { fg: 'error-content', bg: 'error', label: 'error surface label' },
 ];
 
+/**
+ * Chip and badge labels drawn on a translucent tint of their semantic
+ * colour (`bg-success/15`, `.badge-success`, ...). The auditor composites
+ * the tint over each surface at the strongest opacity in use (18%).
+ */
+const TINT_PERCENT = 18;
+const TINTED_LABELS = ['primary', 'success', 'info', 'warning', 'error'];
+
 const PAIRS = THEMES.flatMap((theme) => [
   ...TEXT_COLOURS.flatMap(({ fg, name }) =>
     SURFACES.map((bg) => ({ theme, fg, bg, use: 'text', label: `${name} on ${bg}` })),
   ),
   ...SOLID_LABELS.map(({ fg, bg, label }) => ({ theme, fg, bg, use: 'text', label })),
+  ...TINTED_LABELS.flatMap((colour) =>
+    SURFACES.map((over) => ({
+      theme,
+      fg: `ds-on-tint-${colour}`,
+      bg: { tint: colour, percent: TINT_PERCENT, over },
+      use: 'text',
+      label: `${colour} chip label on ${over}`,
+    })),
+  ),
 ]);
 
 // ── Run ──────────────────────────────────────────────────────────
@@ -194,20 +220,30 @@ for (const pair of PAIRS) {
   }
   const token = (name) => palette[name] ?? palette[`color-${name}`];
   const fg = token(pair.fg);
-  const bg = token(pair.bg);
+  let bg;
+  let bgName = pair.bg;
+  if (typeof pair.bg === 'string') {
+    bg = token(pair.bg);
+  } else {
+    const { tint, percent, over } = pair.bg;
+    bgName = `${tint} ${percent}% tint over ${over}`;
+    const tintHex = token(tint);
+    const overHex = token(over);
+    bg = tintHex && overHex ? composite(tintHex, percent, overHex) : undefined;
+  }
   if (!fg || !bg) {
-    errors.push(`token missing for ${pair.theme}.${pair.fg}/${pair.bg}`);
+    errors.push(`token missing for ${pair.theme}.${pair.fg}/${bgName}`);
     continue;
   }
   const ratio = contrastRatio(fg, bg);
   const need = THRESHOLD[pair.use];
   if (ratio + 1e-9 < need) {
     failures.push(
-      `  ✗ ${pair.theme.padEnd(15)} ${pair.label.padEnd(36)} ${pair.fg}(${fg}) on ${pair.bg}(${bg}) → ${ratio.toFixed(2)}:1  (need ≥ ${need}:1 for ${pair.use})`
+      `  ✗ ${pair.theme.padEnd(15)} ${pair.label.padEnd(36)} ${pair.fg}(${fg}) on ${bgName}(${bg}) → ${ratio.toFixed(2)}:1  (need ≥ ${need}:1 for ${pair.use})`
     );
   } else {
     console.log(
-      `  ✓ ${pair.theme.padEnd(15)} ${pair.label.padEnd(36)} ${pair.fg}(${fg}) on ${pair.bg}(${bg}) → ${ratio.toFixed(2)}:1`
+      `  ✓ ${pair.theme.padEnd(15)} ${pair.label.padEnd(36)} ${pair.fg}(${fg}) on ${bgName}(${bg}) → ${ratio.toFixed(2)}:1`
     );
   }
 }

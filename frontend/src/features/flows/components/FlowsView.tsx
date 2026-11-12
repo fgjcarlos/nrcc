@@ -317,7 +317,7 @@ function AnalysisPanel({
 
           {result.pros.length > 0 && (
             <div>
-              <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-success-content">
+              <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-ds-on-tint-success">
                 <ThumbsUp className="w-3.5 h-3.5" />
                 {t('flows:strengths')}
               </div>
@@ -334,7 +334,7 @@ function AnalysisPanel({
 
           {result.cons.length > 0 && (
             <div>
-              <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-error-content">
+              <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-ds-on-tint-error">
                 <ThumbsDown className="w-3.5 h-3.5" />
                 {t('flows:improvements')}
               </div>
@@ -351,7 +351,7 @@ function AnalysisPanel({
 
           {result.suggestions.length > 0 && (
             <div>
-              <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-info-content">
+              <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-ds-on-tint-info">
                 <Lightbulb className="w-3.5 h-3.5" />
                 {t('flows:suggestions')}
               </div>

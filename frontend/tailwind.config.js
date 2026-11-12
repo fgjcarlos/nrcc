@@ -41,6 +41,13 @@ export default {
         'ds-warning': '#e8a811',
         'ds-danger': '#e54233',
         'ds-info': '#2c9edb',
+
+        // On-tint text: theme-aware labels on translucent semantic tints
+        'ds-on-tint-primary': 'var(--ds-on-tint-primary)',
+        'ds-on-tint-success': 'var(--ds-on-tint-success)',
+        'ds-on-tint-info': 'var(--ds-on-tint-info)',
+        'ds-on-tint-warning': 'var(--ds-on-tint-warning)',
+        'ds-on-tint-error': 'var(--ds-on-tint-error)',
       },
       fontFamily: {
          sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
