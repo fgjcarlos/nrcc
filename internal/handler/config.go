@@ -224,7 +224,7 @@ func (h *ConfigHandler) saveConfigLegacy(w http.ResponseWriter, r *http.Request,
 
 	if h.processManager != nil && !h.processManager.IsExternalMode() {
 		if status := h.processManager.Status(); status.Status == "running" {
-			if err := h.processManager.Restart(r.Context()); err != nil {
+			if err := h.processManager.Restart(context.WithoutCancel(r.Context())); err != nil {
 				model.RespondError(w, http.StatusInternalServerError, "CONFIG_SAVED_RESTART_FAILED", "Configuration was saved, but Node-RED could not restart: "+err.Error())
 				return
 			}

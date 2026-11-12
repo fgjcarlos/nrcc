@@ -30,7 +30,7 @@ func TestPresetsHandler_ListReturnsCorePresets(t *testing.T) {
 		t.Fatalf("List status: got %d want %d", w.Code, http.StatusOK)
 	}
 	var body struct {
-		Success bool                       `json:"success"`
+		Success bool             `json:"success"`
 		Data    []map[string]any `json:"data"`
 	}
 	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {

@@ -106,7 +106,7 @@ func (h *UpdateHandler) PostApply(w http.ResponseWriter, r *http.Request) {
 	flowState := h.svc.GetFlowState()
 	if flowState.State != model.StateIdle {
 		// Another update is already in progress
-		model.RespondError(w, http.StatusConflict, "UPDATE_IN_PROGRESS", 
+		model.RespondError(w, http.StatusConflict, "UPDATE_IN_PROGRESS",
 			"An update is already in progress. Please wait for it to complete.")
 		return
 	}
@@ -147,12 +147,12 @@ func (h *UpdateHandler) PostApply(w http.ResponseWriter, r *http.Request) {
 
 	// Return 200 OK with current state
 	model.RespondJSON(w, http.StatusOK, map[string]interface{}{
-		"success":      true,
-		"message":      "Update flow started",
-		"state":        flowState.State,
-		"backupId":     flowState.BackupID,
-		"fromVersion":  fromVersion,
-		"toVersion":    toVersion,
+		"success":     true,
+		"message":     "Update flow started",
+		"state":       flowState.State,
+		"backupId":    flowState.BackupID,
+		"fromVersion": fromVersion,
+		"toVersion":   toVersion,
 	})
 }
 

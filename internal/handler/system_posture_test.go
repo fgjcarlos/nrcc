@@ -31,9 +31,9 @@ func newMfaSvcForPosture(t *testing.T, auth *service.AuthService) *service.MfaSe
 func decodePosture(t *testing.T, body []byte) SecurityPostureResponse {
 	t.Helper()
 	var resp struct {
-		Success   bool                     `json:"success"`
-		Data      SecurityPostureResponse  `json:"data"`
-		Timestamp string                   `json:"timestamp"`
+		Success   bool                    `json:"success"`
+		Data      SecurityPostureResponse `json:"data"`
+		Timestamp string                  `json:"timestamp"`
 	}
 	if err := json.Unmarshal(body, &resp); err != nil {
 		t.Fatalf("decode response: %v: body=%s", err, body)

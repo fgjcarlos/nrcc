@@ -53,7 +53,7 @@ func TestComputeDiskUsage_Ext4ReservedBlocks(t *testing.T) {
 		t.Fatalf("used = %d, want %d (Blocks-Bfree × bsize; #705)", used, wantUsed)
 	}
 	// Sanity: the reserved-block over-report is exactly (Bfree - Bavail)*bsize.
-	if (free+used) >= total {
+	if (free + used) >= total {
 		t.Fatalf("free + used (%d) must be < total (%d): reserved blocks lie between them",
 			free+used, total)
 	}

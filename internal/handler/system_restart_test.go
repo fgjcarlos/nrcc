@@ -14,10 +14,10 @@ import (
 // returns a canned error from Run / CombinedOutput so failure paths
 // can be exercised without spawning real subprocesses.
 type execRecorder struct {
-	mu       sync.Mutex
-	calls    []execCall
-	runErr   error
-	capture  func(call execCall) *exec.Cmd
+	mu      sync.Mutex
+	calls   []execCall
+	runErr  error
+	capture func(call execCall) *exec.Cmd
 }
 
 type execCall struct {

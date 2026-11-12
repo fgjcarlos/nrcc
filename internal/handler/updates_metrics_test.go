@@ -12,7 +12,7 @@ import (
 )
 
 type stubUpdateMetrics struct {
-	mu   sync.Mutex
+	mu    sync.Mutex
 	calls []bool
 	done  chan struct{}
 }
