@@ -20,26 +20,28 @@ describe('StatusChip', () => {
     render(<StatusChip variant="success">Running</StatusChip>);
     const chip = screen.getByRole('status');
     expect(chip.className).toMatch(/bg-ds-success/);
-    expect(chip.className).toMatch(/text-ds-success/);
+    expect(chip.className).toMatch(/text-ds-on-tint-success/);
   });
 
   it('applies the warning variant palette', () => {
     render(<StatusChip variant="warning">Pending</StatusChip>);
     const chip = screen.getByRole('status');
     expect(chip.className).toMatch(/bg-ds-warning/);
-    expect(chip.className).toMatch(/text-ds-warning/);
+    expect(chip.className).toMatch(/text-ds-on-tint-warning/);
   });
 
   it('applies the danger variant palette', () => {
     render(<StatusChip variant="danger">Failed</StatusChip>);
     const chip = screen.getByRole('status');
     expect(chip.className).toMatch(/bg-ds-danger/);
+    expect(chip.className).toMatch(/text-ds-on-tint-error/);
   });
 
   it('applies the info variant palette', () => {
     render(<StatusChip variant="info">Detected</StatusChip>);
     const chip = screen.getByRole('status');
     expect(chip.className).toMatch(/bg-ds-info/);
+    expect(chip.className).toMatch(/text-ds-on-tint-info/);
   });
 
   it('honours the size="sm" override', () => {

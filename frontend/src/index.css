@@ -76,6 +76,21 @@
      /* Button Hover State Tokens */
      --ds-brand-hover:          #b83d26;
 
+     /* Tailwind ds-* utility palette (tailwind.config.js) */
+     --ds-brand-primary:        #d4472b;
+     --ds-brand-dim:            #8f2f1f;
+     --ds-accent-primary:       #0089b4;
+     --ds-accent-hover:         #22b4df;
+     --ds-accent-dim:           #075a73;
+     --ds-ui-border-subtle:     #263241;
+     --ds-ui-border-default:    #39485c;
+     --ds-ui-border-strong:     #4a5f7c;
+     --ds-text-tertiary:        #9aa7b8;
+     --ds-success:              #16a36a;
+     --ds-warning:              #e8a811;
+     --ds-danger:               #e54233;
+     --ds-info:                 #2c9edb;
+
     --radius-selector: .375rem;
     --radius-field:    .25rem;
     --radius-box:      .5rem;
@@ -151,6 +166,21 @@
 
      /* Button Hover State Tokens */
      --ds-brand-hover:          #a53722;
+
+     /* Tailwind ds-* utility palette (tailwind.config.js) */
+     --ds-brand-primary:        #bd3f27;
+     --ds-brand-dim:            #f3d9d3;
+     --ds-accent-primary:       #007aa0;
+     --ds-accent-hover:         #006585;
+     --ds-accent-dim:           #d6eef6;
+     --ds-ui-border-subtle:     #d8e0ea;
+     --ds-ui-border-default:    #d8e0ea;
+     --ds-ui-border-strong:     #b7c3d1;
+     --ds-text-tertiary:        #4a5566;
+     --ds-success:              #0e8558;
+     --ds-warning:              #c98905;
+     --ds-danger:               #c93429;
+     --ds-info:                 #1679b7;
 
     --radius-selector: .5rem;
     --radius-field:    .25rem;

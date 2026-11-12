@@ -12,7 +12,9 @@ import { cn } from '@/shared/lib/utils';
  * (e.g. EdgeModeBadge).
  *
  * Variants map to the existing ds-* semantic palette in
- * tailwind.config.js — no new colours are introduced.
+ * tailwind.config.js — no new colours are introduced. Labels sit on a
+ * translucent tint, so they use the theme-aware ds-on-tint-* text
+ * tokens (issue #889) rather than the solid signal colour.
  */
 
 const statusChipVariants = cva(
@@ -22,10 +24,10 @@ const statusChipVariants = cva(
   {
     variants: {
       variant: {
-        success: 'bg-ds-success/15 text-ds-success border border-ds-success/35',
-        warning: 'bg-ds-warning/15 text-ds-warning border border-ds-warning/35',
-        danger: 'bg-ds-danger/15 text-ds-danger border border-ds-danger/35',
-        info: 'bg-ds-info/15 text-ds-info border border-ds-info/35',
+        success: 'bg-ds-success/15 text-ds-on-tint-success border border-ds-success/35',
+        warning: 'bg-ds-warning/15 text-ds-on-tint-warning border border-ds-warning/35',
+        danger: 'bg-ds-danger/15 text-ds-on-tint-error border border-ds-danger/35',
+        info: 'bg-ds-info/15 text-ds-on-tint-info border border-ds-info/35',
         neutral: 'bg-base-300/60 text-base-content/80 border border-ds-border-default',
       },
       size: {
