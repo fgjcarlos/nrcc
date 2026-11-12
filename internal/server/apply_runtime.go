@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"strconv"
 
 	"github.com/dop251/goja/ast"
@@ -47,14 +48,23 @@ func serverApplyResolver(detect func() model.HostStatus, processManager func() *
 		case nodeRed.Mode == model.InstallationModeNative && !nodeRed.ManagedByNRCC:
 			// Issue #918: bind the systemd readiness probe to the port the
 			// candidate settings define instead of a well-known default a
-			// foreign listener could occupy. Resolve the port at selection time
-			// so a settings file whose uiPort cannot be proven static fails
-			// validation BEFORE any restart, instead of restarting a healthy
-			// runtime and failing readiness afterwards (verifier finding B1).
-			if _, err := applyCandidatePort(req); err != nil {
-				return nil, err
+			// foreign listener could occupy. When the strict single-statement
+			// parser cannot prove the uiPort static (stock Node-RED templates
+			// use `process.env.PORT || 1880` alongside require() calls), fall
+			// back to the declared numeric literal so applies that succeeded
+			// at baseline keep working; only refuse when no port authority can
+			// be derived at all.
+			_, portErr := applyCandidatePort(req)
+			fallbackPort, hasFallback := fallbackLiteralPort(req)
+			if portErr != nil && !hasFallback {
+				return nil, portErr
 			}
-			readinessResolver = func() (string, error) { return settingsReadinessURL(req.Path) }
+			readinessResolver = func() (string, error) {
+				if portErr == nil {
+					return settingsReadinessURL(req.Path)
+				}
+				return fmt.Sprintf("http://127.0.0.1:%d/settings", fallbackPort), nil
+			}
 		}
 		return service.SelectApplyAdapter(req.Capabilities, nodeRed, service.ApplyAdapterDeps{
 			ProcessManager: pm, SystemdManager: systemd, Docker: docker,
@@ -64,6 +74,28 @@ func serverApplyResolver(detect func() model.HostStatus, processManager func() *
 }
 
 var errSettingsPortMissing = errors.New("apply: settings must define exactly one static uiPort")
+
+// fallbackPortRe extracts the declared numeric uiPort literal from raw
+// settings the strict parser rejects, e.g. `uiPort: process.env.PORT || 1880`
+// (review correction for issue #918: stock templates must keep applying).
+var fallbackPortRe = regexp.MustCompile(`uiPort\s*:\s*(?:[^\n,]+?\|\|\s*)?(\d{1,5})\b`)
+
+// fallbackLiteralPort reports the declared fallback uiPort literal of the
+// candidate settings, if any.
+func fallbackLiteralPort(req service.ApplyRequest) (int, bool) {
+	if req.Content == "" {
+		return 0, false
+	}
+	m := fallbackPortRe.FindStringSubmatch(req.Content)
+	if m == nil {
+		return 0, false
+	}
+	port, err := strconv.Atoi(m[1])
+	if err != nil || port < 1 || port > 65535 {
+		return 0, false
+	}
+	return port, true
+}
 
 func managedSettingsReadinessURL(path string, pm *service.ProcessManager) (string, error) {
 	if pm == nil {

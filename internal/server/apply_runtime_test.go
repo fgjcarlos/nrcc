@@ -316,3 +316,35 @@ func TestSystemdDynamicSettingsFailBeforeRestart(t *testing.T) {
 		}
 	}
 }
+
+// TestSystemdStockTemplateStillApplies locks the review correction for
+// issue #918: a stock Node-RED settings template (`uiPort:
+// process.env.PORT || 1880`) on a systemd host must pass selection and
+// probe its declared fallback port instead of being refused.
+func TestSystemdStockTemplateStillApplies(t *testing.T) {
+	content := "const os = require('os'); module.exports = { uiPort: process.env.PORT || 1880, hostname: os.hostname() };"
+	path := filepath.Join(t.TempDir(), "settings.js")
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	detect := func() model.HostStatus {
+		return model.HostStatus{NodeRed: model.NodeRedEnvironment{Detected: true, Mode: model.InstallationModeNative, ContainerName: "nodered.service"}}
+	}
+	resolver := serverApplyResolver(detect, func() *service.ProcessManager { return nil }, probeSystemd{}, nil)
+	adapter, err := resolver(service.ApplyRequest{
+		Capabilities: model.ConfigurationCapabilities{Adapter: "nodered-5"},
+		Path:         path,
+		Content:      content,
+	})
+	if err != nil {
+		t.Fatalf("stock systemd settings refused at selection: %v", err)
+	}
+	// Ready must probe 127.0.0.1:1880 (the declared fallback), not a
+	// foreign default: with nothing listening there, readiness fails on
+	// the probe itself, never with an "apply: settings" resolution error.
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if rerr := adapter.Ready(ctx); rerr != nil && strings.HasPrefix(rerr.Error(), "apply: settings") {
+		t.Fatalf("readiness resolution error for stock template: %v", rerr)
+	}
+}
