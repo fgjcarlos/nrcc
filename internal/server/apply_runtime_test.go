@@ -84,8 +84,8 @@ func TestHardenedNodeRedFixtureProcess(t *testing.T) {
 	}
 	port := os.Getenv("NODE_RED_PORT")
 	server := &http.Server{
-		Addr:              "127.0.0.1:" + port,
-		Handler:           http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		Addr: "127.0.0.1:" + port,
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.URL.Path == "/settings" {
 				w.WriteHeader(http.StatusOK)
 				return

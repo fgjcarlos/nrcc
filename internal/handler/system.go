@@ -375,10 +375,10 @@ func getNodeVersion() string {
 // the UI treats the chip as "degraded" without crashing.
 type SecurityPostureResponse struct {
 	EncryptionKeyConfigured bool `json:"encryptionKeyConfigured"` // NRCC_ENCRYPTION_KEY is set and non-empty
-	BackupAccessAdminGated bool `json:"backupAccessAdminGated"`   // /api/backups/{id}/download is RequireAdmin
-	ActiveRefreshSessions  int  `json:"activeRefreshSessions"`   // count of non-revoked, non-expired sessions
-	TotalAdmins            int  `json:"totalAdmins"`             // users with RoleAdmin
-	MfaEnrolledAdmins      int  `json:"mfaEnrolledAdmins"`       // subset of totalAdmins with TOTP enrolled
+	BackupAccessAdminGated  bool `json:"backupAccessAdminGated"`  // /api/backups/{id}/download is RequireAdmin
+	ActiveRefreshSessions   int  `json:"activeRefreshSessions"`   // count of non-revoked, non-expired sessions
+	TotalAdmins             int  `json:"totalAdmins"`             // users with RoleAdmin
+	MfaEnrolledAdmins       int  `json:"mfaEnrolledAdmins"`       // subset of totalAdmins with TOTP enrolled
 }
 
 // GetSecurityPosture handles GET /api/system/security-posture — admin-only

@@ -27,7 +27,6 @@ import (
 // readiness, so the strict restart path refuses instead.
 var ErrForeignListener = errors.New("node-red port is already bound by a foreign process")
 
-
 // Env precedence for the Node-RED child process (and any helper that
 // resolves the same env layers, e.g. EnvService.activeNodeRedUserDir):
 //   1. OS environ (base)
