@@ -1,6 +1,6 @@
 module github.com/fgjcarlos/nrcc
 
-go 1.27.0
+go 1.27.4
 
 require (
 	github.com/dop251/goja v0.0.0-20260806115107-493f22071ef6
