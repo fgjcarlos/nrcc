@@ -124,6 +124,18 @@ jobs:
       - name: Test
         run: pnpm test --run
 
+      # Accessibility evidence (#889): the static WCAG AA contrast guard is
+      # strict by default and fails the job on any documented pair below
+      # its threshold, in both themes. Its own behavioural tests and the
+      # theme-variable contract for Tailwind ds-* colours run first.
+      - name: Contrast auditor and theme-token tests
+        run: |
+          pnpm test:contrast
+          pnpm test:tailwind-vars
+
+      - name: WCAG AA contrast guard (both themes)
+        run: pnpm check:contrast
+
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
 
