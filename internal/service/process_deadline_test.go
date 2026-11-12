@@ -24,7 +24,7 @@ func newDeadlineTestProcessManager(t *testing.T, trap string) (*ProcessManager, 
 	dir := t.TempDir()
 	script := filepath.Join(dir, "fake-node-red.sh")
 	body := "#!/bin/sh\ntrap '' TERM\necho ready > \"$0.ready\"\nsleep 30\n"
-	if err := os.WriteFile(script, []byte(body), 0o700); err != nil {
+	if err := os.WriteFile(script, []byte(body), 0o700); err != nil { //nolint:gosec // G306: the fake Node-RED script must stay executable.
 		t.Fatalf("write script: %v", err)
 	}
 	// Pick a free port so startLocked does not collide with a real listener.
@@ -120,7 +120,7 @@ func TestProcessManager_RestartRefusesForeignListener(t *testing.T) {
 func TestProcessManager_StopNormalStillWorks(t *testing.T) {
 	dir := t.TempDir()
 	script := filepath.Join(dir, "sleep.sh")
-	if err := os.WriteFile(script, []byte("#!/bin/sh\nsleep 30\n"), 0o700); err != nil {
+	if err := os.WriteFile(script, []byte("#!/bin/sh\nsleep 30\n"), 0o700); err != nil { //nolint:gosec // G306: the fake Node-RED script must stay executable.
 		t.Fatalf("write script: %v", err)
 	}
 	l, err := net.Listen("tcp", "127.0.0.1:0")
