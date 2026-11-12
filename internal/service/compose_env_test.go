@@ -59,7 +59,7 @@ var composePinned = map[string]string{
 // composeNotForwarded are contract variables the canonical stack
 // intentionally does not take from the host, with the reason documented in
 // docs/configuration/env-contract.md.
-var composeNotForwarded = map[string]string{
+var composeNotForwarded = map[string]string{ //nolint:gosec // G101 variable names and reasons, not credentials.
 	"NODE_RED_PORT":             "container port 1880 is fixed by the port mapping; use NODE_RED_HOST_PORT",
 	"NRCC_MANAGE_NODE_RED":      "false would leave the one-container stack without a Node-RED process",
 	"NRCC_IMAGE":                "display label only; the stack builds the image locally",
@@ -89,7 +89,7 @@ func readComposeEnvironment(t *testing.T) map[string]string {
 	if err != nil {
 		t.Fatalf("open docker-compose.yml: %v", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	env := map[string]string{}
 	inEnv := false
@@ -228,7 +228,7 @@ func runComposeConfig(t *testing.T, envFile string) ([]byte, string, error) {
 	if err != nil {
 		t.Skip("docker CLI not installed")
 	}
-	if err := exec.Command(docker, "compose", "version").Run(); err != nil {
+	if err := exec.Command(docker, "compose", "version").Run(); err != nil { //nolint:gosec // G204 docker path comes from exec.LookPath.
 		t.Skip("docker compose plugin not available")
 	}
 	dir := t.TempDir()
@@ -236,7 +236,7 @@ func runComposeConfig(t *testing.T, envFile string) ([]byte, string, error) {
 	if err := os.WriteFile(path, []byte(envFile), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command(docker, "compose",
+	cmd := exec.Command(docker, "compose", //nolint:gosec // G204 docker path from exec.LookPath, args are test-controlled.
 		"-f", filepath.Join(repoRootDir(t), "docker-compose.yml"),
 		"--env-file", path,
 		"-p", "nrcc-env-contract-test",
