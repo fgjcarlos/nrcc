@@ -321,22 +321,32 @@ the gate end-to-end.
 ### Contrast auditor (W4-a)
 
 `scripts/check-contrast-tokens.mjs` reads the colour tokens declared in
-`tailwind.config.js` and `src/index.css`, computes the WCAG 2.1
-relative-luminance ratio for every documented foreground / background
-pair in both themes, and fails when any pair drops below the AA
-threshold (4.5:1 for body text, 3:1 for UI components). It runs in two
-modes:
+`src/index.css` (and legacy palettes in `tailwind.config.js`), computes
+the WCAG 2.1 relative-luminance ratio for every documented foreground /
+background pair in both themes, and fails when any pair drops below its
+threshold:
 
-- `pnpm check:contrast` — report-only, exits 0 even on drift; intended
-  for local development.
-- `pnpm check:contrast:strict` — exits 1 on AA drift; intended for CI
-  once the pre-existing design drift in corporateLight muted text is
-  fixed (see the W4 evidence section in the ODD task).
+- **text — 4.5:1.** Body, secondary and muted text on every surface
+  (`base-100`, `base-200`, `base-300`, `ds-bg-surface`,
+  `ds-bg-elevated`, `ds-bg-overlay`), and the labels of solid buttons,
+  chips and badges. Small labels (< 18.66px bold or < 24px regular) are
+  normal text; they are never treated as large text automatically
+  (#889).
+- **large — 3:1.** Only for text verified to meet the large-text size.
+- **non-text — 3:1.** Borders, icons and focus indicators.
 
-The auditor's unit test lives in
-`scripts/check-contrast-tokens.test.mjs` and covers the happy path,
-report-only drift, `--strict` drift, missing-token resolution, and a
-calculator identity check.
+Modes:
+
+- `pnpm check:contrast` — strict (default): exits 1 on any AA drift.
+  `pnpm check:contrast:strict` is kept as an explicit alias.
+- `pnpm check:contrast:report` — report-only: lists drift and exits 0.
+  Use it locally while iterating on tokens.
+
+A missing token exits 2 in every mode. The auditor's behavioural tests
+live in `scripts/check-contrast-tokens.test.mjs` (`pnpm test:contrast`)
+and cover the happy path, strict-by-default drift, `--report`, the text
+threshold for small labels, every-surface coverage, missing tokens, and
+a calculator identity check.
 
 ### axe-core browser gate (W4-b)
 

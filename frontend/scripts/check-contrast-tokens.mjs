@@ -1,22 +1,28 @@
 #!/usr/bin/env node
 /**
- * check-contrast-tokens.mjs — issue #766 slice G W4
+ * check-contrast-tokens.mjs — issues #766 slice G W4 and #889
  *
- * Static auditor for WCAG 2.1 SC 1.4.3 (Contrast — Minimum).
+ * Static auditor for WCAG 2.1 SC 1.4.3 (Contrast — Minimum) and
+ * SC 1.4.11 (Non-text Contrast).
  *
  * Reads the colour tokens declared in `src/index.css` for both themes
- * and supports legacy `corporateDark` / `corporateLight` palettes in
- * `tailwind.config.js`, computes the contrast ratio for every
- * documented foreground / background pair, and fails CI when any pair
- * drops below the AA threshold (4.5:1 for body text, 3:1 for large
- * text and UI components).
+ * (and legacy `corporateDark` / `corporateLight` palettes in
+ * `tailwind.config.js`), computes the contrast ratio for every
+ * documented foreground / background pair, and fails when any pair
+ * drops below its threshold.
  *
- * The contract: pairs are listed explicitly in the PAIRS table below.
- * A new pair added to the UI must also be added here. Drift between
- * the design tokens and this script fails the build.
+ * The contract: pairs are generated from the tables below. A new text
+ * colour, surface or solid label added to the UI must also be added
+ * here. Drift between the design tokens and this script fails the build.
+ *
+ * Modes:
+ *   (default)  strict — any failing pair exits 1. `--strict` is accepted
+ *              as an explicit alias.
+ *   --report   report-only — failing pairs are listed but the exit code
+ *              is 0. Use it locally while iterating on tokens.
  *
  * Exit codes:
- *   0  every documented pair meets AA in every theme
+ *   0  every documented pair meets AA in every theme (or --report)
  *   1  at least one pair fails AA in at least one theme
  *   2  token referenced by a pair is missing from the palette
  */
@@ -122,44 +128,53 @@ function contrastRatio(hexA, hexB) {
 // ── Pairs contract ───────────────────────────────────────────────
 
 /**
- * Documented foreground/background pairs.
+ * Thresholds (WCAG 2.1):
+ *   text      4.5:1  normal text, including small button, badge and
+ *                    chip labels (they are < 18.66px bold / < 24px)
+ *   large     3.0:1  text verified to be >= 24px, or >= 18.66px bold
+ *   non-text  3.0:1  borders, icons and focus indicators (SC 1.4.11)
  *
- * Each pair names a semantic role; the auditor resolves the role to
- * the theme's concrete hex value at audit time. Thresholds:
- *   body    4.5:1   normal text
- *   large   3.0:1   ≥ 18 px or ≥ 14 px bold
- *   ui      3.0:1   UI components / graphical objects
- *
- * When the same pair is documented twice (e.g. body + large), the
- * auditor evaluates the lower of the two thresholds.
+ * Labels are never treated as large text automatically: a pair may only
+ * use `large` when every rendered instance meets the size rule.
  */
-const PAIRS = [
-  // Base body text — must always be readable.
-  { theme: 'corporateDark', fg: 'base-content', bg: 'base-100', use: 'body', label: 'body text on base' },
-  { theme: 'corporateLight', fg: 'base-content', bg: 'base-100', use: 'body', label: 'body text on base' },
+const THRESHOLD = { text: 4.5, large: 3.0, 'non-text': 3.0 };
 
-  // Muted text — secondary copy lines, captions.
-  { theme: 'corporateDark', fg: 'ds-text-muted', bg: 'base-100', use: 'body', label: 'muted text on base' },
-  { theme: 'corporateLight', fg: 'ds-text-muted', bg: 'base-100', use: 'body', label: 'muted text on base' },
+const THEMES = ['corporateDark', 'corporateLight'];
 
-  // Primary action — buttons, links.
-  { theme: 'corporateDark', fg: 'primary-content', bg: 'primary', use: 'ui', label: 'primary button label' },
-  { theme: 'corporateLight', fg: 'primary-content', bg: 'primary', use: 'ui', label: 'primary button label' },
-
-  // Accent — chips, links.
-  { theme: 'corporateDark', fg: 'accent-content', bg: 'accent', use: 'ui', label: 'accent surface label' },
-  { theme: 'corporateLight', fg: 'accent-content', bg: 'accent', use: 'ui', label: 'accent surface label' },
-
-  // Semantic: success / warning / error chips.
-  { theme: 'corporateDark', fg: 'success-content', bg: 'success', use: 'ui', label: 'success surface label' },
-  { theme: 'corporateLight', fg: 'success-content', bg: 'success', use: 'ui', label: 'success surface label' },
-  { theme: 'corporateDark', fg: 'warning-content', bg: 'warning', use: 'ui', label: 'warning surface label' },
-  { theme: 'corporateLight', fg: 'warning-content', bg: 'warning', use: 'ui', label: 'warning surface label' },
-  { theme: 'corporateDark', fg: 'error-content', bg: 'error', use: 'ui', label: 'error surface label' },
-  { theme: 'corporateLight', fg: 'error-content', bg: 'error', use: 'ui', label: 'error surface label' },
+/** Surfaces that body, secondary and muted text are rendered on. */
+const SURFACES = [
+  'base-100',
+  'base-200',
+  'base-300',
+  'ds-bg-surface',
+  'ds-bg-elevated',
+  'ds-bg-overlay',
 ];
 
-const THRESHOLD = { body: 4.5, large: 3.0, ui: 3.0 };
+/** Neutral text colours, audited on every surface. */
+const TEXT_COLOURS = [
+  { fg: 'base-content', name: 'body text' },
+  { fg: 'ds-text-secondary', name: 'secondary text' },
+  { fg: 'ds-text-muted', name: 'muted text' },
+];
+
+/** Solid fills carrying a small label (buttons, chips, badges). */
+const SOLID_LABELS = [
+  { fg: 'primary-content', bg: 'primary', label: 'primary button label' },
+  { fg: 'primary-content', bg: 'ds-brand-hover', label: 'primary button label (hover)' },
+  { fg: 'accent-content', bg: 'accent', label: 'accent surface label' },
+  { fg: 'info-content', bg: 'info', label: 'info surface label' },
+  { fg: 'success-content', bg: 'success', label: 'success surface label' },
+  { fg: 'warning-content', bg: 'warning', label: 'warning surface label' },
+  { fg: 'error-content', bg: 'error', label: 'error surface label' },
+];
+
+const PAIRS = THEMES.flatMap((theme) => [
+  ...TEXT_COLOURS.flatMap(({ fg, name }) =>
+    SURFACES.map((bg) => ({ theme, fg, bg, use: 'text', label: `${name} on ${bg}` })),
+  ),
+  ...SOLID_LABELS.map(({ fg, bg, label }) => ({ theme, fg, bg, use: 'text', label })),
+]);
 
 // ── Run ──────────────────────────────────────────────────────────
 
@@ -188,11 +203,11 @@ for (const pair of PAIRS) {
   const need = THRESHOLD[pair.use];
   if (ratio + 1e-9 < need) {
     failures.push(
-      `  ✗ ${pair.theme.padEnd(15)} ${pair.label.padEnd(28)} ${pair.fg}(${fg}) on ${pair.bg}(${bg}) → ${ratio.toFixed(2)}:1  (need ≥ ${need}:1 for ${pair.use})`
+      `  ✗ ${pair.theme.padEnd(15)} ${pair.label.padEnd(36)} ${pair.fg}(${fg}) on ${pair.bg}(${bg}) → ${ratio.toFixed(2)}:1  (need ≥ ${need}:1 for ${pair.use})`
     );
   } else {
     console.log(
-      `  ✓ ${pair.theme.padEnd(15)} ${pair.label.padEnd(28)} ${pair.fg}(${fg}) on ${pair.bg}(${bg}) → ${ratio.toFixed(2)}:1`
+      `  ✓ ${pair.theme.padEnd(15)} ${pair.label.padEnd(36)} ${pair.fg}(${fg}) on ${pair.bg}(${bg}) → ${ratio.toFixed(2)}:1`
     );
   }
 }
@@ -203,21 +218,18 @@ if (errors.length) {
   process.exit(2);
 }
 
-const strict = process.argv.includes('--strict');
+const reportOnly = process.argv.includes('--report');
 
 if (failures.length) {
   console.error('\n✗ WCAG AA contrast drift detected:');
   for (const f of failures) console.error(f);
-  if (strict) {
+  if (!reportOnly) {
     console.error(
-      '\nFailing the build because --strict was passed. Fix the token(s) above and rerun without --strict to confirm.'
+      '\nFailing because the contrast guard is strict by default. Fix the token(s) above; pass --report to list drift without failing.'
     );
     process.exit(1);
   }
-  console.error(
-    '\nReport-only mode (default). Pass --strict to fail the build once the documented design drift is fixed.\n' +
-      'See odd/tasks/issue-766-slice-g-a11y-responsive-states.md § "Pre-existing contrast drift" for the backlog item.'
-  );
+  console.error('\nReport-only mode (--report): exiting 0 despite the drift listed above.');
   process.exit(0);
 }
 
