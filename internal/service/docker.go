@@ -26,6 +26,10 @@ type DockerService struct {
 	// defaults to dockerExecCommand (a package variable that wraps
 	// exec.Command) so tests can override it per-instance.
 	execCommand func(name string, arg ...string) *exec.Cmd
+	// execCommandContext is the context-aware exec shim used by
+	// RestartContext (issue #918). Defaults to exec.CommandContext so
+	// tests can stub it per-instance.
+	execCommandContext func(ctx context.Context, name string, arg ...string) *exec.Cmd
 	// lookPath is the os/exec.LookPath shim used to check that the
 	// `docker` binary is available on the host. Optional: nil falls
 	// back to exec.LookPath.
@@ -36,9 +40,17 @@ type DockerService struct {
 // exec shims so tests can stub them out.
 func NewDockerService() *DockerService {
 	return &DockerService{
-		execCommand: dockerExecCommand,
-		lookPath:    exec.LookPath,
+		execCommand:        dockerExecCommand,
+		execCommandContext: exec.CommandContext,
+		lookPath:           exec.LookPath,
 	}
+}
+
+// WithExecCommandContext overrides the context-aware exec shim used by
+// RestartContext (issue #918).
+func (d *DockerService) WithExecCommandContext(fn func(ctx context.Context, name string, arg ...string) *exec.Cmd) *DockerService {
+	d.execCommandContext = fn
+	return d
 }
 
 // WithLookPath overrides the binary-lookup function used to check that
@@ -79,11 +91,11 @@ func (d *DockerService) WithExecCommand(fn func(name string, arg ...string) *exe
 // internal/handler/docker.go for the in-Docker path. It is reused by
 // the native path so the frontend keeps a single mental model.
 type DockerStatus struct {
-	Available   bool            `json:"available"`
-	InDocker    bool            `json:"inDocker,omitempty"`
-	Source      string          `json:"source,omitempty"`
-	Message     string          `json:"message,omitempty"`
-	Container   *ContainerInfo  `json:"container,omitempty"`
+	Available bool           `json:"available"`
+	InDocker  bool           `json:"inDocker,omitempty"`
+	Source    string         `json:"source,omitempty"`
+	Message   string         `json:"message,omitempty"`
+	Container *ContainerInfo `json:"container,omitempty"`
 }
 
 // ContainerInfo is the shape the frontend's DockerView consumes.
@@ -233,7 +245,7 @@ func (d *DockerService) runDockerContext(ctx context.Context, action, name strin
 	if d == nil || d.execCommand == nil {
 		return errDockerNotFound
 	}
-	cmd := exec.CommandContext(ctx, "docker", action, name)
+	cmd := d.execCommandContext(ctx, "docker", action, name)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {

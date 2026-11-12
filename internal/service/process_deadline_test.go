@@ -18,10 +18,11 @@ import (
 // newDeadlineTestProcessManager builds a ProcessManager whose child is a
 // shell script that installs the given trap before sleeping.
 func newDeadlineTestProcessManager(t *testing.T, trap string) (*ProcessManager, string) {
+	_ = trap // trap is always TERM; kept for readability of the deadline cases
 	t.Helper()
 	dir := t.TempDir()
 	script := filepath.Join(dir, "fake-node-red.sh")
-	body := fmt.Sprintf("#!/bin/sh\ntrap '' %s\nsleep 30\n", trap)
+	body := "#!/bin/sh\ntrap '' TERM\necho ready > \"$0.ready\"\nsleep 30\n"
 	if err := os.WriteFile(script, []byte(body), 0o755); err != nil {
 		t.Fatalf("write script: %v", err)
 	}
@@ -36,17 +37,35 @@ func newDeadlineTestProcessManager(t *testing.T, trap string) (*ProcessManager, 
 	if err := os.WriteFile(envFile, []byte("NODE_RED_PORT="+strconv.Itoa(port)+"\nNODE_RED_USER_DIR="+dir+"\n"), 0o600); err != nil {
 		t.Fatalf("write env: %v", err)
 	}
-	return NewProcessManager(script, dir), dir
+	return NewProcessManager(script, dir), script
+}
+
+// waitForTrapReady blocks until the child has installed its SIGTERM trap
+// so deadline tests are not racy against shell startup.
+func waitForTrapReady(t *testing.T, script string) {
+	t.Helper()
+	ready := script + ".ready"
+	deadlineSync := time.Now().Add(5 * time.Second)
+	for {
+		if _, err := os.Stat(ready); err == nil {
+			return
+		}
+		if time.Now().After(deadlineSync) {
+			t.Fatal("child never installed SIGTERM trap")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 }
 
 // TestProcessManager_StopHonoursContext proves Stop returns before the
 // context deadline even when the child ignores SIGTERM and SIGKILL-level
 // escalation would still be pending (issue #918, S1).
 func TestProcessManager_StopHonoursContext(t *testing.T) {
-	pm, _ := newDeadlineTestProcessManager(t, "TERM")
+	pm, script := newDeadlineTestProcessManager(t, "TERM")
 	if err := pm.Start(); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
+	waitForTrapReady(t, script)
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 	defer cancel()
 	start := time.Now()

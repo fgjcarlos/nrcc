@@ -20,17 +20,34 @@ outlive the recovery deadline and a foreign listener cannot satisfy readiness.
 
 - T1 (S1): `ProcessManager.Stop(ctx)` / `Restart(ctx)` bounded by ctx; strict
   restart that refuses to attach to an occupied port. Commit: pending.
+  Commit: 5f35a1b (with T1) — recorded post-hoc; slice 1 = 479 authored lines
+  (T1) in commit `fix(service): bound ProcessManager Stop/Restart...`.
 - T2 (S1): systemd / docker adapters run restart via `exec.CommandContext`
-  (ctx-aware shims); `DockerService.RestartContext(ctx)`. Commit: pending.
+  (ctx-aware shims); `DockerService.RestartContext(ctx)`. Commit: ad892ed
+  (slice 2, T2+T3 together — the selector change and the ctx shims share one
+  behavior: authority-bound, deadline-safe restart).
 - T3 (S2): systemd readiness bound to the settings-derived URL instead of the
-  fixed default endpoint; selector requires a resolvable endpoint. Commit: pending.
+  fixed default endpoint; selector requires a resolvable endpoint. Commit: ad892ed.
 - T4 (S3): recovery error mapping — expired recovery context surfaces as an
-  ApplyError rollback failure, never a hang or nil. Commit: pending.
+  ApplyError rollback failure, never a hang or nil. Commit: verified against
+  existing TestRuntimeApplyRecoveryTimeoutUnwrapsRollbackFailure (passes); the
+  real adapters now honour the recovery ctx via T1/T2, so no code change was
+  needed beyond what T1/T2 deliver.
 - T5 (S4): deterministic tests for deadline-enforced restart, occupied-port
   start, recovery failure mapping + regression for changed shared helpers.
-  Commit: pending.
+  Commit: see final commit.
 
 ## Log
 
 - L1: "Realiza un plan para resolver la issue #918" — plan approved with
   "Implementea el plan".
+- L2: Verification evidence: T1 tests PASS (process_deadline_test.go, 3 runs);
+  T2/T3 tests PASS (apply_adapter_test.go); recovery mapping test PASS;
+  internal/server suite PASS (78s); internal/handler suite PASS.
+  Pre-existing environment failures (fail identically on origin/main):
+  TestRuntimeStructuredAndRawApplyShareFlightGuard,
+  TestDashboardApplySharesConfigRuntimeGuard, and a source_patch_fixture
+  test that hangs in HostService.Detect → `docker compose version` under
+  load. Not caused by this change.
+- L3: Slice boundary: slice 1 = 479 authored lines (T1); slice 2 = T2+T3
+  (ad892ed); slice 3 = T4/T5 verification and test-fixture fixes.

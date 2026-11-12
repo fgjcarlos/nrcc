@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"os/exec"
 	"testing"
@@ -41,9 +42,13 @@ func (c *capturedCmd) factory() func(name string, arg ...string) *exec.Cmd {
 
 func newServiceWithDocker(t *testing.T, c *capturedCmd) *DockerService {
 	t.Helper()
+	factory := c.factory()
 	return NewDockerService().
 		WithLookPath(func(string) (string, error) { return "/usr/bin/docker", nil }).
-		WithExecCommand(c.factory())
+		WithExecCommand(factory).
+		WithExecCommandContext(func(ctx context.Context, name string, arg ...string) *exec.Cmd {
+			return factory(name, arg...)
+		})
 }
 
 func TestDockerService_Available(t *testing.T) {
