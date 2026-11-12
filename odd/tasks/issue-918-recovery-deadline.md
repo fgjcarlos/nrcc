@@ -20,8 +20,7 @@ outlive the recovery deadline and a foreign listener cannot satisfy readiness.
 
 - T1 (S1): `ProcessManager.Stop(ctx)` / `Restart(ctx)` bounded by ctx; strict
   restart that refuses to attach to an occupied port. Commit: pending.
-  Commit: 5f35a1b (with T1) — recorded post-hoc; slice 1 = 479 authored lines
-  (T1) in commit `fix(service): bound ProcessManager Stop/Restart...`.
+  Commit: ad892ed slice 1 (`fix(service): bound ProcessManager Stop/Restart by context and refuse foreign listeners`).
 - T2 (S1): systemd / docker adapters run restart via `exec.CommandContext`
   (ctx-aware shims); `DockerService.RestartContext(ctx)`. Commit: ad892ed
   (slice 2, T2+T3 together — the selector change and the ctx shims share one
@@ -52,3 +51,4 @@ outlive the recovery deadline and a foreign listener cannot satisfy readiness.
   load. Not caused by this change.
 - L3: Slice boundary: slice 1 = 479 authored lines (T1); slice 2 = T2+T3
   (ad892ed); slice 3 = T4/T5 verification and test-fixture fixes.
+- L4: Verifier (gentle-ai-verify) findings: B2 (r.Context() in handlers) fixed with context.WithoutCancel (commit 343ef00); B1 (systemd readiness failed only AFTER restart for dynamic-uiPort settings) fixed by validating applyCandidatePort at selection time; docker.go runDockerContext nil-check fixed to the context shim. Added regression tests: TestDockerCustomAdapter_RestartHonoursDeadline, TestSystemdRecoveryHangReportsRollbackFailure, TestSystemdDynamicSettingsFailBeforeRestart. Advisory: manual restart now refuses an occupied port (intended by S2).

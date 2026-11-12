@@ -47,7 +47,13 @@ func serverApplyResolver(detect func() model.HostStatus, processManager func() *
 		case nodeRed.Mode == model.InstallationModeNative && !nodeRed.ManagedByNRCC:
 			// Issue #918: bind the systemd readiness probe to the port the
 			// candidate settings define instead of a well-known default a
-			// foreign listener could occupy.
+			// foreign listener could occupy. Resolve the port at selection time
+			// so a settings file whose uiPort cannot be proven static fails
+			// validation BEFORE any restart, instead of restarting a healthy
+			// runtime and failing readiness afterwards (verifier finding B1).
+			if _, err := applyCandidatePort(req); err != nil {
+				return nil, err
+			}
 			readinessResolver = func() (string, error) { return settingsReadinessURL(req.Path) }
 		}
 		return service.SelectApplyAdapter(req.Capabilities, nodeRed, service.ApplyAdapterDeps{

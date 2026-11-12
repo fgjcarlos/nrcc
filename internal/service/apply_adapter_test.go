@@ -5,8 +5,10 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -535,4 +537,39 @@ func matchErrMsg(got, want error) bool {
 		return true
 	}
 	return strings.Contains(got.Error(), want.Error())
+}
+
+// TestSystemdRecoveryHangReportsRollbackFailure proves a hung systemd
+// recovery restart is bounded by the recovery deadline and surfaces as
+// an honest rollback failure (issue #918, S3) through the real
+// nativeSystemdAdapter rather than a fake.
+func TestSystemdRecoveryHangReportsRollbackFailure(t *testing.T) {
+	f := newApplyCoordinatorFixture(t)
+	var calls int32
+	var recoveryStart atomic.Value
+	adapter := &nativeSystemdAdapter{
+		mgr:  &recordingSystemdManager{},
+		unit: "nodered.service",
+		execCommandContext: func(ctx context.Context, n string, a ...string) *exec.Cmd {
+			if atomic.AddInt32(&calls, 1) == 1 {
+				return exec.CommandContext(ctx, "false")
+			}
+			recoveryStart.Store(time.Now())
+			return exec.CommandContext(ctx, "sleep", "30")
+		},
+		readinessURLResolver: func() (string, error) { return "http://127.0.0.1:1/settings", nil },
+	}
+	co := NewRuntimeApplyCoordinator(f.apply, func(ApplyRequest) (ApplyAdapter, error) { return adapter, nil })
+	candidate := strings.Replace(validSettingsJS(t), "uiPort: 1880", "uiPort: 4581", 1)
+	_, err := co.Apply(context.Background(), ApplyRequest{
+		Path: f.settingsPath, Content: candidate, Expected: f.liveRevision(t),
+		BackupDir: filepath.Join(f.dir, "backups"), RecoveryTimeout: 400 * time.Millisecond,
+	})
+	var rb *RollbackError
+	if !errors.Is(err, context.DeadlineExceeded) || !errors.As(err, &rb) {
+		t.Fatalf("err=%v, want DeadlineExceeded in a *RollbackError chain", err)
+	}
+	if rs, _ := recoveryStart.Load().(time.Time); rs.IsZero() || time.Since(rs) > 2*time.Second {
+		t.Fatalf("recovery restart was not bounded by the deadline")
+	}
 }

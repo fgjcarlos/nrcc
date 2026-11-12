@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"syscall"
@@ -145,3 +146,25 @@ func TestProcessManager_StopNormalStillWorks(t *testing.T) {
 
 // ensure syscall import stays used if traps evolve.
 var _ = syscall.SIGTERM
+
+// TestDockerCustomAdapter_RestartHonoursDeadline proves the docker
+// adapter's restart path is bounded by the supplied context (issue
+// #918, S1) even when the docker CLI hangs.
+func TestDockerCustomAdapter_RestartHonoursDeadline(t *testing.T) {
+	c := &capturedCmd{psOutput: "abc\tnodered/node-red:4\tmynr\tUp 1 minute\t2024-01-01\n"}
+	d := NewDockerService().
+		WithLookPath(func(string) (string, error) { return "/usr/bin/docker", nil }).
+		WithExecCommand(c.factory()).
+		WithExecCommandContext(func(ctx context.Context, n string, a ...string) *exec.Cmd {
+			return exec.CommandContext(ctx, "sleep", "30")
+		})
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	if err := (&dockerCustomAdapter{docker: d}).Restart(ctx); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("err=%v, want context.DeadlineExceeded", err)
+	}
+	if el := time.Since(start); el > 2*time.Second {
+		t.Fatalf("Restart took %v, want it bounded near the deadline", el)
+	}
+}

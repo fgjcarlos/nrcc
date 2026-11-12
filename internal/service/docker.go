@@ -242,7 +242,7 @@ func (d *DockerService) RestartContext(ctx context.Context) error {
 
 // runDockerContext is runDocker with a context-bound command.
 func (d *DockerService) runDockerContext(ctx context.Context, action, name string) error {
-	if d == nil || d.execCommand == nil {
+	if d == nil || d.execCommandContext == nil {
 		return errDockerNotFound
 	}
 	cmd := d.execCommandContext(ctx, "docker", action, name)

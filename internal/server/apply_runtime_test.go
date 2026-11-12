@@ -271,3 +271,48 @@ func serverPort(t *testing.T, address net.Addr) int {
 	}
 	return port
 }
+
+// probeSystemd is a minimal SystemdManager stub for resolver-level probes.
+type probeSystemd struct{}
+
+func (probeSystemd) IsAvailable() bool                       { return true }
+func (probeSystemd) DaemonReload() error                     { return nil }
+func (probeSystemd) EnableAndStart(string) error             { return nil }
+func (probeSystemd) Stop(string) error                       { return nil }
+func (probeSystemd) Disable(string) error                    { return nil }
+func (probeSystemd) GetServiceStatus(string) (string, error) { return "active", nil }
+
+// TestSystemdDynamicSettingsFailBeforeRestart locks verifier finding B1
+// (issue #918, S2): a systemd settings file whose uiPort cannot be proven
+// static must be refused at selection time — BEFORE any restart — instead
+// of restarting a healthy runtime and failing readiness afterwards.
+func TestSystemdDynamicSettingsFailBeforeRestart(t *testing.T) {
+	for _, content := range []string{
+		"module.exports = { uiPort: process.env.PORT || 1880 };",
+		"const os = require('os'); module.exports = { uiPort: 1880, hostname: os.hostname() };",
+		"module.exports = { flowFile: 'flows.json' };",
+	} {
+		path := filepath.Join(t.TempDir(), "settings.js")
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		detect := func() model.HostStatus {
+			return model.HostStatus{NodeRed: model.NodeRedEnvironment{Detected: true, Mode: model.InstallationModeNative, ContainerName: "nodered.service"}}
+		}
+		resolver := serverApplyResolver(detect, func() *service.ProcessManager { return nil }, probeSystemd{}, nil)
+		adapter, err := resolver(service.ApplyRequest{
+			Capabilities: model.ConfigurationCapabilities{Adapter: "nodered-5"},
+			Path:         path,
+			Content:      content,
+		})
+		if err != nil {
+			continue // refused before restart: acceptable and preferred
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		readyErr := adapter.Ready(ctx)
+		cancel()
+		if readyErr != nil && strings.HasPrefix(readyErr.Error(), "apply: settings") {
+			t.Errorf("%q: readiness resolution fails only after restart: %v", content, readyErr)
+		}
+	}
+}
