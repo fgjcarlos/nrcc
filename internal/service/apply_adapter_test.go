@@ -88,12 +88,7 @@ func newRecordingDockerService() *DockerService {
 	return NewDockerService()
 }
 
-// execCommandRecorder replaces the package-level execCommand so the
-// docker-compose adapter test can drive the exec layer without
-// touching the host's docker binary. It returns a function with the
-// same signature as exec.Command so it slots into the adapter's
-// execCommand field directly.
-// with a nodered-5 adapter must resolve to the documented ApplyAdapter
+// TestSelectApplyAdapter_Matrix locks in the dispatch table documented
 // name; any other combination must yield ErrUnsupportedAdapter.
 func TestSelectApplyAdapter_Matrix(t *testing.T) {
 	cases := []struct {
