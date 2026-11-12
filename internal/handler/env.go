@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -158,7 +159,7 @@ func (h *EnvHandler) withManagedNodeRedStopped(change func() error) (bool, error
 
 	wasRunning := h.pm.Status().Status == "running"
 	if wasRunning {
-		if err := h.pm.Stop(); err != nil {
+		if err := h.pm.Stop(context.Background()); err != nil {
 			return false, fmt.Errorf("stop Node-RED before environment update: %w", err)
 		}
 	}
@@ -191,7 +192,7 @@ func (h *EnvHandler) restartIfRunning() bool {
 		return false
 	}
 	// Restart in background — don't block the HTTP response
-	go func() { _ = h.pm.Restart() }()
+	go func() { _ = h.pm.Restart(context.Background()) }()
 	return true
 }
 

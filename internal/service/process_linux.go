@@ -3,6 +3,8 @@
 package service
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -18,6 +20,12 @@ import (
 	"github.com/fgjcarlos/nrcc/internal/model"
 	"github.com/fgjcarlos/nrcc/internal/ui"
 )
+
+// ErrForeignListener is returned by ProcessManager.Restart when the runtime
+// port is already bound by a process this manager does not own (issue #918).
+// Attaching to a foreign listener would let an unrelated process satisfy
+// readiness, so the strict restart path refuses instead.
+var ErrForeignListener = errors.New("node-red port is already bound by a foreign process")
 
 // Env precedence for the Node-RED child process (and any helper that
 // resolves the same env layers, e.g. EnvService.activeNodeRedUserDir):
@@ -54,6 +62,7 @@ type ProcessManager struct {
 	restartCount int
 	lastError    error
 	stopCh       chan struct{} // closed to signal intentional stop to waitForExit
+	stopOnce     *sync.Once    // guards closing stopCh so Stop is idempotent
 	doneCh       chan struct{} // closed by waitForExit when the process fully exits
 
 	// restart history (ring buffer, capacity 50)
@@ -241,16 +250,22 @@ func (pm *ProcessManager) IsExternalMode() bool {
 }
 
 // Start starts the Node-RED process. Returns an error if already running.
+// Start may attach to an already-running external Node-RED instance bound
+// to the configured port (attach is the documented UX for manual starts).
 func (pm *ProcessManager) Start() error {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
-	return pm.startLocked(true)
+	return pm.startLocked(true, true)
 }
 
 // startLocked starts the process. Must be called with pm.mu held.
 // resetCounter resets the crash counter (true for user-initiated starts,
 // false for auto-restarts so the backoff counter is preserved).
-func (pm *ProcessManager) startLocked(resetCounter bool) error {
+// attachAllowed controls the occupied-port policy: user-facing Start()
+// attaches to an existing listener, while the strict restart path
+// (issue #918) refuses so readiness can never be satisfied by a
+// foreign process.
+func (pm *ProcessManager) startLocked(resetCounter bool, attachAllowed bool) error {
 	if pm.running {
 		pid := pm.currentCmd.Process.Pid
 		return fmt.Errorf("process already running (PID: %d)", pid)
@@ -269,6 +284,12 @@ func (pm *ProcessManager) startLocked(resetCounter bool) error {
 
 	// Check if Node-RED is already running externally on the configured port
 	if isPortInUse(rt.Port) {
+		if !attachAllowed {
+			// Strict path (restart): we just stopped the child we own, so any
+			// remaining listener is a foreign process. Attaching would let it
+			// satisfy the readiness probe; refuse instead (issue #918).
+			return fmt.Errorf("%w: port %s", ErrForeignListener, rt.Port)
+		}
 		// Attach to existing instance
 		pm.externalMode = true
 		pm.running = true
@@ -329,6 +350,7 @@ func (pm *ProcessManager) startLocked(resetCounter bool) error {
 	pm.currentCmd = cmd
 	pm.runtimePort = runtimePort
 	pm.stopCh = stopCh
+	pm.stopOnce = &sync.Once{}
 	pm.doneCh = doneCh
 	pm.running = true
 	pm.startedAt = time.Now()
@@ -358,8 +380,11 @@ func (pm *ProcessManager) startLocked(resetCounter bool) error {
 	return nil
 }
 
-// Stop gracefully stops the node-red process and waits for it to exit.
-func (pm *ProcessManager) Stop() error {
+// Stop gracefully stops the node-red process and waits for it to exit,
+// bounded by ctx (issue #918). When the child ignores SIGTERM and outlives
+// ctx, Stop returns the context error instead of blocking forever; the
+// child is killed best-effort before returning.
+func (pm *ProcessManager) Stop(ctx context.Context) error {
 	pm.mu.Lock()
 	if !pm.running || pm.currentCmd == nil {
 		pm.mu.Unlock()
@@ -376,30 +401,55 @@ func (pm *ProcessManager) Stop() error {
 	}
 
 	stopCh := pm.stopCh
+	stopOnce := pm.stopOnce
 	doneCh := pm.doneCh
 	proc := pm.currentCmd.Process
 	pm.mu.Unlock()
 
-	// Close stopCh BEFORE sending the signal so waitForExit sees it as intentional.
-	close(stopCh)
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	// Close stopCh BEFORE sending the signal so waitForExit sees it as
+	// intentional. The once makes Stop idempotent across retries (a caller
+	// may re-invoke Stop after a deadline expiry).
+	stopOnce.Do(func() { close(stopCh) })
 
 	if err := proc.Signal(syscall.SIGTERM); err != nil {
 		_ = proc.Kill()
 	}
 
-	// Wait for waitForExit to call cmd.Wait() and close doneCh.
+	// Wait for waitForExit to call cmd.Wait() and close doneCh. The wait is
+	// bounded by ctx so a hung child cannot outlive the recovery deadline.
 	select {
 	case <-doneCh:
 		return nil
-	case <-time.After(5 * time.Second):
+	case <-time.After(stopGraceTimeout):
 		_ = proc.Kill()
-		<-doneCh // still wait so cmd.Wait() finishes before we return
-		return nil
+		select {
+		case <-doneCh:
+			return nil
+		case <-ctx.Done():
+			// The child ignored SIGKILL escalation within the caller's
+			// deadline. Report the context error honestly; cmd.Wait() still
+			// runs in waitForExit, so no goroutine owns the wait twice.
+			return fmt.Errorf("stop node-red: %w", ctx.Err())
+		}
+	case <-ctx.Done():
+		_ = proc.Kill()
+		return fmt.Errorf("stop node-red: %w", ctx.Err())
 	}
 }
 
-// Restart stops and starts the node-red process.
-func (pm *ProcessManager) Restart() error {
+// stopGraceTimeout is the SIGTERM→SIGKILL grace window Stop waits before
+// escalating, independent of the caller's context deadline.
+const stopGraceTimeout = 5 * time.Second
+
+// Restart stops and starts the node-red process, bounded by ctx
+// (issue #918). The start leg uses the strict occupied-port policy so a
+// foreign listener on the runtime port fails the restart instead of being
+// adopted.
+func (pm *ProcessManager) Restart(ctx context.Context) error {
 	pm.mu.Lock()
 	if pm.externalMode {
 		pm.mu.Unlock()
@@ -407,10 +457,15 @@ func (pm *ProcessManager) Restart() error {
 	}
 	pm.mu.Unlock()
 
-	if err := pm.Stop(); err != nil {
+	if err := pm.Stop(ctx); err != nil {
 		return fmt.Errorf("stop failed: %w", err)
 	}
-	return pm.Start()
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("restart: %w", err)
+	}
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+	return pm.startLocked(true, false)
 }
 
 // Status returns the current runtime status.
@@ -526,7 +581,7 @@ func (pm *ProcessManager) waitForExit(cmd *exec.Cmd, stopCh, doneCh chan struct{
 		// Best-effort — a save failure is logged but never fatal.
 		ui.Warnf("restart count store: save failed: %v", saveErr)
 	}
-	if startErr := pm.startLocked(false); startErr != nil {
+	if startErr := pm.startLocked(false, true); startErr != nil {
 		pm.lastError = startErr
 	}
 	pm.mu.Unlock()

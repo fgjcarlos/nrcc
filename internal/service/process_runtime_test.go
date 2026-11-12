@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"net"
 	"os"
 	"path/filepath"
@@ -171,7 +172,7 @@ func TestProcessManagerEffectiveRuntimePortUsesLastLaunchEnvironment(t *testing.
 		t.Fatalf("start ProcessManager fixture: %v", err)
 	}
 	t.Cleanup(func() {
-		if err := pm.Stop(); err != nil {
+		if err := pm.Stop(context.Background()); err != nil {
 			t.Errorf("stop ProcessManager fixture: %v", err)
 		}
 	})

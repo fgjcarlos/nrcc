@@ -149,7 +149,7 @@ func runServer() {
 
 	// Stop Node-RED process first
 	if manageRuntime {
-		if err := pm.Stop(); err != nil {
+		if err := pm.Stop(context.Background()); err != nil {
 			ui.Error(fmt.Sprintf("Node-RED shutdown error: %v", err))
 		} else {
 			ui.Info("Node-RED stopped")

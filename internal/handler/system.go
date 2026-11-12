@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -375,10 +376,10 @@ func getNodeVersion() string {
 // the UI treats the chip as "degraded" without crashing.
 type SecurityPostureResponse struct {
 	EncryptionKeyConfigured bool `json:"encryptionKeyConfigured"` // NRCC_ENCRYPTION_KEY is set and non-empty
-	BackupAccessAdminGated bool `json:"backupAccessAdminGated"`   // /api/backups/{id}/download is RequireAdmin
-	ActiveRefreshSessions  int  `json:"activeRefreshSessions"`   // count of non-revoked, non-expired sessions
-	TotalAdmins            int  `json:"totalAdmins"`             // users with RoleAdmin
-	MfaEnrolledAdmins      int  `json:"mfaEnrolledAdmins"`       // subset of totalAdmins with TOTP enrolled
+	BackupAccessAdminGated  bool `json:"backupAccessAdminGated"`  // /api/backups/{id}/download is RequireAdmin
+	ActiveRefreshSessions   int  `json:"activeRefreshSessions"`   // count of non-revoked, non-expired sessions
+	TotalAdmins             int  `json:"totalAdmins"`             // users with RoleAdmin
+	MfaEnrolledAdmins       int  `json:"mfaEnrolledAdmins"`       // subset of totalAdmins with TOTP enrolled
 }
 
 // GetSecurityPosture handles GET /api/system/security-posture — admin-only
@@ -451,7 +452,7 @@ func (h *SystemHandler) RestartNodeRed(w http.ResponseWriter, r *http.Request) {
 		model.RespondError(w, http.StatusConflict, "EXTERNAL_NODE_RED", "cannot restart an externally managed Node-RED instance")
 		return
 	}
-	if err := h.processManager.Restart(); err != nil {
+	if err := h.processManager.Restart(context.WithoutCancel(r.Context())); err != nil {
 		model.RespondError(w, http.StatusInternalServerError, "RESTART_FAILED", err.Error())
 		return
 	}
@@ -481,7 +482,7 @@ func (h *SystemHandler) StopNodeRed(w http.ResponseWriter, r *http.Request) {
 		model.RespondError(w, http.StatusConflict, "EXTERNAL_NODE_RED", "cannot stop an externally managed Node-RED instance")
 		return
 	}
-	if err := h.processManager.Stop(); err != nil {
+	if err := h.processManager.Stop(context.WithoutCancel(r.Context())); err != nil {
 		model.RespondError(w, http.StatusInternalServerError, "STOP_FAILED", err.Error())
 		return
 	}

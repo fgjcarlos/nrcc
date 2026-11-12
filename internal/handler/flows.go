@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/fgjcarlos/nrcc/internal/audit"
@@ -134,7 +135,7 @@ func (h *FlowHandler) PostRevert(w http.ResponseWriter, r *http.Request) {
 	versionID := chi.URLParam(r, "id")
 	wasRunning := h.processManager != nil && !h.processManager.IsExternalMode() && h.processManager.Status().Status == "running"
 	if wasRunning {
-		if err := h.processManager.Stop(); err != nil {
+		if err := h.processManager.Stop(context.WithoutCancel(r.Context())); err != nil {
 			model.RespondError(w, http.StatusInternalServerError, "RUNTIME_QUIESCE_ERROR", "Failed to stop Node-RED before reverting flows: "+err.Error())
 			return
 		}

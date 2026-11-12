@@ -84,8 +84,8 @@ func TestHardenedNodeRedFixtureProcess(t *testing.T) {
 	}
 	port := os.Getenv("NODE_RED_PORT")
 	server := &http.Server{
-		Addr:              "127.0.0.1:" + port,
-		Handler:           http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		Addr: "127.0.0.1:" + port,
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.URL.Path == "/settings" {
 				w.WriteHeader(http.StatusOK)
 				return
@@ -132,7 +132,7 @@ func TestManagedReadinessUsesLaunchPortWithoutProcAccess(t *testing.T) {
 		t.Fatalf("start hardened Node-RED child: %v", err)
 	}
 	t.Cleanup(func() {
-		if err := pm.Stop(); err != nil {
+		if err := pm.Stop(context.Background()); err != nil {
 			t.Errorf("stop hardened Node-RED child: %v", err)
 		}
 	})
@@ -270,4 +270,81 @@ func serverPort(t *testing.T, address net.Addr) int {
 		t.Fatal(err)
 	}
 	return port
+}
+
+// probeSystemd is a minimal SystemdManager stub for resolver-level probes.
+type probeSystemd struct{}
+
+func (probeSystemd) IsAvailable() bool                       { return true }
+func (probeSystemd) DaemonReload() error                     { return nil }
+func (probeSystemd) EnableAndStart(string) error             { return nil }
+func (probeSystemd) Stop(string) error                       { return nil }
+func (probeSystemd) Disable(string) error                    { return nil }
+func (probeSystemd) GetServiceStatus(string) (string, error) { return "active", nil }
+
+// TestSystemdDynamicSettingsFailBeforeRestart locks verifier finding B1
+// (issue #918, S2): a systemd settings file whose uiPort cannot be proven
+// static must be refused at selection time — BEFORE any restart — instead
+// of restarting a healthy runtime and failing readiness afterwards.
+func TestSystemdDynamicSettingsFailBeforeRestart(t *testing.T) {
+	for _, content := range []string{
+		"module.exports = { uiPort: process.env.PORT || 1880 };",
+		"const os = require('os'); module.exports = { uiPort: 1880, hostname: os.hostname() };",
+		"module.exports = { flowFile: 'flows.json' };",
+	} {
+		path := filepath.Join(t.TempDir(), "settings.js")
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		detect := func() model.HostStatus {
+			return model.HostStatus{NodeRed: model.NodeRedEnvironment{Detected: true, Mode: model.InstallationModeNative, ContainerName: "nodered.service"}}
+		}
+		resolver := serverApplyResolver(detect, func() *service.ProcessManager { return nil }, probeSystemd{}, nil)
+		adapter, err := resolver(service.ApplyRequest{
+			Capabilities: model.ConfigurationCapabilities{Adapter: "nodered-5"},
+			Path:         path,
+			Content:      content,
+		})
+		if err != nil {
+			continue // refused before restart: acceptable and preferred
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		readyErr := adapter.Ready(ctx)
+		cancel()
+		if readyErr != nil && strings.HasPrefix(readyErr.Error(), "apply: settings") {
+			t.Errorf("%q: readiness resolution fails only after restart: %v", content, readyErr)
+		}
+	}
+}
+
+// TestSystemdStockTemplateStillApplies locks the review correction for
+// issue #918: a stock Node-RED settings template (`uiPort:
+// process.env.PORT || 1880`) on a systemd host must pass selection and
+// probe its declared fallback port instead of being refused.
+func TestSystemdStockTemplateStillApplies(t *testing.T) {
+	content := "const os = require('os'); module.exports = { uiPort: process.env.PORT || 1880, hostname: os.hostname() };"
+	path := filepath.Join(t.TempDir(), "settings.js")
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	detect := func() model.HostStatus {
+		return model.HostStatus{NodeRed: model.NodeRedEnvironment{Detected: true, Mode: model.InstallationModeNative, ContainerName: "nodered.service"}}
+	}
+	resolver := serverApplyResolver(detect, func() *service.ProcessManager { return nil }, probeSystemd{}, nil)
+	adapter, err := resolver(service.ApplyRequest{
+		Capabilities: model.ConfigurationCapabilities{Adapter: "nodered-5"},
+		Path:         path,
+		Content:      content,
+	})
+	if err != nil {
+		t.Fatalf("stock systemd settings refused at selection: %v", err)
+	}
+	// Ready must probe 127.0.0.1:1880 (the declared fallback), not a
+	// foreign default: with nothing listening there, readiness fails on
+	// the probe itself, never with an "apply: settings" resolution error.
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if rerr := adapter.Ready(ctx); rerr != nil && strings.HasPrefix(rerr.Error(), "apply: settings") {
+		t.Fatalf("readiness resolution error for stock template: %v", rerr)
+	}
 }

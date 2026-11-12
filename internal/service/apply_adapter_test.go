@@ -5,8 +5,10 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -86,34 +88,6 @@ func newRecordingDockerService() *DockerService {
 	return NewDockerService()
 }
 
-// execCommandRecorder replaces the package-level execCommand so the
-// docker-compose adapter test can drive the exec layer without
-// touching the host's docker binary. It returns a function with the
-// same signature as exec.Command so it slots into the adapter's
-// execCommand field directly.
-func execCommandRecorder(t *testing.T, wantName string, wantArgsContain string, fakeErr error) func(string, ...string) *exec.Cmd {
-	t.Helper()
-	return func(name string, arg ...string) *exec.Cmd {
-		if name != wantName {
-			t.Errorf("exec name = %q, want %q", name, wantName)
-		}
-		joined := strings.Join(arg, " ")
-		if wantArgsContain != "" && !strings.Contains(joined, wantArgsContain) {
-			t.Errorf("exec args %v missing %q", arg, wantArgsContain)
-		}
-		if fakeErr != nil {
-			// Build a real *exec.Cmd pointed at `/bin/false` (or
-			// whatever exists on the test runner) and override Run
-			// via the exec shim. The simplest portable stub is to
-			// attach Stdin so the cmd fails to start; we instead
-			// point at a binary path that is guaranteed to fail
-			// fast with the canned error wrapped through Run.
-			return exec.Command("false")
-		}
-		return exec.Command("true")
-	}
-}
-
 // TestSelectApplyAdapter_Matrix locks in the dispatch table documented
 // on SelectApplyAdapter. Every combination of (Mode, ManagedByNRCC)
 // with a nodered-5 adapter must resolve to the documented ApplyAdapter
@@ -138,7 +112,7 @@ func TestSelectApplyAdapter_Matrix(t *testing.T) {
 		{
 			name:     "nativeExternallyManagedResolvesNativeSystemd",
 			caps:     model.ConfigurationCapabilities{Adapter: "nodered-5"},
-			nodeRed:  model.NodeRedEnvironment{Mode: model.InstallationModeNative, ManagedByNRCC: false, ContainerName: "nodered.service"},
+			nodeRed:  model.NodeRedEnvironment{Mode: model.InstallationModeNative, ManagedByNRCC: false, ContainerName: "nodered.service", ReadinessURL: "http://127.0.0.1:1880/settings"},
 			wantName: AdapterNameNativeSystemd,
 		},
 		{
@@ -271,9 +245,9 @@ func TestNativeSystemdAdapter_RestartInvokesSystemctl(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			a := &nativeSystemdAdapter{
-				mgr:         &recordingSystemdManager{},
-				unit:        tc.unit,
-				execCommand: execCommandRecorder(t, "systemctl", "restart "+tc.unit, tc.fakeErr),
+				mgr:                &recordingSystemdManager{},
+				unit:               tc.unit,
+				execCommandContext: execCommandContextRecorder(t, "systemctl", "restart "+tc.unit, tc.fakeErr),
 			}
 			err := a.Restart(context.Background())
 			if tc.wantErrIs != nil {
@@ -296,6 +270,92 @@ func TestNativeSystemdAdapter_RestartInvokesSystemctl(t *testing.T) {
 // docker-compose adapter prefixes `-p <project>` when a project name
 // is supplied and omits it otherwise. This protects the slice C
 // multi-project host path from accidentally restarting a sibling.
+// execCommandContextRecorder is the context-aware counterpart of
+// execCommandRecorder (issue #918): it slots into the adapters whose
+// restart command is bounded by a deadline.
+func execCommandContextRecorder(t *testing.T, wantName string, wantArgsContain string, fakeErr error) execCommandContextFn {
+	t.Helper()
+	return func(ctx context.Context, name string, arg ...string) *exec.Cmd {
+		if name != wantName {
+			t.Errorf("exec name = %q, want %q", name, wantName)
+		}
+		joined := strings.Join(arg, " ")
+		if wantArgsContain != "" && !strings.Contains(joined, wantArgsContain) {
+			t.Errorf("exec args %v missing %q", arg, wantArgsContain)
+		}
+		if fakeErr != nil {
+			return exec.CommandContext(ctx, "false")
+		}
+		return exec.CommandContext(ctx, "true")
+	}
+}
+
+// TestNativeSystemdAdapter_RestartHonoursDeadline proves a hung
+// `systemctl restart` is killed at the context deadline instead of
+// outliving the bounded recovery context (issue #918, S1).
+func TestNativeSystemdAdapter_RestartHonoursDeadline(t *testing.T) {
+	a := &nativeSystemdAdapter{
+		mgr:  &recordingSystemdManager{},
+		unit: "nodered.service",
+		execCommandContext: func(ctx context.Context, name string, arg ...string) *exec.Cmd {
+			return exec.CommandContext(ctx, "sleep", "30")
+		},
+		readinessURLResolver: func() (string, error) { return "http://127.0.0.1:1/settings", nil },
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	err := a.Restart(ctx)
+	if err == nil {
+		t.Fatal("Restart over hung systemctl = nil error, want deadline error")
+	}
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("Restart err = %v, want context.DeadlineExceeded", err)
+	}
+	if elapsed := time.Since(start); elapsed > 5*time.Second {
+		t.Errorf("Restart took %v, want it to return near the deadline", elapsed)
+	}
+}
+
+// TestNativeSystemdAdapter_ReadyProbesResolvedEndpoint proves the
+// systemd readiness probe is bound to the resolver supplied by the
+// transaction, not the well-known default admin URL (issue #918, S2).
+func TestNativeSystemdAdapter_ReadyProbesResolvedEndpoint(t *testing.T) {
+	const unitURL = "http://127.0.0.1:1/settings" // nothing listens there
+	a := &nativeSystemdAdapter{
+		mgr:                  &recordingSystemdManager{},
+		unit:                 "nodered.service",
+		execCommandContext:   exec.CommandContext,
+		readinessURLResolver: func() (string, error) { return unitURL, nil },
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	err := a.Ready(ctx)
+	if err == nil {
+		t.Fatal("Ready against dead unit endpoint = nil, want failure")
+	}
+}
+
+// TestSelectApplyAdapter_SystemdWithoutReadinessIsUnsupported locks the
+// authority binding: a systemd target without a resolvable readiness
+// endpoint must not fall back to the default admin URL (issue #918, S2).
+func TestSelectApplyAdapter_SystemdWithoutReadinessIsUnsupported(t *testing.T) {
+	deps := ApplyAdapterDeps{SystemdManager: &recordingSystemdManager{}}
+	nodeRed := model.NodeRedEnvironment{Mode: model.InstallationModeNative, ManagedByNRCC: false, ContainerName: "nodered.service"}
+	_, err := SelectApplyAdapter(model.ConfigurationCapabilities{Adapter: "nodered-5"}, nodeRed, deps)
+	if !errors.Is(err, ErrUnsupportedAdapter) || !strings.Contains(err.Error(), "readiness endpoint is unknown") {
+		t.Fatalf("err = %v, want ErrUnsupportedAdapter with readiness endpoint missing", err)
+	}
+	nodeRed.ReadinessURL = "http://127.0.0.1:1880/settings"
+	adapter, err := SelectApplyAdapter(model.ConfigurationCapabilities{Adapter: "nodered-5"}, nodeRed, deps)
+	if err != nil {
+		t.Fatalf("SelectApplyAdapter with ReadinessURL: %v", err)
+	}
+	if adapter.Name() != AdapterNameNativeSystemd {
+		t.Fatalf("adapter = %q, want native-systemd", adapter.Name())
+	}
+}
+
 func TestDockerComposeAdapter_RestartBuildsProjectFlag(t *testing.T) {
 	cases := []struct {
 		name        string
@@ -309,8 +369,8 @@ func TestDockerComposeAdapter_RestartBuildsProjectFlag(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			a := &dockerComposeAdapter{
-				execCommand: execCommandRecorder(t, "docker", tc.wantContain, nil),
-				projectName: tc.projectName,
+				execCommandContext: execCommandContextRecorder(t, "docker", tc.wantContain, nil),
+				projectName:        tc.projectName,
 			}
 			if a.Name() != AdapterNameDockerCompose {
 				t.Errorf("Name = %q, want %q", a.Name(), AdapterNameDockerCompose)
@@ -449,4 +509,39 @@ func matchErrMsg(got, want error) bool {
 		return true
 	}
 	return strings.Contains(got.Error(), want.Error())
+}
+
+// TestSystemdRecoveryHangReportsRollbackFailure proves a hung systemd
+// recovery restart is bounded by the recovery deadline and surfaces as
+// an honest rollback failure (issue #918, S3) through the real
+// nativeSystemdAdapter rather than a fake.
+func TestSystemdRecoveryHangReportsRollbackFailure(t *testing.T) {
+	f := newApplyCoordinatorFixture(t)
+	var calls int32
+	var recoveryStart atomic.Value
+	adapter := &nativeSystemdAdapter{
+		mgr:  &recordingSystemdManager{},
+		unit: "nodered.service",
+		execCommandContext: func(ctx context.Context, n string, a ...string) *exec.Cmd {
+			if atomic.AddInt32(&calls, 1) == 1 {
+				return exec.CommandContext(ctx, "false")
+			}
+			recoveryStart.Store(time.Now())
+			return exec.CommandContext(ctx, "sleep", "30")
+		},
+		readinessURLResolver: func() (string, error) { return "http://127.0.0.1:1/settings", nil },
+	}
+	co := NewRuntimeApplyCoordinator(f.apply, func(ApplyRequest) (ApplyAdapter, error) { return adapter, nil })
+	candidate := strings.Replace(validSettingsJS(t), "uiPort: 1880", "uiPort: 4581", 1)
+	_, err := co.Apply(context.Background(), ApplyRequest{
+		Path: f.settingsPath, Content: candidate, Expected: f.liveRevision(t),
+		BackupDir: filepath.Join(f.dir, "backups"), RecoveryTimeout: 400 * time.Millisecond,
+	})
+	var rb *RollbackError
+	if !errors.Is(err, context.DeadlineExceeded) || !errors.As(err, &rb) {
+		t.Fatalf("err=%v, want DeadlineExceeded in a *RollbackError chain", err)
+	}
+	if rs, _ := recoveryStart.Load().(time.Time); rs.IsZero() || time.Since(rs) > 2*time.Second {
+		t.Fatalf("recovery restart was not bounded by the deadline")
+	}
 }
