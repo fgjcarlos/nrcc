@@ -27,7 +27,12 @@ export function Layout() {
     <div className="drawer lg:drawer-open min-h-screen bg-background app-shell">
       <SkipLink targetId="main-content" label={t('common:layout.skipToContent')} />
 
-      <input id="sidebar-drawer" type="checkbox" className="drawer-toggle" />
+      <input
+        id="sidebar-drawer"
+        type="checkbox"
+        className="drawer-toggle"
+        aria-label="Abrir navegación principal"
+      />
 
       <div className="drawer-content flex min-h-screen flex-col lg:pl-0">
         <Header />

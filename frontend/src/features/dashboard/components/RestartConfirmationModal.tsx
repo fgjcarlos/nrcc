@@ -1,6 +1,8 @@
+import { useRef } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useT } from '@/i18n';
+import { useModalKeyboard } from '@/shared/hooks/useModalKeyboard';
 
 interface RestartConfirmationModalProps {
   isOpen: boolean;
@@ -10,6 +12,12 @@ interface RestartConfirmationModalProps {
 
 export function RestartConfirmationModal({ isOpen, onCancel, onConfirm }: RestartConfirmationModalProps) {
   const { t } = useT();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  // Escape cancels, Tab stays inside, and initial focus lands on the
+  // non-destructive Cancel action (same contract as ConfirmationDialog).
+  useModalKeyboard({ isOpen, containerRef: dialogRef, onEscape: onCancel, initialFocusRef: cancelButtonRef });
+
   if (!isOpen) {
     return null;
   }
@@ -20,8 +28,10 @@ export function RestartConfirmationModal({ isOpen, onCancel, onConfirm }: Restar
   return createPortal(
     <div className="modal-overlay" onClick={onCancel}>
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
+        tabIndex={-1}
         aria-labelledby="restart-confirmation-modal-title"
         className="surface-panel w-full max-w-sm border border-border p-6 shadow-glow"
         onClick={(e) => e.stopPropagation()}
@@ -38,7 +48,7 @@ export function RestartConfirmationModal({ isOpen, onCancel, onConfirm }: Restar
           </div>
         </div>
         <div className="flex justify-end gap-2 pt-2">
-          <button onClick={onCancel} className="action-btn-secondary">
+          <button ref={cancelButtonRef} onClick={onCancel} className="action-btn-secondary">
             {t('common:cancel')}
           </button>
           <button onClick={onConfirm} className="action-btn-primary gap-2">

@@ -16,6 +16,15 @@
     min-height: 100%;
   }
 
+  /* Keyboard focus fallback (issue #889, WCAG 2.4.7). Zero specificity and
+     the base layer let any component focus style (rings, outlines in the
+     utilities/components layers) take precedence; controls without one
+     get a solid accent outline instead of the browser default. */
+  :where(a[href], button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])):focus-visible {
+    outline: 2px solid var(--ds-accent-primary, #0089b4);
+    outline-offset: 2px;
+  }
+
   /* ══════════════════════════════════════════════════════════════
      daisyUI v5 custom theme variables
      daisyUI v5 only resolves --color-* vars for built-in themes.

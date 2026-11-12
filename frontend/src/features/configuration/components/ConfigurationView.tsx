@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useId } from 'react';
 import { toast } from 'sonner';
 import { cn } from '@/shared/lib';
 import type { NodeRedConfigFormData } from '@/shared/types';
@@ -150,6 +150,8 @@ export function ConfigurationView() {
 
   // Data and actions hooks
   const { t } = useT();
+  // Names the raw settings.js editor after its section heading (#889 axe `label`).
+  const rawSettingsHeadingId = useId();
 
   const data = useConfigurationData();
   const actions = useConfigurationActions();
@@ -393,7 +395,7 @@ export function ConfigurationView() {
       <div className="surface-card p-6 space-y-4">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h2 className="text-lg font-semibold text-base-content">
+            <h2 id={rawSettingsHeadingId} className="text-lg font-semibold text-base-content">
               {t('configuration:advanced.title')}
             </h2>
             <p className="text-sm text-base-content/65">
@@ -425,6 +427,7 @@ export function ConfigurationView() {
           }}
           readOnly={!rawEditorUnlocked}
           aria-readonly={!rawEditorUnlocked}
+          aria-labelledby={rawSettingsHeadingId}
           className={cn(
             'min-h-[20rem] w-full rounded-2xl border border-border bg-base-100/80 p-4 font-mono text-sm text-base-content focus:outline-none focus:ring-2 focus:ring-primary',
             !rawEditorUnlocked && 'cursor-not-allowed opacity-70'
