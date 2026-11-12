@@ -27,7 +27,7 @@ try {
   for (const [label, pattern] of [
     ['dark corporate theme tokens', /data-theme=["']?corporateDark["']?/],
     ['light corporate theme tokens', /data-theme=["']?corporateLight["']?/],
-    ['dark theme palette', /--color-primary:#d4472b/],
+    ['dark theme palette', /--color-primary:#cf452a/], // #889: darkened from #d4472b for 4.5:1 white labels
     ['light theme palette', /--color-primary:#bd3f27/],
     ['glass panel styling', /\.glass-panel/],
     ['primary button utility', /\.btn-primary/],

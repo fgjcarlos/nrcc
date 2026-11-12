@@ -139,6 +139,16 @@ jobs:
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
 
+      # Appearance evidence (#889), kept separate from accessibility
+      # evidence: these pin the built CSS contract and computed styles
+      # (2 themes x 2 viewports). A failure here means the look changed,
+      # not that a WCAG rule broke; the contrast guard and axe e2e cover
+      # accessibility.
+      - name: Appearance regression (built CSS and computed styles)
+        run: |
+          pnpm test:css
+          pnpm test:appearance
+
       - name: E2E smoke tests
         id: fixture-e2e
         run: pnpm test:e2e

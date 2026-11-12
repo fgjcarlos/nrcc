@@ -361,6 +361,46 @@ design backlog items are addressed.
 
 ---
 
+## Accessibility vs appearance evidence (issue #889)
+
+The two kinds of evidence answer different questions and run as
+separate CI steps in the `frontend` job of `.github/workflows/pr.yml`
+(which the release workflow reuses):
+
+| Evidence | Question it answers | Command | CI step |
+|---|---|---|---|
+| Accessibility | Does every maintained theme meet WCAG AA, and are essential controls usable by keyboard and on mobile? | `pnpm test:contrast`, `pnpm test:tailwind-vars`, `pnpm check:contrast`, `pnpm test:e2e` (`a11y*.spec.ts`) | "Contrast auditor and theme-token tests", "WCAG AA contrast guard (both themes)", "E2E smoke tests" |
+| Appearance | Did the built CSS or the computed look of the design system change? | `pnpm test:css`, `pnpm test:appearance` | "Appearance regression (built CSS and computed styles)" |
+
+Accessibility evidence:
+
+- **Static contrast** — `scripts/check-contrast-tokens.mjs` (strict by
+  default) audits text, solid labels and tinted chip/badge labels in
+  both themes (see "Contrast auditor" above).
+- **Theme variables** — `scripts/tailwind-ds-vars.test.mjs` checks that
+  every Tailwind `ds-*` colour is a CSS variable declared in both theme
+  blocks, so `text-ds-*`/`bg-ds-*` utilities follow the active theme.
+- **Browser** — Playwright runs three projects: `chromium-dark` (every
+  spec), `chromium-light` and `mobile-light` (Pixel 7, `a11y*.spec.ts`
+  only). Each project pins `localStorage['cc-theme']` and the matching
+  `colorScheme`, and every axe scan first asserts the pinned
+  `data-theme`. `e2e/a11y.spec.ts` runs axe (critical/serious) on
+  login, overview, configuration and security and checks the computed
+  muted-text colour per theme; `e2e/a11y-keyboard.spec.ts` checks visible
+  focus indicators while tabbing, modal keyboard behaviour (Escape,
+  focus trap, focus return) and opening the mobile drawer by keyboard.
+
+Appearance evidence:
+
+- `scripts/tailwind-alignment.test.mjs` pins the production CSS
+  contract (theme blocks, palette anchors, core component classes).
+- `scripts/tailwind-appearance.test.mjs` renders design-system controls
+  in both themes at 1440×900 and 390×844 and asserts computed styles.
+
+An intentional palette change (for example a contrast fix) updates the
+appearance pins in the same commit; an accessibility check must never be
+relaxed to make an appearance change pass.
+
 ## Changelog
 
 | Date | Change | Phase |
