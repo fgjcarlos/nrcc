@@ -132,7 +132,7 @@ func TestManagedReadinessUsesLaunchPortWithoutProcAccess(t *testing.T) {
 		t.Fatalf("start hardened Node-RED child: %v", err)
 	}
 	t.Cleanup(func() {
-		if err := pm.Stop(); err != nil {
+		if err := pm.Stop(context.Background()); err != nil {
 			t.Errorf("stop hardened Node-RED child: %v", err)
 		}
 	})

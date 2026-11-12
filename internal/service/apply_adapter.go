@@ -96,6 +96,10 @@ type ApplyAdapter interface {
 	Ready(ctx context.Context) error
 }
 
+// execCommandContextFn is the context-aware exec shim signature used by
+// adapters whose restart command must honour a deadline (issue #918).
+type execCommandContextFn func(ctx context.Context, name string, arg ...string) *exec.Cmd
+
 // ApplyAdapterDeps groups the optional restart primitives the
 // selector needs. Tests construct a value with only the fields they
 // exercise; production callers wire every dependency so any of the
@@ -103,13 +107,14 @@ type ApplyAdapter interface {
 //
 // ProcessManager / SystemdManager / DockerService are nullable because
 // not every deployment exposes all three (e.g. a native systemd
-// install does not need DockerService). ExecCommand defaults to
-// exec.Command via the package-level execCommand shim.
+// install does not need DockerService). ExecCommand /
+// ExecCommandContext default to the package-level exec shims.
 type ApplyAdapterDeps struct {
 	ProcessManager       *ProcessManager
 	SystemdManager       SystemdManager
 	Docker               *DockerService
 	ExecCommand          func(name string, arg ...string) *exec.Cmd
+	ExecCommandContext   execCommandContextFn
 	ReadinessURLResolver func() (string, error)
 }
 
@@ -164,10 +169,21 @@ func SelectApplyAdapter(capabilities model.ConfigurationCapabilities, nodeRed mo
 		if strings.TrimSpace(nodeRed.ContainerName) == "" {
 			return nil, fmt.Errorf("%w: systemd unit name is empty", ErrUnsupportedAdapter)
 		}
+		// Issue #918: readiness must probe the endpoint owned by the unit
+		// the transaction selected, never a well-known default port that a
+		// foreign listener could occupy.
+		readinessResolver := deps.ReadinessURLResolver
+		if readinessResolver == nil && strings.TrimSpace(nodeRed.ReadinessURL) != "" {
+			readinessResolver = func() (string, error) { return nodeRed.ReadinessURL, nil }
+		}
+		if readinessResolver == nil {
+			return nil, fmt.Errorf("%w: systemd readiness endpoint is unknown", ErrUnsupportedAdapter)
+		}
 		return &nativeSystemdAdapter{
-			mgr:         deps.SystemdManager,
-			unit:        nodeRed.ContainerName,
-			execCommand: ensureExecCommand(deps.ExecCommand),
+			mgr:                  deps.SystemdManager,
+			unit:                 nodeRed.ContainerName,
+			execCommandContext:   ensureExecCommandContext(deps.ExecCommandContext),
+			readinessURLResolver: readinessResolver,
 		}, nil
 	case model.InstallationModeDocker:
 		if strings.TrimSpace(nodeRed.ContainerID) == "" || strings.TrimSpace(nodeRed.ReadinessURL) == "" {
@@ -197,6 +213,15 @@ func ensureExecCommand(deps func(name string, arg ...string) *exec.Cmd) func(nam
 	return execCommand
 }
 
+// ensureExecCommandContext is the context-aware counterpart of
+// ensureExecCommand (issue #918).
+func ensureExecCommandContext(deps execCommandContextFn) execCommandContextFn {
+	if deps != nil {
+		return deps
+	}
+	return exec.CommandContext
+}
+
 // nativeBinaryAdapter restarts Node-RED via the in-process ProcessManager.
 // This is the path used when NRCC itself spawned the child process and
 // holds the lifecycle authority (the managed-runtime detection in
@@ -215,7 +240,7 @@ func (a *nativeBinaryAdapter) Restart(ctx context.Context) error {
 	if a.pm == nil {
 		return fmt.Errorf("%w: ProcessManager is nil", ErrUnsupportedAdapter)
 	}
-	return a.pm.Restart()
+	return a.pm.Restart(ctx)
 }
 
 func (a *nativeBinaryAdapter) Ready(ctx context.Context) error {
@@ -233,9 +258,10 @@ func (a *nativeBinaryAdapter) Ready(ctx context.Context) error {
 // purpose in the same way managed docker installs reuse it for the
 // compose project name).
 type nativeSystemdAdapter struct {
-	mgr         SystemdManager
-	unit        string
-	execCommand func(name string, arg ...string) *exec.Cmd
+	mgr                  SystemdManager
+	unit                 string
+	execCommandContext   execCommandContextFn
+	readinessURLResolver func() (string, error)
 }
 
 func (a *nativeSystemdAdapter) Name() string { return AdapterNameNativeSystemd }
@@ -254,23 +280,30 @@ func (a *nativeSystemdAdapter) Restart(ctx context.Context) error {
 	// fails after Stop succeeded. The exec shim is the same one the
 	// package uses everywhere else so tests can stub it.
 	// #nosec G204 -- unit is the operator-supplied systemd unit name from NodeRedEnvironment, not request-derived.
-	cmd := a.execCommand("systemctl", "restart", a.unit)
+	cmd := a.execCommandContext(ctx, "systemctl", "restart", a.unit)
 	if err := cmd.Run(); err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return fmt.Errorf("systemctl restart %s: %w", a.unit, ctxErr)
+		}
 		return fmt.Errorf("systemctl restart %s: %w", a.unit, err)
 	}
 	return nil
 }
 
 func (a *nativeSystemdAdapter) Ready(ctx context.Context) error {
-	return probeAdminReady(ctx, nativeDefaultAdminURL())
+	url, err := a.readinessURLResolver()
+	if err != nil {
+		return err
+	}
+	return probeAdminReady(ctx, url)
 }
 
 // dockerComposeAdapter restarts Node-RED via `docker compose restart`.
 // The compose project name comes from NodeRedEnvironment.ContainerName
 // (the field slice A already populates for managed docker installs).
 type dockerComposeAdapter struct {
-	execCommand func(name string, arg ...string) *exec.Cmd
-	projectName string
+	execCommandContext execCommandContextFn
+	projectName        string
 }
 
 type dockerTargetAdapter struct {
@@ -294,8 +327,11 @@ func (a *dockerComposeAdapter) Restart(ctx context.Context) error {
 		args = append(args, "-p", a.projectName)
 	}
 	// #nosec G204 -- args are composed from the operator-controlled project name and a fixed subcommand list; not request-derived.
-	cmd := a.execCommand("docker", args...)
+	cmd := a.execCommandContext(ctx, "docker", args...)
 	if err := cmd.Run(); err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return fmt.Errorf("docker compose restart: %w", ctxErr)
+		}
 		return fmt.Errorf("docker compose restart: %w", err)
 	}
 	return nil
@@ -322,7 +358,7 @@ func (a *dockerCustomAdapter) Restart(ctx context.Context) error {
 	if a.docker == nil {
 		return fmt.Errorf("%w: DockerService is nil", ErrUnsupportedAdapter)
 	}
-	return a.docker.Restart()
+	return a.docker.RestartContext(ctx)
 }
 
 func (a *dockerCustomAdapter) Ready(ctx context.Context) error {

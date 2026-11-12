@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -77,7 +78,7 @@ func TestServerApplyResolverDoesNotTreatExternalProcessManagerAsOwnedChild(t *te
 		t.Fatalf("attach ProcessManager to test-owned listener (nonexistent test binary prevents spawning Node-RED): %v", err)
 	}
 	defer func() {
-		if err := pm.Stop(); err != nil {
+		if err := pm.Stop(context.Background()); err != nil {
 			t.Errorf("detach external ProcessManager: %v", err)
 		}
 	}()

@@ -587,7 +587,7 @@ func newRealAcceptanceFixture(t *testing.T, binary string) *realAcceptanceFixtur
 			t.Errorf("refusing cleanup without owned child identity: external=%v status=%+v", manager.IsExternalMode(), status)
 			return
 		}
-		if err := manager.Stop(); err != nil {
+		if err := manager.Stop(context.Background()); err != nil {
 			t.Errorf("stop owned Node-RED PID %d: %v", status.PID, err)
 		}
 		if after := manager.Status(); after.PID != 0 || after.Status == "running" {

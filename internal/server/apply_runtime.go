@@ -44,6 +44,11 @@ func serverApplyResolver(detect func() model.HostStatus, processManager func() *
 			if port != 1880 {
 				return nil, fmt.Errorf("apply: Docker target publishes container port 1880, candidate port %d is unsupported", port)
 			}
+		case nodeRed.Mode == model.InstallationModeNative && !nodeRed.ManagedByNRCC:
+			// Issue #918: bind the systemd readiness probe to the port the
+			// candidate settings define instead of a well-known default a
+			// foreign listener could occupy.
+			readinessResolver = func() (string, error) { return settingsReadinessURL(req.Path) }
 		}
 		return service.SelectApplyAdapter(req.Capabilities, nodeRed, service.ApplyAdapterDeps{
 			ProcessManager: pm, SystemdManager: systemd, Docker: docker,

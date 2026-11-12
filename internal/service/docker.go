@@ -3,6 +3,7 @@ package service
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"os/exec"
@@ -213,11 +214,35 @@ func (d *DockerService) Status() DockerStatus {
 // the container is missing the function returns a typed error so the
 // HTTP layer can answer 503 with DOCKER_NOT_AVAILABLE.
 func (d *DockerService) Restart() error {
+	return d.RestartContext(context.Background())
+}
+
+// RestartContext is Restart bounded by ctx (issue #918): a hung
+// `docker restart` is killed at the deadline and the context error is
+// reported instead of blocking the recovery path.
+func (d *DockerService) RestartContext(ctx context.Context) error {
 	info, err := d.DiscoverNodeRed()
 	if err != nil {
 		return err
 	}
-	return d.runDocker("restart", info.Name)
+	return d.runDockerContext(ctx, "restart", info.Name)
+}
+
+// runDockerContext is runDocker with a context-bound command.
+func (d *DockerService) runDockerContext(ctx context.Context, action, name string) error {
+	if d == nil || d.execCommand == nil {
+		return errDockerNotFound
+	}
+	cmd := exec.CommandContext(ctx, "docker", action, name)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return fmt.Errorf("docker %s %s failed: %w", action, name, ctxErr)
+		}
+		return fmt.Errorf("docker %s %s failed: %w: %s", action, name, err, strings.TrimSpace(stderr.String()))
+	}
+	return nil
 }
 
 // Stop runs `docker stop <name>` against the discovered Node-RED

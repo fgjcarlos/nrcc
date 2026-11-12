@@ -451,7 +451,7 @@ func (h *SystemHandler) RestartNodeRed(w http.ResponseWriter, r *http.Request) {
 		model.RespondError(w, http.StatusConflict, "EXTERNAL_NODE_RED", "cannot restart an externally managed Node-RED instance")
 		return
 	}
-	if err := h.processManager.Restart(); err != nil {
+	if err := h.processManager.Restart(r.Context()); err != nil {
 		model.RespondError(w, http.StatusInternalServerError, "RESTART_FAILED", err.Error())
 		return
 	}
@@ -481,7 +481,7 @@ func (h *SystemHandler) StopNodeRed(w http.ResponseWriter, r *http.Request) {
 		model.RespondError(w, http.StatusConflict, "EXTERNAL_NODE_RED", "cannot stop an externally managed Node-RED instance")
 		return
 	}
-	if err := h.processManager.Stop(); err != nil {
+	if err := h.processManager.Stop(r.Context()); err != nil {
 		model.RespondError(w, http.StatusInternalServerError, "STOP_FAILED", err.Error())
 		return
 	}

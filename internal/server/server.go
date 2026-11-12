@@ -567,7 +567,7 @@ func (s *Server) SetProcessManager(pm *service.ProcessManager) {
 	// Both stops are best-effort; failure is recorded in the backup event
 	// stream but does not roll back a successful restore.
 	if s.backupSvc != nil {
-		stop := pm.Stop
+		stop := func() error { return pm.Stop(context.Background()) }
 		start := pm.Start
 		s.backupSvc.SetRestoreHooks(stop, func() error {
 			if err := start(); err != nil {
@@ -585,7 +585,7 @@ func (s *Server) SetProcessManager(pm *service.ProcessManager) {
 			if pm.Status().Status != "running" {
 				return nil
 			}
-			if err := pm.Stop(); err != nil {
+			if err := pm.Stop(context.Background()); err != nil {
 				return err
 			}
 			return start()

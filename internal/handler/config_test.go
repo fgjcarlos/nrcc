@@ -539,7 +539,7 @@ func TestSaveConfig_WritesExplicitRuntimeSettingsAndRestarts(t *testing.T) {
 	if err := processManager.Start(); err != nil {
 		t.Fatalf("start managed Node-RED stub: %v", err)
 	}
-	t.Cleanup(func() { _ = processManager.Stop() })
+	t.Cleanup(func() { _ = processManager.Stop(context.Background()) })
 
 	handler := NewConfigHandler(configSvc)
 	handler.SetProcessManager(processManager)
