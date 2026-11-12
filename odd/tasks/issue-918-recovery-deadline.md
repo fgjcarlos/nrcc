@@ -35,7 +35,8 @@ outlive the recovery deadline and a foreign listener cannot satisfy readiness.
   needed beyond what T1/T2 deliver.
 - T5 (S4): deterministic tests for deadline-enforced restart, occupied-port
   start, recovery failure mapping + regression for changed shared helpers.
-  Commit: see final commit.
+  Commit: 9f042b8 + 79826c0. Final verification: new service tests PASS; handler
+  (config/settings/system/env) PASS; server suite PASS; recovery mapping PASS.
 
 ## Log
 
