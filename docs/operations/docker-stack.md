@@ -29,6 +29,28 @@ Once the stack is up:
 The first login prompts you to create the admin user. After that,
 the JWT cookie keeps you signed in across restarts.
 
+## Configure operational settings
+
+Compose reads `.env` for interpolation only; the shipped
+`docker-compose.yml` forwards the documented operational settings into
+the container (#888): CORS (`NRCC_CORS_ORIGINS`,
+`NRCC_CORS_UNSAFE_WILDCARD`), `NRCC_TRUSTED_PROXIES`, `NRCC_TLS`,
+`EDGE_MODE`, `NRCC_METRICS_PUBLIC`, the bulk import limits and the
+`NRCC_AI_*` settings. Leave a value unset to keep the binary default.
+
+```bash
+echo "EDGE_MODE=true"                                  >> .env
+echo "NRCC_CORS_ORIGINS=https://ops.example.com"       >> .env
+docker compose up -d   # recreates the container with the new environment
+```
+
+`docker compose restart` keeps the old environment; use
+`docker compose up -d` after every `.env` change. The settings the
+one-container stack intentionally does not forward (Restic,
+`NRCC_MANAGE_NODE_RED`, backup paths, `NPM_BIN`, `NRCC_IMAGE`,
+`NODE_RED_PORT`) are listed with their reason in
+[Compose forwarding](../configuration/env-contract.md#compose-forwarding).
+
 ## Verify the contract is honoured
 
 The env contract is enforced by CI:
@@ -42,32 +64,46 @@ until you extend `canonicalBootstrap` in
 `internal/service/env_contract_test.go` (and update
 [`.env.example`](../../.env.example) +
 [docs/configuration/env-contract.md](../configuration/env-contract.md)
-in the same commit).
+in the same commit). The Compose side is pinned by
+`go test -count=1 -run TestComposeEnv ./internal/service/`, which
+fails until the new variable has a Compose routing decision; with the
+docker CLI installed it also resolves the stack with
+`docker compose config` for default and non-default values.
 
 ## Multi-instance
 
-Two or more NRCC stacks on the same host MUST differ on:
+Each stack is one container (one NRCC, one Node-RED). Inside the
+container every stack uses the same pinned ports (`3001`, `1880`) and
+`DATA_DIR=/data`; two stacks on the same host MUST differ on:
 
-- `PORT` (the host port mapped to nrcc's container port `3001`)
-- `NODE_RED_PORT` (the host port mapped to Node-RED's `1880`)
-- `DATA_DIR` (the named volume mounted at `/data` inside the container)
-- `JWT_SECRET` (independent auth realm)
+- the Compose project name (`-p`), which namespaces the three volumes
+- `NRCC_HOST_PORT` and `NODE_RED_HOST_PORT` (the host ports)
 - `NRCC_ENCRYPTION_KEY` (independent secret store)
+- `JWT_SECRET` (independent auth realm; leave it empty to have each
+  stack generate its own inside its own volume)
 
-Procedure:
+Procedure — keep the shipped compose file unchanged and give the second
+stack its own settings file (`stack-b.conf` below; any path works):
 
-1. Copy `docker-compose.yml` to a second file (e.g. `docker-compose.b.yml`).
-2. Rename the service (`nrcc` → `nrcc-b`).
-3. Remap host ports: `"127.0.0.1:3001:3001"` → `"127.0.0.1:3002:3001"`,
-   `"127.0.0.1:1880:1880"` → `"127.0.0.1:1881:1880"`.
-4. Rename volumes: `nrcc_data` → `nrcc_data_b`, etc.
-5. Set fresh `JWT_SECRET` and `NRCC_ENCRYPTION_KEY` in the new file's
-   `environment:` block.
-6. `docker compose -f docker-compose.b.yml up -d --build`.
+```bash
+umask 077
+cat > stack-b.conf <<EOF
+NRCC_ENCRYPTION_KEY=$(openssl rand -base64 48)
+JWT_SECRET=$(openssl rand -base64 48)
+NRCC_HOST_PORT=3002
+NODE_RED_HOST_PORT=1881
+EOF
+docker compose -p nrcc-b --env-file stack-b.conf up -d --build
+```
 
-A preflight check that detects two stacks sharing `DATA_DIR` or
-`NRCC_ENCRYPTION_KEY` is the natural follow-up; for now the operator
-is responsible. See
+Run every later command for that stack with the same
+`-p nrcc-b --env-file stack-b.conf`. Keep every per-stack value
+(encryption key, JWT secret, host ports) in that file so the two stacks
+share no secret. The acceptance suite (`scripts/acceptance/docker-stacks.sh`) boots stacks
+with distinct project names, host ports and encryption keys, and fails
+if two of them resolve the same encryption key, host port, or named
+volume. No runtime preflight checks this on an operator's host yet;
+the operator is responsible. See
 [the Per-stack guarantees section](../configuration/env-contract.md#per-stack-guarantees)
 for the full contract.
 
@@ -121,10 +157,11 @@ NRCC ships two backup surfaces:
    These cover flows, settings.js, env store, and the npm package
    list. They are **not** off-host; if the volume is destroyed the
    snapshots go with it.
-2. **Restic (optional)** — encrypted, deduplicated, off-host
-   incremental backups. Enable by setting all five `NRCC_RESTIC_*`
-   variables in `.env` and restarting. See
-   [the contract](../configuration/env-contract.md#bootstrap-variables).
+2. **Restic — deferred.** Off-host encrypted backups are tracked in
+   [#432](https://github.com/fgjcarlos/nrcc/issues/432). The image ships
+   no `restic` binary and the canonical compose file does not forward the
+   `NRCC_RESTIC_*` variables, so setting them in `.env` has no effect.
+   Copy backup archives off the host yourself until #432 lands.
 
 Recommended: mount `<DATA_DIR>/backups` on a separate volume (the
 shipped `docker-compose.yml` does this — `nrcc_backups`) so a stack

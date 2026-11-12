@@ -8,6 +8,15 @@
 #
 # Set JWT_SECRET via .env or host env; if absent nrcc generates one in /data.
 #
+# Host .env values only reach the container through the environment block
+# below (#888). Every documented operational setting is forwarded as
+# "${NAME:-}": an unset host value arrives empty and the binary keeps its
+# default. In-container ports and paths are pinned; settings the one-container
+# stack intentionally does not take from the host (NRCC_MANAGE_NODE_RED,
+# NRCC_BACKUP_*, NRCC_RESTIC_*, NPM_BIN, NRCC_IMAGE, NODE_RED_PORT) are listed
+# with their reason in docs/configuration/env-contract.md. Changing any value
+# needs `docker compose up -d` to recreate the container.
+#
 # Ports are bound to 127.0.0.1 (loopback) by default. On a host with
 # Tailscale installed the same ports are reachable via the Tailscale
 # IP of this host (e.g. http://100.x.y.z:3001) without exposing them
@@ -23,12 +32,27 @@ services:
       - "127.0.0.1:${NRCC_HOST_PORT:-3001}:3001"   # nrcc web UI + API (Tailscale-reachable)
       - "127.0.0.1:${NODE_RED_HOST_PORT:-1880}:1880"   # Node-RED editor (Tailscale-reachable)
     environment:
+      # Pinned by the one-container image layout.
       PORT: "3001"
-      DATA_DIR: /data
-      NODE_RED_CMD: node-red
-      NODE_RED_USER_DIR: /data
-      NODE_RED_SETTINGS: /data/settings.js
+      DATA_DIR: "/data"
+      NODE_RED_CMD: "node-red"
+      NODE_RED_USER_DIR: "/data"
+      NODE_RED_SETTINGS: "/data/settings.js"
       JWT_SECRET: "${JWT_SECRET:-}"
+      # Operational settings forwarded from the host .env (#888).
+      NRCC_CORS_ORIGINS: "${NRCC_CORS_ORIGINS:-}"
+      NRCC_CORS_UNSAFE_WILDCARD: "${NRCC_CORS_UNSAFE_WILDCARD:-}"
+      NRCC_TRUSTED_PROXIES: "${NRCC_TRUSTED_PROXIES:-}"
+      NRCC_TLS: "${NRCC_TLS:-}"
+      EDGE_MODE: "${EDGE_MODE:-}"
+      NRCC_METRICS_PUBLIC: "${NRCC_METRICS_PUBLIC:-}"
+      NRCC_BULK_MAX_ENTRIES: "${NRCC_BULK_MAX_ENTRIES:-}"
+      NRCC_BULK_MAX_ENTRY_BYTES: "${NRCC_BULK_MAX_ENTRY_BYTES:-}"
+      NRCC_AI_ENABLED: "${NRCC_AI_ENABLED:-}"
+      NRCC_AI_PROVIDER: "${NRCC_AI_PROVIDER:-}"
+      NRCC_AI_ENDPOINT: "${NRCC_AI_ENDPOINT:-}"
+      NRCC_AI_MODEL: "${NRCC_AI_MODEL:-}"
+      NRCC_AI_API_KEY: "${NRCC_AI_API_KEY:-}"
       # #664: the encryption key is required — without it, "encrypted"
       # env vars are silently written to config.json in plaintext while
       # still being labelled Encrypted: true. The :? form aborts compose
