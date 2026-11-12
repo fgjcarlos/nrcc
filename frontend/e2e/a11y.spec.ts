@@ -1,6 +1,7 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { installApiMocks, login } from './helpers'
+import { expectedTheme, expectPinnedTheme } from './a11y-helpers'
 
 /**
  * a11y.spec.ts — issue #766 slice G W4
@@ -14,77 +15,75 @@ import { installApiMocks, login } from './helpers'
  * rules once the open design backlog items are addressed.
  */
 
+async function expectNoAxeBlockers(page: Page, surface: string) {
+  await expectPinnedTheme(page)
+  // Callers wait for the surface's real content first; settling the
+  // fixture requests as well keeps every project scanning the same DOM.
+  await page.waitForLoadState('networkidle')
+  const results = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+    .analyze()
+
+  const blocking = results.violations.filter(
+    (v) => v.impact === 'critical' || v.impact === 'serious',
+  )
+  if (blocking.length > 0) {
+    // Print every blocker so the CI log shows the offending nodes.
+    console.error(JSON.stringify(blocking, null, 2))
+  }
+  expect(blocking, `${surface} axe blockers (${expectedTheme()})`).toHaveLength(0)
+}
+
 test.describe('Issue #766 slice G W4 — WCAG 2.1 AA gate', () => {
   test('login page has no critical or serious axe violations', async ({ page }) => {
     await installApiMocks(page, 'initialized')
     await page.goto('/login')
-
-    const results = await new AxeBuilder({ page })
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-      .analyze()
-
-    const blocking = results.violations.filter(
-      (v) => v.impact === 'critical' || v.impact === 'serious',
-    )
-    if (blocking.length > 0) {
-      // Print every blocker so the CI log shows the offending nodes.
-
-      console.error(JSON.stringify(blocking, null, 2))
-    }
-    expect(blocking, 'login axe blockers').toHaveLength(0)
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+    await expect(page.getByLabel('Username')).toBeVisible()
+    await expectNoAxeBlockers(page, 'login')
   })
 
   test('overview page has no critical or serious axe violations', async ({ page }) => {
     await login(page)
-
-    const results = await new AxeBuilder({ page })
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-      .analyze()
-
-    const blocking = results.violations.filter(
-      (v) => v.impact === 'critical' || v.impact === 'serious',
-    )
-    if (blocking.length > 0) {
-
-      console.error(JSON.stringify(blocking, null, 2))
-    }
-    expect(blocking, 'overview axe blockers').toHaveLength(0)
+    // login() already waits for the Overview heading; also wait for the
+    // late-rendering runtime tile so every project scans the same DOM.
+    await expect(page.getByRole('button', { name: 'Restart', exact: true })).toBeVisible()
+    await expectNoAxeBlockers(page, 'overview')
   })
 
   test('configuration page has no critical or serious axe violations', async ({ page }) => {
     await login(page)
     await page.goto('/configuration')
-
-    const results = await new AxeBuilder({ page })
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-      .analyze()
-
-    const blocking = results.violations.filter(
-      (v) => v.impact === 'critical' || v.impact === 'serious',
-    )
-    if (blocking.length > 0) {
-
-      console.error(JSON.stringify(blocking, null, 2))
-    }
-    expect(blocking, 'configuration axe blockers').toHaveLength(0)
+    await expect(page.getByRole('heading', { name: 'Node-RED Configuration', exact: true })).toBeVisible()
+    // The raw settings.js editor renders after its fixture loads.
+    await expect(page.getByRole('textbox', { name: 'Advanced settings.js' })).toHaveValue(/fixture settings\.js/)
+    await expectNoAxeBlockers(page, 'configuration')
   })
 
   test('security page has no critical or serious axe violations', async ({ page }) => {
     await login(page)
     await page.goto('/security')
+    await expect(page.getByRole('heading', { name: 'Node-RED admin auth' })).toBeVisible()
+    await expectNoAxeBlockers(page, 'security')
+  })
 
-    const results = await new AxeBuilder({ page })
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-      .analyze()
+  test('computed muted text colour matches the pinned theme token (#889 S1)', async ({ page }) => {
+    await installApiMocks(page, 'initialized')
+    await page.goto('/login')
+    await expectPinnedTheme(page)
 
-    const blocking = results.violations.filter(
-      (v) => v.impact === 'critical' || v.impact === 'serious',
-    )
-    if (blocking.length > 0) {
-
-      console.error(JSON.stringify(blocking, null, 2))
-    }
-    expect(blocking, 'security axe blockers').toHaveLength(0)
+    // L5 token values: dark --ds-text-muted #8e99a8, light #5a6577.
+    const expected = expectedTheme() === 'corporateDark' ? 'rgb(142, 153, 168)' : 'rgb(90, 101, 119)'
+    const computed = await page.evaluate(() => {
+      const probe = document.createElement('p')
+      probe.className = 'text-body-secondary'
+      probe.textContent = 'probe'
+      document.body.appendChild(probe)
+      const color = window.getComputedStyle(probe).color
+      probe.remove()
+      return color
+    })
+    expect(computed).toBe(expected)
   })
 
   test('prefers-reduced-motion collapses Tailwind animations to ~0ms', async ({ browser }) => {
