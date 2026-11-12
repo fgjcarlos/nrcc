@@ -93,31 +93,6 @@ func newRecordingDockerService() *DockerService {
 // touching the host's docker binary. It returns a function with the
 // same signature as exec.Command so it slots into the adapter's
 // execCommand field directly.
-func execCommandRecorder(t *testing.T, wantName string, wantArgsContain string, fakeErr error) func(string, ...string) *exec.Cmd {
-	t.Helper()
-	return func(name string, arg ...string) *exec.Cmd {
-		if name != wantName {
-			t.Errorf("exec name = %q, want %q", name, wantName)
-		}
-		joined := strings.Join(arg, " ")
-		if wantArgsContain != "" && !strings.Contains(joined, wantArgsContain) {
-			t.Errorf("exec args %v missing %q", arg, wantArgsContain)
-		}
-		if fakeErr != nil {
-			// Build a real *exec.Cmd pointed at `/bin/false` (or
-			// whatever exists on the test runner) and override Run
-			// via the exec shim. The simplest portable stub is to
-			// attach Stdin so the cmd fails to start; we instead
-			// point at a binary path that is guaranteed to fail
-			// fast with the canned error wrapped through Run.
-			return exec.Command("false")
-		}
-		return exec.Command("true")
-	}
-}
-
-// TestSelectApplyAdapter_Matrix locks in the dispatch table documented
-// on SelectApplyAdapter. Every combination of (Mode, ManagedByNRCC)
 // with a nodered-5 adapter must resolve to the documented ApplyAdapter
 // name; any other combination must yield ErrUnsupportedAdapter.
 func TestSelectApplyAdapter_Matrix(t *testing.T) {
