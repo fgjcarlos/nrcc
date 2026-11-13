@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * check-contrast-tokens.mjs — issues #766 slice G W4 and #889
+ * check-contrast-tokens.mjs — issues #766 slice G W4, #889 and #965
  *
  * Static auditor for WCAG 2.1 SC 1.4.3 (Contrast — Minimum) and
  * SC 1.4.11 (Non-text Contrast).
@@ -184,11 +184,22 @@ const SOLID_LABELS = [
  * the tint over each surface at the strongest opacity in use (18%).
  */
 const TINT_PERCENT = 18;
-const TINTED_LABELS = ['primary', 'success', 'info', 'warning', 'error'];
+const TINTED_LABELS = ['primary', 'success', 'info', 'warning', 'error', 'accent'];
+
+/**
+ * Semantic text (`text-primary`, `text-error`, ...) drawn directly on a
+ * surface (#965). The `text-X` utilities resolve to `--ds-on-tint-X`
+ * (index.css `@theme`), so one token is audited on plain surfaces here
+ * and on the semantic tint above.
+ */
+const SEMANTIC_TEXT = ['primary', 'error', 'success', 'warning', 'info', 'accent'];
 
 const PAIRS = THEMES.flatMap((theme) => [
   ...TEXT_COLOURS.flatMap(({ fg, name }) =>
     SURFACES.map((bg) => ({ theme, fg, bg, use: 'text', label: `${name} on ${bg}` })),
+  ),
+  ...SEMANTIC_TEXT.flatMap((colour) =>
+    SURFACES.map((bg) => ({ theme, fg: `ds-on-tint-${colour}`, bg, use: 'text', label: `${colour} text on ${bg}` })),
   ),
   ...SOLID_LABELS.map(({ fg, bg, label }) => ({ theme, fg, bg, use: 'text', label })),
   ...TINTED_LABELS.flatMap((colour) =>

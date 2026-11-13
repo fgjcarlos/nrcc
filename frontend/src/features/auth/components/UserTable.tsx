@@ -61,20 +61,20 @@ export function UserTable({
                 <td className="px-4 py-3 text-right space-x-2">
                   <button
                     onClick={() => onEdit(user)}
-                    className="text-sm text-primary transition-colors hover:text-primary/80"
+                    className="text-sm text-primary transition-colors hover:underline"
                   >
                     {t('auth:editUser')}
                   </button>
                   <button
                     onClick={() => onChangePassword(user)}
-                    className="text-sm text-primary transition-colors hover:text-primary/80"
+                    className="text-sm text-primary transition-colors hover:underline"
                   >
                     {t('auth:changePassword')}
                   </button>
                   <button
                     onClick={() => onDelete(user)}
                     disabled={user.id === currentUserId || (user.role === 'admin' && adminCount === 1)}
-                    className="text-sm text-error transition-colors hover:text-error/80 disabled:text-base-content/40 disabled:cursor-not-allowed"
+                    className="text-sm text-error transition-colors hover:underline disabled:text-base-content/40 disabled:cursor-not-allowed"
                   >
                     {t('common:delete')}
                   </button>
@@ -123,20 +123,20 @@ export function UserTable({
               <div className="flex gap-2 pt-2">
                 <button
                   onClick={() => onEdit(user)}
-                  className="flex-1 text-sm text-primary transition-colors hover:text-primary/80"
+                  className="flex-1 text-sm text-primary transition-colors hover:underline"
                 >
                   {t('auth:editUser')}
                 </button>
                 <button
                   onClick={() => onChangePassword(user)}
-                  className="flex-1 text-sm text-primary transition-colors hover:text-primary/80"
+                  className="flex-1 text-sm text-primary transition-colors hover:underline"
                 >
                   {t('auth:changePassword')}
                 </button>
                 <button
                   onClick={() => onDelete(user)}
                   disabled={user.id === currentUserId || (user.role === 'admin' && adminCount === 1)}
-                  className="flex-1 text-sm text-error transition-colors hover:text-error/80 disabled:text-base-content/40 disabled:cursor-not-allowed"
+                  className="flex-1 text-sm text-error transition-colors hover:underline disabled:text-base-content/40 disabled:cursor-not-allowed"
                 >
                   {t('common:delete')}
                 </button>
