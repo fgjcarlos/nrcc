@@ -58,7 +58,15 @@ describe('HttpBasicAuthBoundaryCard — httpNodeAuth', () => {
     expect(screen.getByTestId('boundary-httpNodeAuth-readonly')).toBeInTheDocument();
   });
 
-  it('surfaces the bcrypt warning when the new password is not a hash', () => {
+  it('asks for a plain password and submits it as typed for the backend to hash', async () => {
+    const user = userEvent.setup();
+    let posted: unknown;
+    server.use(
+      http.post('/api/config/apply', async ({ request }) => {
+        posted = await request.json();
+        return ok({ configuration: {}, document: {} });
+      }),
+    );
     renderBoundary({
       surface: 'httpNodeAuth',
       config: { user: 'nodes', pass: '$2a$hash' },
@@ -66,12 +74,18 @@ describe('HttpBasicAuthBoundaryCard — httpNodeAuth', () => {
       expectedRevision: 'rev',
       editable: true,
     });
+    const card = screen.getByTestId('boundary-httpNodeAuth');
+    expect(card).toHaveTextContent('Password');
+    expect(card).not.toHaveTextContent('(bcrypt hash)');
     const passInput = screen.getByTestId('boundary-httpNodeAuth-pass');
+    expect(passInput).toHaveAttribute('type', 'password');
     fireEvent.change(passInput, { target: { value: 'plain-text' } });
-    // The bcrypt warning shows when the typed value is non-empty + non-hash.
-    // After the change event the local state holds 'plain-text' which is not
-    // a bcrypt hash, so the warning surfaces.
-    expect(screen.getByTestId('boundary-httpNodeAuth-bcrypt-warning')).toBeInTheDocument();
+    expect(screen.queryByTestId('boundary-httpNodeAuth-bcrypt-warning')).not.toBeInTheDocument();
+    await user.click(screen.getByTestId('boundary-httpNodeAuth-save'));
+    await waitFor(() => expect(posted).toBeDefined());
+    expect((posted as { httpNodeAuth?: { pass: string } }).httpNodeAuth?.pass).toBe(
+      'plain-text',
+    );
   });
 
   it('submits the httpNodeAuth payload on save', async () => {

@@ -127,6 +127,33 @@ func upgradePlaintextAdminAuthPasswords(cfg model.NodeRedConfig) error {
 	return nil
 }
 
+// upgradePlaintextBasicAuthPass hashes a cleartext httpNodeAuth or
+// httpStaticAuth pass the same way adminAuth passwords are upgraded; a bcrypt
+// hash is kept as is. The surface is copied so a shared pointer is never
+// rewritten.
+func upgradePlaintextBasicAuthPass(cfg *model.NodeRedConfig) error {
+	for _, surface := range []struct {
+		name string
+		auth **model.HTTPBasicAuth
+	}{
+		{"httpNodeAuth", &cfg.HTTPNodeAuth},
+		{"httpStaticAuth", &cfg.HTTPStaticAuth},
+	} {
+		auth := *surface.auth
+		if auth == nil || auth.Pass == "" || isBcryptHash(auth.Pass) {
+			continue
+		}
+		hash, err := bcrypt.GenerateFromPassword([]byte(auth.Pass), BcryptCost)
+		if err != nil {
+			return fmt.Errorf("%s: %w", surface.name, err)
+		}
+		hashed := *auth
+		hashed.Pass = string(hash)
+		*surface.auth = &hashed
+	}
+	return nil
+}
+
 // Save commits the configuration to the JSON store and renders settings.js.
 // Plaintext passwords in AdminAuth are upgraded to bcrypt hashes here so the
 // frontend can submit cleartext when changing the admin password without the
@@ -141,6 +168,9 @@ func (s *ConfigService) Save(cfg model.NodeRedConfig) error {
 		preserveSecuritySurfaces(current, fallbacks, &candidate)
 		preserveWriteOnlySecrets(current, &candidate)
 		if err := upgradePlaintextAdminAuthPasswords(candidate); err != nil {
+			return err
+		}
+		if err := upgradePlaintextBasicAuthPass(&candidate); err != nil {
 			return err
 		}
 		if err := validateAdminAuthPasswords(candidate); err != nil {
@@ -279,6 +309,9 @@ func (s *ConfigService) commitStructured(full *model.NodeRedConfig, patch *model
 		preserveAdminAuthPasswords(existing, &candidate)
 		preserveWriteOnlySecrets(existing, &candidate)
 		if err := upgradePlaintextAdminAuthPasswords(candidate); err != nil {
+			return err
+		}
+		if err := upgradePlaintextBasicAuthPass(&candidate); err != nil {
 			return err
 		}
 		if err := validateAdminAuthPasswords(candidate); err != nil {

@@ -13,7 +13,7 @@ password, and editor theme images never reach Node-RED.
 ## Tasks
 
 - T1 (S1) worker — AdminAuthBoundaryCard new-row editing + test. Commit: "fix(security): make new admin auth users editable".
-- T2 (S2) worker — plain → bcrypt for HTTP basic auth (backend), labels/warnings/openapi. Commit: pending.
+- T2 (S2) worker — plain → bcrypt for HTTP basic auth (backend), labels/warnings/openapi. Commit: "fix(security): hash plain HTTP basic auth passwords".
 - T3 (S3) worker — editorTheme image paths. Commit: pending.
 - T4 (S4) blocked — waiting for the error message / audit failure stage.
 
