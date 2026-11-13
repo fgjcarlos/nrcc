@@ -82,9 +82,10 @@ export function useBackupsActions() {
      },
   });
 
-  // Retention policy mutation
+  // Retention policy mutation. Uses the full config endpoint because
+  // PATCH /storage/retention applies one value to all three retention kinds.
   const retentionMutation = useMutation({
-    mutationFn: backupService.patchStorageRetention,
+    mutationFn: backupService.saveConfig,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.backups.config });
       await queryClient.invalidateQueries({ queryKey: queryKeys.backups.storage });
