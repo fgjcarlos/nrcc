@@ -49,7 +49,7 @@ export function Sidebar() {
   const { t } = useT();
   const isAdmin = user?.role === 'admin';
   
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < MOBILE_BREAKPOINT);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < MOBILE_BREAKPOINT);
   const [collapsed, setCollapsed] = useState(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     return stored ? stored === 'true' : false;
