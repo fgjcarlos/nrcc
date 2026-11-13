@@ -5,6 +5,18 @@
   themes: false;
 }
 
+/* Semantic text utilities (#965). `text-X` reads --text-color-X before
+   --color-X, so text gets the readable --ds-on-tint-X token while bg-,
+   border- and daisyUI solid fills keep --color-X (white button labels). */
+@theme inline {
+  --text-color-primary: var(--ds-on-tint-primary);
+  --text-color-error: var(--ds-on-tint-error);
+  --text-color-success: var(--ds-on-tint-success);
+  --text-color-warning: var(--ds-on-tint-warning);
+  --text-color-info: var(--ds-on-tint-info);
+  --text-color-accent: var(--ds-on-tint-accent);
+}
+
 /* ═══════════════════════════════════════════════════════════════
    BASE LAYER
    ═══════════════════════════════════════════════════════════════ */
@@ -75,12 +87,14 @@
      --ds-text-secondary:       #d8dee8;
      --ds-text-muted:           #8e99a8;
 
-     /* On-tint text: labels drawn on translucent semantic tints */
+     /* Semantic text: labels on translucent semantic tints and text-X
+        on plain surfaces (#965); the solid fills keep --color-X */
      --ds-on-tint-primary:      #e48b79;
      --ds-on-tint-success:      #5cbf97;
      --ds-on-tint-info:         #5db4cf;
      --ds-on-tint-warning:      #e8aa16;
      --ds-on-tint-error:        #ee867c;
+     --ds-on-tint-accent:       #5db4cf;
 
      /* Button Hover State Tokens */
      --ds-brand-hover:          #b83d26;
@@ -166,12 +180,14 @@
      --ds-text-secondary:       #263241;
      --ds-text-muted:           #5a6577;
 
-     /* On-tint text: labels drawn on translucent semantic tints */
+     /* Semantic text: labels on translucent semantic tints and text-X
+        on plain surfaces (#965); the solid fills keep --color-X */
      --ds-on-tint-primary:      #a03521;
      --ds-on-tint-success:      #0b6a46;
      --ds-on-tint-info:         #116091;
      --ds-on-tint-warning:      #805703;
      --ds-on-tint-error:        #a62b22;
+     --ds-on-tint-accent:       #0a6080;
 
      /* Button Hover State Tokens */
      --ds-brand-hover:          #a53722;

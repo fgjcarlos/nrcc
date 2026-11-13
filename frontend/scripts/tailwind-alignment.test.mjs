@@ -41,6 +41,12 @@ try {
     ['custom shadow utility', /\.shadow-glow\{/],
     ['DaisyUI field radius token', /--radius-field:\.25rem/],
     ['DaisyUI field size token', /--size-field:\.25rem/],
+    // #965: semantic text reads the readable on-tint token; fills keep --color-*.
+    ...['primary', 'error', 'success', 'warning', 'info', 'accent'].map((colour) => [
+      `text-${colour} on --ds-on-tint-${colour}`,
+      new RegExp(`\\.text-${colour}\\{color:var\\(--ds-on-tint-${colour}\\)\\}`),
+    ]),
+    ['bg-primary keeps the solid fill', /\.bg-primary[,{][^}]*background-color:var\(--color-primary\)/],
   ]) {
     assert.match(css, pattern, `Built CSS is missing ${label}`);
   }

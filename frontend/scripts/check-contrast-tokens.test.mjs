@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * check-contrast-tokens.test.mjs — issues #766 slice G W4 and #889
+ * check-contrast-tokens.test.mjs — issues #766 slice G W4, #889 and #965
  *
  * Behavioural tests for scripts/check-contrast-tokens.mjs.
  *
@@ -11,6 +11,8 @@
  *   3. small button labels are text (4.5:1), not UI components (3:1)
  *   4. text is audited on every documented surface, not only base-100,
  *      and chip/badge labels on their 18% tint over every surface
+ *   4b. semantic text (`text-primary`, `text-accent`, ...) is audited
+ *      on every surface through its readable `ds-on-tint-*` token (#965)
  *   5. missing token → exits 2 in every mode
  *   6. calculator identity check on known values
  *
@@ -56,6 +58,7 @@ const PASSING = {
     'ds-on-tint-info': '#f5f7fa',
     'ds-on-tint-warning': '#f5f7fa',
     'ds-on-tint-error': '#f5f7fa',
+    'ds-on-tint-accent': '#f5f7fa',
   },
   corporateLight: {
     'color-base-100': '#f6f7f9',
@@ -85,6 +88,7 @@ const PASSING = {
     'ds-on-tint-info': '#10151c',
     'ds-on-tint-warning': '#10151c',
     'ds-on-tint-error': '#10151c',
+    'ds-on-tint-accent': '#10151c',
   },
 };
 
@@ -199,6 +203,29 @@ withFixture({ corporateLight: { 'ds-on-tint-warning': '#c98905' } }, (workdir) =
     'tinted chip label → names the composite background',
     run.stderr,
   );
+});
+
+// ── 4b. Semantic text is audited on every surface (#965) ─────────
+withFixture({ corporateDark: { 'ds-on-tint-primary': '#cf452a' } }, (workdir) => {
+  // #cf452a on #223044 ≈ 2.88:1 — the old dark text-primary colour.
+  const run = runScript(workdir);
+  assert(run.status === 1, 'semantic text drift → exits 1', `status=${run.status}`);
+  assert(run.stderr.includes('primary text on ds-bg-overlay'), 'semantic text → plain-surface pair reported', run.stderr);
+  assert(run.stderr.includes('primary text on base-100'), 'semantic text → base-100 pair reported', run.stderr);
+});
+
+withFixture({}, (workdir) => {
+  const { stdout } = runScript(workdir);
+  for (const colour of ['primary', 'error', 'success', 'warning', 'info', 'accent']) {
+    assert(stdout.includes(`${colour} text on ds-bg-surface`), `semantic ${colour} text pair audited`);
+  }
+  assert(stdout.includes('accent chip label on ds-bg-surface'), 'accent chip label on its tint audited');
+});
+
+withFixture({ corporateLight: { 'ds-on-tint-accent': undefined } }, (workdir) => {
+  const run = runScript(workdir);
+  assert(run.status === 2, 'missing accent text token → exits 2', `status=${run.status}`);
+  assert(run.stderr.includes('ds-on-tint-accent'), 'missing accent text token named', run.stderr);
 });
 
 // ── 5. Missing token exits 2 in every mode ───────────────────────
