@@ -97,7 +97,12 @@ func deactivateLibraryInSettings(content, module string) string {
 // Node-RED nodes. Those load in the palette and are not exposed through
 // functionGlobalContext. An unreadable package.json counts as a plain library.
 func isNodeRedNodePackage(dir, module string) bool {
-	// #nosec G304 -- module passed ValidatePackageName (no path traversal); dir is the operator-supplied dataDir.
+	// Callers pass a validated name; reject traversal here too so the read can
+	// never leave node_modules.
+	if strings.Contains(module, "..") {
+		return false
+	}
+	// #nosec G304 -- module has no ".." (checked above); dir is the operator-supplied dataDir.
 	data, err := os.ReadFile(filepath.Join(dir, "node_modules", module, "package.json"))
 	if err != nil {
 		return false

@@ -215,3 +215,18 @@ func TestTransformRawSettingsSkipsReadOnlyConfiguration(t *testing.T) {
 		t.Errorf("read-only configuration was touched (stat err = %v, transform called = %t)", err, called)
 	}
 }
+
+// isNodeRedNodePackage must not read outside node_modules even if called with
+// an unvalidated name.
+func TestIsNodeRedNodePackageRejectsTraversal(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"node-red":{}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "node_modules"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if isNodeRedNodePackage(dir, "..") {
+		t.Error("isNodeRedNodePackage read a package.json outside node_modules")
+	}
+}
