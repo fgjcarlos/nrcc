@@ -14,8 +14,8 @@ application. Branch: `feat/ui-brand-overhaul`.
 
 ## Tasks
 
-- [ ] T1 — S1,S3 — Phase 0: `/impeccable init` → `PRODUCT.md` (interview) — inline — commit: _pending_
-- [ ] T2 — S1 — Phase 1: rendered diagnosis: `critique` per surface + `audit` + `detect <dev-server URL>` → prioritized P0–P3 backlog — inline — commit: _pending_
+- [x] T1 — S1,S3 — Phase 0: `/impeccable init` → `PRODUCT.md` (interview) — inline — commit: 59b9254
+- [x] T2 — S1 — Phase 1: rendered diagnosis: `critique` per surface + `audit` + `detect <dev-server URL>` → prioritized P0–P3 backlog — inline + explore subagents — commit: this doc (snapshot in `frontend/.impeccable/critique/`, self-ignored)
 - [ ] T3 — S2,S4 — Phase 2: new visual world (`new-work`), `DESIGN.md` (`document`), tokens rewritten in `index.css`, self-hosted fonts, logo/wordmark; retire stale `COLOR_REFERENCE.md` — inline — commit: _pending_
 - [ ] T4 — S2,S4 — Phase 3a: `extract` shared primitives (Button, Input/Select/Textarea, Card, Dialog, Table, Tabs, Badge/StatusChip, feedback states) — route TBD — commit: _pending_
 - [ ] T5 — S5 — Phase 3b: dev-only `/styleguide` route (foundations + components, both themes, en/es) — route TBD — commit: _pending_
@@ -35,3 +35,6 @@ application. Branch: `feat/ui-brand-overhaul`.
 - **L2** — User: "1. opcion 2, 2. opcion 2" → decision 1 = rebrand (S4), decision 2 = in-app `/styleguide` (S5).
 - **L3** — Prior art to reconcile: `odd/tasks/issue-766-slice-*` (earlier "Signal Prime" design-system foundation). This feature supersedes its visual layer; its a11y/contrast tooling (`check-contrast-tokens`, `tailwind-ds-vars` tests, axe e2e) stays.
 - **L4** — Baseline: `impeccable detect --json src` (source-only rules) = 3 findings (overused-font ×2, bounce-easing ×1). Rendered rules not yet run.
+- **L5** — Init interview: primary user = "Operador de su propia instancia"; brand commitment = "Solo el nombre NRCC" (mark may be redesigned); constraints = "WCAG 2.2 AA + offline". No `buildPath` recorded (app screens are code-first). Live mode not configured yet.
+- **L6** — T2 baseline critique (whole app, isolated stack, dark+light desktop, dark 390px): **22/40 Acceptable**, P0=1, P1=5. Rendered detector totals: low-contrast 87 (73 in light), undersized-ui-text 60, nested-cards 32, gpt-thin-border-wide-shadow 24, overused-font 22, kicker-above-heading 18, radial-spotlight-glow 11, straggler 6, skipped-heading 2, bounce-easing 1. Backlog: P0 Environment header actions off-screen at 390px; P1 raw i18n keys + Spanish in EN UI; P1 AA contrast/1.4.11 failures (light input borders, 10.88px text); P1 restore dialog (UUID retype, ES copy); P1 gated change sequence invisible; P1 generic identity + light theme copied from dark; P2 header status contradicts page/hidden on mobile; P2 Security overload, Overview alarm without fix; P3 nav naming. Separate audit pass folded into the rendered detector run.
+- **L7** — Functional bug found (outside rebrand scope): `frontend/src/features/backups/components/BackupsView.tsx:345` calls `retentionMutation.mutate(manual)`, so auto and pre-restore retention edits are never persisted.
