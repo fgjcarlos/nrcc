@@ -316,7 +316,7 @@
   }
 
   .sidebar-nav-link-active svg {
-    color: var(--color-primary);
+    color: var(--ds-on-tint-primary); /* #965: readable on the primary tint */
   }
 
   /* ── Glass Panel (Glassmorphism) ─────────────────────────── */
