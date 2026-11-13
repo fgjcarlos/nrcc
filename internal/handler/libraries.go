@@ -63,7 +63,8 @@ func (h *LibraryHandler) GetLibraries(w http.ResponseWriter, r *http.Request) {
 // POST /api/libraries/install
 func (h *LibraryHandler) PostInstall(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Name string `json:"name"`
+		Name  string `json:"name"`
+		Alias string `json:"alias"`
 	}
 
 	if !DecodeJSON(w, r, &req) {
@@ -78,13 +79,17 @@ func (h *LibraryHandler) PostInstall(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), installHandlerTimeout)
 	defer cancel()
 
-	err := h.svc.Install(ctx, req.Name)
+	err := h.svc.Install(ctx, req.Name, req.Alias)
 	if err != nil {
 		if h.libraryMetrics != nil {
 			h.libraryMetrics.RecordLibraryOperation("install", false)
 		}
 		if errors.Is(err, service.ErrInvalidPackageName) {
 			model.RespondError(w, http.StatusBadRequest, "INVALID_PACKAGE_NAME", err.Error())
+			return
+		}
+		if errors.Is(err, service.ErrInvalidLibraryAlias) {
+			model.RespondError(w, http.StatusBadRequest, "INVALID_LIBRARY_ALIAS", err.Error())
 			return
 		}
 		model.RespondError(w, http.StatusInternalServerError, "INSTALL_ERROR", err.Error())

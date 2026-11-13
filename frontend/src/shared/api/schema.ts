@@ -396,6 +396,7 @@ export interface paths {
          * Save Node-RED configuration
          * @description **Admin only.** Overwrites the Node-RED configuration.
          *     The authentication surfaces (`adminAuth`, `httpNodeAuth`, `httpStaticAuth`) are preserved when the payload omits them, so a payload that only edits other capabilities leaves Node-RED's accounts, permissions and session expiry untouched. Send an explicit `null` to clear a surface. Inside a carried `adminAuth`, an empty `password` means "unchanged" and keeps the stored bcrypt hash.
+         *     The body may carry an optional `expectedRevision`: the `settings.js` fingerprint the operator read before composing the edit (issue #878). When it does not match the live revision the save is rejected with `409 SETTINGS_REVISION_CONFLICT` and neither `config.json` nor `settings.js` is modified. Clients that omit the field keep the historical "no expectation" behaviour.
          */
         post: operations["postConfig"];
         delete?: never;
@@ -1142,7 +1143,7 @@ export interface paths {
         put?: never;
         /**
          * Install a library
-         * @description Installs an npm package into the Node-RED user directory via npm.
+         * @description Installs an npm package into the Node-RED user directory via npm, then activates it in settings.js: `functionExternalModules` is set to true and, unless the package declares Node-RED nodes, it is exposed in `functionGlobalContext` under `alias` (guarded `require`). Node-RED is restarted when it is running.
          */
         post: operations["installLibrary"];
         delete?: never;
@@ -1701,7 +1702,7 @@ export interface components {
              * @example INVALID_REQUEST
              * @enum {string}
              */
-            code: "INVALID_REQUEST" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "WEAK_PASSWORD" | "USERNAME_EXISTS" | "UPDATE_IN_PROGRESS" | "BACKUP_ERROR" | "FLOW_ERROR" | "ENV_ERROR" | "AUTH_FAILED" | "RATE_LIMITED" | "SETUP_REQUIRED" | "ALREADY_INITIALIZED";
+            code: "INVALID_REQUEST" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "WEAK_PASSWORD" | "USERNAME_EXISTS" | "UPDATE_IN_PROGRESS" | "BACKUP_ERROR" | "FLOW_ERROR" | "ENV_ERROR" | "AUTH_FAILED" | "RATE_LIMITED" | "SETUP_REQUIRED" | "ALREADY_INITIALIZED" | "SETTINGS_REVISION_CONFLICT";
             /**
              * @description Human-readable error description
              * @example Username and password are required
@@ -1895,7 +1896,7 @@ export interface components {
             /** @example ./data */
             userDir?: string;
             nodesDir?: string;
-            /** @description Encryption secret for Node-RED credentials */
+            /** @description Encryption secret for Node-RED credentials. Write-only: the API never returns the stored value, for any role. An empty or redacted value on write keeps the stored secret; a new value rotates it. The literal "false" disables credential encryption. */
             credentialSecret?: string;
             disableEditor?: boolean;
             adminAuth?: components["schemas"]["AdminAuth"];
@@ -1906,6 +1907,22 @@ export interface components {
             lang?: string;
             functionLibraries?: components["schemas"]["FunctionLibrary"][];
             envVars?: components["schemas"]["EnvVar"][];
+            /** @description Redirect HTTP requests to HTTPS */
+            requireHttps?: boolean;
+            https?: components["schemas"]["HttpsConfig"];
+        };
+        /** @description Node-RED TLS listener block */
+        HttpsConfig: {
+            /** @description Path to the TLS private key file */
+            key?: string;
+            /** @description Path to the TLS certificate file */
+            cert?: string;
+            /** @description Path to the TLS certificate authority file */
+            ca?: string;
+            /** @description TLS listener port */
+            port?: number;
+            /** @description Private-key passphrase. Write-only: the API never returns the stored value, for any role. An empty or redacted value on write keeps the stored passphrase; a new value rotates it. */
+            passphrase?: string;
         };
         AdminAuth: {
             /** @example credentials */
@@ -2370,6 +2387,8 @@ export interface components {
         InstallLibraryRequest: {
             /** @description npm package name to install */
             name: string;
+            /** @description functionGlobalContext key for the library (`global.get(alias)`). Defaults to the package name without version. */
+            alias?: string;
         };
         LibraryInstallResult: {
             success: boolean;
@@ -3673,7 +3692,13 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["NodeRedConfig"];
+                "application/json": components["schemas"]["NodeRedConfig"] & {
+                    /**
+                     * @description sha256 fingerprint of the `settings.js` bytes the operator read before composing the edit. Optional.
+                     * @example 9f2c1b0d4e5a6f7c8d9e0a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f6
+                     */
+                    expectedRevision?: string;
+                };
             };
         };
         responses: {
@@ -3689,6 +3714,25 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            /** @description Revision conflict — the live `settings.js` moved on since the operator read it. Nothing was modified. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "success": false,
+                     *       "error": {
+                     *         "code": "SETTINGS_REVISION_CONFLICT",
+                     *         "message": "settings.js revision conflict: live=… provided=…"
+                     *       },
+                     *       "timestamp": "2026-05-24T14:00:00Z"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
         };
     };
     getConfigDefault: {

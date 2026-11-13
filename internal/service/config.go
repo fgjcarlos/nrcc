@@ -710,6 +710,27 @@ func (s *ConfigService) SaveRawSettingsWithRevision(content string, expected mod
 	return doc, nil
 }
 
+// TransformRawSettings applies transform to the live settings.js and saves
+// the result through SaveRawSettingsWithRevision, so the write is validated,
+// backed up and rejected if the file changed in between. A transform that
+// changes nothing writes nothing. A read-only configuration is left as is and
+// is not an error: callers such as library install must keep succeeding there.
+func (s *ConfigService) TransformRawSettings(transform func(string) string) error {
+	if !s.ConfigurationCapabilities().Editable {
+		return nil
+	}
+	doc, err := s.GetRawSettings()
+	if err != nil {
+		return err
+	}
+	updated := transform(doc.Content)
+	if updated == doc.Content {
+		return nil
+	}
+	_, err = s.SaveRawSettingsWithRevision(updated, doc.Revision)
+	return err
+}
+
 // currentOnDiskRevision returns the SourceRevision of the bytes currently
 // on disk for the active settings.js path. When the file does not exist
 // (first-write state) the revision is computed against the would-be

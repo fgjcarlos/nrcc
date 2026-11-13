@@ -140,3 +140,20 @@ func TestLibraryMetrics_ResponseBody(t *testing.T) {
 		t.Fatalf("response body must be valid JSON: %v", err)
 	}
 }
+
+// TestPostInstall_ForwardsAlias proves the alias field reaches the service:
+// an unsafe alias is rejected with 400 before npm runs.
+func TestPostInstall_ForwardsAlias(t *testing.T) {
+	h, _ := setupLibraryHandlerWithMetrics(t)
+
+	body := `{"name":"lodash","alias":"x\"); process.exit(1); (\""}`
+	req := httptest.NewRequest(http.MethodPost, "/api/libraries/install", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	h.PostInstall(rec, req)
+
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "INVALID_LIBRARY_ALIAS") {
+		t.Fatalf("status = %d, body = %s; want 400 INVALID_LIBRARY_ALIAS", rec.Code, rec.Body.String())
+	}
+}
