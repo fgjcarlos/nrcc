@@ -7,7 +7,6 @@ import {
   applySecurityPatch,
   detectLegacyAliases,
   humanizeApplyError,
-  isBcryptOrEmpty,
   reportApplyError,
   reportApplySuccess,
 } from './securityCenterHelpers';
@@ -43,7 +42,8 @@ interface HttpBasicAuthBoundaryCardProps {
  * Renders the httpNodeAuth or httpStaticAuth basic-auth form.
  *
  * Each surface is a thin wrapper over the same body so we can keep
- * the migration / bcrypt-hash / apply pipeline in one place.
+ * the migration / password / apply pipeline in one place. A plain
+ * password is sent as typed; the backend stores it as a bcrypt hash.
  */
 export function HttpBasicAuthBoundaryCard({
   surface,
@@ -130,9 +130,6 @@ export function HttpBasicAuthBoundaryCard({
     await apply();
   };
 
-  const typedPass = value.pass.trim();
-  const bcryptInvalid = typedPass.length > 0 && !isBcryptOrEmpty(typedPass);
-
   return (
     <article
       data-testid={`boundary-${surface}`}
@@ -192,16 +189,6 @@ export function HttpBasicAuthBoundaryCard({
         </p>
       )}
 
-      {bcryptInvalid && (
-        <p
-          role="status"
-          className="mt-3 rounded-xl border border-warning/40 bg-warning/10 p-3 text-sm text-warning"
-          data-testid={`boundary-${surface}-bcrypt-warning`}
-        >
-          {t(i18n('bcryptWarning'))}
-        </p>
-      )}
-
       {isLegacySurface && editable && (
         <div
           role="status"
@@ -234,7 +221,7 @@ export function HttpBasicAuthBoundaryCard({
           />
         </label>
         <label className="text-sm">
-          {t(i18n('bcryptHash'))}
+          {t(i18n('password'))}
           <input
             className="input input-bordered mt-1 w-full"
             data-testid={`boundary-${surface}-pass`}
@@ -253,7 +240,7 @@ export function HttpBasicAuthBoundaryCard({
             </p>
           )}
           <p className="mt-1 text-sm text-base-content/65">
-            {t(i18n('bcryptHint'))}
+            {t(i18n('passwordHint'))}
           </p>
         </label>
 

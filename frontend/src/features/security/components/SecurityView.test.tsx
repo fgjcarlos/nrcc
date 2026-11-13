@@ -134,22 +134,24 @@ describe('SecurityView (slice E composition)', () => {
     expect(payload).toBeDefined();
   });
 
-  it('rejects a non-bcrypt password on httpNodeAuth', async () => {
+  it('accepts a plain password on httpNodeAuth and labels passwords without bcrypt', async () => {
     const user = userEvent.setup();
     setupMocks();
     renderSecurityView();
     await waitFor(() =>
       expect(screen.getByTestId('boundary-httpNodeAuth')).toBeInTheDocument(),
     );
+    await waitFor(() =>
+      expect(screen.getAllByTestId('boundary-admin-auth-password').length).toBeGreaterThan(0),
+    );
+    expect(screen.getByTestId('boundary-admin-auth')).not.toHaveTextContent('bcrypt');
     const userInput = screen.getByTestId('boundary-httpNodeAuth-user');
     await user.type(userInput, 'nodes');
-    // Force a non-bcrypt password by writing a plain string to the input.
     const passInput = screen.getByTestId('boundary-httpNodeAuth-pass');
-    await user.type(passInput, 'not-a-bcrypt-hash');
-    // The bcrypt-warning banner surfaces before save is even attempted.
+    await user.type(passInput, 'plain-password');
     expect(
-      screen.getByTestId('boundary-httpNodeAuth-bcrypt-warning'),
-    ).toBeInTheDocument();
+      screen.queryByTestId('boundary-httpNodeAuth-bcrypt-warning'),
+    ).not.toBeInTheDocument();
   });
 
   it('deep-links the NRCC access card to /settings/users', async () => {

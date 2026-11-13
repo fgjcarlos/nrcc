@@ -1936,6 +1936,7 @@ export interface components {
         };
         AdminAuthUser: {
             username: string;
+            /** @description Plain password, which NRCC hashes with bcrypt before storing it. A value that is already a bcrypt hash is stored as is. An empty value keeps the stored hash. */
             password: string;
             /**
              * @description Node-RED's only permission vocabulary: `*` (full access) or `read` (read-only editor).
@@ -1945,7 +1946,7 @@ export interface components {
         };
         HTTPBasicAuth: {
             user: string;
-            /** @description bcrypt hash of the password */
+            /** @description Plain password, which NRCC hashes with bcrypt before storing it. A value that is already a bcrypt hash is stored as is. */
             pass: string;
         };
         FunctionLibrary: {

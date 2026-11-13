@@ -29,19 +29,11 @@ interface AdminAuthBoundaryCardProps {
   onApplied: () => void;
 }
 
-/** Per-user edits the operator has made since the last server fetch.
- *  Cleared automatically when the prop changes (server refetch). */
+/** Edits the operator has made since the last successful apply. */
 interface UserEdits {
-  /** Username overrides indexed by user row index. */
-  usernames: Map<number, string>;
-  /** Permission overrides indexed by user row index. */
-  permissions: Map<number, Permission>;
-  /** Password overrides indexed by user row index (never re-populated from server). */
-  passwords: Map<number, string>;
-  /** Rows the operator added locally (not yet on the server). */
-  added: AdminUser[];
-  /** Server-user indices the operator has marked for deletion. */
-  removed: Set<number>;
+  /** Full edited user list (server rows + added rows, minus removed);
+   *  undefined until the first user edit so server values drive the form. */
+  users?: AdminUser[];
   /** Expiry override (when operator typed a new value). */
   expiry?: number;
 }
@@ -68,13 +60,7 @@ export function AdminAuthBoundaryCard({
   onApplied,
 }: AdminAuthBoundaryCardProps) {
   const { t } = useT();
-  const [edits, setEdits] = useState<UserEdits>({
-    usernames: new Map(),
-    permissions: new Map(),
-    passwords: new Map(),
-    added: [],
-    removed: new Set(),
-  });
+  const [edits, setEdits] = useState<UserEdits>({});
   const [saving, setSaving] = useState(false);
   const [confirmMigration, setConfirmMigration] = useState(false);
   const [appliedAt, setAppliedAt] = useState<number | null>(null);
@@ -84,24 +70,14 @@ export function AdminAuthBoundaryCard({
   // Server-authoritative user list (drives row count + base values).
   const serverUsers = config?.users ?? [];
 
-  // Derived display values: server rows (minus any the operator marked
-  // for deletion) with edit overrides applied + locally added rows
-  // appended after.
-  const displayUsers: AdminUser[] = [
-    ...serverUsers
-      .map((serverUser, index) => {
-        if (edits.removed.has(index)) return null;
-        const overrideUser: AdminUser = {
-          username: edits.usernames.get(index) ?? serverUser.username ?? '',
-          permissions:
-            edits.permissions.get(index) ?? serverUser.permissions ?? '*',
-          password: edits.passwords.get(index) ?? '',
-        };
-        return overrideUser;
-      })
-      .filter((u): u is AdminUser => u !== null),
-    ...edits.added,
-  ];
+  // Server rows start with an empty password (empty keeps the stored hash).
+  const displayUsers: AdminUser[] =
+    edits.users ??
+    serverUsers.map((serverUser) => ({
+      username: serverUser.username ?? '',
+      permissions: serverUser.permissions ?? '*',
+      password: '',
+    }));
   const displayExpiry = edits.expiry ?? config?.sessionExpiryTime ?? 0;
 
   const surfacesConfigured = serverUsers.length > 0;
@@ -111,91 +87,35 @@ export function AdminAuthBoundaryCard({
       ? 'success'
       : 'warning';
 
-  const updateUsername = (index: number, value: string) => {
-    setEdits((current) => {
-      const next = new Map(current.usernames);
-      next.set(index, value);
-      return { ...current, usernames: next };
-    });
+  const updateUsers = (change: (users: AdminUser[]) => AdminUser[]) => {
+    setEdits((current) => ({ ...current, users: change(current.users ?? displayUsers) }));
     setError(undefined);
   };
 
-  const updatePermission = (index: number, value: Permission) => {
-    setEdits((current) => {
-      const next = new Map(current.permissions);
-      next.set(index, value);
-      return { ...current, permissions: next };
-    });
-    setError(undefined);
-  };
+  const updateUser = (index: number, patch: Partial<AdminUser>) =>
+    updateUsers((users) =>
+      users.map((user, i) => (i === index ? { ...user, ...patch } : user)),
+    );
 
-  const updatePassword = (index: number, value: string) => {
-    setEdits((current) => {
-      const next = new Map(current.passwords);
-      next.set(index, value);
-      return { ...current, passwords: next };
-    });
-    setError(undefined);
-  };
+  const updateUsername = (index: number, value: string) =>
+    updateUser(index, { username: value });
+
+  const updatePermission = (index: number, value: Permission) =>
+    updateUser(index, { permissions: value });
+
+  const updatePassword = (index: number, value: string) =>
+    updateUser(index, { password: value });
 
   const updateExpiry = (value: number) => {
     setEdits((current) => ({ ...current, expiry: value }));
     setError(undefined);
   };
 
-  const addUser = () => {
-    setEdits((current) => ({
-      ...current,
-      added: [...current.added, { username: '', permissions: '*', password: '' }],
-    }));
-    setError(undefined);
-  };
+  const addUser = () =>
+    updateUsers((users) => [...users, { username: '', permissions: '*', password: '' }]);
 
-  const removeUser = (index: number) => {
-    // Remove either an edited server user (mark the index as removed
-    // + shift edits > index down by one so the remaining rows keep
-    // their edits) or a locally-added row (drop the matching index
-    // from edits.added). The two paths split cleanly on the server
-    // row count.
-    setEdits((current) => {
-      const serverCount = serverUsers.length;
-      if (index >= serverCount) {
-        const addedIndex = index - serverCount;
-        const newRemoved = new Set(current.removed);
-        if (addedIndex < 0) {
-          // Mark the corresponding server row as removed.
-          newRemoved.add(index);
-        }
-        return {
-          ...current,
-          added: current.added.filter((_, i) => i !== addedIndex),
-          removed: newRemoved,
-        };
-      }
-      const shiftMap = <Value,>(src: Map<number, Value>) => {
-        const out = new Map<number, Value>();
-        for (const [k, v] of src.entries()) {
-          if (k < index) out.set(k, v);
-          else if (k > index) out.set(k - 1, v);
-        }
-        return out;
-      };
-      const newRemoved = new Set<number>();
-      for (const r of current.removed) {
-        if (r === index) continue;
-        newRemoved.add(r < index ? r : r - 1);
-      }
-      newRemoved.add(index);
-      return {
-        ...current,
-        usernames: shiftMap(current.usernames),
-        permissions: shiftMap(current.permissions),
-        passwords: shiftMap(current.passwords),
-        removed: newRemoved,
-      };
-    });
-    setError(undefined);
-  };
+  const removeUser = (index: number) =>
+    updateUsers((users) => users.filter((_, i) => i !== index));
 
   const apply = async () => {
     setConfirmMigration(false);
@@ -218,20 +138,8 @@ export function AdminAuthBoundaryCard({
     const result = await applySecurityPatch({ adminAuth }, expectedRevision);
     setSaving(false);
     if (result.status === 'applied') {
-      setEdits({
-        usernames: new Map(),
-        permissions: new Map(),
-        passwords: new Map(),
-        added: [],
-        removed: new Set(),
-      });
-      // The lint rule flags Date.now() as impure; this call runs from
-      // the Save button click handler (an event), not from render, so
-      // purity is preserved. Capture once to keep the call out of
-      // the setState callback.
-      // eslint-disable-next-line react-hooks/purity
-      const ts = Date.now();
-      setAppliedAt(ts);
+      setEdits({});
+      setAppliedAt(Date.now());
       reportApplySuccess(t('security:adminAuthBoundary.applied'));
       onApplied();
     } else {

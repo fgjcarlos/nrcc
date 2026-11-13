@@ -483,7 +483,8 @@ describe('configTransformers', () => {
       });
     });
 
-    it('should strip uploads prefix from editor images sent to the API', () => {
+    it('should keep the upload URL of editor images sent to the API', () => {
+      // The backend maps "/uploads/<name>" to the filesystem path Node-RED stats.
       const formData = configToFormData({});
       formData.editorPageFavicon = '/uploads/favicon.png';
       formData.editorHeaderImage = '/uploads/header.png';
@@ -491,9 +492,9 @@ describe('configTransformers', () => {
 
       const result = formDataToConfigPayload(formData);
 
-      expect(result.editorTheme?.page?.favicon).toBe('/favicon.png');
-      expect(result.editorTheme?.header?.image).toBe('/header.png');
-      expect(result.editorTheme?.login?.image).toBe('/login.png');
+      expect(result.editorTheme?.page?.favicon).toBe('/uploads/favicon.png');
+      expect(result.editorTheme?.header?.image).toBe('/uploads/header.png');
+      expect(result.editorTheme?.login?.image).toBe('/uploads/login.png');
     });
 
     it('should handle palette catalogues split by newlines', () => {

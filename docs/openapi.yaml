@@ -2868,6 +2868,10 @@ components:
           type: string
         password:
           type: string
+          description: >-
+            Plain password, which NRCC hashes with bcrypt before storing it. A
+            value that is already a bcrypt hash is stored as is. An empty value
+            keeps the stored hash.
         permissions:
           type: string
           description: >-
@@ -2883,7 +2887,9 @@ components:
           type: string
         pass:
           type: string
-          description: bcrypt hash of the password
+          description: >-
+            Plain password, which NRCC hashes with bcrypt before storing it. A
+            value that is already a bcrypt hash is stored as is.
 
     FunctionLibrary:
       type: object
