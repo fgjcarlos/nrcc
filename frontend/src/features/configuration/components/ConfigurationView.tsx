@@ -318,8 +318,6 @@ export function ConfigurationView() {
 
   return (
     <LoadingBoundary state={configViewState}>
-
-  return (
     <div className="space-y-6">
       {/* Header (slice F W3) — page title + topology diagram */}
       <ConfigurationHeader />

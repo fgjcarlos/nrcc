@@ -17,3 +17,4 @@ clicked repeatedly, and applies without a confirmation step.
 
 - L1: "Bien pero el boton de sheet apply, no tieen accion, esd decir deberia de tener un doble check, y tneer feedback al user de que se esta realziando la accion, ademas de desabilitarse al pulsar una vez para evitar puslar 2 veces o mas"
 - L2: Exploration: root cause ConfigurationView.tsx:509 passes actions.saveConfigMutation.isPending while useConfigurationSave.ts:45 creates its own useConfigurationActions() mutation (:71 mutateAsync, :77 isPending unused). Reusable dialog: shared/components/ConfirmationDialog.tsx (isPending support). e2e/stack.spec.ts ~855-858 clicks Apply and expects the success toast.
+- L3: Out-of-spec visible fix found by the worker: ConfigurationView rendered a stray literal "return (" text node inside <LoadingBoundary> (also on main); removed in its own commit.
