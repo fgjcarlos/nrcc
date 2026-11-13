@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
@@ -72,6 +72,12 @@ beforeEach(() => {
   mocks.getRaw.mockResolvedValue({ data: { data: { content: 'module.exports = {};\n', path: '/etc/node-red/settings.js', writable: true }, success: true, timestamp: '' } });
   mocks.getStatus.mockResolvedValue({ data: { data: { nodeRed: { mode: 'docker', detected: true, version: '5.0.6' }, settings: { path: '/etc/node-red/settings.js' }, configuration: { runtimeVersion: '5.0.6', adapter: 'node-red-5', catalogVersion: '5.0.6', source: 'detected', mode: 'editable', editable: true } }, success: true, timestamp: '' } });
 });
+
+// Apply in the review drawer asks for confirmation before saving.
+async function confirmApply(user: ReturnType<typeof userEvent.setup>) {
+  const dialog = await screen.findByRole('dialog', { name: 'Apply changes?' });
+  await user.click(within(dialog).getByRole('button', { name: /^confirm$/i }));
+}
 
 async function switchToTab(user: ReturnType<typeof userEvent.setup>, label: string) {
   // The tab buttons render an icon + the label. The accessible name
@@ -333,6 +339,7 @@ describe('ConfigurationView (issue #762 — Security tab for credentialSecret / 
     await user.click(screen.getByText('Save', { selector: 'button' }));
     const reviewPanel = await screen.findByTestId('review-changes-panel');
     await user.click(within(reviewPanel).getByTestId('review-changes-panel-apply'));
+    await confirmApply(user);
 
     await waitFor(() => expect(updateSpy).toHaveBeenCalled());
     const payload = updateSpy.mock.calls[0][0] as Record<string, unknown>;
@@ -369,8 +376,151 @@ describe('ConfigurationView (issue #762 — Security tab for credentialSecret / 
     await user.click(screen.getByText('Save', { selector: 'button' }));
     const reviewPanel = await screen.findByTestId('review-changes-panel');
     await user.click(within(reviewPanel).getByTestId('review-changes-panel-apply'));
+    await confirmApply(user);
 
     await waitFor(() => expect(updateSpy).toHaveBeenCalled());
     expect(updateSpy.mock.calls[0][1]).toBe('rev-42');
+  });
+});
+
+describe('ConfigurationView (review drawer Apply — confirm, feedback, single submit)', () => {
+  function deferredUpdate() {
+    const handle: { resolve: (v: unknown) => void; reject: (e: unknown) => void } = {
+      resolve: () => undefined,
+      reject: () => undefined,
+    };
+    const updateSpy: Mock = vi.fn().mockImplementation(
+      () =>
+        new Promise((resolve, reject) => {
+          handle.resolve = resolve;
+          handle.reject = reject;
+        }),
+    );
+    return { updateSpy, handle };
+  }
+
+  async function spyUpdate(updateSpy: Mock) {
+    const configModule = await import('@/features/configuration/services');
+    vi.spyOn(configModule.configService, 'updateConfig').mockImplementation(updateSpy);
+  }
+
+  async function openApplyConfirmation(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(await screen.findByRole('button', { name: /^TLS & Secrets$/ }));
+    await user.click(findToggleButton(/^Require HTTPS$/));
+    await user.click(screen.getByText('Save', { selector: 'button' }));
+    const panel = await screen.findByTestId('review-changes-panel');
+    await user.click(within(panel).getByTestId('review-changes-panel-apply'));
+    const dialog = await screen.findByRole('dialog', { name: 'Apply changes?' });
+    return { panel, dialog };
+  }
+
+  it('asks for confirmation before saving; Cancel sends nothing and keeps the drawer', async () => {
+    const user = userEvent.setup();
+    const { updateSpy } = deferredUpdate();
+    await spyUpdate(updateSpy);
+    renderConfiguration();
+
+    const { panel, dialog } = await openApplyConfirmation(user);
+    expect(updateSpy).not.toHaveBeenCalled();
+
+    await user.click(within(dialog).getByRole('button', { name: /^cancel$/i }));
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Apply changes?' })).not.toBeInTheDocument(),
+    );
+    expect(panel).toBeInTheDocument();
+    expect(updateSpy).not.toHaveBeenCalled();
+  });
+
+  it('sends exactly one request and shows progress while it runs, then closes on success', async () => {
+    const user = userEvent.setup();
+    const { updateSpy, handle } = deferredUpdate();
+    await spyUpdate(updateSpy);
+    renderConfiguration();
+
+    const { panel, dialog } = await openApplyConfirmation(user);
+    const confirm = within(dialog).getByRole('button', { name: /^confirm$/i });
+    // Same-tick double click: the second click must not start a second save.
+    fireEvent.click(confirm);
+    fireEvent.click(confirm);
+
+    await waitFor(() => expect(confirm).toBeDisabled());
+    expect(within(dialog).getByText('Processing...')).toBeInTheDocument();
+    const apply = within(panel).getByTestId('review-changes-panel-apply');
+    expect(apply).toBeDisabled();
+    expect(apply).toHaveTextContent('Applying…');
+    expect(screen.getByText('Saving...', { selector: 'button' })).toBeDisabled();
+
+    await user.click(confirm);
+    await user.click(apply);
+    expect(updateSpy).toHaveBeenCalledTimes(1);
+
+    await act(async () => handle.resolve({ data: { data: {}, success: true, timestamp: '' } }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(screen.queryByTestId('review-changes-panel')).not.toBeInTheDocument();
+    expect(updateSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes the confirmation but keeps the drawer usable when the save fails', async () => {
+    const user = userEvent.setup();
+    const { updateSpy, handle } = deferredUpdate();
+    await spyUpdate(updateSpy);
+    renderConfiguration();
+
+    const { panel, dialog } = await openApplyConfirmation(user);
+    await user.click(within(dialog).getByRole('button', { name: /^confirm$/i }));
+    await waitFor(() => expect(within(panel).getByTestId('review-changes-panel-apply')).toBeDisabled());
+
+    await act(async () => handle.reject(new Error('boom')));
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Apply changes?' })).not.toBeInTheDocument(),
+    );
+    expect(screen.getByTestId('review-changes-panel')).toBeInTheDocument();
+    const apply = within(panel).getByTestId('review-changes-panel-apply');
+    expect(apply).toBeEnabled();
+    expect(apply).toHaveTextContent('Apply');
+    expect(updateSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('Escape in the confirmation closes only the confirmation', async () => {
+    const user = userEvent.setup();
+    const { updateSpy } = deferredUpdate();
+    await spyUpdate(updateSpy);
+    renderConfiguration();
+
+    await openApplyConfirmation(user);
+    await user.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Apply changes?' })).not.toBeInTheDocument(),
+    );
+    expect(screen.getByTestId('review-changes-panel')).toBeInTheDocument();
+    expect(updateSpy).not.toHaveBeenCalled();
+  });
+
+  it('credentialSecret rotation skips the extra confirmation and shows its own progress', async () => {
+    const user = userEvent.setup();
+    const { updateSpy, handle } = deferredUpdate();
+    await spyUpdate(updateSpy);
+    renderConfiguration();
+
+    await user.click(await screen.findByRole('button', { name: /^TLS & Secrets$/ }));
+    await user.type(screen.getByLabelText('Credential Secret'), 'new-rotation-passphrase');
+    await user.click(screen.getByText('Save', { selector: 'button' }));
+    const panel = await screen.findByTestId('review-changes-panel');
+    await user.click(within(panel).getByTestId('review-changes-panel-apply'));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Rotate credential secret' });
+    expect(screen.queryByRole('dialog', { name: 'Apply changes?' })).not.toBeInTheDocument();
+    await user.click(within(dialog).getByTestId('confirmation-dialog-ack'));
+    const confirm = within(dialog).getByRole('button', { name: /^confirm$/i });
+    fireEvent.click(confirm);
+    fireEvent.click(confirm);
+
+    await waitFor(() => expect(confirm).toBeDisabled());
+    expect(within(dialog).getByText('Processing...')).toBeInTheDocument();
+    expect(updateSpy).toHaveBeenCalledTimes(1);
+
+    await act(async () => handle.resolve({ data: { data: {}, success: true, timestamp: '' } }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(updateSpy).toHaveBeenCalledTimes(1);
   });
 });

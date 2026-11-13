@@ -1,4 +1,4 @@
-import { useState, useEffect, useId } from 'react';
+import { useState, useEffect, useId, useRef } from 'react';
 import { toast } from 'sonner';
 import { cn } from '@/shared/lib';
 import type { NodeRedConfigFormData } from '@/shared/types';
@@ -147,6 +147,11 @@ export function ConfigurationView() {
   // goes through `handleSave` so the credentialSecret rotation dialog
   // and the raw-settings unlock flow remain the single source of truth.
   const [reviewPanelOpen, setReviewPanelOpen] = useState(false);
+  // Apply in the drawer asks for confirmation before saving.
+  const [applyConfirmOpen, setApplyConfirmOpen] = useState(false);
+  // Synchronous guard: the mutation's pending flag lands after a render,
+  // so a same-tick double click would otherwise start two saves.
+  const savingRef = useRef(false);
 
   // Data and actions hooks
   const { t } = useT();
@@ -207,15 +212,32 @@ export function ConfigurationView() {
     setReviewPanelOpen(true);
   };
 
-  const handleApplyFromPanel = async () => {
+  // Runs the save once at a time; null means a save is already running.
+  const runSave = async () => {
+    if (savingRef.current) return null;
+    savingRef.current = true;
+    try {
+      return await save.save();
+    } finally {
+      savingRef.current = false;
+    }
+  };
+
+  const handleApplyFromPanel = () => {
     // Issue #762 — rotation confirmation gates the save on a new
-    // credentialSecret.
+    // credentialSecret; it already confirms, so no second dialog.
     if (formData.credentialSecret) {
       setReviewPanelOpen(false);
       setRotationDialogOpen(true);
       return;
     }
-    const outcome = await save.save();
+    setApplyConfirmOpen(true);
+  };
+
+  const handleConfirmApply = async () => {
+    const outcome = await runSave();
+    if (!outcome) return;
+    setApplyConfirmOpen(false);
     if (outcome.ok) {
       setHasChanges(false);
       setReviewPanelOpen(false);
@@ -231,8 +253,10 @@ export function ConfigurationView() {
   };
 
   const handleConfirmRotation = async () => {
+    // Keep the dialog open while saving so it shows its processing state.
+    const outcome = await runSave();
+    if (!outcome) return;
     setRotationDialogOpen(false);
-    const outcome = await save.save();
     if (outcome.ok) {
       setHasChanges(false);
     } else if (outcome.reason === 'validation-errors') {
@@ -278,7 +302,8 @@ export function ConfigurationView() {
 
   // Derived state
   const ActiveComponent = SECTIONS.find(s => s.id === activeTab)?.component || BasicSettings;
-  const isSaving = actions.saveConfigMutation.isPending;
+  // `save` owns the mutation instance that actually runs the request.
+  const isSaving = save.isPending;
   const configViewState = data.configLoading
     ? { status: 'pending' as const }
     : data.configError
@@ -293,8 +318,6 @@ export function ConfigurationView() {
 
   return (
     <LoadingBoundary state={configViewState}>
-
-  return (
     <div className="space-y-6">
       {/* Header (slice F W3) — page title + topology diagram */}
       <ConfigurationHeader />
@@ -317,7 +340,7 @@ export function ConfigurationView() {
           className="action-btn-primary"
         >
           <Save className="w-4 h-4" />
-          {actions.saveConfigMutation.isPending ? t('common:saving') + '...' : t('common:save')}
+          {isSaving ? t('common:saving') : t('common:save')}
         </button>
       </div>
 
@@ -496,6 +519,7 @@ export function ConfigurationView() {
         description={t('configuration:rotateSecretDescription')}
         variant="warning"
         acknowledgement={t('configuration:rotateSecretAcknowledgement')}
+        isPending={isSaving}
         onCancel={handleCancelRotation}
         onConfirm={handleConfirmRotation}
       />
@@ -506,9 +530,19 @@ export function ConfigurationView() {
         fields={diff.fields}
         pendingCount={diff.pendingCount}
         target="settings.js"
-        isPending={actions.saveConfigMutation.isPending}
+        isPending={isSaving}
         onApply={handleApplyFromPanel}
         onCancel={() => setReviewPanelOpen(false)}
+      />
+
+      <ConfirmationDialog
+        isOpen={applyConfirmOpen}
+        title={t('configuration:reviewPanel.confirmTitle')}
+        description={t('configuration:reviewPanel.confirmDescription', { count: diff.pendingCount, target: 'settings.js' })}
+        variant="warning"
+        isPending={isSaving}
+        onCancel={() => setApplyConfirmOpen(false)}
+        onConfirm={handleConfirmApply}
       />
     </div>
     </LoadingBoundary>

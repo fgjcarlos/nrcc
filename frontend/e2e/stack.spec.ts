@@ -855,6 +855,11 @@ test('unrelated visual edit keeps every admin account, permission and session ex
   // Issue #766 slice F: the global Save button opens the review panel and
   // the panel's Apply button performs the save.
   await page.getByTestId('review-changes-panel-apply').click()
+  // Apply asks for confirmation before saving.
+  await page
+    .getByRole('dialog', { name: 'Apply changes?' })
+    .getByRole('button', { name: 'Confirm', exact: true })
+    .click()
   await expect(page.getByText('Configuration saved successfully')).toBeVisible()
 
   // --- the authentication model is unchanged ----------------------

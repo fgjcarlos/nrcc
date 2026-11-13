@@ -179,7 +179,9 @@
     "cancel": "Cancel",
     "applying": "Applying…",
     "applied": "Applied successfully.",
-    "appliedError": "Failed to apply: {{message}}"
+    "appliedError": "Failed to apply: {{message}}",
+    "confirmTitle": "Apply changes?",
+    "confirmDescription": "{{count}} pending change(s) will be written to {{target}}. Node-RED may restart, which can take a while."
   },
   "topology": {
     "title": "Configuration topology",
