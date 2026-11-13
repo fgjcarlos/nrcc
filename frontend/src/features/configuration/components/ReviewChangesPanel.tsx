@@ -113,6 +113,9 @@ export function ReviewChangesPanel({
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
+      // A dialog stacked on top of the drawer owns the keyboard.
+      const target = e.target as Element | null;
+      if (!panelRef.current?.contains(target) && target?.closest?.('[role="dialog"]')) return;
       if (e.key === 'Escape' && !isPending) {
         e.preventDefault();
         onCancel();

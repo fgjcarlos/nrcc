@@ -179,7 +179,9 @@
     "cancel": "Cancelar",
     "applying": "Aplicando…",
     "applied": "Aplicado correctamente.",
-    "appliedError": "Error al aplicar: {{message}}"
+    "appliedError": "Error al aplicar: {{message}}",
+    "confirmTitle": "¿Aplicar cambios?",
+    "confirmDescription": "Se escribirán {{count}} cambio(s) pendiente(s) en {{target}}. Node-RED puede reiniciarse, lo que puede tardar un poco."
   },
   "topology": {
     "title": "Topología de configuración",
