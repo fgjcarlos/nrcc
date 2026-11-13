@@ -201,3 +201,17 @@ func TestLibraryServiceInstallInvalidPackageBeatsAlias(t *testing.T) {
 		t.Errorf("npm ran %d times for an invalid package name", pm.installCalls)
 	}
 }
+
+// Read-only configuration is never written, and must not turn a successful
+// install into a failure (baseline behaviour before settings activation).
+func TestTransformRawSettingsSkipsReadOnlyConfiguration(t *testing.T) {
+	dir := t.TempDir()
+	svc := NewConfigServiceWithHost(dir, nil) // no host: version unknown, not editable
+	called := false
+	if err := svc.TransformRawSettings(func(c string) string { called = true; return c + "x" }); err != nil {
+		t.Fatalf("TransformRawSettings on read-only configuration = %v, want nil", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "settings.js")); !os.IsNotExist(err) || called {
+		t.Errorf("read-only configuration was touched (stat err = %v, transform called = %t)", err, called)
+	}
+}

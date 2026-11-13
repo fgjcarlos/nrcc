@@ -40,7 +40,7 @@ type LibraryService struct {
 	restart func() error
 	// updateSettings is an optional hook that applies a transform to the
 	// live settings.js. Install / Uninstall use it to activate the library;
-	// nil disables it (tests, read-only configuration).
+	// nil disables it (tests); the production hook skips read-only configuration.
 	updateSettings func(transform func(string) string) error
 }
 

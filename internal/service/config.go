@@ -713,10 +713,11 @@ func (s *ConfigService) SaveRawSettingsWithRevision(content string, expected mod
 // TransformRawSettings applies transform to the live settings.js and saves
 // the result through SaveRawSettingsWithRevision, so the write is validated,
 // backed up and rejected if the file changed in between. A transform that
-// changes nothing writes nothing.
+// changes nothing writes nothing. A read-only configuration is left as is and
+// is not an error: callers such as library install must keep succeeding there.
 func (s *ConfigService) TransformRawSettings(transform func(string) string) error {
-	if caps := s.ConfigurationCapabilities(); !caps.Editable {
-		return fmt.Errorf("configuration is read-only: %s", caps.Reason)
+	if !s.ConfigurationCapabilities().Editable {
+		return nil
 	}
 	doc, err := s.GetRawSettings()
 	if err != nil {
