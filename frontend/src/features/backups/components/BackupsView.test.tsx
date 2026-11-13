@@ -1,17 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Stub the heavy subcomponents so the test surface is just the alert + retry
 // button. Each subcomponent receives whatever props BackupsView forwards and
 // renders nothing — keeps the test focused on the retry behaviour.
+const { retentionMutate, retentionProps } = vi.hoisted(() => ({
+  retentionMutate: vi.fn(),
+  retentionProps: { current: null as null | { onSave: (manual: number, auto: number, preRestore: number) => void } },
+}));
+
 vi.mock('@/features/backups/components', () => ({
   BackupSummaryCards: () => null,
   BackupListSection: () => null,
   BackupDetailSection: () => null,
   SchedulerConfigSection: () => null,
-  RetentionPolicySection: () => null,
+  RetentionPolicySection: (props: { onSave: (manual: number, auto: number, preRestore: number) => void }) => {
+    retentionProps.current = props;
+    return null;
+  },
 }));
 
 vi.mock('@/features/backups/hooks/useBackupsActions', () => ({
@@ -20,7 +28,7 @@ vi.mock('@/features/backups/hooks/useBackupsActions', () => ({
     createMutation: { isPending: false, mutate: vi.fn() },
     restoreMutation: { isPending: false, variables: null, mutate: vi.fn() },
     deleteMutation: { isPending: false, variables: null, mutate: vi.fn() },
-    retentionMutation: { isPending: false, isError: false, mutate: vi.fn(), mutateAsync: vi.fn() },
+    retentionMutation: { isPending: false, isError: false, mutate: retentionMutate, mutateAsync: vi.fn() },
   }),
 }));
 
@@ -87,5 +95,52 @@ describe('BackupsView error retry', () => {
       configurable: true,
       value: { ...window.location, reload: originalReload },
     });
+  });
+});
+
+describe('BackupsView retention save', () => {
+  const persistedConfig = {
+    enabled: true,
+    schedule: 'daily' as const,
+    customSchedule: '',
+    retentionManual: 30,
+    retentionAuto: 30,
+    retentionPreRestore: 5,
+    includeConfig: true,
+    includeSettings: true,
+    includeFlowsCred: false,
+    includePackageJson: true,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useBackupsDataMock.mockReturnValue({
+      config: persistedConfig, configLoading: false, configError: false,
+      status: null, statusLoading: false, statusError: false,
+      observability: null, observabilityLoading: false, observabilityError: false,
+      backupList: undefined, backupsLoading: false, backupsError: false, backups: [],
+      detail: null, detailLoading: false, detailFetching: false,
+      storage: null, storageLoading: false, storageError: false,
+      refetchConfig: vi.fn(), refetchStatus: vi.fn(), refetchObservability: vi.fn(), refetchBackups: vi.fn(), refetchStorage: vi.fn(),
+    });
+  });
+
+  it('sends distinct manual, auto and pre-restore retention values to the persistence call', () => {
+    renderWithProviders();
+
+    act(() => retentionProps.current?.onSave(7, 14, 3));
+
+    expect(retentionMutate).toHaveBeenCalledTimes(1);
+    expect(retentionMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ retentionManual: 7, retentionAuto: 14, retentionPreRestore: 3 }),
+    );
+  });
+
+  it('still saves manual retention and keeps the rest of the persisted config', () => {
+    renderWithProviders();
+
+    act(() => retentionProps.current?.onSave(90, 30, 5));
+
+    expect(retentionMutate).toHaveBeenCalledWith({ ...persistedConfig, retentionManual: 90 });
   });
 });

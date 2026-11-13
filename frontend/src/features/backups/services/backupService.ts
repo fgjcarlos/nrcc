@@ -548,11 +548,4 @@ export const backupService = {
       limit: typeof data?.limit === 'number' ? data.limit : params.limit,
     };
   },
-
-  patchStorageRetention: async (retentionDays: number) => {
-    const response = await api.patch<
-      ApiEnvelope<{ retentionDays: number }> | { retentionDays: number }
-    >('/storage/retention', { retentionDays });
-    return unwrapData(response.data);
-  },
 };
