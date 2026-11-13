@@ -45,7 +45,7 @@ func TestLibraryServiceInstallTriggersRestart(t *testing.T) {
 				restartCalls++
 				return nil
 			})
-			err := svc.Install(context.Background(), "node-red-dashboard")
+			err := svc.Install(context.Background(), "node-red-dashboard", "")
 			if c.installErr == nil && err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -82,7 +82,7 @@ func TestLibraryServiceUninstallTriggersRestart(t *testing.T) {
 func TestLibraryServiceInstallWithoutHook(t *testing.T) {
 	pm := &stubPM{}
 	svc := NewLibraryServiceWithPackageManager(t.TempDir(), pm)
-	if err := svc.Install(context.Background(), "node-red-dashboard"); err != nil {
+	if err := svc.Install(context.Background(), "node-red-dashboard", ""); err != nil {
 		t.Fatalf("install: %v", err)
 	}
 	if pm.installCalls != 1 {
@@ -97,7 +97,7 @@ func TestLibraryServiceInstallReportsRestartError(t *testing.T) {
 	svc := NewLibraryServiceWithPackageManager(t.TempDir(), pm)
 	restartErr := errors.New("node-red already stopped")
 	svc.SetNodeRedRestart(func() error { return restartErr })
-	err := svc.Install(context.Background(), "node-red-dashboard")
+	err := svc.Install(context.Background(), "node-red-dashboard", "")
 	if err == nil || !errors.Is(err, restartErr) {
 		t.Fatalf("install error = %v, want wrapped restart error", err)
 	}

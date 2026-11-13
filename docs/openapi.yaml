@@ -1695,7 +1695,12 @@ paths:
       tags: [Libraries]
       operationId: installLibrary
       summary: Install a library
-      description: Installs an npm package into the Node-RED user directory via npm.
+      description: >-
+        Installs an npm package into the Node-RED user directory via npm, then
+        activates it in settings.js: `functionExternalModules` is set to true and,
+        unless the package declares Node-RED nodes, it is exposed in
+        `functionGlobalContext` under `alias` (guarded `require`). Node-RED is
+        restarted when it is running.
       security:
         - bearerAuth: []
       requestBody:
@@ -3731,6 +3736,12 @@ components:
         name:
           type: string
           description: npm package name to install
+        alias:
+          type: string
+          pattern: "^[A-Za-z0-9_$@./-]{1,214}$"
+          description: >-
+            functionGlobalContext key for the library (`global.get(alias)`).
+            Defaults to the package name without version.
 
     LibraryInstallResult:
       type: object

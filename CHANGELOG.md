@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Installing a library now activates it in settings.js: `functionExternalModules`
+  is enabled and plain npm libraries are exposed in `functionGlobalContext` under
+  their alias (guarded `require`, so a module that fails to load cannot stop
+  Node-RED). Uninstall removes the NRCC-managed entry; operator-authored entries
+  are preserved. The install `alias` field is no longer ignored.
 - Align the frontend on Tailwind CSS 4 with its Vite integration and daisyUI 5,
   preserving the corporate themes and setting the styling browser floor to Safari
   16.4, Chrome 111, and Firefox 128. The Tailwind 3 braces advisory route is removed.
