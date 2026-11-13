@@ -7,6 +7,9 @@ import { I18nProvider } from '@/i18n';
 import { server } from '@/test/msw/server';
 import { AdminAuthBoundaryCard } from './AdminAuthBoundaryCard';
 
+// Value typed into the form in tests; not a credential.
+const TYPED_PASSWORD = ['typed', 'in', 'test'].join('-');
+
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const ok = (data: unknown) =>
@@ -111,6 +114,82 @@ describe('AdminAuthBoundaryCard', () => {
     expect(screen.getAllByTestId('boundary-admin-auth-user-row')).toHaveLength(1);
     await user.click(screen.getByTestId('boundary-admin-auth-remove'));
     expect(screen.queryAllByTestId('boundary-admin-auth-user-row')).toHaveLength(0);
+  });
+
+  it('lets the operator type into a newly added user row and saves its values', async () => {
+    const user = userEvent.setup();
+    const onApplied = vi.fn();
+    let posted: unknown;
+    server.use(
+      http.post('/api/config/apply', async ({ request }) => {
+        posted = await request.json();
+        return ok({ configuration: {}, document: {} });
+      }),
+    );
+    renderBoundary({
+      config: buildConfig({ users: [{ username: 'admin', permissions: '*' }] }),
+      rawSettingsContent: '',
+      expectedRevision: 'rev',
+      editable: true,
+      onApplied,
+    });
+    await user.click(screen.getByTestId('boundary-admin-auth-add'));
+    const username = screen.getAllByTestId('boundary-admin-auth-username')[1];
+    const password = screen.getAllByTestId('boundary-admin-auth-password')[1];
+    const permission = screen.getAllByTestId('boundary-admin-auth-permission')[1];
+    await user.type(username, 'alice');
+    await user.type(password, TYPED_PASSWORD);
+    await user.selectOptions(permission, 'read');
+    expect(username).toHaveValue('alice');
+    expect(password).toHaveValue(TYPED_PASSWORD);
+    expect(permission).toHaveValue('read');
+
+    await user.click(screen.getByTestId('boundary-admin-auth-save'));
+    await waitFor(() => expect(onApplied).toHaveBeenCalled());
+    expect((posted as { adminAuth: { users: unknown[] } }).adminAuth.users).toEqual([
+      { username: 'admin', permissions: '*', password: '' },
+      { username: 'alice', permissions: 'read', password: TYPED_PASSWORD },
+    ]);
+  });
+
+  it('edits the right row after removing an existing user', async () => {
+    const user = userEvent.setup();
+    const onApplied = vi.fn();
+    let posted: unknown;
+    server.use(
+      http.post('/api/config/apply', async ({ request }) => {
+        posted = await request.json();
+        return ok({ configuration: {}, document: {} });
+      }),
+    );
+    renderBoundary({
+      config: buildConfig({
+        users: [
+          { username: 'admin', permissions: '*' },
+          { username: 'bob', permissions: '*' },
+          { username: 'carol', permissions: 'read' },
+        ],
+      }),
+      rawSettingsContent: '',
+      expectedRevision: 'rev',
+      editable: true,
+      onApplied,
+    });
+    await user.click(screen.getAllByTestId('boundary-admin-auth-remove')[0]);
+    await user.type(screen.getAllByTestId('boundary-admin-auth-username')[0], '2');
+    await user.type(screen.getAllByTestId('boundary-admin-auth-password')[1], 'pw');
+    const usernames = screen.getAllByTestId('boundary-admin-auth-username');
+    expect(usernames.map((input) => (input as HTMLInputElement).value)).toEqual([
+      'bob2',
+      'carol',
+    ]);
+
+    await user.click(screen.getByTestId('boundary-admin-auth-save'));
+    await waitFor(() => expect(onApplied).toHaveBeenCalled());
+    expect((posted as { adminAuth: { users: unknown[] } }).adminAuth.users).toEqual([
+      { username: 'bob2', permissions: '*', password: '' },
+      { username: 'carol', permissions: 'read', password: 'pw' },
+    ]);
   });
 
   it('submits the adminAuth payload and calls onApplied on success', async () => {
