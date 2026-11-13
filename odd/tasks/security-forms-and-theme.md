@@ -14,10 +14,11 @@ password, and editor theme images never reach Node-RED.
 
 - T1 (S1) worker — AdminAuthBoundaryCard new-row editing + test. Commit: "fix(security): make new admin auth users editable".
 - T2 (S2) worker — plain → bcrypt for HTTP basic auth (backend), labels/warnings/openapi. Commit: "fix(security): hash plain HTTP basic auth passwords".
-- T3 (S3) worker — editorTheme image paths. Commit: pending.
+- T3 (S3) worker — editorTheme image paths. Commit: "fix(config): point editor theme images at the uploaded files".
 - T4 (S4) blocked — waiting for the error message / audit failure stage.
 
 ## Log
 
 - L1: "En el formulario admin auth no dme deja escribir al añadir un nuevo user en el de http auth si, y poner un pass hash... lo normal es poner una contraseña y nrcc que lo hashee, la configuracion de nodered tmb fallo desde cambiar el nombre al header, icono, etc"
 - L2: Exploration (gentle-ai-explore): S1 cause AdminAuthBoundaryCard.tsx:103 vs :118-143; S2 validateHTTPBasicAuth config.go:862-873 rejects plaintext, admin already hashes (label wrong es/security.json:24); S3 toEditorImageUrl strips to "/<name>" but Node-RED theme.js serveFile fs.statSync's the value.
+- L3: Slice boundary: T1+T2 = 519 authored lines (tests and regenerated schema included); T3 lands as its own commit in the same PR, reviewable per commit.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -906,6 +907,9 @@ func validateHTTPBasicAuth(name string, auth *model.HTTPBasicAuth) error {
 }
 
 func (s *ConfigService) decorateConfig(cfg *model.NodeRedConfig) {
+	// The mirror keeps the upload URL the UI previews; settings.js gets the
+	// filesystem path (see renderSettings).
+	cfg.EditorTheme = s.mapEditorThemeUploads(cfg.EditorTheme, func(name string) string { return "/uploads/" + name })
 	if s.hostSvc == nil {
 		return
 	}
@@ -964,6 +968,11 @@ func (s *ConfigService) backupSettingsFile(path string) (string, error) {
 // httpMiddleware, ...) survive a Save. Falls back to generating from scratch
 // on first write or when the file is unreadable. Closes #577.
 func (s *ConfigService) renderSettings(cfg model.NodeRedConfig) string {
+	// Node-RED stats editorTheme images as filesystem paths, so NRCC uploads
+	// are rendered as the absolute path of the stored file.
+	cfg.EditorTheme = s.mapEditorThemeUploads(cfg.EditorTheme, func(name string) string {
+		return filepath.Join(s.uploadsDir(), name)
+	})
 	path := s.hostSvc.Detect().Settings.Path
 	if path == "" {
 		path = filepath.Join(s.dataDir, "settings.js")
@@ -1025,9 +1034,8 @@ func generateSettingsJS(cfg model.NodeRedConfig) string {
 		builder.WriteString(renderHTTPBasicAuthBlock("httpStaticAuth", cfg.HTTPStaticAuth))
 		builder.WriteString("\n")
 	}
-	builder.WriteString("  editorTheme: {\n")
-	fmt.Fprintf(&builder, "    projects: { enabled: %t },\n", cfg.ProjectsEnabled)
-	builder.WriteString("  },\n")
+	builder.WriteString(renderEditorThemeBlock(cfg))
+	builder.WriteString("\n")
 	if block := renderLoggingBlock(loggingModelOrDefault(cfg.Logging)); block != "" {
 		builder.WriteString(block)
 		builder.WriteString("\n")
@@ -1102,6 +1110,73 @@ func patchSettingsJS(existingContent string, cfg model.NodeRedConfig) string {
 	content = ensureHTTPStatic(content, "uploads")
 
 	return content
+}
+
+// editorThemeImageKeys lists the editorTheme values Node-RED reads as image files.
+var editorThemeImageKeys = [][2]string{{"page", "favicon"}, {"header", "image"}, {"login", "image"}, {"deployButton", "icon"}}
+
+// uploadsDir is the absolute directory the files handler stores uploads in.
+func (s *ConfigService) uploadsDir() string {
+	dir, err := filepath.Abs(s.dataDir)
+	if err != nil {
+		dir = s.dataDir
+	}
+	return filepath.Join(dir, "uploads")
+}
+
+// uploadName reports the stored file name an editorTheme image refers to:
+// "/uploads/<name>", the absolute "<uploadsDir>/<name>", or the legacy
+// "/<name>" when that upload exists. Other values are not NRCC uploads.
+func (s *ConfigService) uploadName(value string) (string, bool) {
+	dir := s.uploadsDir()
+	var name string
+	legacy := false
+	switch {
+	case strings.HasPrefix(value, "/uploads/"):
+		// filepath.Base drops any traversal so only <uploadsDir>/<name> is reachable.
+		name = filepath.Base(strings.TrimPrefix(value, "/uploads/"))
+	case strings.HasPrefix(value, dir+string(filepath.Separator)):
+		name = strings.TrimPrefix(value, dir+string(filepath.Separator))
+	case strings.HasPrefix(value, "/"):
+		name, legacy = value[1:], true
+	default:
+		return "", false
+	}
+	if name == "" || name == "." || name == ".." || name != filepath.Base(name) {
+		return "", false
+	}
+	if legacy {
+		// #nosec G703 -- name == filepath.Base(name) and is not "", "." or ".." (checked above); the path is rooted to the uploads directory.
+		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
+			return "", false
+		}
+	}
+	return name, true
+}
+
+// mapEditorThemeUploads returns a copy of theme whose NRCC upload images are
+// rewritten by to; the input is never mutated.
+func (s *ConfigService) mapEditorThemeUploads(theme any, to func(name string) string) any {
+	src, ok := theme.(map[string]any)
+	if !ok {
+		return theme
+	}
+	out := maps.Clone(src)
+	for _, key := range editorThemeImageKeys {
+		section, ok := out[key[0]].(map[string]any)
+		if !ok {
+			continue
+		}
+		value, _ := section[key[1]].(string)
+		name, ok := s.uploadName(value)
+		if !ok {
+			continue
+		}
+		section = maps.Clone(section)
+		section[key[1]] = to(name)
+		out[key[0]] = section
+	}
+	return out
 }
 
 // ensureHTTPStatic makes Node-RED serve the configured uploads directory
