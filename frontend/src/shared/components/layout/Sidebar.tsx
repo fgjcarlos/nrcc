@@ -38,7 +38,10 @@ const maintenanceItems = [
 ];
 
 const STORAGE_KEY = 'sidebar-collapsed';
-const MOBILE_BREAKPOINT = 768;
+// Must match Tailwind's `lg` breakpoint (min-width: 1024px, no custom
+// screens in tailwind.config.js): Layout.tsx keeps the drawer closed and
+// Header.tsx hides its toggle above this width (#966).
+const MOBILE_BREAKPOINT = 1024;
 
 export function Sidebar() {
   const { user, logout } = useAuth();
@@ -46,7 +49,7 @@ export function Sidebar() {
   const { t } = useT();
   const isAdmin = user?.role === 'admin';
   
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < MOBILE_BREAKPOINT);
   const [collapsed, setCollapsed] = useState(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     return stored ? stored === 'true' : false;
@@ -193,7 +196,7 @@ export function Sidebar() {
       data-testid="app-sidebar"
       className={cn(
         'app-sidebar-shell flex h-full min-h-full flex-col border-r',
-        collapsed ? 'w-16' : 'w-64',
+        collapsed && !isMobile ? 'w-16' : 'w-64',
         'transition-all duration-200'
       )}
     >

@@ -175,3 +175,51 @@ test.describe('Issue #889 — mobile navigation by keyboard', () => {
     await expect(page).toHaveURL(/\/configuration$/)
   })
 })
+
+test.describe('Issue #966 — tablet navigation by keyboard', () => {
+  test('drawer opens by keyboard at a tablet width and the sidebar matches the drawer breakpoint', async ({ page }) => {
+    test.skip(isMobileProject(), 'tablet width is emulated on a desktop project')
+
+    // 900px sits between the old 768px sidebar breakpoint and lg (1024px):
+    // sidebar mode and drawer state must agree here.
+    await page.setViewportSize({ width: 900, height: 800 })
+    await login(page)
+    await page.reload()
+    await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible()
+
+    // Drawer-mode sidebar content: no collapse control below lg.
+    await expect(page.getByRole('button', { name: /navegación/i })).toBeHidden()
+
+    const nav = page.getByRole('navigation', { name: 'Navegación principal' })
+    await expect(nav).toBeHidden()
+
+    // Reach the drawer toggle from the top of the page.
+    let toggleReached = false
+    for (let i = 0; i < 5 && !toggleReached; i += 1) {
+      await page.keyboard.press('Tab')
+      toggleReached = await page.evaluate(() => document.activeElement?.id === 'sidebar-drawer')
+    }
+    expect(toggleReached, 'drawer toggle is reachable with Tab').toBe(true)
+    await page.keyboard.press('Space')
+    await expect(nav).toBeVisible()
+
+    // Tab forward until focus enters the drawer navigation.
+    let tabs = 0
+    let inNav = false
+    while (tabs < 150 && !inNav) {
+      await page.keyboard.press('Tab')
+      tabs += 1
+      inNav = await nav.evaluate((el) => el.contains(document.activeElement))
+    }
+    expect(inNav, `a nav link is reachable after ${tabs} Tab presses`).toBe(true)
+
+    const configurationLink = nav.getByRole('link', { name: 'Configuration' })
+    while (!(await configurationLink.evaluate((el) => el === document.activeElement)) && tabs < 160) {
+      await page.keyboard.press('Tab')
+      tabs += 1
+    }
+    await expect(configurationLink).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(page).toHaveURL(/\/configuration$/)
+  })
+})
