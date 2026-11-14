@@ -135,7 +135,7 @@ export function AdvancedSettings({ rawContent, expectedRevision, onApplied }: Ad
   const presets = presetsQuery.data;
 
   return (
-    <section aria-label={t('configuration:preset.sectionLabel')} className="surface-card space-y-4 p-6">
+    <section aria-label={t('configuration:preset.sectionLabel')} className="space-y-4 border-t border-ds-border-subtle pt-4">
       <header className="flex items-center gap-2">
         <ShieldCheck className="h-5 w-5 text-primary" />
         <h2 className="text-lg font-semibold">{t('configuration:preset.title')}</h2>
@@ -152,7 +152,7 @@ export function AdvancedSettings({ rawContent, expectedRevision, onApplied }: Ad
             aria-label={preset.id}
             className="rounded-2xl border border-border bg-base-100/60 p-4"
           >
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-base font-semibold">{preset.name}</h3>
               <span
                 className="rounded-full bg-base-200/60 px-2 py-0.5 text-xs text-base-content/65"

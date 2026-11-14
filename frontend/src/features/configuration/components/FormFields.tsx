@@ -23,6 +23,9 @@ export function InputField({ label, value, onChange, type = 'text', placeholder,
         placeholder={placeholder}
         disabled={disabled}
         error={error}
+        // The shared Input sets border-none; the global input rule supplies
+        // the control-border colour (--ds-border-strong, >=3:1, WCAG 1.4.11).
+        className="border border-solid"
       />
       {help && <p className="text-xs text-base-content/60">{help}</p>}
     </div>
@@ -48,13 +51,16 @@ export function ToggleField({ label, value, onChange, help, disabled }: ToggleFi
         type="button"
         onClick={() => onChange(!value)}
         disabled={disabled}
-        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-          value ? 'bg-primary' : 'bg-muted'
+        aria-pressed={value}
+        // Off: control-border outline and a muted knob, so the track stays
+        // visible on the surface in both themes (WCAG 1.4.11).
+        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors ${
+          value ? 'border-primary bg-primary' : 'border-ds-border-default bg-ds-bg-base'
         } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
       >
         <span
-          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-            value ? 'translate-x-6' : 'translate-x-1'
+          className={`inline-block h-4 w-4 transform rounded-full transition-transform ${
+            value ? 'translate-x-6 bg-primary-content' : 'translate-x-1 bg-ds-text-muted'
           }`}
         />
       </button>
@@ -78,7 +84,7 @@ export function SelectField({ label, value, onChange, options, disabled }: Selec
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
-        className="flex w-full rounded-md px-3 py-2 text-sm bg-base-300 text-base-content border-none outline-none transition-all duration-200 focus:ring-1 focus:ring-primary input-focus-glow disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex w-full rounded-md px-3 py-2 text-sm bg-base-300 text-base-content border border-solid outline-none transition-all duration-200 focus:ring-1 focus:ring-primary input-focus-glow disabled:cursor-not-allowed disabled:opacity-50"
       >
         {options.map((opt) => (
           <option key={opt.value} value={opt.value}>{opt.label}</option>

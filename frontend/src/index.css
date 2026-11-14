@@ -933,6 +933,25 @@ aside.bg-base-100 {
   box-shadow: 0 0 0 2px var(--ds-bg-base), 0 0 0 4px var(--ds-accent-primary);
 }
 
+/* Change circuit contact blade (T9): closing a contact is the one authored
+   motion on the configuration surface. Contacts close in sequence. */
+.circuit-blade {
+  transform-box: view-box;
+  transform-origin: 10px 15px;
+  transition: transform 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: calc(var(--contact-i, 0) * 60ms);
+}
+
+.circuit-blade[data-open="true"] {
+  transform: rotate(-30deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .circuit-blade {
+    transition: none;
+  }
+}
+
 
 /* ══════════════════════════════════════════════════════════════
    REDUCED MOTION — Issue #766 slice G W4

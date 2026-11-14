@@ -23,11 +23,14 @@ export interface NrccTopologyDiagramProps {
   ariaLabel?: string;
   /** Optional extra className for layout (margins, max-width, etc.). */
   className?: string;
+  /** Smaller drawing; caption and subtitle stay for assistive tech only. */
+  compact?: boolean;
 }
 
 export function NrccTopologyDiagram({
   ariaLabel,
   className,
+  compact = false,
 }: NrccTopologyDiagramProps) {
   const { t } = useT();
   const label = ariaLabel ?? t('configuration:topology.title');
@@ -39,12 +42,12 @@ export function NrccTopologyDiagram({
       className={['flex flex-col gap-2', className].filter(Boolean).join(' ')}
       data-testid="nrcc-topology-diagram"
     >
-      <figcaption className="text-xs uppercase tracking-[0.24em] text-base-content/50">
+      <figcaption className={compact ? 'sr-only' : 'text-xs uppercase tracking-[0.24em] text-base-content/50'}>
         {t('configuration:topology.title')}
       </figcaption>
       <svg
         viewBox="0 0 480 96"
-        className="h-24 w-full max-w-xl"
+        className={compact ? 'h-14 w-full' : 'h-24 w-full max-w-xl'}
         role="presentation"
         aria-hidden="true"
       >
@@ -202,7 +205,7 @@ export function NrccTopologyDiagram({
           </text>
         </g>
       </svg>
-      <p className="text-xs text-base-content/60">
+      <p className={compact ? 'sr-only' : 'text-xs text-base-content/60'}>
         {t('configuration:topology.subtitle')}
       </p>
     </figure>

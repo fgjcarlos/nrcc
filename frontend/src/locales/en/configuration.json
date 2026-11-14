@@ -2,7 +2,9 @@
   "host": {
     "installationDetected": "Installation detected",
     "nodeRedNotDetected": "(no Node-RED detected)",
-    "pathNotDetected": "no path detected"
+    "pathNotDetected": "no path detected",
+    "recommendPortless": "Optional: install Portless to expose nrcc or Node-RED with HTTPS .localhost, LAN or Tailscale URLs.",
+    "recommendWritable": "Grant write access to settings.js so nrcc can save changes."
   },
   "advanced": {
     "title": "Advanced settings.js",
@@ -193,5 +195,60 @@
     "nodeRed": "Node-RED + Dashboard",
     "arrowNrccSettings": "edits",
     "arrowSettingsNodeRed": "loads"
+  },
+  "circuit": {
+    "title": "Change circuit",
+    "summary": "Step {{index}} of {{total}} · {{step}} · {{state}}",
+    "steps": {
+      "edit": "Edit",
+      "diff": "Diff",
+      "validate": "Validate",
+      "backup": "Backup",
+      "apply": "Apply",
+      "ready": "Ready"
+    },
+    "state": {
+      "idle": "Waiting",
+      "blocked": "Open",
+      "active": "Pending",
+      "passed": "Closed",
+      "failed": "Failed",
+      "unknown": "Not confirmed"
+    },
+    "proof": {
+      "changes_one": "{{count}} change",
+      "changes_other": "{{count}} changes",
+      "noChanges": "No changes",
+      "readOnly": "Read-only runtime",
+      "notReviewed": "Not reviewed",
+      "reviewed": "Diff reviewed",
+      "invalid_one": "{{count}} field invalid",
+      "invalid_other": "{{count}} fields invalid",
+      "localValid": "Fields valid; the server checks on apply",
+      "running": "Transaction running on the server",
+      "serverAccepted": "Accepted by the server",
+      "rejected": "Rejected; nothing written",
+      "notReached": "Not reached",
+      "backupTaken": "Taken before write",
+      "backupFailed": "Backup failed; nothing written",
+      "written": "settings.js written, Node-RED restarted",
+      "writeFailed": "Write failed",
+      "restartFailed": "Restart failed",
+      "recoveryFailed": "Recovery failed",
+      "ready": "Readiness OK",
+      "notReady": "Readiness failed",
+      "unknown": "Outcome not confirmed; check the runtime"
+    },
+    "rollback": {
+      "restored": "Rollback: restored from backup",
+      "failed": "Rollback failed: runtime recovery unsuccessful"
+    },
+    "total_one": "{{count}} change",
+    "total_other": "{{count}} changes",
+    "restartCost_one": "{{count}} needs restart",
+    "restartCost_other": "{{count}} need restart",
+    "review_one": "Review {{count}} change",
+    "review_other": "Review {{count}} changes",
+    "reviewNone": "No changes to review"
   }
 }
