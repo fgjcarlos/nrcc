@@ -10,6 +10,7 @@ import type {
 } from '../hooks/useConfigurationDiff';
 import type { NodeRedConfigFormData } from '@/shared/types';
 import { FIELD_LABELS, SETTINGS_KEYS } from '../lib/fieldLabels';
+import { SettingKey } from './FormFields';
 
 /**
  * Issue #766 slice F (W4) — reviewable safe-apply panel.
@@ -235,9 +236,7 @@ export function ReviewChangesPanel({
                       >
                         <div className="flex items-start justify-between gap-2">
                           <span className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 text-sm text-ds-text-secondary">
-                            <span className="break-all font-mono font-semibold text-ds-text-primary">
-                              {SETTINGS_KEYS[key] ?? key}
-                            </span>
+                            <SettingKey path={SETTINGS_KEYS[key] ?? key} />
                             <span aria-hidden="true">·</span>
                             <span>{FIELD_LABELS[key] ?? key}</span>
                           </span>

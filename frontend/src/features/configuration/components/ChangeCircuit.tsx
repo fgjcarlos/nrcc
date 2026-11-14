@@ -2,6 +2,7 @@ import { useId, type CSSProperties } from 'react';
 import { useT } from '@/i18n';
 import { cn } from '@/shared/lib';
 import type { Circuit, CircuitStep, ContactState } from '../lib/changeCircuit';
+import { SettingKey } from './FormFields';
 
 /**
  * ChangeCircuit (T9) — the gated change sequence drawn as a single-line
@@ -84,6 +85,33 @@ function ContactSymbol({ state, index }: { state: ContactState; index: number })
           strokeWidth="1"
         />
       )}
+    </svg>
+  );
+}
+
+/**
+ * Rollback branch glyph for the note under the circuit, so the outcome is
+ * drawn at every width (the side branch itself is only drawn from lg up).
+ * A dashed return path from Apply back to the Backup contact: restored ends
+ * on a closed contact; failed ends on an open one.
+ */
+function RollbackSymbol({ outcome }: { outcome: 'restored' | 'failed' }) {
+  return (
+    <svg
+      viewBox="0 0 24 16"
+      width="24"
+      height="16"
+      aria-hidden="true"
+      className="shrink-0 text-ds-on-tint-error"
+      data-testid="rollback-symbol"
+      data-outcome={outcome}
+    >
+      <g stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="square">
+        <path d="M22 13 H6 V7" strokeDasharray="2 2" />
+        <path d="M3 10 L6 7 L9 10" />
+        <line x1="10" y1="4" x2="14" y2="4" />
+        {outcome === 'restored' ? <line x1="14" y1="4" x2="21" y2="4" /> : <line x1="14" y1="4" x2="20" y2="1" />}
+      </g>
     </svg>
   );
 }
@@ -187,7 +215,16 @@ export function ChangeCircuit({
                   </span>
                 </div>
                 {s.proof && <p className="text-xs text-ds-text-secondary">{proofText(s)}</p>}
-                {s.code && <p className="break-all font-mono text-xs text-ds-text-secondary">{s.code}</p>}
+                {s.code && (
+                  <p className="font-mono text-xs text-ds-text-secondary">
+                    {s.code.split(', ').map((designator, i) => (
+                      <span key={designator}>
+                        {i > 0 && ', '}
+                        <SettingKey path={designator} className="" />
+                      </span>
+                    ))}
+                  </p>
+                )}
               </div>
             </li>
           );
@@ -197,11 +234,12 @@ export function ChangeCircuit({
       {circuit.rollback && (
         <p
           className={cn(
-            'mt-2 flex items-baseline gap-2 border-t border-dashed border-ds-danger pt-2 text-xs',
+            'mt-2 flex items-center gap-2 border-t border-dashed border-ds-danger pt-2 text-xs',
             circuit.rollback === 'failed' ? 'font-semibold text-ds-on-tint-error' : 'text-ds-text-primary',
           )}
           data-testid="change-circuit-rollback"
         >
+          <RollbackSymbol outcome={circuit.rollback} />
           <span className="font-mono text-ds-on-tint-error">RB</span>
           {t(`configuration:circuit.rollback.${circuit.rollback}`)}
         </p>

@@ -472,7 +472,9 @@ describe('ConfigurationView (review drawer Apply — confirm, feedback, single s
     expect(updateSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('closes the confirmation but keeps the drawer usable when the save fails', async () => {
+  // T9: no failure toast. The drawer closes so the change circuit beside it
+  // shows the failed contact; the review action reopens it for a retry.
+  it('closes the drawer on a failed save so the circuit shows the outcome', async () => {
     const user = userEvent.setup();
     const { updateSpy, handle } = deferredUpdate();
     await spyUpdate(updateSpy);
@@ -483,13 +485,13 @@ describe('ConfigurationView (review drawer Apply — confirm, feedback, single s
     await waitFor(() => expect(within(panel).getByTestId('review-changes-panel-apply')).toBeDisabled());
 
     await act(async () => handle.reject(new Error('boom')));
-    await waitFor(() =>
-      expect(screen.queryByRole('dialog', { name: 'Apply changes?' })).not.toBeInTheDocument(),
-    );
-    expect(screen.getByTestId('review-changes-panel')).toBeInTheDocument();
-    const apply = within(panel).getByTestId('review-changes-panel-apply');
-    expect(apply).toBeEnabled();
-    expect(apply).toHaveTextContent('Apply');
+    await waitFor(() => expect(screen.queryByTestId('review-changes-panel')).not.toBeInTheDocument());
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByTestId('change-circuit-live')).toHaveTextContent('Validate: Not confirmed');
+
+    await user.click(reviewAction());
+    const reopened = await screen.findByTestId('review-changes-panel');
+    expect(within(reopened).getByTestId('review-changes-panel-apply')).toBeEnabled();
     expect(updateSpy).toHaveBeenCalledTimes(1);
   });
 
@@ -667,6 +669,10 @@ describe('ConfigurationView (change circuit)', () => {
     const steps = await circuitSteps();
     expect(within(steps[3]).getByText('Taken before write')).toBeInTheDocument();
     expect(within(steps[5]).getByText('Readiness OK')).toBeInTheDocument();
+    // No toast: the circuit and its live region carry the outcome.
+    const { toast } = await import('sonner');
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(screen.getByTestId('change-circuit-live')).toHaveTextContent('Ready: Closed. Readiness OK');
   });
 
   it('opens the Ready contact and shows the rollback branch when readiness fails', async () => {
@@ -701,9 +707,13 @@ describe('ConfigurationView (change circuit)', () => {
     expect(within(validate).getByText('Closed')).toBeInTheDocument();
     expect(within(backup).getByText('Closed')).toBeInTheDocument();
     expect(within(apply).getByText('Closed')).toBeInTheDocument();
-    expect(screen.getByTestId('change-circuit-rollback')).toHaveTextContent(
-      'Rollback: restored from backup',
-    );
+    const rollback = screen.getByTestId('change-circuit-rollback');
+    expect(rollback).toHaveTextContent('Rollback: restored from backup');
+    // Text plus a drawn symbol, so the outcome reads on the mobile strip too
+    // (the side branch is only drawn from lg up).
+    expect(within(rollback).getByTestId('rollback-symbol')).toHaveAttribute('data-outcome', 'restored');
+    const { toast } = await import('sonner');
+    expect(toast.error).not.toHaveBeenCalled();
     expect(screen.getByTestId('change-circuit-live')).toHaveTextContent('Ready: Failed');
   });
 
@@ -833,5 +843,27 @@ describe('ConfigurationView (finish review)', () => {
     expect(textarea).toHaveAttribute('aria-invalid', 'true');
     expect(textarea).toHaveAttribute('aria-describedby', error.id);
     expect(toast.error).not.toHaveBeenCalled();
+  });
+});
+
+describe('ConfigurationView (finish review round 2)', () => {
+  it('lets long settings.js keys break only after a dot', async () => {
+    const user = userEvent.setup();
+    renderConfiguration();
+    await user.click(await screen.findByRole('tab', { name: /^Editor Theme$/ }));
+
+    const select = screen.getByLabelText('Theme (editorTheme.codeEditor.options.theme)');
+    const key = within(document.querySelector(`label[for="${select.id}"]`) as HTMLElement)
+      .getByText('editorTheme.codeEditor.options.theme');
+    expect(key.className).not.toMatch(/break-all/);
+    expect(key.querySelectorAll('wbr')).toHaveLength(3);
+  });
+
+  it('keeps the lock banner text wide enough to push the unlock button below it', async () => {
+    renderConfiguration();
+    const banner = await screen.findByTestId('raw-settings-locked-banner');
+    expect(banner).toHaveClass('flex-wrap');
+    const text = within(banner).getByText(/^Locked\./);
+    expect(text.className).toMatch(/flex-\[1_1_14rem\]/);
   });
 });

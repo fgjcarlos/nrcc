@@ -27,6 +27,7 @@
     "acknowledgement": "I understand that confirming a preset will rewrite the managed key in settings.js and the original managed value cannot be recovered unless a backup exists.",
     "loadingCurated": "Loading curated presets...",
     "loadError": "Presets could not be loaded.",
+    "unavailable": "Curated presets are not available on this NRCC server.",
     "sectionLabel": "Curated presets",
     "title": "Curated presets",
     "description": "Vetted high-value recipes for advanced Node-RED 5 settings. Each preset declares the editor / HTTP / Socket.IO surfaces it touches and never rewrites operator-owned code outside its declared scope.",

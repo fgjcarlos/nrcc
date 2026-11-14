@@ -860,7 +860,9 @@ test('unrelated visual edit keeps every admin account, permission and session ex
     .getByRole('dialog', { name: 'Apply changes?' })
     .getByRole('button', { name: 'Confirm', exact: true })
     .click()
-  await expect(page.getByText('Configuration saved successfully')).toBeVisible()
+  // The change circuit carries the outcome (no toast): every contact closes
+  // and the polite live region reports the Ready contact's proof.
+  await expect(page.getByTestId('change-circuit-live')).toHaveText('Ready: Closed. Readiness OK')
 
   // --- the authentication model is unchanged ----------------------
   const afterResponse = await nrcc.get('/api/config', { headers })

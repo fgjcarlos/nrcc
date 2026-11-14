@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useConfigurationActions } from '../hooks';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Loader2, AlertTriangle, Lock, ShieldCheck } from 'lucide-react';
+import { Loader2, Info, Lock, ShieldCheck } from 'lucide-react';
 import api from '@/shared/lib';
 import { ConfirmationDialog } from '@/shared/components/ConfirmationDialog';
 import { useT } from '@/i18n';
@@ -48,6 +48,10 @@ interface AdvancedSettingsProps {
   onApplied: () => void;
 }
 
+function isRouteMissing(error: unknown): boolean {
+  return (error as { response?: { status?: number } } | null)?.response?.status === 404;
+}
+
 export function AdvancedSettings({ rawContent, expectedRevision, onApplied }: AdvancedSettingsProps) {
   const [activePreset, setActivePreset] = useState<PresetView | null>(null);
   const [preview, setPreview] = useState<PresetPreview | null>(null);
@@ -62,6 +66,10 @@ export function AdvancedSettings({ rawContent, expectedRevision, onApplied }: Ad
       const r = await api.get<{ success: boolean; data: PresetView[] }>('/presets');
       return r.data.data;
     },
+    // A 404 is definitive: this server does not mount the presets routes
+    // (internal/server never registers handler.PresetsHandler), so retrying
+    // only keeps the spinner up. Other failures keep the default retries.
+    retry: (failureCount, error) => !isRouteMissing(error) && failureCount < 3,
   });
 
   async function openPreview(preset: PresetView) {
@@ -121,13 +129,16 @@ export function AdvancedSettings({ rawContent, expectedRevision, onApplied }: Ad
     );
   }
 
+  // Presets are optional: an unavailable catalogue is reported calmly, in
+  // neutral ink, not as a warning.
   if (presetsQuery.isError || !presetsQuery.data) {
     return (
       <div
         role="status"
-        className="flex items-center gap-2 rounded-box border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning"
+        className="flex items-center gap-2 rounded-box border border-ds-border-subtle px-3 py-2 text-sm text-ds-text-secondary"
       >
-        <AlertTriangle className="h-4 w-4" /> {t('configuration:preset.loadError')}
+        <Info className="h-4 w-4 shrink-0" aria-hidden="true" />
+        {isRouteMissing(presetsQuery.error) ? t('configuration:preset.unavailable') : t('configuration:preset.loadError')}
       </div>
     );
   }

@@ -95,4 +95,30 @@ describe('AdvancedSettings', () => {
       expect(screen.queryByText(/missing-preset/)).not.toBeInTheDocument();
     });
   });
+
+  // The backend does not mount the presets routes (no /api/presets in
+  // internal/server), so the SPA handler answers 404 API_ROUTE_NOT_FOUND.
+  // That is definitive: no retry spinner, and a calm, truthful message.
+  it('reports presets as unavailable without retrying when the route is missing', async () => {
+    let calls = 0;
+    server.use(
+      http.get('/api/presets', () => {
+        calls += 1;
+        return HttpResponse.json(
+          { success: false, error: { code: 'API_ROUTE_NOT_FOUND', message: 'API endpoint not found' } },
+          { status: 404 },
+        );
+      }),
+    );
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: 3 } } })}>
+        <AdvancedSettings rawContent="module.exports = {}" onApplied={vi.fn()} />
+      </QueryClientProvider>,
+    );
+
+    const status = await screen.findByText('Curated presets are not available on this NRCC server.');
+    expect(status.closest('[role="status"]')?.className).not.toMatch(/warning/);
+    expect(screen.queryByText(/Loading curated presets/)).not.toBeInTheDocument();
+    expect(calls).toBe(1);
+  });
 });

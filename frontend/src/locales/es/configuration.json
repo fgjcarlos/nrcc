@@ -27,6 +27,7 @@
     "acknowledgement": "Entiendo que al confirmar un preset se reescribirá la clave gestionada en settings.js y el valor original no se podrá recuperar a menos que exista un respaldo.",
     "loadingCurated": "Cargando presets curados...",
     "loadError": "No se pudieron cargar los presets.",
+    "unavailable": "Los presets curados no están disponibles en este servidor de NRCC.",
     "sectionLabel": "Presets curados",
     "title": "Presets curados",
     "description": "Recetas verificadas para ajustes avanzados de Node-RED 5. Cada preset declara las superficies editor / HTTP / Socket.IO que toca y nunca reescribe código del operador fuera de su alcance declarado.",

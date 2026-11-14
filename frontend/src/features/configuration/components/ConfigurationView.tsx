@@ -273,11 +273,10 @@ export function ConfigurationView() {
     const outcome = await runSave();
     if (!outcome) return;
     setApplyConfirmOpen(false);
-    // Success and a no-op close the drawer. A held gate closes it too, so
-    // the circuit shows the reason; a server failure keeps it open for retry.
-    if (outcome.ok || outcome.reason !== 'mutation-failed') {
-      setReviewPanelOpen(false);
-    }
+    // Every settled outcome closes the drawer: the circuit beside it carries
+    // the result (closed contacts, a held gate or the rollback branch), and
+    // the drawer would otherwise cover it. Review reopens it for a retry.
+    setReviewPanelOpen(false);
   };
 
   const handleConfirmRotation = async () => {
@@ -530,7 +529,7 @@ export function ConfigurationView() {
             className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-box border border-[var(--ds-border-strong)] px-3 py-2 text-sm text-ds-text-secondary"
           >
             <Lock className="h-4 w-4 shrink-0 text-ds-text-primary" aria-hidden="true" />
-            <span className="min-w-0 flex-1">{t('configuration:advanced.lockedBadge')}</span>
+            <span className="min-w-0 flex-[1_1_14rem]">{t('configuration:advanced.lockedBadge')}</span>
             <button
               type="button"
               onClick={() => setUnlockDialogOpen(true)}

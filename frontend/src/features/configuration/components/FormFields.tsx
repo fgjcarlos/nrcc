@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import type { LoggingLevel, NodeRedConfigFormData } from '@/shared/types';
 import { Input } from '@/shared/components/ui';
 import { SETTINGS_KEYS } from '../lib/fieldLabels';
@@ -19,10 +20,30 @@ function fieldIdentity(field: FieldKey | undefined, label: string) {
   };
 }
 
+/**
+ * A settings.js key in mono that may wrap only after a dot
+ * (`editorTheme.codeEditor.` / `options.theme`), never mid-word. `<wbr>`
+ * adds no text, so the accessible name is unchanged.
+ */
+export function SettingKey({ path, className }: { path: string; className?: string }) {
+  const parts = path.split('.');
+  return (
+    <span className={className ?? 'font-mono font-semibold text-ds-text-primary'}>
+      {/* Fragments keep every part a direct text node of this span. */}
+      {parts.map((part, i) => (
+        <Fragment key={i}>
+          {part}
+          {i < parts.length - 1 && <>.<wbr /></>}
+        </Fragment>
+      ))}
+    </span>
+  );
+}
+
 export function FieldLabel({ label, settingKey, htmlFor }: { label: string; settingKey?: string; htmlFor?: string }) {
   return (
     <label htmlFor={htmlFor} className="flex flex-wrap items-baseline gap-x-1.5 text-xs text-ds-text-secondary">
-      {settingKey && <span className="break-all font-mono font-semibold text-ds-text-primary">{settingKey}</span>}
+      {settingKey && <SettingKey path={settingKey} />}
       {settingKey && <span aria-hidden="true">·</span>}
       <span>{label}</span>
     </label>
