@@ -16,13 +16,13 @@ application. Branch: `feat/ui-brand-overhaul`.
 
 - [x] T1 — S1,S3 — Phase 0: `/impeccable init` → `PRODUCT.md` (interview) — inline — commit: 59b9254
 - [x] T2 — S1 — Phase 1: rendered diagnosis: `critique` per surface + `audit` + `detect <dev-server URL>` → prioritized P0–P3 backlog — inline + explore subagents — commit: this doc (snapshot in `frontend/.impeccable/critique/`, self-ignored)
-- [ ] T3 — S2,S4 — Phase 2: new visual world (`new-work`), `DESIGN.md` (`document`), tokens rewritten in `index.css`, self-hosted fonts, logo/wordmark; retire stale `COLOR_REFERENCE.md` — inline — commit: _pending_
+- [ ] T3 — S2,S4 — Phase 2: new visual world (`new-work`), `DESIGN.md` (`document`), tokens rewritten in `index.css`, self-hosted fonts, logo/wordmark; retire stale `COLOR_REFERENCE.md` — worker — commits: 9bbc221 (surface brief + direction contract), 6f186eb (tokens, fonts, effects). Open: logo/wordmark, retire `COLOR_REFERENCE.md` + `SIGNAL_PRIME_TOKENS.md`, DESIGN.md after T9 builds the proof surface
 - [ ] T4 — S2,S4 — Phase 3a: `extract` shared primitives (Button, Input/Select/Textarea, Card, Dialog, Table, Tabs, Badge/StatusChip, feedback states) — route TBD — commit: _pending_
 - [ ] T5 — S5 — Phase 3b: dev-only `/styleguide` route (foundations + components, both themes, en/es) — route TBD — commit: _pending_
 - [ ] T6 — S1 — Phase 4: app chrome (sidebar, header, command palette) + i18n leaks — commit: _pending_
 - [ ] T7 — S1 — Phase 4: Login / Setup (`onboard`, `clarify`, `harden`) — commit: _pending_
 - [ ] T8 — S1 — Phase 4: Overview (`layout`, `colorize`, `typeset`) — commit: _pending_
-- [ ] T9 — S1 — Phase 4: Configuration (`harden`, `clarify`, `layout`) — commit: _pending_
+- [ ] T9 — S1,S4 — Phase 4: Configuration + change circuit, the proof surface of the new world (pulled forward right after T3 foundation; `harden`, `clarify`, `layout`) — commit: _pending_
 - [ ] T10 — S1 — Phase 4: Backups, Env vars, Security (`polish`, `harden`) — commit: _pending_
 - [ ] T11 — S1 — Phase 4: Maintenance (updates, libraries) and Users (`polish`) — commit: _pending_
 - [ ] T12 — S1 — Phase 4: `adapt` (responsive) and `animate` pass — commit: _pending_
@@ -40,3 +40,6 @@ application. Branch: `feat/ui-brand-overhaul`.
 - **L7** — Functional bug found (outside rebrand scope): `frontend/src/features/backups/components/BackupsView.tsx:345` calls `retentionMutation.mutate(manual)`, so auto and pre-restore retention edits are never persisted.
 - **L8** — User decisions after critique: order = "Rebrand primero (Recomendada)" (urgent fixes land inside each surface slice); brand axis = "Sí, el \"riel\" es la marca" (shared transaction rail for Config/Security/Env/Restore defines the visual language); retention bug = "Arreglarlo ya, aparte" (own branch from main, outside this feature).
 - **L9** — Retention bug fixed apart on `fix/backup-retention-save` (commit e7fad89), PR #974. Root cause wider than reported: `PATCH /storage/retention` writes one value into all three retention kinds (`internal/handler/backup.go:400-402`); fix saves via `POST /backups/config`. Backend endpoint left as a follow-up.
+- **L10** — Direction round (decision page unavailable: no browser in env; structured tool used): user chose the assigned direction "Esquema eléctrico" (IEC wiring-diagram world), seed:a927e97550a2032a, code-led (Operate). Surface questions: first surface = "Configuration + riel (Recomendada)"; scene = "Mezcla sin dominante" (light and dark first-class); wrong if = "Parece marketing / juguete", "Pierde densidad"; untouchable = "se peude cambiar todo".
+- **L11** — Foundation slice 6f186eb verified: contrast strict 206 pairs pass both themes, unit 611 passed / 2 skipped, test:css, test:appearance, build pass; independent verify of Risk item 5 (fonts @5.3.0, OFL-1.1, no install scripts, no runtime deps, no external font hosts in dist, frozen-lockfile installs) all pass. Rendered check: glows gone, blue action, red only for critical. Known gap: light inputs use `glass-panel` and barely show a border (T4).
+- **L12** — Slice boundary 1 (delivery: chained PRs): commits 59b9254..6f186eb (product context, baseline critique, direction contract, foundation) form PR slice 1 (~1.5k authored lines, mostly index.css rewrite: +540/−822). Next work starts slice 2.
