@@ -383,8 +383,9 @@
     background-color: color-mix(in srgb, var(--color-primary) 10%, var(--ds-bg-surface));
   }
 
+  /* inline-flex keeps an icon on the label's line (it wrapped above it). */
   .action-btn-secondary {
-    @apply px-4 py-2 text-base-content transition-colors disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 text-base-content transition-colors disabled:opacity-50;
     border: 1px solid var(--ds-border-strong);
   }
 
@@ -402,7 +403,7 @@
   }
 
   .action-btn-ghost {
-    @apply px-3 py-2 text-base-content transition-colors disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 px-3 py-2 text-base-content transition-colors disabled:opacity-50;
     border: 1px solid transparent;
   }
 
@@ -937,7 +938,7 @@ aside.bg-base-100 {
    motion on the configuration surface. Contacts close in sequence. */
 .circuit-blade {
   transform-box: view-box;
-  transform-origin: 10px 15px;
+  transform-origin: 10.5px 15px;
   transition: transform 150ms cubic-bezier(0.16, 1, 0.3, 1);
   transition-delay: calc(var(--contact-i, 0) * 60ms);
 }

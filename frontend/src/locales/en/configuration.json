@@ -4,7 +4,8 @@
     "nodeRedNotDetected": "(no Node-RED detected)",
     "pathNotDetected": "no path detected",
     "recommendPortless": "Optional: install Portless to expose nrcc or Node-RED with HTTPS .localhost, LAN or Tailscale URLs.",
-    "recommendWritable": "Grant write access to settings.js so nrcc can save changes."
+    "recommendWritable": "Grant write access to settings.js so nrcc can save changes.",
+    "revisionTitle": "settings.js revision {{fingerprint}}"
   },
   "advanced": {
     "title": "Advanced settings.js",
@@ -16,8 +17,10 @@
     "unlockAcknowledgement": "I understand that a bad save can break Node-RED startup.",
     "saveRaw": "Save raw settings.js",
     "savingRaw": "Saving settings.js...",
-    "lockedBadge": "Locked - click \"Unlock to edit\" to make changes",
-    "cancelEdit": "Cancel"
+    "lockedBadge": "Locked. Select \"Unlock to edit settings.js\" to edit the file directly; a backup is taken before any write.",
+    "cancelEdit": "Cancel",
+    "directEdit": "Direct edit · bypasses the change circuit (no diff review)",
+    "parseError": "Invalid settings.js: {{message}}"
   },
   "preset": {
     "confirmApply": "Confirm apply",
@@ -56,6 +59,7 @@
   "aiProvider": "AI Provider",
   "aiProviderDesc": "Configure optional, review-first AI flow assistance.",
   "pageTitle": "Node-RED Configuration",
+  "sectionsLabel": "Configuration sections",
   "discardChanges": "Discard Changes",
   "runtimeVersionLabel": "Runtime version",
   "configSourceLabel": "Configuration source",

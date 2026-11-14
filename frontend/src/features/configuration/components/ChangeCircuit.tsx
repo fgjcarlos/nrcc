@@ -55,16 +55,18 @@ function ContactSymbol({ state, index }: { state: ContactState; index: number })
       width="20"
       height="20"
       aria-hidden="true"
-      className={cn('relative shrink-0 max-lg:-rotate-90', STATE_STROKE[state])}
+      // Rotating 90° about the centre keeps x=10.5 on the strip's y=10.5 conductor.
+      className={cn('relative shrink-0 max-lg:rotate-90', STATE_STROKE[state])}
     >
-      <rect x="6" y="5" width="8" height="10" className="fill-ds-bg-surface" />
+      <rect x="6.5" y="5" width="8" height="10" className="fill-ds-bg-surface" />
+      {/* x=10.5 sits on the 1px conductor drawn at whole pixels (12–13px in the gutter). */}
       <g stroke="currentColor" strokeWidth="1.5" strokeLinecap="square">
-        <line x1="10" y1="0" x2="10" y2="5" />
-        <line x1="10" y1="15" x2="10" y2="20" />
+        <line x1="10.5" y1="0" x2="10.5" y2="5" />
+        <line x1="10.5" y1="15" x2="10.5" y2="20" />
         <line
-          x1="10"
+          x1="10.5"
           y1="15"
-          x2="10"
+          x2="10.5"
           y2="5"
           strokeDasharray={state === 'unknown' ? '2 1.5' : undefined}
           className="circuit-blade"
@@ -74,7 +76,7 @@ function ContactSymbol({ state, index }: { state: ContactState; index: number })
       </g>
       {closed && (
         <rect
-          x="13.5"
+          x="14"
           y="8"
           width="4"
           height="4"
@@ -150,9 +152,11 @@ export function ChangeCircuit({
         aria-labelledby={titleId}
         className={cn(
           'relative flex min-w-0 justify-between lg:flex-col lg:justify-start',
-          "before:pointer-events-none before:absolute before:bg-ds-border-default before:content-['']",
-          'max-lg:before:inset-x-0 max-lg:before:top-1/2 max-lg:before:h-px',
-          'lg:before:inset-y-0 lg:before:left-[11.5px] lg:before:w-px',
+          // Ink conductor: the control-border token (>=3:1 in both themes),
+          // 1px on whole pixels so it is never antialiased to half strength.
+          "before:pointer-events-none before:absolute before:bg-[var(--ds-border-strong)] before:content-['']",
+          'max-lg:before:inset-x-0 max-lg:before:top-2.5 max-lg:before:h-px',
+          'lg:before:inset-y-0 lg:before:left-3 lg:before:w-px',
         )}
         data-testid="change-circuit-steps"
       >

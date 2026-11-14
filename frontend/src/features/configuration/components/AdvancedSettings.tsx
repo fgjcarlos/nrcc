@@ -115,7 +115,7 @@ export function AdvancedSettings({ rawContent, expectedRevision, onApplied }: Ad
 
   if (presetsQuery.isLoading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-base-content/65">
+      <div className="flex items-center gap-2 text-sm text-ds-text-secondary">
         <Loader2 className="h-4 w-4 animate-spin" /> {t('configuration:preset.loadingCurated')}
       </div>
     );
@@ -125,7 +125,7 @@ export function AdvancedSettings({ rawContent, expectedRevision, onApplied }: Ad
     return (
       <div
         role="status"
-        className="flex items-center gap-2 rounded-xl border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning"
+        className="flex items-center gap-2 rounded-box border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning"
       >
         <AlertTriangle className="h-4 w-4" /> {t('configuration:preset.loadError')}
       </div>
@@ -138,9 +138,9 @@ export function AdvancedSettings({ rawContent, expectedRevision, onApplied }: Ad
     <section aria-label={t('configuration:preset.sectionLabel')} className="space-y-4 border-t border-ds-border-subtle pt-4">
       <header className="flex items-center gap-2">
         <ShieldCheck className="h-5 w-5 text-primary" />
-        <h2 className="text-lg font-semibold">{t('configuration:preset.title')}</h2>
+        <h2 className="text-sm font-semibold text-ds-text-primary">{t('configuration:preset.title')}</h2>
       </header>
-      <p className="text-sm text-base-content/65">
+      <p className="text-sm text-ds-text-secondary">
         {t('configuration:preset.description')}
       </p>
 
@@ -150,24 +150,24 @@ export function AdvancedSettings({ rawContent, expectedRevision, onApplied }: Ad
             key={preset.id}
             role="region"
             aria-label={preset.id}
-            className="rounded-2xl border border-border bg-base-100/60 p-4"
+            className="rounded-box border border-ds-border-subtle p-3"
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-base font-semibold">{preset.name}</h3>
+              <h3 className="text-sm font-semibold text-ds-text-primary">{preset.name}</h3>
               <span
-                className="rounded-full bg-base-200/60 px-2 py-0.5 text-xs text-base-content/65"
+                className="rounded-full bg-base-200/60 px-2 py-0.5 text-xs text-ds-text-secondary"
                 title={`Channel boundary: ${preset.channelBoundary}`}
               >
                 <Lock className="mr-1 inline h-3 w-3" />
                 {preset.channelBoundary}
               </span>
             </div>
-            <p className="mt-1 text-sm text-base-content/65">{preset.description}</p>
+            <p className="mt-1 text-sm text-ds-text-secondary">{preset.description}</p>
             <div className="mt-2 flex flex-wrap gap-2 text-xs">
               {preset.surfaces.map((surface) => (
                 <span
                   key={surface}
-                  className="rounded-full border border-border bg-base-200/40 px-2 py-0.5 text-base-content/65"
+                  className="rounded-full border border-border bg-base-200/40 px-2 py-0.5 text-ds-text-secondary"
                 >
                   {surface}
                 </span>
@@ -209,7 +209,7 @@ export function AdvancedSettings({ rawContent, expectedRevision, onApplied }: Ad
           <pre
             role="region"
             aria-label="Redacted transaction preview"
-            className="max-h-80 overflow-auto rounded-xl border border-border bg-base-200/40 p-3 font-mono text-xs"
+            className="max-h-80 overflow-auto rounded-box border border-ds-border-subtle bg-ds-bg-base p-3 font-mono text-xs"
           >
             {preview.preview}
           </pre>

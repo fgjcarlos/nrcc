@@ -9,7 +9,7 @@ import type {
   RestartSeverity,
 } from '../hooks/useConfigurationDiff';
 import type { NodeRedConfigFormData } from '@/shared/types';
-import { FIELD_LABELS } from '../lib/fieldLabels';
+import { FIELD_LABELS, SETTINGS_KEYS } from '../lib/fieldLabels';
 
 /**
  * Issue #766 slice F (W4) — reviewable safe-apply panel.
@@ -172,18 +172,18 @@ export function ReviewChangesPanel({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="relative z-[60] surface-panel flex h-full w-full max-w-xl flex-col border-l border-border shadow-glow sm:rounded-none rounded-t-2xl sm:mt-0 mt-auto max-h-[85vh] sm:max-h-full"
+        className="relative z-[60] surface-panel flex h-full w-full max-w-xl flex-col border-l border-border shadow-glow sm:rounded-none rounded-t-box sm:mt-0 mt-auto max-h-[85vh] sm:max-h-full"
         data-testid="review-changes-panel"
       >
         {/* Header */}
         <header className="flex items-start justify-between border-b ghost-divider modal-inner p-6">
           <div className="min-w-0">
-            <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">
+            <h2 id={titleId} className="text-xl font-semibold text-ds-text-primary">
               {t('configuration:reviewPanel.title')}
-            </p>
-            <h2 id={titleId} className="mt-1 text-lg font-semibold text-base-content">
-              {t('configuration:reviewPanel.subtitle', { target })}
             </h2>
+            <p className="mt-1 text-sm text-ds-text-secondary">
+              {t('configuration:reviewPanel.subtitle', { target })}
+            </p>
           </div>
           <button
             type="button"
@@ -200,7 +200,7 @@ export function ReviewChangesPanel({
         <div className="flex-1 overflow-y-auto px-6 py-5">
           {noChanges ? (
             <p
-              className="text-sm text-base-content/70"
+              className="text-sm text-ds-text-secondary"
               data-testid="review-changes-panel-empty"
             >
               {t('configuration:reviewPanel.noChanges')}
@@ -212,7 +212,7 @@ export function ReviewChangesPanel({
                   key={group.severity}
                   data-testid={`review-changes-panel-group-${group.severity}`}
                 >
-                  <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-base-content/65">
+                  <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-ds-text-secondary">
                     {group.severity === 'hard' ? (
                       <RotateCw className="h-3.5 w-3.5" aria-hidden="true" />
                     ) : group.severity === 'soft' ? (
@@ -230,12 +230,16 @@ export function ReviewChangesPanel({
                     {group.entries.map(({ key, diff }) => (
                       <li
                         key={key}
-                        className="rounded-xl border border-border bg-base-100/60 p-3"
+                        className="rounded-box border border-ds-border-subtle p-3"
                         data-testid={`review-changes-panel-row-${key}`}
                       >
                         <div className="flex items-start justify-between gap-2">
-                          <span className="text-sm font-medium text-base-content">
-                            {FIELD_LABELS[key] ?? key}
+                          <span className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 text-sm text-ds-text-secondary">
+                            <span className="break-all font-mono font-semibold text-ds-text-primary">
+                              {SETTINGS_KEYS[key] ?? key}
+                            </span>
+                            <span aria-hidden="true">·</span>
+                            <span>{FIELD_LABELS[key] ?? key}</span>
                           </span>
                           <StatusChip
                             variant={diff.validation.state === 'invalid' ? 'warning' : 'neutral'}
@@ -247,13 +251,13 @@ export function ReviewChangesPanel({
                           </StatusChip>
                         </div>
                         <div className="mt-2 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-xs">
-                          <span className="text-base-content/50">
+                          <span className="text-ds-text-muted">
                             {t('configuration:reviewPanel.configuredLabel')}
                           </span>
-                          <span className="font-mono text-base-content/80 break-all">
+                          <span className="font-mono text-ds-text-secondary break-all">
                             {formatValue(diff.configuredValue)}
                           </span>
-                          <span className="text-base-content/50">
+                          <span className="text-ds-text-muted">
                             {t('configuration:reviewPanel.newLabel')}
                           </span>
                           <span className="font-mono text-base-content break-all">

@@ -1,5 +1,5 @@
 import { useState, useEffect, useId, useMemo, useRef } from 'react';
-import { toast } from 'sonner';
+import { errorMessage } from '@/shared/lib/errorMessage';
 import { cn } from '@/shared/lib';
 import type { NodeRedConfigFormData } from '@/shared/types';
 import { settingsRawSchema } from '@/shared/validation/schemas';
@@ -15,9 +15,23 @@ import { ConfigurationHeader } from './ConfigurationHeader';
 import { ReviewChangesPanel } from './ReviewChangesPanel';
 import { ChangeCircuit } from './ChangeCircuit';
 import { applyErrorCode, deriveCircuit, type ApplyRun } from '../lib/changeCircuit';
+import { SETTINGS_KEYS } from '../lib/fieldLabels';
+
+/** Form field names to the settings.js keys shown as circuit designators. */
+const settingsKeys = (fields: string[]) =>
+  fields.map((f) => SETTINGS_KEYS[f as keyof NodeRedConfigFormData] ?? f);
+
+/** Roving tabindex: the next tab index for Left/Right/Home/End, else null. */
+function nextTabIndex(key: string, index: number, count: number): number | null {
+  if (key === 'ArrowRight') return (index + 1) % count;
+  if (key === 'ArrowLeft') return (index - 1 + count) % count;
+  if (key === 'Home') return 0;
+  if (key === 'End') return count - 1;
+  return null;
+}
 import {
   Server, Shield, Activity, Palette,
-  Save, LockOpen, AlertTriangle, Bot
+  Save, Lock, LockOpen, Bot
 } from 'lucide-react';
 import { useConfigurationData, useConfigurationActions, useConfigurationDiff, useConfigurationSave, fieldValidationMap } from '../hooks';
 import { useT } from '@/i18n';
@@ -129,6 +143,7 @@ const INITIAL_FORM_DATA: NodeRedConfigFormData = {
 export function ConfigurationView() {
   // UI state
   const [activeTab, setActiveTab] = useState('basic');
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [formData, setFormData] = useState<NodeRedConfigFormData>(INITIAL_FORM_DATA);
   const [rawSettingsContent, setRawSettingsContent] = useState('');
   // Raw-settings editor gate (issue #364): the textarea is read-only by
@@ -136,6 +151,7 @@ export function ConfigurationView() {
   // the warning dialog, and only then can they edit and save. Re-locking
   // discards any in-flight edits.
   const [rawEditorUnlocked, setRawEditorUnlocked] = useState(false);
+  const [rawParseError, setRawParseError] = useState<string | null>(null);
   const [rawEditorSnapshot, setRawEditorSnapshot] = useState('');
   const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
 
@@ -160,6 +176,7 @@ export function ConfigurationView() {
 
   // Data and actions hooks
   const { t } = useT();
+  const rawErrorId = useId();
   // Names the raw settings.js editor after its section heading (#889 axe `label`).
   const rawSettingsHeadingId = useId();
 
@@ -228,7 +245,12 @@ export function ConfigurationView() {
           ? { status: 'succeeded', count }
           : outcome.reason === 'mutation-failed'
             ? { status: 'failed', count, code: applyErrorCode(outcome.error) }
-            : { status: 'idle' },
+            // Gated outcomes stay on the circuit, not on a toast (THESIS).
+            : outcome.reason === 'validation-errors'
+              ? { status: 'held', count, reason: 'invalid', fields: settingsKeys(Object.keys(outcome.errors)) }
+              : outcome.reason === 'read-only'
+                ? { status: 'held', count, reason: 'readOnly' }
+                : { status: 'idle' },
       );
       return outcome;
     } finally {
@@ -251,16 +273,10 @@ export function ConfigurationView() {
     const outcome = await runSave();
     if (!outcome) return;
     setApplyConfirmOpen(false);
-    if (outcome.ok) {
+    // Success and a no-op close the drawer. A held gate closes it too, so
+    // the circuit shows the reason; a server failure keeps it open for retry.
+    if (outcome.ok || outcome.reason !== 'mutation-failed') {
       setReviewPanelOpen(false);
-    } else if (outcome.reason === 'validation-errors') {
-      toast.error(`Fix ${Object.keys(outcome.errors).length} field${Object.keys(outcome.errors).length === 1 ? '' : 's'} before saving`);
-    } else if (outcome.reason === 'no-pending-changes') {
-      // Operator applied without changing anything; treat as a
-      // soft no-op.
-      setReviewPanelOpen(false);
-    } else if (outcome.reason === 'read-only') {
-      toast.error('Configuration is read-only on this host');
     }
   };
 
@@ -268,13 +284,8 @@ export function ConfigurationView() {
     // Keep the dialog open while saving so it shows its processing state.
     const outcome = await runSave();
     if (!outcome) return;
+    // The circuit carries every outcome of the rotation save.
     setRotationDialogOpen(false);
-    if (outcome.ok) return;
-    if (outcome.reason === 'validation-errors') {
-      toast.error(`Fix ${Object.keys(outcome.errors).length} field${Object.keys(outcome.errors).length === 1 ? '' : 's'} before saving`);
-    } else if (outcome.reason === 'read-only') {
-      toast.error('Configuration is read-only on this host');
-    }
   };
 
   const handleCancelRotation = () => {
@@ -294,6 +305,7 @@ export function ConfigurationView() {
   const handleCancelRawEdit = () => {
     setRawSettingsContent(rawEditorSnapshot);
     setRawEditorUnlocked(false);
+    setRawParseError(null);
   };
 
   // Called when the user clicks the "Save changes" button on the unlocked
@@ -302,7 +314,7 @@ export function ConfigurationView() {
   const handleSaveRawSettingsLocked = (content: string) => {
     const result = settingsRawSchema.safeParse(content);
     if (!result.success) {
-      toast.error(`Invalid settings.js: ${result.error.issues[0]?.message ?? 'syntax error'}`);
+      setRawParseError(result.error.issues[0]?.message ?? 'syntax error');
       return;
     }
     // Issue #878 — the raw editor sends the revision of the document it
@@ -322,13 +334,20 @@ export function ConfigurationView() {
     () =>
       deriveCircuit({
         pendingCount: diff.pendingCount,
-        invalidCount: Object.keys(diff.validationErrors).length,
+        invalidFields: settingsKeys(Object.keys(diff.validationErrors)),
         reviewed: reviewedFormData === formData,
         readOnly,
         run: applyRun,
       }),
     [diff, reviewedFormData, formData, readOnly, applyRun],
   );
+  // Inline errors under the raw editor: client syntax check, then the server.
+  const rawError = rawParseError
+    ? t('configuration:advanced.parseError', { message: rawParseError })
+    : actions.saveRawSettingsMutation.error
+      ? errorMessage(actions.saveRawSettingsMutation.error)
+      : null;
+  const revision = data.settingsDoc?.revision?.fingerprint;
   const restartCount = Object.values(diff.fields).filter((f) => f.pending && f.restart === 'hard').length;
   const host = data.hostStatus as (typeof data.hostStatus & { portless?: { installed?: boolean } }) | undefined;
   const recommendations = host
@@ -352,8 +371,18 @@ export function ConfigurationView() {
   return (
     <LoadingBoundary state={configViewState}>
     <div className="space-y-4">
-      {/* Header (slice F W3, T9) — title, one runtime status, host details, topology */}
+      {/* Header (slice F W3, T9) — title, revision designator, one runtime status, host details */}
       <ConfigurationHeader
+        designator={
+          revision && (
+            <span
+              className="font-mono text-xs font-semibold text-ds-text-primary"
+              title={t('configuration:host.revisionTitle', { fingerprint: revision })}
+            >
+              {`REV ${revision.slice(0, 8)}`}
+            </span>
+          )
+        }
         status={
           data.hostStatus && (
             <p className="text-sm text-ds-text-secondary" data-testid="configuration-runtime-status">
@@ -410,34 +439,56 @@ export function ConfigurationView() {
       />
 
       <div className="min-w-0 space-y-4 lg:col-start-1 lg:row-start-1">
-      {/* Tabs Navigation */}
-      <div className="border-b ghost-divider">
-        <nav className="flex space-x-1 overflow-x-auto" aria-label="Tabs">
-          {SECTIONS.map((section) => {
-            const Icon = section.icon;
-            return (
-              <button
-                key={section.id}
-                onClick={() => setActiveTab(section.id)}
-                className={cn(
-                  'flex items-center gap-2 border-b-2 px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors',
-                  activeTab === section.id
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-base-content/55 hover:border-border hover:text-base-content'
-                )}
-              >
-                <Icon className="w-4 h-4" />
-                {section.label}
-              </button>
-            );
-          })}
-        </nav>
+      {/* Sections: a WAI-ARIA tablist with roving tabindex. */}
+      <div
+        role="tablist"
+        aria-label={t('configuration:sectionsLabel')}
+        className="flex gap-1 overflow-x-auto border-b border-ds-border-subtle"
+      >
+        {SECTIONS.map((section, index) => {
+          const Icon = section.icon;
+          const selected = activeTab === section.id;
+          return (
+            <button
+              key={section.id}
+              ref={(el) => { tabRefs.current[index] = el; }}
+              type="button"
+              role="tab"
+              id={`config-tab-${section.id}`}
+              aria-selected={selected}
+              aria-controls={`config-panel-${section.id}`}
+              tabIndex={selected ? 0 : -1}
+              onClick={() => setActiveTab(section.id)}
+              onKeyDown={(event) => {
+                const next = nextTabIndex(event.key, index, SECTIONS.length);
+                if (next === null) return;
+                event.preventDefault();
+                setActiveTab(SECTIONS[next].id);
+                tabRefs.current[next]?.focus();
+              }}
+              className={cn(
+                '-mb-px flex min-h-9 items-center gap-2 border-b-2 px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors',
+                selected
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-ds-text-muted hover:border-[var(--ds-border-strong)] hover:text-ds-text-primary'
+              )}
+            >
+              <Icon className="h-4 w-4" aria-hidden="true" />
+              {section.label}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Active Tab Content */}
-      <div>
+      <div
+        role="tabpanel"
+        id={`config-panel-${activeTab}`}
+        aria-labelledby={`config-tab-${activeTab}`}
+        tabIndex={0}
+        className="focus-visible:outline-offset-4"
+      >
         {readOnly ? (
-          <div className="rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm text-warning" role="status">
+          <div className="rounded-box border border-warning/40 bg-warning/10 p-4 text-sm text-warning" role="status">
             {t('configuration:controlsUnavailable')}
           </div>
         ) : activeTab === 'ai' ? <AIProviderSettings /> : <ActiveComponent settings={formData} onUpdate={handleUpdateField} disabled={isSaving} fieldErrors={fieldValidationMap(diff.fields)} />}
@@ -454,27 +505,42 @@ export function ConfigurationView() {
       <div className="space-y-4 border-t border-ds-border-subtle pt-4">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
           <div className="min-w-0">
-            <h2 id={rawSettingsHeadingId} className="text-lg font-semibold text-base-content">
+            <h2 id={rawSettingsHeadingId} className="text-sm font-semibold text-ds-text-primary">
               {t('configuration:advanced.title')}
             </h2>
-            <p className="text-sm text-base-content/65">
+            <p className="text-xs font-semibold uppercase tracking-wide text-ds-text-primary">
+              {t('configuration:advanced.directEdit')}
+            </p>
+            <p className="text-sm text-ds-text-secondary">
               {t('configuration:advanced.description')}
             </p>
           </div>
           {data.settingsDoc?.backupPath && (
-            <span className="min-w-0 break-all text-xs text-base-content/55">
+            <span className="min-w-0 break-all text-xs text-ds-text-muted">
               {t('configuration:advanced.lastBackup', { path: data.settingsDoc.backupPath })}
             </span>
           )}
         </div>
 
+        {/* Locked is the safe default, so the banner is neutral ink with the
+            unlock control beside its text. */}
         {!rawEditorUnlocked && (
           <div
             data-testid="raw-settings-locked-banner"
-            className="flex items-center gap-2 rounded-xl border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning"
+            className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-box border border-[var(--ds-border-strong)] px-3 py-2 text-sm text-ds-text-secondary"
           >
-            <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-            <span>{t('configuration:advanced.lockedBadge')}</span>
+            <Lock className="h-4 w-4 shrink-0 text-ds-text-primary" aria-hidden="true" />
+            <span className="min-w-0 flex-1">{t('configuration:advanced.lockedBadge')}</span>
+            <button
+              type="button"
+              onClick={() => setUnlockDialogOpen(true)}
+              disabled={!data.settingsDoc?.writable || actions.saveRawSettingsMutation.isPending}
+              data-testid="raw-settings-unlock-btn"
+              className="action-btn-secondary min-h-9 text-sm"
+            >
+              <LockOpen className="h-4 w-4" aria-hidden="true" />
+              {t('configuration:advanced.unlockToEdit')}
+            </button>
           </div>
         )}
 
@@ -483,53 +549,51 @@ export function ConfigurationView() {
           onChange={(event) => {
             if (!rawEditorUnlocked) return;
             setRawSettingsContent(event.target.value);
+            setRawParseError(null);
+            if (actions.saveRawSettingsMutation.error) actions.saveRawSettingsMutation.reset();
           }}
           readOnly={!rawEditorUnlocked}
           aria-readonly={!rawEditorUnlocked}
           aria-labelledby={rawSettingsHeadingId}
+          aria-invalid={rawError ? true : undefined}
+          aria-describedby={rawError ? rawErrorId : undefined}
+          // Sized to the source: one row per line between 8 and 24, then scroll.
+          rows={Math.min(Math.max(rawSettingsContent.split('\n').length, 8), 24)}
           className={cn(
-            'min-h-[20rem] w-full rounded-2xl border border-border bg-base-100/80 p-4 font-mono text-sm text-base-content focus:outline-none focus:ring-2 focus:ring-primary',
-            !rawEditorUnlocked && 'cursor-not-allowed opacity-70'
+            'w-full resize-y overflow-auto rounded-box border border-border p-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-primary',
+            rawEditorUnlocked ? 'bg-base-100 text-base-content' : 'cursor-not-allowed bg-ds-bg-base text-ds-text-secondary'
           )}
           spellCheck={false}
         />
+        {rawError && (
+          <p id={rawErrorId} role="alert" className="text-sm text-ds-on-tint-error" data-testid="raw-settings-error">
+            {rawError}
+          </p>
+        )}
 
-        <div className="flex justify-end gap-2">
-          {!rawEditorUnlocked ? (
+        {rawEditorUnlocked && (
+          <div className="flex justify-end gap-2">
             <button
               type="button"
-              onClick={() => setUnlockDialogOpen(true)}
-              disabled={!data.settingsDoc?.writable || actions.saveRawSettingsMutation.isPending}
-              data-testid="raw-settings-unlock-btn"
+              onClick={handleCancelRawEdit}
+              disabled={actions.saveRawSettingsMutation.isPending}
+              data-testid="raw-settings-cancel-btn"
               className="action-btn-secondary"
             >
-              <LockOpen className="w-4 h-4" />
-              {t('configuration:advanced.unlockToEdit')}
+              {t('configuration:advanced.cancelEdit')}
             </button>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={handleCancelRawEdit}
-                disabled={actions.saveRawSettingsMutation.isPending}
-                data-testid="raw-settings-cancel-btn"
-                className="action-btn-secondary"
-              >
-                {t('configuration:advanced.cancelEdit')}
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSaveRawSettingsLocked(rawSettingsContent)}
-                disabled={!data.settingsDoc?.writable || actions.saveRawSettingsMutation.isPending}
-                data-testid="raw-settings-save-btn"
-                className="action-btn-primary"
-              >
-                <Save className="w-4 h-4" />
-                {actions.saveRawSettingsMutation.isPending ? t('configuration:advanced.savingRaw') : t('common:saveChanges')}
-              </button>
-            </>
-          )}
-        </div>
+            <button
+              type="button"
+              onClick={() => handleSaveRawSettingsLocked(rawSettingsContent)}
+              disabled={!data.settingsDoc?.writable || actions.saveRawSettingsMutation.isPending}
+              data-testid="raw-settings-save-btn"
+              className="action-btn-primary"
+            >
+              <Save className="w-4 h-4" />
+              {actions.saveRawSettingsMutation.isPending ? t('configuration:advanced.savingRaw') : t('configuration:advanced.saveRaw')}
+            </button>
+          </div>
+        )}
       </div>
 
       </div>

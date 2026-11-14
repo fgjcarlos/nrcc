@@ -1,4 +1,3 @@
-import { Palette } from 'lucide-react';
 import { InputField, ToggleField, SelectField } from './FormFields';
 import { ImageUpload } from './ImageUpload';
 import type { NodeRedConfigFormData } from '@/shared/types';
@@ -14,18 +13,14 @@ export function EditorThemeSettings({ settings, onUpdate, disabled }: EditorThem
   const { t } = useT();
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 mb-4">
-        <Palette className="w-5 h-5 text-base-content/60" />
-        <h3 className="text-lg font-medium text-base-content">{t('configuration:editorTheme')}</h3>
-      </div>
-
       <div className="space-y-6">
         {/* Page Settings */}
         <div>
-          <h4 className="mb-3 text-sm font-medium text-base-content/60">{t('configuration:editorPage')}</h4>
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ds-text-secondary">{t('configuration:editorPage')}</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <InputField
               label="Page Title"
+              field="editorPageTitle"
               value={settings.editorPageTitle}
               onChange={(v) => onUpdate('editorPageTitle', v as string)}
               placeholder="Node-RED"
@@ -34,6 +29,7 @@ export function EditorThemeSettings({ settings, onUpdate, disabled }: EditorThem
             <div>
               <ImageUpload
                 label="Favicon"
+                field="editorPageFavicon"
                 value={settings.editorPageFavicon}
                 onChange={(v) => onUpdate('editorPageFavicon', v)}
                 type="favicon"
@@ -45,10 +41,11 @@ export function EditorThemeSettings({ settings, onUpdate, disabled }: EditorThem
 
         {/* Header Settings */}
         <div>
-          <h4 className="mb-3 text-sm font-medium text-base-content/60">Header</h4>
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ds-text-secondary">Header</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <InputField
               label="Header Title"
+              field="editorHeaderTitle"
               value={settings.editorHeaderTitle}
               onChange={(v) => onUpdate('editorHeaderTitle', v as string)}
               placeholder="Node-RED"
@@ -56,6 +53,7 @@ export function EditorThemeSettings({ settings, onUpdate, disabled }: EditorThem
             />
             <InputField
               label="Header URL"
+              field="editorHeaderUrl"
               value={settings.editorHeaderUrl}
               onChange={(v) => onUpdate('editorHeaderUrl', v as string)}
               placeholder="http://nodered.org"
@@ -64,6 +62,7 @@ export function EditorThemeSettings({ settings, onUpdate, disabled }: EditorThem
             <div className="md:col-span-2">
               <ImageUpload
                 label="Header Image"
+                field="editorHeaderImage"
                 value={settings.editorHeaderImage}
                 onChange={(v) => onUpdate('editorHeaderImage', v)}
                 type="header"
@@ -75,10 +74,11 @@ export function EditorThemeSettings({ settings, onUpdate, disabled }: EditorThem
 
         {/* Palette */}
         <div>
-          <h4 className="mb-3 text-sm font-medium text-base-content/60">Palette</h4>
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ds-text-secondary">Palette</h4>
           <div className="space-y-3">
             <ToggleField
               label="Allow Node Installation"
+              field="editorPaletteEditable"
               value={settings.editorPaletteEditable}
               onChange={(v) => onUpdate('editorPaletteEditable', v)}
               help="Allow users to install nodes from the palette"
@@ -86,6 +86,7 @@ export function EditorThemeSettings({ settings, onUpdate, disabled }: EditorThem
             />
             <InputField
               label="Node Catalogues (one per line)"
+              field="editorPaletteCatalogues"
               value={settings.editorPaletteCatalogues}
               onChange={(v) => onUpdate('editorPaletteCatalogues', v as string)}
               placeholder="https://catalogue.nodered.org/catalogue.json"
@@ -96,10 +97,11 @@ export function EditorThemeSettings({ settings, onUpdate, disabled }: EditorThem
 
         {/* Code Editor */}
         <div>
-          <h4 className="mb-3 text-sm font-medium text-base-content/60">{t('configuration:codeEditor')}</h4>
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ds-text-secondary">{t('configuration:codeEditor')}</h4>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <SelectField
               label="Editor Library"
+              field="editorCodeLib"
               value={settings.editorCodeLib}
               onChange={(v) => onUpdate('editorCodeLib', v)}
               options={[
@@ -110,6 +112,7 @@ export function EditorThemeSettings({ settings, onUpdate, disabled }: EditorThem
             />
             <SelectField
               label="Theme"
+              field="editorCodeTheme"
               value={settings.editorCodeTheme}
               onChange={(v) => onUpdate('editorCodeTheme', v)}
               options={[
@@ -121,6 +124,7 @@ export function EditorThemeSettings({ settings, onUpdate, disabled }: EditorThem
             />
             <InputField
               label="Font Size"
+              field="editorCodeFontSize"
               value={settings.editorCodeFontSize}
               onChange={(v) => onUpdate('editorCodeFontSize', v as number)}
               type="number"
@@ -131,22 +135,25 @@ export function EditorThemeSettings({ settings, onUpdate, disabled }: EditorThem
 
         {/* Misc */}
         <div>
-          <h4 className="mb-3 text-sm font-medium text-base-content/60">Miscellaneous</h4>
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ds-text-secondary">Miscellaneous</h4>
           <div className="space-y-3">
             <ToggleField
               label="Show User Menu"
+              field="editorUserMenu"
               value={settings.editorUserMenu}
               onChange={(v) => onUpdate('editorUserMenu', v)}
               disabled={disabled}
             />
             <ToggleField
               label="Enable Welcome Tours"
+              field="editorTours"
               value={settings.editorTours}
               onChange={(v) => onUpdate('editorTours', v)}
               disabled={disabled}
             />
             <ToggleField
               label="Enable Projects in Editor"
+              field="editorProjectsEnabled"
               value={settings.editorProjectsEnabled}
               onChange={(v) => onUpdate('editorProjectsEnabled', v)}
               disabled={disabled}
@@ -156,9 +163,10 @@ export function EditorThemeSettings({ settings, onUpdate, disabled }: EditorThem
 
         {/* Login Image */}
         <div>
-          <h4 className="mb-3 text-sm font-medium text-base-content/60">{t('configuration:loginScreen')}</h4>
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ds-text-secondary">{t('configuration:loginScreen')}</h4>
           <ImageUpload
             label="Login Background Image"
+            field="editorLoginImage"
             value={settings.editorLoginImage}
             onChange={(v) => onUpdate('editorLoginImage', v)}
             type="login"
@@ -167,6 +175,7 @@ export function EditorThemeSettings({ settings, onUpdate, disabled }: EditorThem
           <div className="mt-3">
             <InputField
               label="Logout Redirect URL"
+              field="editorLogoutRedirect"
               value={settings.editorLogoutRedirect}
               onChange={(v) => onUpdate('editorLogoutRedirect', v as string)}
               placeholder="http://example.com"

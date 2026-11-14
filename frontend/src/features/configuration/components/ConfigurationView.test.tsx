@@ -22,6 +22,13 @@ vi.mock('@/features/configuration/services', () => ({
   },
   fileService: { uploadImage: vi.fn(), deleteImage: vi.fn(), listImages: vi.fn() },
   settingsService: { getRaw: mocks.getRaw, saveRaw: vi.fn() },
+  // The AI Provider tab loads its own config when the tablist reaches it.
+  aiService: {
+    getConfig: vi.fn().mockResolvedValue({ enabled: false, provider: 'offline' }),
+    getStatus: vi.fn().mockResolvedValue({ status: 'disabled' }),
+    saveConfig: vi.fn(),
+    testConfig: vi.fn(),
+  },
 }));
 
 vi.mock('@/features/bootstrap/services', () => ({
@@ -86,10 +93,9 @@ function reviewAction() {
 }
 
 async function switchToTab(user: ReturnType<typeof userEvent.setup>, label: string) {
-  // The tab buttons render an icon + the label. The accessible name
-  // for the <button> is the visible label (the icon is aria-hidden via
-  // lucide-react), so getByRole with `name` is the stable selector.
-  const tab = await screen.findByRole('button', { name: new RegExp(`^${label}$`) });
+  // The sections are a tablist; each tab's accessible name is its
+  // visible label (the icon is aria-hidden).
+  const tab = await screen.findByRole('tab', { name: new RegExp(`^${label}$`) });
   await user.click(tab);
 }
 
@@ -280,25 +286,25 @@ describe('ConfigurationView (issue #762 — Security tab for credentialSecret / 
     const user = userEvent.setup();
     renderConfiguration();
 
-    await user.click(await screen.findByRole('button', { name: /^TLS & Secrets$/ }));
+    await user.click(await screen.findByRole('tab', { name: /^TLS & Secrets$/ }));
 
     // credentialSecret + https use the shared Input (label+id).
     // requireHttps is a ToggleField with no htmlFor link.
-    expect(screen.getByLabelText('Credential Secret')).toBeInTheDocument();
+    expect(screen.getByLabelText('Credential Secret (credentialSecret)')).toBeInTheDocument();
     expect(screen.getByText(/^Require HTTPS$/)).toBeInTheDocument();
-    expect(screen.getByLabelText('Private Key Path')).toBeInTheDocument();
-    expect(screen.getByLabelText('Certificate Path')).toBeInTheDocument();
-    expect(screen.getByLabelText('CA Bundle Path')).toBeInTheDocument();
-    expect(screen.getByLabelText('HTTPS Port')).toBeInTheDocument();
-    expect(screen.getByLabelText('Private Key Passphrase')).toBeInTheDocument();
+    expect(screen.getByLabelText('Private Key Path (https.key)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Certificate Path (https.cert)')).toBeInTheDocument();
+    expect(screen.getByLabelText('CA Bundle Path (https.ca)')).toBeInTheDocument();
+    expect(screen.getByLabelText('HTTPS Port (https.port)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Private Key Passphrase (https.passphrase)')).toBeInTheDocument();
   });
 
   it('gates credentialSecret rotation behind a confirmation dialog and clears the field on cancel', async () => {
     const user = userEvent.setup();
     renderConfiguration();
 
-    await user.click(await screen.findByRole('button', { name: /^TLS & Secrets$/ }));
-    const secretInput = screen.getByLabelText('Credential Secret') as HTMLInputElement;
+    await user.click(await screen.findByRole('tab', { name: /^TLS & Secrets$/ }));
+    const secretInput = screen.getByLabelText('Credential Secret (credentialSecret)') as HTMLInputElement;
     await user.type(secretInput, 'new-rotation-passphrase');
 
     // Issue #766 slice F (W4) — the review action opens the panel first;
@@ -337,9 +343,9 @@ describe('ConfigurationView (issue #762 — Security tab for credentialSecret / 
 
     renderConfiguration();
 
-    await user.click(await screen.findByRole('button', { name: /^TLS & Secrets$/ }));
+    await user.click(await screen.findByRole('tab', { name: /^TLS & Secrets$/ }));
     await user.click(findToggleButton(/^Require HTTPS$/));
-    await user.type(screen.getByLabelText('Private Key Path'), '/etc/node-red/key.pem');
+    await user.type(screen.getByLabelText('Private Key Path (https.key)'), '/etc/node-red/key.pem');
     // Issue #766 slice F (W4) — the review action opens the panel first;
     // the actual save dispatches when the operator clicks Apply.
     await user.click(reviewAction());
@@ -377,7 +383,7 @@ describe('ConfigurationView (issue #762 — Security tab for credentialSecret / 
 
     renderConfiguration();
 
-    await user.click(await screen.findByRole('button', { name: /^TLS & Secrets$/ }));
+    await user.click(await screen.findByRole('tab', { name: /^TLS & Secrets$/ }));
     await user.click(findToggleButton(/^Require HTTPS$/));
     await user.click(reviewAction());
     const reviewPanel = await screen.findByTestId('review-changes-panel');
@@ -411,7 +417,7 @@ describe('ConfigurationView (review drawer Apply — confirm, feedback, single s
   }
 
   async function openApplyConfirmation(user: ReturnType<typeof userEvent.setup>) {
-    await user.click(await screen.findByRole('button', { name: /^TLS & Secrets$/ }));
+    await user.click(await screen.findByRole('tab', { name: /^TLS & Secrets$/ }));
     await user.click(findToggleButton(/^Require HTTPS$/));
     await user.click(reviewAction());
     const panel = await screen.findByTestId('review-changes-panel');
@@ -508,8 +514,8 @@ describe('ConfigurationView (review drawer Apply — confirm, feedback, single s
     await spyUpdate(updateSpy);
     renderConfiguration();
 
-    await user.click(await screen.findByRole('button', { name: /^TLS & Secrets$/ }));
-    await user.type(screen.getByLabelText('Credential Secret'), 'new-rotation-passphrase');
+    await user.click(await screen.findByRole('tab', { name: /^TLS & Secrets$/ }));
+    await user.type(screen.getByLabelText('Credential Secret (credentialSecret)'), 'new-rotation-passphrase');
     await user.click(reviewAction());
     const panel = await screen.findByTestId('review-changes-panel');
     await user.click(within(panel).getByTestId('review-changes-panel-apply'));
@@ -597,13 +603,13 @@ describe('ConfigurationView (change circuit)', () => {
 
     expect(await screen.findByRole('button', { name: 'No changes to review' })).toBeDisabled();
 
-    await user.click(await screen.findByRole('button', { name: /^TLS & Secrets$/ }));
+    await user.click(await screen.findByRole('tab', { name: /^TLS & Secrets$/ }));
     await user.click(findToggleButton(/^Require HTTPS$/));
     expect(screen.getByRole('button', { name: 'Review 1 change' })).toBeEnabled();
     expect(screen.getByTestId('change-circuit-total')).toHaveTextContent('1 change');
 
-    await user.click(await screen.findByRole('button', { name: /^Basic$/ }));
-    const port = screen.getByLabelText('UI Port');
+    await user.click(await screen.findByRole('tab', { name: /^Basic$/ }));
+    const port = screen.getByLabelText('UI Port (uiPort)');
     await user.clear(port);
     await user.type(port, '1881');
     expect(screen.getByRole('button', { name: 'Review 2 changes' })).toBeEnabled();
@@ -621,7 +627,7 @@ describe('ConfigurationView (change circuit)', () => {
     const user = userEvent.setup();
     renderConfiguration();
 
-    await user.click(await screen.findByRole('button', { name: /^TLS & Secrets$/ }));
+    await user.click(await screen.findByRole('tab', { name: /^TLS & Secrets$/ }));
     await user.click(findToggleButton(/^Require HTTPS$/));
     await user.click(screen.getByRole('button', { name: 'Discard Changes' }));
 
@@ -633,7 +639,7 @@ describe('ConfigurationView (change circuit)', () => {
     const user = userEvent.setup();
     renderConfiguration();
 
-    await user.click(await screen.findByRole('button', { name: /^TLS & Secrets$/ }));
+    await user.click(await screen.findByRole('tab', { name: /^TLS & Secrets$/ }));
     await user.click(findToggleButton(/^Require HTTPS$/));
     await user.click(screen.getByRole('button', { name: 'Review 1 change' }));
 
@@ -648,7 +654,7 @@ describe('ConfigurationView (change circuit)', () => {
     await spyUpdate(vi.fn().mockResolvedValue({ data: { data: {}, success: true, timestamp: '' } }));
     renderConfiguration();
 
-    await user.click(await screen.findByRole('button', { name: /^TLS & Secrets$/ }));
+    await user.click(await screen.findByRole('tab', { name: /^TLS & Secrets$/ }));
     await user.click(findToggleButton(/^Require HTTPS$/));
     await user.click(screen.getByRole('button', { name: 'Review 1 change' }));
     await user.click(within(await screen.findByTestId('review-changes-panel')).getByTestId('review-changes-panel-apply'));
@@ -681,7 +687,7 @@ describe('ConfigurationView (change circuit)', () => {
     );
     renderConfiguration();
 
-    await user.click(await screen.findByRole('button', { name: /^TLS & Secrets$/ }));
+    await user.click(await screen.findByRole('tab', { name: /^TLS & Secrets$/ }));
     await user.click(findToggleButton(/^Require HTTPS$/));
     await user.click(screen.getByRole('button', { name: 'Review 1 change' }));
     await user.click(within(await screen.findByTestId('review-changes-panel')).getByTestId('review-changes-panel-apply'));
@@ -706,7 +712,7 @@ describe('ConfigurationView (change circuit)', () => {
     await spyUpdate(vi.fn().mockRejectedValue(new Error('timeout of 120000ms exceeded')));
     renderConfiguration();
 
-    await user.click(await screen.findByRole('button', { name: /^TLS & Secrets$/ }));
+    await user.click(await screen.findByRole('tab', { name: /^TLS & Secrets$/ }));
     await user.click(findToggleButton(/^Require HTTPS$/));
     await user.click(screen.getByRole('button', { name: 'Review 1 change' }));
     await user.click(within(await screen.findByTestId('review-changes-panel')).getByTestId('review-changes-panel-apply'));
@@ -717,5 +723,115 @@ describe('ConfigurationView (change circuit)', () => {
       for (const step of steps.slice(2)) expect(within(step).getByText('Not confirmed')).toBeInTheDocument();
     });
     expect(screen.queryByTestId('change-circuit-rollback')).not.toBeInTheDocument();
+  });
+});
+
+// Finish review (T9 follow-up): schematic designators, gated outcomes on
+// the circuit, a real tablist and the direct-edit lock region.
+describe('ConfigurationView (finish review)', () => {
+  it('renders the sections as a tablist with roving focus and arrow keys', async () => {
+    const user = userEvent.setup();
+    renderConfiguration();
+
+    const tablist = await screen.findByRole('tablist', { name: 'Configuration sections' });
+    const tabs = within(tablist).getAllByRole('tab');
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['Basic', 'TLS & Secrets', 'Logging', 'Editor Theme', 'AI Provider']);
+    expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
+    expect(tabs[0]).toHaveAttribute('tabindex', '0');
+    for (const tab of tabs.slice(1)) {
+      expect(tab).toHaveAttribute('aria-selected', 'false');
+      expect(tab).toHaveAttribute('tabindex', '-1');
+    }
+    const panel = screen.getByRole('tabpanel', { name: 'Basic' });
+    expect(tabs[0]).toHaveAttribute('aria-controls', panel.id);
+
+    tabs[0].focus();
+    await user.keyboard('{ArrowRight}');
+    expect(tabs[1]).toHaveFocus();
+    expect(tabs[1]).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tabpanel', { name: 'TLS & Secrets' })).toBeInTheDocument();
+    await user.keyboard('{End}');
+    expect(tabs[4]).toHaveFocus();
+    await user.keyboard('{ArrowRight}');
+    expect(tabs[0]).toHaveFocus();
+    await user.keyboard('{ArrowLeft}');
+    expect(tabs[4]).toHaveFocus();
+    await user.keyboard('{Home}');
+    expect(tabs[0]).toHaveFocus();
+    expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('labels each field with its settings.js key as the terminal designator', async () => {
+    renderConfiguration();
+
+    const port = await screen.findByLabelText('UI Port (uiPort)');
+    const label = document.querySelector(`label[for="${port.id}"]`) as HTMLElement;
+    expect(within(label).getByText('uiPort')).toHaveClass('font-mono');
+    expect(within(label).getByText('UI Port')).toBeInTheDocument();
+    // Nested keys use their settings.js path.
+    expect(screen.getByRole('button', { name: 'Disable Editor (disableEditor)' })).toBeInTheDocument();
+  });
+
+  it('shows the settings.js revision as the header designator', async () => {
+    mocks.getRaw.mockResolvedValue({
+      data: {
+        data: {
+          content: 'module.exports = {};\n',
+          path: '/etc/node-red/settings.js',
+          writable: true,
+          revision: { fingerprint: '9f2c1b0d4e5a6f7c8d9e', algorithm: 'sha256' },
+        },
+        success: true,
+        timestamp: '',
+      },
+    });
+    renderConfiguration();
+
+    expect(await screen.findByText('REV 9f2c1b0d')).toHaveClass('font-mono');
+  });
+
+  it('holds the Validate contact open with the invalid keys as its proof', async () => {
+    const user = userEvent.setup();
+    renderConfiguration();
+
+    const port = await screen.findByLabelText('UI Port (uiPort)');
+    await user.clear(port);
+    await user.type(port, '70000');
+
+    const validate = within(await screen.findByRole('list', { name: 'Change circuit' })).getAllByRole('listitem')[2];
+    expect(within(validate).getByText('Open')).toBeInTheDocument();
+    expect(within(validate).getByText('1 field invalid')).toBeInTheDocument();
+    expect(within(validate).getByText('uiPort')).toBeInTheDocument();
+  });
+
+  it('marks the raw editor as a direct edit with the unlock control in the lock banner', async () => {
+    renderConfiguration();
+
+    const banner = await screen.findByTestId('raw-settings-locked-banner');
+    expect(within(banner).getByTestId('raw-settings-unlock-btn')).toBeInTheDocument();
+    expect(banner).toHaveTextContent(/Unlock to edit settings\.js/);
+    expect(banner).toHaveTextContent(/backup is taken before any write/i);
+    expect(screen.getByText(/bypasses the change circuit/i)).toBeInTheDocument();
+  });
+
+  it('shows a settings.js syntax error inline under the editor, not as a toast', async () => {
+    const user = userEvent.setup();
+    const { toast } = await import('sonner');
+    renderConfiguration();
+
+    await user.click(await screen.findByTestId('raw-settings-unlock-btn'));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByTestId('confirmation-dialog-ack'));
+    await user.click(within(dialog).getByRole('button', { name: /confirm/i }));
+
+    const textarea = await screen.findByDisplayValue(/module\.exports/);
+    fireEvent.change(textarea, { target: { value: 'module.exports = {' } });
+    await user.click(screen.getByTestId('raw-settings-save-btn'));
+
+    const error = await screen.findByTestId('raw-settings-error');
+    expect(error).toHaveTextContent(/Invalid settings\.js/);
+    expect(textarea).toHaveAttribute('aria-invalid', 'true');
+    expect(textarea).toHaveAttribute('aria-describedby', error.id);
+    expect(toast.error).not.toHaveBeenCalled();
   });
 });

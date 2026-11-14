@@ -66,3 +66,54 @@ export const FIELD_LABELS: Record<keyof NodeRedConfigFormData, string> = {
   httpsPort: 'HTTPS Port',
   httpsPassphrase: 'Private Key Passphrase',
 };
+
+/**
+ * T9 finish review — the settings.js key each form field writes, shown as
+ * the field's terminal label (IEC designator). Paths follow
+ * `formDataToConfigPayload` and the backend renderer
+ * (internal/service/config.go renderSettingsJS, renderHttpsBlock).
+ */
+export const SETTINGS_KEYS: Record<keyof NodeRedConfigFormData, string> = {
+  uiPort: 'uiPort',
+  uiHost: 'uiHost',
+  httpAdminRoot: 'httpAdminRoot',
+  httpNodeRoot: 'httpNodeRoot',
+  disableEditor: 'disableEditor',
+  projectsEnabled: 'projectsEnabled',
+  loggingConsoleLevel: 'logging.console.level',
+  loggingConsoleMetrics: 'logging.console.metrics',
+  loggingInternalLevel: 'logging.internal.level',
+  loggingInternalMetrics: 'logging.internal.metrics',
+  flowFile: 'flowFile',
+  userDir: 'userDir',
+  nodesDir: 'nodesDir',
+  editorPageTitle: 'editorTheme.page.title',
+  editorPageFavicon: 'editorTheme.page.favicon',
+  editorPageCss: 'editorTheme.page.css',
+  editorHeaderTitle: 'editorTheme.header.title',
+  editorHeaderImage: 'editorTheme.header.image',
+  editorHeaderUrl: 'editorTheme.header.url',
+  editorDeployType: 'editorTheme.deployButton.type',
+  editorDeployLabel: 'editorTheme.deployButton.label',
+  editorDeployIcon: 'editorTheme.deployButton.icon',
+  editorPaletteEditable: 'editorTheme.palette.editable',
+  editorPaletteCatalogues: 'editorTheme.palette.catalogues',
+  editorProjectsEnabled: 'editorTheme.projects.enabled',
+  editorCodeLib: 'editorTheme.codeEditor.lib',
+  editorCodeTheme: 'editorTheme.codeEditor.options.theme',
+  editorCodeFontSize: 'editorTheme.codeEditor.options.fontSize',
+  editorUserMenu: 'editorTheme.userMenu',
+  editorTours: 'editorTheme.tours',
+  editorLoginImage: 'editorTheme.login.image',
+  editorLogoutRedirect: 'editorTheme.logout.redirect',
+  runtimeStateEnabled: 'runtimeState.enabled',
+  runtimeStateFile: 'runtimeState.file',
+  lang: 'lang',
+  credentialSecret: 'credentialSecret',
+  requireHttps: 'requireHttps',
+  httpsKey: 'https.key',
+  httpsCert: 'https.cert',
+  httpsCA: 'https.ca',
+  httpsPort: 'https.port',
+  httpsPassphrase: 'https.passphrase',
+};

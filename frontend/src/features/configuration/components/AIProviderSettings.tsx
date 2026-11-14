@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Bot, Save, Wifi } from 'lucide-react';
+import { Save, Wifi } from 'lucide-react';
 import { toast } from 'sonner';
 import { aiService, type AIConfigInput, type AIProviderStatus } from '../services';
 import { InputField, SelectField, ToggleField } from './FormFields';
@@ -56,22 +56,17 @@ export function AIProviderSettings() {
     }
   };
 
-  if (loading) return <div className="py-8 text-sm text-base-content/60">{t('configuration:aiLoading')}</div>;
+  if (loading) return <div className="py-8 text-sm text-ds-text-muted">{t('configuration:aiLoading')}</div>;
 
   const remoteProvider = config.provider === 'openai';
   return (
     <div className="space-y-6">
-      <div className="flex items-start gap-3">
-        <Bot className="mt-0.5 h-5 w-5 text-primary" aria-hidden="true" />
-        <div>
-<h3 className="text-lg font-medium text-base-content">{t('configuration:aiProvider')}</h3>
-          <p className="text-sm text-base-content/60">{t('configuration:aiProviderDesc')}</p>
-        </div>
-      </div>
+      {/* NRCC's own setting, not a settings.js key: no terminal designators. */}
+      <p className="text-sm text-ds-text-secondary">{t('configuration:aiProviderDesc')}</p>
 
-      <div className="rounded-xl border border-border bg-base-200/35 p-4 text-sm" aria-live="polite">
+      <div className="rounded-box border border-ds-border-subtle p-4 text-sm" aria-live="polite">
         <p className="font-medium text-base-content">Capability: {status?.status ?? 'unknown'}</p>
-        {status?.reason && <p className="mt-1 text-base-content/65">{status.reason}</p>}
+        {status?.reason && <p className="mt-1 text-ds-text-secondary">{status.reason}</p>}
       </div>
 
       <ToggleField label="Enable AI assistance" value={config.enabled ?? false} onChange={(value) => update('enabled', value)} disabled={saving || testing} />

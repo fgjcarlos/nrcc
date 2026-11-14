@@ -676,7 +676,7 @@ test('cancelled configuration review sends no write and leaves source and runtim
     }
   })
   await page.getByTestId('app-sidebar').getByRole('link', { name: 'Configuration' }).click()
-  await page.getByRole('button', { name: 'Editor Theme' }).click()
+  await page.getByRole('tab', { name: 'Editor Theme' }).click()
   // The view resets the form when the saved config arrives, so the edit is
   // re-applied until it sticks.
   await expect(async () => {
@@ -843,7 +843,7 @@ test('unrelated visual edit keeps every admin account, permission and session ex
   // --- the unrelated visual edit, through the real screen ---------
   await login(page)
   await page.getByTestId('app-sidebar').getByRole('link', { name: 'Configuration' }).click()
-  await page.getByRole('button', { name: 'Editor Theme' }).click()
+  await page.getByRole('tab', { name: 'Editor Theme' }).click()
   // The configuration view loads the saved config asynchronously and resets
   // the form when it arrives, so the edit is re-applied until it sticks.
   await expect(async () => {

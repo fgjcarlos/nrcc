@@ -33,7 +33,7 @@ export interface CircuitStep {
   id: StepId;
   state: ContactState;
   proof: StepProof | null;
-  /** Server error code shown as the failed contact's designator. */
+  /** Mono designator line: the server error code or the invalid settings.js keys. */
   code?: string;
 }
 
@@ -41,11 +41,15 @@ export type ApplyRun =
   | { status: 'idle' }
   | { status: 'running'; count: number }
   | { status: 'succeeded'; count: number }
-  | { status: 'failed'; count: number; code?: string };
+  | { status: 'failed'; count: number; code?: string }
+  // The client save gate refused before any request (useConfigurationSave).
+  | { status: 'held'; count: number; reason: 'invalid'; fields: string[] }
+  | { status: 'held'; count: number; reason: 'readOnly' };
 
 export interface CircuitInput {
   pendingCount: number;
-  invalidCount: number;
+  /** settings.js keys of the fields that fail local validation. */
+  invalidFields: string[];
   /** The operator opened the review drawer for the current form state. */
   reviewed: boolean;
   readOnly: boolean;
@@ -95,14 +99,27 @@ const step = (id: StepId, state: ContactState, proof: StepProof | null = null): 
 });
 
 function serverSteps(run: ApplyRun, input: CircuitInput): CircuitStep[] {
+  const invalid = (fields: string[]): CircuitStep => ({
+    ...step('validate', 'blocked', { key: 'invalid', count: fields.length }),
+    code: fields.join(', '),
+  });
   if (run.status === 'idle') {
     const anyChange = input.pendingCount > 0;
     const validate = !anyChange
       ? step('validate', 'idle')
-      : input.invalidCount > 0
-        ? step('validate', 'blocked', { key: 'invalid', count: input.invalidCount })
+      : input.invalidFields.length > 0
+        ? invalid(input.invalidFields)
         : step('validate', 'idle', { key: 'localValid' });
     return [validate, step('backup', 'idle'), step('apply', 'idle'), step('ready', 'idle')];
+  }
+  if (run.status === 'held') {
+    const notReached = { key: 'notReached' };
+    return [
+      run.reason === 'invalid' ? invalid(run.fields) : step('validate', 'idle', notReached),
+      step('backup', 'idle', notReached),
+      step('apply', 'idle', notReached),
+      step('ready', 'idle', notReached),
+    ];
   }
   if (run.status === 'running') {
     // One request covers all four stages; the order inside it is not observable.
@@ -153,10 +170,11 @@ export function deriveCircuit(input: CircuitInput): Circuit {
   const inRun = run.status !== 'idle';
   const count = inRun ? run.count : input.pendingCount;
 
-  const edit = inRun || count > 0
-    ? step('edit', 'passed', { key: 'changes', count })
-    : input.readOnly
-      ? step('edit', 'blocked', { key: 'readOnly' })
+  const heldReadOnly = run.status === 'held' && run.reason === 'readOnly';
+  const edit = heldReadOnly || (!inRun && count === 0 && input.readOnly)
+    ? step('edit', 'blocked', { key: 'readOnly' })
+    : inRun || count > 0
+      ? step('edit', 'passed', { key: 'changes', count })
       : step('edit', 'idle', { key: 'noChanges' });
   const diff = inRun || (count > 0 && input.reviewed)
     ? step('diff', 'passed', { key: 'reviewed' })

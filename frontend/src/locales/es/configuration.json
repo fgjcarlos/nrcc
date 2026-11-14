@@ -4,7 +4,8 @@
     "nodeRedNotDetected": "(sin Node-RED detectado)",
     "pathNotDetected": "sin ruta detectada",
     "recommendPortless": "Opcional: instala Portless para exponer nrcc o Node-RED con URLs HTTPS .localhost, LAN o Tailscale.",
-    "recommendWritable": "Otorga permisos de escritura sobre settings.js para que nrcc pueda guardar cambios."
+    "recommendWritable": "Otorga permisos de escritura sobre settings.js para que nrcc pueda guardar cambios.",
+    "revisionTitle": "Revisión de settings.js {{fingerprint}}"
   },
   "advanced": {
     "title": "Ajustes avanzados de settings.js",
@@ -16,8 +17,10 @@
     "unlockAcknowledgement": "Entiendo que un guardado incorrecto puede bloquear el inicio de Node-RED.",
     "saveRaw": "Guardar settings.js sin procesar",
     "savingRaw": "Guardando settings.js...",
-    "lockedBadge": "Bloqueado - haz clic en \"Desbloquear para editar\" para realizar cambios",
-    "cancelEdit": "Cancelar"
+    "lockedBadge": "Bloqueado. Selecciona \"Desbloquear para editar settings.js\" para editar el archivo directamente; se toma un respaldo antes de cualquier escritura.",
+    "cancelEdit": "Cancelar",
+    "directEdit": "Edición directa · no pasa por el circuito de cambios (sin revisión del diff)",
+    "parseError": "settings.js no válido: {{message}}"
   },
   "preset": {
     "confirmApply": "Confirmar aplicación",
@@ -56,6 +59,7 @@
   "aiProvider": "Proveedor de IA",
   "aiProviderDesc": "Configura la asistencia opcional de IA con revisión previa.",
   "pageTitle": "Configuración de Node-RED",
+  "sectionsLabel": "Secciones de configuración",
   "discardChanges": "Descartar cambios",
   "runtimeVersionLabel": "Versión del runtime",
   "configSourceLabel": "Origen de configuración",

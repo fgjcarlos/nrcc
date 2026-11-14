@@ -4,16 +4,21 @@ import { toast } from 'sonner';
 import { fileService } from '@/features/configuration/services';
 import { cn } from '@/shared/lib';
 import { useT } from '@/i18n';
+import type { NodeRedConfigFormData } from '@/shared/types';
+import { FieldLabel } from './FormFields';
+import { SETTINGS_KEYS } from '../lib/fieldLabels';
 
 interface ImageUploadProps {
   label: string;
+  /** Form field; its settings.js key becomes the terminal label. */
+  field?: keyof NodeRedConfigFormData;
   value: string;
   onChange: (url: string) => void;
   type: 'favicon' | 'header' | 'login';
   help?: string;
 }
 
-export function ImageUpload({ label, value, onChange, type, help }: ImageUploadProps) {
+export function ImageUpload({ label, field, value, onChange, type, help }: ImageUploadProps) {
   const { t } = useT();
   const [isUploading, setIsUploading] = useState(false);
   const [preview, setPreview] = useState<string | null>(value || null);
@@ -87,10 +92,10 @@ export function ImageUpload({ label, value, onChange, type, help }: ImageUploadP
 
   return (
     <div className="space-y-2">
-      <label className="text-sm font-medium text-base-content">{label}</label>
+      <FieldLabel label={label} settingKey={field ? SETTINGS_KEYS[field] : undefined} />
       
       {preview ? (
-        <div className="relative group overflow-hidden rounded-2xl border border-border">
+        <div className="relative group overflow-hidden rounded-box border border-border">
           <img
             src={preview}
             alt={label}
@@ -122,9 +127,9 @@ export function ImageUpload({ label, value, onChange, type, help }: ImageUploadP
           onClick={() => inputRef.current?.click()}
           disabled={isUploading}
           className={cn(
-            "h-24 w-full rounded-2xl border-2 border-dashed border-border",
+            "h-24 w-full rounded-box border-2 border-dashed border-border",
             "flex flex-col items-center justify-center gap-2",
-            "text-base-content/55 hover:border-primary/50 hover:text-base-content",
+            "text-ds-text-muted hover:border-primary/50 hover:text-base-content",
             "transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           )}
         >
@@ -150,7 +155,7 @@ export function ImageUpload({ label, value, onChange, type, help }: ImageUploadP
         className="hidden"
       />
       
-      {help && <p className="text-xs text-base-content/60">{help}</p>}
+      {help && <p className="text-xs text-ds-text-muted">{help}</p>}
     </div>
   );
 }
