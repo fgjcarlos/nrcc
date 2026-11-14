@@ -11,6 +11,8 @@
  *   3. small button labels are text (4.5:1), not UI components (3:1)
  *   4. text is audited on every documented surface, not only base-100,
  *      and chip/badge labels on their 18% tint over every surface
+ *   4a. control borders are audited at 3:1 (SC 1.4.11) on every
+ *       surface in both themes
  *   4b. semantic text (`text-primary`, `text-accent`, ...) is audited
  *      on every surface through its readable `ds-on-tint-*` token (#965)
  *   5. missing token → exits 2 in every mode
@@ -53,6 +55,7 @@ const PASSING = {
     'ds-text-secondary': '#d8dee8',
     'ds-text-muted': '#9aa7b8',
     'ds-brand-hover': '#1e40af',
+    'ds-border-strong': '#8e99a8',
     'ds-on-tint-primary': '#f5f7fa',
     'ds-on-tint-success': '#f5f7fa',
     'ds-on-tint-info': '#f5f7fa',
@@ -83,6 +86,7 @@ const PASSING = {
     'ds-text-secondary': '#263241',
     'ds-text-muted': '#5a6577',
     'ds-brand-hover': '#1e40af',
+    'ds-border-strong': '#5a6577',
     'ds-on-tint-primary': '#10151c',
     'ds-on-tint-success': '#10151c',
     'ds-on-tint-info': '#10151c',
@@ -203,6 +207,36 @@ withFixture({ corporateLight: { 'ds-on-tint-warning': '#c98905' } }, (workdir) =
     'tinted chip label → names the composite background',
     run.stderr,
   );
+});
+
+// ── 4a. Control borders are non-text at 3:1 on every surface ────
+withFixture({}, (workdir) => {
+  const { stdout } = runScript(workdir);
+  for (const theme of ['corporateDark', 'corporateLight']) {
+    for (const bg of ['base-100', 'base-200', 'base-300', 'ds-bg-surface', 'ds-bg-elevated', 'ds-bg-overlay']) {
+      assert(
+        stdout.split('\n').some((line) => line.includes(theme) && line.includes(`control border on ${bg} `)),
+        `control border on ${bg} audited (${theme})`,
+      );
+    }
+  }
+});
+
+withFixture({ corporateLight: { 'ds-border-strong': '#b7c3d1' } }, (workdir) => {
+  // A hairline-strength border (#b7c3d1 on #f6f7f9 ≈ 1.8:1) cannot mark a control.
+  const run = runScript(workdir);
+  assert(run.status === 1, 'control border drift → exits 1', `status=${run.status}`);
+  assert(
+    run.stderr.includes('control border on base-100') && run.stderr.includes('need ≥ 3:1 for non-text'),
+    'control border → judged against the 3:1 non-text threshold',
+    run.stderr,
+  );
+});
+
+withFixture({ corporateDark: { 'ds-border-strong': undefined } }, (workdir) => {
+  const run = runScript(workdir);
+  assert(run.status === 2, 'missing control border token → exits 2', `status=${run.status}`);
+  assert(run.stderr.includes('ds-border-strong'), 'missing control border token named', run.stderr);
 });
 
 // ── 4b. Semantic text is audited on every surface (#965) ─────────
