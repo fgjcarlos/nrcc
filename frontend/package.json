@@ -72,7 +72,7 @@
     "openapi-typescript": "7.13.0",
     "postcss": "^8.5.23",
     "serve": "^14.2.6",
-    "@tailwindcss/vite": "^4.3.3",
+    "@tailwindcss/vite": "^4.3.5",
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.72.1",
