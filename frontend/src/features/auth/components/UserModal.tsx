@@ -136,8 +136,8 @@ export function UserModal({
                   disabled={isLastAdmin || isCurrentUser}
                   required={mode === 'create'}
                 >
-                  <option value="viewer">Viewer</option>
-                  <option value="admin">Admin</option>
+                  <option value="viewer">{t('auth:roles.viewer')}</option>
+                  <option value="admin">{t('auth:roles.admin')}</option>
                 </Select>
                 {isLastAdmin && (
                   <p className="text-xs text-ds-on-tint-error">{t('auth:cannotDemoteLastAdmin')}</p>
