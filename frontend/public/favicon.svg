@@ -1,4 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="NRCC">
-  <rect width="64" height="64" rx="14" fill="#111827"/>
-  <path d="M17 32h30M17 32l10-10m-10 10 10 10M47 32 37 22m10 10L37 42" fill="none" stroke="#f97316" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" role="img" aria-label="NRCC">
+  <!--
+    NRCC mark: the IEC normally-open contact, closed. The conductor ends
+    in two open terminal rings; the blade lies flat between them, heavier
+    than the conductor. Ink on a drawing-white tile so it reads on light
+    and dark tabs. Same glyph as docs/assets/nrcc-mark.svg.
+  -->
+  <rect width="16" height="16" rx="2" fill="#f6f5f0"/>
+  <g fill="none" stroke="#15171c">
+    <line x1="0" y1="8" x2="2.25" y2="8" stroke-width="1.5"/>
+    <line x1="13.75" y1="8" x2="16" y2="8" stroke-width="1.5"/>
+    <line x1="5.75" y1="8" x2="10.25" y2="8" stroke-width="2.5"/>
+    <circle cx="4" cy="8" r="1.75" stroke-width="1.5"/>
+    <circle cx="12" cy="8" r="1.75" stroke-width="1.5"/>
+  </g>
 </svg>
