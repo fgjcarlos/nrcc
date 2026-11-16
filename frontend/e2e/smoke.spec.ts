@@ -148,8 +148,10 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
     // heading.
     await page.goto('/security')
     await expect(page.getByRole('heading', { name: 'Node-RED admin auth' })).toBeVisible()
-    // Read-only mode keeps the Save button mounted but disabled so
-    // the operator still sees the action affordance.
+    // Surfaces render collapsed; open admin auth first. Read-only mode
+    // keeps the Save button mounted but disabled so the operator still
+    // sees the action affordance.
+    await page.getByTestId('boundary-admin-auth').locator('summary').click()
     await expect(page.getByRole('button', { name: 'Save admin auth' })).toBeDisabled()
   })
 })

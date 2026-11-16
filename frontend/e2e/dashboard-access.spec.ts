@@ -12,6 +12,8 @@ test('applies a mocked dashboard policy without displaying its secret', async ({
   await page.route('**/api/dashboards/access', async (route) => { request = JSON.parse(route.request().postData() ?? '{}'); await route.fulfill({ contentType: 'application/json', body: JSON.stringify(envelope({ document: {} })) }); });
   // Issue #766 slice A — Authentication tab lifted into /security.
   await page.goto('/security');
+  // T10: the dashboard form sits behind its Edit disclosure.
+  await page.getByTestId('boundary-dashboard-access').locator('summary').click();
   await page.getByLabel('Access secret').fill('browser-secret'); await page.getByLabel('Username').last().fill('operator');
   await page.getByRole('button', { name: 'Apply dashboard access' }).click();
   await expect.poll(() => request).toMatchObject({ target: 'legacy', username: 'operator', expectedRevision: 'revision' });
