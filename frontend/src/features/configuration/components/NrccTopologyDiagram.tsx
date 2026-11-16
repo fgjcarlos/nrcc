@@ -39,7 +39,7 @@ export function NrccTopologyDiagram({
       className={['flex flex-col gap-2', className].filter(Boolean).join(' ')}
       data-testid="nrcc-topology-diagram"
     >
-      <figcaption className="text-xs uppercase tracking-[0.24em] text-base-content/50">
+      <figcaption className="text-xs uppercase tracking-[0.24em] text-ds-text-muted">
         {t('configuration:topology.title')}
       </figcaption>
       <svg
@@ -202,7 +202,7 @@ export function NrccTopologyDiagram({
           </text>
         </g>
       </svg>
-      <p className="text-xs text-base-content/60">
+      <p className="text-xs text-ds-text-muted">
         {t('configuration:topology.subtitle')}
       </p>
     </figure>

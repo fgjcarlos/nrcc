@@ -134,41 +134,41 @@ export function NodeRedHealthTile({
         </p>
         <div className="mt-2 grid grid-cols-3 gap-3" data-testid="overview-node-red-resources">
         <div className="rounded-xl border border-border/60 bg-base-200/30 px-3 py-3 text-xs">
-          <div className="flex items-center gap-1.5 text-base-content/45 uppercase tracking-[0.18em]">
+          <div className="flex items-center gap-1.5 text-ds-text-muted uppercase tracking-[0.18em]">
             <Cpu className="h-3 w-3" aria-hidden="true" />
             {t('dashboard:overviewTiles.nodeRedHealth.cpu')}
           </div>
           <div className="mt-1.5 text-base font-semibold text-base-content">
             {system?.cpu.available ? formatPercent(system.cpu.usage) : '—'}
           </div>
-          <p className="mt-0.5 text-base-content/55">
+          <p className="mt-0.5 text-ds-text-muted">
             {system?.cpu.available
               ? `${system.cpu.cores} ${t('dashboard:overviewTiles.nodeRedHealth.cores')}`
               : scopeLabel(system?.resourceScope, t)}
           </p>
         </div>
         <div className="rounded-xl border border-border/60 bg-base-200/30 px-3 py-3 text-xs">
-          <div className="flex items-center gap-1.5 text-base-content/45 uppercase tracking-[0.18em]">
+          <div className="flex items-center gap-1.5 text-ds-text-muted uppercase tracking-[0.18em]">
             <MemoryStick className="h-3 w-3" aria-hidden="true" />
             {t('dashboard:overviewTiles.nodeRedHealth.memory')}
           </div>
           <div className="mt-1.5 text-base font-semibold text-base-content">
             {system?.memory.available ? formatPercent(system.memory.usagePercent) : '—'}
           </div>
-          <p className="mt-0.5 text-base-content/55">
+          <p className="mt-0.5 text-ds-text-muted">
             {system?.memory.available
               ? `${formatBytes(system.memory.used)} / ${formatBytes(system.memory.total)}`
               : scopeLabel(system?.resourceScope, t)}
           </p>
         </div>
         <div className="rounded-xl border border-border/60 bg-base-200/30 px-3 py-3 text-xs">
-          <div className="flex items-center gap-1.5 text-base-content/45 uppercase tracking-[0.18em]">
+          <div className="flex items-center gap-1.5 text-ds-text-muted uppercase tracking-[0.18em]">
             {t('dashboard:overviewTiles.nodeRedHealth.disk')}
           </div>
           <div className="mt-1.5 text-base font-semibold text-base-content">
             {system?.disk.available ? formatPercent(system.disk.usagePercent) : '—'}
           </div>
-          <p className="mt-0.5 text-base-content/55">
+          <p className="mt-0.5 text-ds-text-muted">
             {system?.disk.available
               ? `${formatBytes(system.disk.used)} / ${formatBytes(system.disk.total)}`
               : scopeLabel(system?.resourceScope, t)}
@@ -222,7 +222,7 @@ export function NodeRedHealthTile({
       </Link>
 
       {container?.image && inDocker && (
-        <p className="mt-3 truncate text-xs text-base-content/55" title={container.image}>
+        <p className="mt-3 truncate text-xs text-ds-text-muted" title={container.image}>
           {container.image}
         </p>
       )}

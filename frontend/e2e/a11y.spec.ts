@@ -72,8 +72,8 @@ test.describe('Issue #766 slice G W4 — WCAG 2.1 AA gate', () => {
     await page.goto('/login')
     await expectPinnedTheme(page)
 
-    // L5 token values: dark --ds-text-muted #8e99a8, light #5a6577.
-    const expected = expectedTheme() === 'corporateDark' ? 'rgb(142, 153, 168)' : 'rgb(90, 101, 119)'
+    // --ds-text-muted per DESIGN.md: dark ink-muted-dark #9a9ea6, light ink-muted #5c626c.
+    const expected = expectedTheme() === 'corporateDark' ? 'rgb(154, 158, 166)' : 'rgb(92, 98, 108)'
     const computed = await page.evaluate(() => {
       const probe = document.createElement('p')
       probe.className = 'text-body-secondary'

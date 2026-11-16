@@ -91,7 +91,7 @@ export function NrccAccessBoundaryCard({ users }: NrccAccessBoundaryCardProps) {
         data-testid="boundary-nrcc-access-summary"
       >
         <div className="rounded-xl border border-border/60 bg-base-200/30 px-3 py-3">
-          <div className="flex items-center gap-1.5 text-base-content/45 uppercase tracking-[0.18em] text-xs">
+          <div className="flex items-center gap-1.5 text-ds-text-muted uppercase tracking-[0.18em] text-xs">
             <Users className="h-3 w-3" aria-hidden="true" />
             {t('security:nrccAccessBoundary.total')}
           </div>
@@ -101,23 +101,23 @@ export function NrccAccessBoundaryCard({ users }: NrccAccessBoundaryCardProps) {
           >
             {total}
           </div>
-          <p className="mt-0.5 text-base-content/55">
+          <p className="mt-0.5 text-ds-text-muted">
             {t('security:nrccAccessBoundary.totalHint')}
           </p>
         </div>
         <div className="rounded-xl border border-border/60 bg-base-200/30 px-3 py-3">
-          <div className="text-base-content/45 uppercase tracking-[0.18em] text-xs">
+          <div className="text-ds-text-muted uppercase tracking-[0.18em] text-xs">
             {t('security:nrccAccessBoundary.roleDistribution')}
           </div>
           <div
             className="mt-1.5 text-base font-semibold text-base-content"
             data-testid="boundary-nrcc-access-roles"
           >
-            {admins} <span className="text-base-content/55">{t('security:nrccAccessBoundary.admins')}</span>
+            {admins} <span className="text-ds-text-muted">{t('security:nrccAccessBoundary.admins')}</span>
             {' · '}
-            {viewers} <span className="text-base-content/55">{t('security:nrccAccessBoundary.viewers')}</span>
+            {viewers} <span className="text-ds-text-muted">{t('security:nrccAccessBoundary.viewers')}</span>
           </div>
-          <p className="mt-0.5 text-base-content/55">
+          <p className="mt-0.5 text-ds-text-muted">
             {t('security:nrccAccessBoundary.roleDistributionHint')}
           </p>
         </div>

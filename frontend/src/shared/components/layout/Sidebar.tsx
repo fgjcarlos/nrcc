@@ -98,7 +98,7 @@ export function Sidebar() {
             <div className="flex min-w-0 items-center gap-3">
               <NrccMark tone="primary" size="md" />
               <div className="min-w-0">
-                <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-base-content/50">Orchestrator</p>
+                <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-ds-text-muted">Orchestrator</p>
                 <h1 className="truncate text-lg font-bold leading-tight text-base-content">Node-RED</h1>
                 <p className="text-xs text-base-content/65">{t('common:productShortName')}</p>
               </div>
@@ -128,7 +128,7 @@ export function Sidebar() {
                 className={({ isActive }) => navLinkClass(isActive)}
                 title={collapsed && !isMobile ? item.label : undefined}
               >
-                <item.icon className="h-5 w-5 flex-shrink-0 stroke-[1.8] text-base-content/55 transition-colors group-hover:text-accent" />
+                <item.icon className="h-5 w-5 flex-shrink-0 stroke-[1.8] text-ds-text-muted transition-colors group-hover:text-accent" />
                 {(!collapsed || isMobile) && <span className="truncate">{item.label}</span>}
               </NavLink>
             </li>
@@ -146,7 +146,7 @@ export function Sidebar() {
                     className={({ isActive }) => navLinkClass(isActive)}
                     title={collapsed && !isMobile ? item.label : undefined}
                   >
-                    <item.icon className="h-5 w-5 flex-shrink-0 stroke-[1.8] text-base-content/55 transition-colors group-hover:text-accent" />
+                    <item.icon className="h-5 w-5 flex-shrink-0 stroke-[1.8] text-ds-text-muted transition-colors group-hover:text-accent" />
                     {(!collapsed || isMobile) && <span className="truncate">{item.label}</span>}
                   </NavLink>
                 </li>
@@ -156,7 +156,7 @@ export function Sidebar() {
                 <>
                   <li className="pt-3">
                     {(!collapsed || isMobile) && (
-                      <p className="px-3 pb-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-base-content/45">
+                      <p className="px-3 pb-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-ds-text-muted">
                         {t('common:maintenanceLabel')}
                       </p>
                     )}
@@ -171,7 +171,7 @@ export function Sidebar() {
                         className={({ isActive }) => navLinkClass(isActive)}
                         title={collapsed && !isMobile ? item.label : undefined}
                       >
-                        <item.icon className="h-5 w-5 flex-shrink-0 stroke-[1.8] text-base-content/55 transition-colors group-hover:text-accent" />
+                        <item.icon className="h-5 w-5 flex-shrink-0 stroke-[1.8] text-ds-text-muted transition-colors group-hover:text-accent" />
                         {(!collapsed || isMobile) && <span className="truncate">{item.label}</span>}
                       </NavLink>
                     </li>
