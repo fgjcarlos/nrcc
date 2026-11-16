@@ -1,24 +1,17 @@
 import { Link } from 'react-router-dom';
-import { ChevronRight, Cpu, ExternalLink, MemoryStick, RefreshCw, Server } from 'lucide-react';
+import { ChevronRight, ExternalLink, RefreshCw } from 'lucide-react';
 import { useT } from '@/i18n';
 import { StatusChip } from '@/shared/components/ui';
 import { cn, formatBytes } from '@/shared/lib';
-import { formatPercent } from '@/features/dashboard/lib';
 import type { HostStatus, RuntimeInfo, SystemInfo } from '@/shared/types';
 import type { DashboardContainerStatus } from '../../types';
+import { runtimeKey } from '../../lib';
 
 /**
- * NodeRedHealthTile — issue #766 slice D
- *
- * Operational decision tile for the Overview screen. Folds the
- * SystemHealthCard (host readiness + issue list), the runtime card
- * (process state + restart/open actions) and a compact resource
- * indicator (CPU/Memory/Disk) into one tile so the operator can
- * answer "is Node-RED healthy?" and "should I restart?" at a glance.
- *
- * The resource indicator is intentionally compact (three percentages)
- * rather than full sparklines; chart detail lives on the dedicated
- * resource panels below the tile.
+ * Node-RED section of the Overview sheet (T8): runtime status, the host
+ * issues that block it, resource usage and the two runtime actions. Opening
+ * the editor is the everyday action; Restart is quieter and stays behind its
+ * confirmation dialog.
  */
 
 export interface NodeRedHealthTileProps {
@@ -38,10 +31,7 @@ function scopeLabel(scope: SystemInfo['resourceScope'] | undefined, t: (k: strin
   return t('dashboard:overviewTiles.nodeRedHealth.scopeUnavailable');
 }
 
-function getDeploymentLabel(
-  mode: HostStatus['nodeRed']['mode'] | undefined,
-  t: (k: string) => string,
-) {
+function getDeploymentLabel(mode: HostStatus['nodeRed']['mode'] | undefined, t: (k: string) => string) {
   switch (mode) {
     case 'native':
       return t('dashboard:overviewTiles.nodeRedHealth.deploymentNative');
@@ -52,6 +42,12 @@ function getDeploymentLabel(
     default:
       return t('dashboard:overviewTiles.nodeRedHealth.deploymentUnknown');
   }
+}
+
+interface Metric {
+  key: 'cpu' | 'memory' | 'disk';
+  percent?: number;
+  detail?: string;
 }
 
 export function NodeRedHealthTile({
@@ -65,8 +61,9 @@ export function NodeRedHealthTile({
   onOpenNodeRed,
 }: NodeRedHealthTileProps) {
   const { t } = useT();
-  const runtimeStatus = runtime?.status ?? (host?.nodeRed.running ? 'running' : 'unknown');
+  const status = runtimeKey(runtime?.status ?? (host?.nodeRed.running ? 'running' : undefined));
   const canRestart = Boolean(host?.nodeRed?.detected);
+  const version = host?.nodeRed.version || system?.nodeRedVersion;
 
   const hostReady = Boolean(host?.ready);
   const issues = host && !host.ready
@@ -77,155 +74,148 @@ export function NodeRedHealthTile({
       ].filter(Boolean)
     : [];
 
-  const overallVariant: 'success' | 'warning' | 'danger' = !hostReady
+  // Red is kept for a host that cannot run Node-RED; unknown stays neutral.
+  const overallVariant: 'success' | 'warning' | 'danger' | 'neutral' = host && !hostReady
     ? 'danger'
-    : runtimeStatus !== 'running'
-      ? 'warning'
-      : 'success';
+    : status === 'running'
+      ? 'success'
+      : status === 'unknown'
+        ? 'neutral'
+        : 'warning';
+  const statusLabel = t(`dashboard:overviewTiles.nodeRedHealth.statuses.${status}`);
+
+  const metrics: Metric[] = [
+    {
+      key: 'cpu',
+      percent: system?.cpu.available ? system.cpu.usage : undefined,
+      detail: system?.cpu.available ? `${system.cpu.cores} ${t('dashboard:overviewTiles.nodeRedHealth.cores')}` : undefined,
+    },
+    {
+      key: 'memory',
+      percent: system?.memory.available ? system.memory.usagePercent : undefined,
+      detail: system?.memory.available ? `${formatBytes(system.memory.used)} / ${formatBytes(system.memory.total)}` : undefined,
+    },
+    {
+      key: 'disk',
+      percent: system?.disk.available ? system.disk.usagePercent : undefined,
+      detail: system?.disk.available ? `${formatBytes(system.disk.used)} / ${formatBytes(system.disk.total)}` : undefined,
+    },
+  ];
 
   return (
-    <article
+    <section
       data-testid="overview-node-red-health-tile"
-      className="card surface-card border border-border p-6"
+      className="grid gap-4 py-4 sm:py-6 lg:grid-cols-[16rem_minmax(0,1fr)] lg:gap-6"
       aria-labelledby="overview-node-red-health-title"
     >
-      <header className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Server className="h-6 w-6 text-base-content/70" aria-hidden="true" />
-          <div className="min-w-0">
-            <h2 id="overview-node-red-health-title" className="text-base font-semibold text-base-content">
-              {t('dashboard:overviewTiles.nodeRedHealth.title')}
-            </h2>
-            <p className="mt-0.5 text-xs text-base-content/65">
-              {inDocker
-                ? `${t('dashboard:overviewTiles.nodeRedHealth.subtitleRuntime')}: ${runtimeStatus}`
-                : getDeploymentLabel(host?.nodeRed.mode, t)}
-            </p>
-          </div>
+      <header className="space-y-2">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <h2 id="overview-node-red-health-title" className="text-sm font-semibold text-ds-text-primary">
+            {t('dashboard:overviewTiles.nodeRedHealth.title')}
+          </h2>
+          <StatusChip
+            variant={overallVariant}
+            size="sm"
+            ariaLabel={t('dashboard:overviewTiles.nodeRedHealth.statusAria', { state: statusLabel })}
+          >
+            {statusLabel}
+          </StatusChip>
         </div>
-        <StatusChip
-          variant={overallVariant}
-          size="sm"
-          ariaLabel={t('dashboard:overviewTiles.nodeRedHealth.statusAria', {
-            state: runtimeStatus,
-          })}
+        <p className="text-xs text-ds-text-secondary">
+          {getDeploymentLabel(host?.nodeRed.mode, t)}
+          {version && (
+            <>
+              {' · '}
+              <span className="font-mono font-semibold tabular-nums text-ds-text-primary">{`Node-RED ${version}`}</span>
+            </>
+          )}
+        </p>
+        <Link
+          to="/configuration"
+          className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-ds-on-tint-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ds-accent-primary sm:min-h-0"
+          data-testid="overview-node-red-link"
         >
-          {runtimeStatus}
-        </StatusChip>
+          {t('dashboard:overviewTiles.nodeRedHealth.cta')}
+          <ChevronRight className="h-4 w-4" aria-hidden="true" />
+        </Link>
       </header>
 
-      {!hostReady && issues.length > 0 && (
-        <ul
-          className="mt-3 space-y-1 rounded-xl border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning"
-          data-testid="overview-node-red-issues"
-        >
-          {issues.map((issue) => (
-            <li key={issue}>• {issue}</li>
-          ))}
-        </ul>
-      )}
+      <div className="min-w-0 space-y-4">
+        {!hostReady && issues.length > 0 && (
+          <ul
+            className="list-disc space-y-1 rounded-box border border-ds-warning/35 bg-ds-warning/10 py-2 pl-7 pr-3 text-xs text-ds-on-tint-warning"
+            data-testid="overview-node-red-issues"
+          >
+            {issues.map((issue) => (
+              <li key={issue}>{issue}</li>
+            ))}
+          </ul>
+        )}
 
-      <div
-        className="mt-5"
-        data-testid="resource-metrics"
-      >
-        <p className="text-xs font-medium uppercase tracking-wide text-base-content/65">
-          {scopeLabel(system?.resourceScope, t)}
-        </p>
-        <div className="mt-2 grid grid-cols-3 gap-3" data-testid="overview-node-red-resources">
-        <div className="rounded-xl border border-border/60 bg-base-200/30 px-3 py-3 text-xs">
-          <div className="flex items-center gap-1.5 text-ds-text-muted uppercase tracking-[0.18em]">
-            <Cpu className="h-3 w-3" aria-hidden="true" />
-            {t('dashboard:overviewTiles.nodeRedHealth.cpu')}
-          </div>
-          <div className="mt-1.5 text-base font-semibold text-base-content">
-            {system?.cpu.available ? formatPercent(system.cpu.usage) : '—'}
-          </div>
-          <p className="mt-0.5 text-ds-text-muted">
-            {system?.cpu.available
-              ? `${system.cpu.cores} ${t('dashboard:overviewTiles.nodeRedHealth.cores')}`
-              : scopeLabel(system?.resourceScope, t)}
-          </p>
+        <div data-testid="resource-metrics" className="space-y-2">
+          <p className="text-xs text-ds-text-secondary">{scopeLabel(system?.resourceScope, t)}</p>
+          <dl className="grid gap-x-6 sm:grid-cols-3" data-testid="overview-node-red-resources">
+            {metrics.map((metric) => (
+              <div key={metric.key} className="flex items-baseline justify-between gap-3 border-b border-ds-border-subtle py-2 sm:block">
+                <dt className="text-xs text-ds-text-secondary">
+                  {t(`dashboard:overviewTiles.nodeRedHealth.${metric.key}`)}
+                </dt>
+                <dd className="text-right sm:text-left">
+                  {metric.percent === undefined ? (
+                    <span className="text-sm text-ds-text-muted">{t('dashboard:overviewTiles.nodeRedHealth.notReported')}</span>
+                  ) : (
+                    <span className="text-sm font-semibold tabular-nums text-ds-text-primary">
+                      {Math.round(metric.percent)}
+                      <span className="ml-0.5 text-xs font-normal text-ds-text-secondary">%</span>
+                    </span>
+                  )}
+                  {metric.detail && (
+                    <span className="block text-xs tabular-nums text-ds-text-muted">{metric.detail}</span>
+                  )}
+                </dd>
+              </div>
+            ))}
+          </dl>
         </div>
-        <div className="rounded-xl border border-border/60 bg-base-200/30 px-3 py-3 text-xs">
-          <div className="flex items-center gap-1.5 text-ds-text-muted uppercase tracking-[0.18em]">
-            <MemoryStick className="h-3 w-3" aria-hidden="true" />
-            {t('dashboard:overviewTiles.nodeRedHealth.memory')}
-          </div>
-          <div className="mt-1.5 text-base font-semibold text-base-content">
-            {system?.memory.available ? formatPercent(system.memory.usagePercent) : '—'}
-          </div>
-          <p className="mt-0.5 text-ds-text-muted">
-            {system?.memory.available
-              ? `${formatBytes(system.memory.used)} / ${formatBytes(system.memory.total)}`
-              : scopeLabel(system?.resourceScope, t)}
-          </p>
-        </div>
-        <div className="rounded-xl border border-border/60 bg-base-200/30 px-3 py-3 text-xs">
-          <div className="flex items-center gap-1.5 text-ds-text-muted uppercase tracking-[0.18em]">
-            {t('dashboard:overviewTiles.nodeRedHealth.disk')}
-          </div>
-          <div className="mt-1.5 text-base font-semibold text-base-content">
-            {system?.disk.available ? formatPercent(system.disk.usagePercent) : '—'}
-          </div>
-          <p className="mt-0.5 text-ds-text-muted">
-            {system?.disk.available
-              ? `${formatBytes(system.disk.used)} / ${formatBytes(system.disk.total)}`
-              : scopeLabel(system?.resourceScope, t)}
-          </p>
-        </div>
-        </div>
-      </div>
 
-      <div className="mt-5 grid grid-cols-2 gap-2.5">
-        <button
-          type="button"
-          aria-label={isRestarting
-            ? t('dashboard:runtimeCard.restartingButton')
-            : t('dashboard:runtimeCard.restartButton')}
-          onClick={onRequestRestart}
-          disabled={isRestarting || !canRestart}
-          data-testid="overview-node-red-restart"
-          className={cn(
-            'group action-btn-secondary flex items-center justify-center gap-3 rounded-xl p-4',
-            'disabled:cursor-not-allowed disabled:opacity-50',
-          )}
+        <div
+          role="group"
+          aria-label={t('dashboard:overviewTiles.nodeRedHealth.actionsLabel')}
+          className="flex flex-wrap items-center gap-2"
         >
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-warning/10 text-warning transition-colors group-hover:bg-warning/20">
-            <RefreshCw className={cn('w-4 h-4', isRestarting && 'animate-spin')} />
-          </div>
-          <span className="text-base font-medium">
+          <button
+            type="button"
+            onClick={onOpenNodeRed}
+            data-testid="overview-node-red-open"
+            className="action-btn-secondary min-h-11 sm:min-h-9"
+          >
+            <ExternalLink className="h-4 w-4" aria-hidden="true" />
+            {t('dashboard:runtimeCard.openButton')}
+          </button>
+          <button
+            type="button"
+            aria-label={isRestarting
+              ? t('dashboard:runtimeCard.restartingButton')
+              : t('dashboard:runtimeCard.restartButton')}
+            onClick={onRequestRestart}
+            disabled={isRestarting || !canRestart}
+            data-testid="overview-node-red-restart"
+            className="action-btn-ghost min-h-11 disabled:cursor-not-allowed sm:min-h-9"
+          >
+            <RefreshCw className={cn('h-4 w-4', isRestarting && 'animate-spin')} aria-hidden="true" />
             {isRestarting ? t('dashboard:runtimeCard.restartingButton') : t('dashboard:runtimeCard.restartButton')}
-          </span>
-        </button>
-        <button
-          type="button"
-          aria-label={t('dashboard:runtimeCard.openButton')}
-          onClick={onOpenNodeRed}
-          data-testid="overview-node-red-open"
-          className="group action-btn-secondary flex items-center justify-center gap-3 rounded-xl p-4"
-        >
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-info/10 text-info transition-colors group-hover:bg-info/20">
-            <ExternalLink className="w-4 h-4" />
-          </div>
-          <span className="text-base font-medium">{t('dashboard:runtimeCard.openButton')}</span>
-        </button>
+          </button>
+        </div>
+
+        {container?.image && inDocker && (
+          <p className="flex min-w-0 gap-1 text-xs text-ds-text-secondary">
+            <span>{t('dashboard:overviewTiles.nodeRedHealth.imageLabel')}</span>
+            <span className="truncate font-mono font-semibold text-ds-text-primary" title={container.image}>
+              {container.image}
+            </span>
+          </p>
+        )}
       </div>
-
-      <Link
-        to="/configuration"
-        className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-accent transition-colors hover:text-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-base-100"
-        data-testid="overview-node-red-link"
-      >
-        {t('dashboard:overviewTiles.nodeRedHealth.cta')}
-        <ChevronRight className="h-4 w-4" aria-hidden="true" />
-      </Link>
-
-      {container?.image && inDocker && (
-        <p className="mt-3 truncate text-xs text-ds-text-muted" title={container.image}>
-          {container.image}
-        </p>
-      )}
-    </article>
+    </section>
   );
 }

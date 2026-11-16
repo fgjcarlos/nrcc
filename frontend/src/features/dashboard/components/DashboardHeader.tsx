@@ -1,32 +1,37 @@
+import { Link } from 'react-router-dom';
 import { useT } from '@/i18n';
+import type { SummaryAction } from '../lib';
 
 interface DashboardHeaderProps {
-  edgeMode?: boolean;
+  /** One sentence stating the instance's state. */
+  summary: string;
+  /** At most one next action, chosen by the most urgent condition. */
+  action: SummaryAction | null;
 }
 
 /**
- * DashboardHeader — issue #766 slice C
- *
- * Page-level header for the Overview screen. Shows the screen title
- * and a "Live telemetry" tag for operator context.
- *
- * Edge-mode used to be rendered here; it now lives in the persistent
- * Header (slice C) so the operator sees the deployment state on
- * every authenticated page, not only on Overview.
+ * Overview page header (T8): the title, one honest summary sentence and at
+ * most one next action, closed by a hairline rule (DESIGN.md page header).
  */
-export function DashboardHeader(_props: DashboardHeaderProps) {
+export function DashboardHeader({ summary, action }: DashboardHeaderProps) {
   const { t } = useT();
   return (
-    <div className="flex items-end justify-between gap-4">
-      <div>
-        <p className="text-xs uppercase tracking-[0.28em] text-ds-text-muted">{t('dashboard:systemOverview')}</p>
-        <h1 className="text-3xl font-bold tracking-tight text-base-content">{t('dashboard:overview')}</h1>
+    <header className="flex flex-col gap-3 border-b border-ds-border-subtle pb-3 sm:flex-row sm:items-end sm:justify-between">
+      <div className="min-w-0 space-y-1">
+        <h1 className="text-xl font-bold text-ds-text-primary">{t('dashboard:overview')}</h1>
+        <p className="max-w-[75ch] text-pretty text-sm text-ds-text-secondary" data-testid="overview-summary">
+          {summary}
+        </p>
       </div>
-      <div className="flex items-center gap-2">
-        <div className="hidden rounded-full bg-base-300/60 px-4 py-2 text-xs font-medium text-base-content/70 md:block">
-          {t('dashboard:liveTelemetry')}
-        </div>
-      </div>
-    </div>
+      {action && (
+        <Link
+          to={action.to}
+          data-testid="overview-summary-action"
+          className="action-btn-primary min-h-11 shrink-0 self-start text-sm sm:min-h-9 sm:self-auto"
+        >
+          {t(`dashboard:summary.actions.${action.labelKey}`)}
+        </Link>
+      )}
+    </header>
   );
 }

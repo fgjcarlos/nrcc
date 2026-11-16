@@ -46,9 +46,7 @@
   "recentActivity": "Actividad reciente",
   "noEvents": "Sin eventos",
   "noEventsRecorded": "Todavía no hay eventos registrados para respaldos o scheduler.",
-  "systemOverview": "Resumen del sistema",
   "overview": "Resumen",
-  "liveTelemetry": "Telemetría en vivo",
   "systemHealth": "Salud del sistema",
   "environmentOk": "Entorno OK",
   "checkEnvironment": "Revisa el entorno por problemas",
@@ -56,12 +54,12 @@
     "title": "Runtime",
     "restartButton": "Reiniciar",
     "restartingButton": "Reiniciando…",
-    "openButton": "Abrir"
+    "openButton": "Abrir editor de Node-RED"
   },
   "overviewTiles": {
     "securityPosture": {
       "title": "Postura de seguridad",
-      "subtitle": "Superficies de autenticación + transporte configuradas en Node-RED",
+      "subtitle": "Autenticación y transporte de Node-RED",
       "cta": "Abrir Seguridad",
       "surfaces": {
         "adminAuth": "Auth admin",
@@ -76,8 +74,10 @@
       "overall": {
         "success": "Asegurado",
         "warning": "Parcial",
-        "danger": "Expuesto"
-      }
+        "danger": "Expuesto",
+        "notReported": "Sin datos"
+      },
+      "statusAria": "Postura de seguridad: {{state}}"
     },
     "backupHealth": {
       "title": "Salud de backups",
@@ -90,16 +90,18 @@
       "never": "Nunca",
       "noSnapshotsYet": "Aún no hay snapshots",
       "noAutomaticRuns": "Sin ejecuciones automáticas",
-      "unknownDate": "—",
-      "backupIdPrefix": "id",
-      "countSuffix": "backups",
-      "cta": "Abrir Recuperación",
+      "cta": "Abrir Respaldos",
       "statusAria": "Estado del backup: {{state}}",
       "statuses": {
         "scheduled": "Programado",
         "withAlerts": "Necesita atención",
-        "notScheduled": "No programado"
-      }
+        "notScheduled": "No programado",
+        "notReported": "Sin datos"
+      },
+      "notReported": "Sin datos",
+      "lastError": "Falló la última ejecución automática:",
+      "backupCount_one": "{{count}} backup",
+      "backupCount_other": "{{count}} backups"
     },
     "nodeRedHealth": {
       "title": "Salud de Node-RED",
@@ -116,7 +118,17 @@
       "deploymentNative": "Despliegue nativo",
       "deploymentDocker": "Despliegue Docker",
       "deploymentNone": "No instalado",
-      "deploymentUnknown": "Despliegue desconocido"
+      "deploymentUnknown": "Despliegue desconocido",
+      "notReported": "Sin datos",
+      "imageLabel": "Imagen de NRCC",
+      "actionsLabel": "Acciones de Node-RED",
+      "statuses": {
+        "running": "En ejecución",
+        "stopped": "Detenido",
+        "error": "Error",
+        "detected": "Detectado",
+        "unknown": "Sin datos"
+      }
     }
   },
   "hostWarning": {
@@ -127,5 +139,33 @@
   "dockerWarning": "El contenedor de Docker no está funcionando correctamente. Algunas funciones pueden no estar disponibles.",
   "deploymentDocker": "Docker",
   "deploymentNative": "Nativo",
-  "deploymentUnknown": "Sin detectar"
+  "deploymentUnknown": "Sin detectar",
+  "summary": {
+    "sentence": "{{runtime}}, {{security}} y {{backup}}.",
+    "runtime": {
+      "running": "Node-RED está en ejecución",
+      "stopped": "Node-RED está detenido",
+      "error": "Node-RED informa de un error",
+      "detected": "Node-RED está detectado pero no en ejecución",
+      "unknown": "El estado de Node-RED no está informado"
+    },
+    "security": {
+      "exposed": "el editor no tiene autenticación de administrador",
+      "partial": "la autenticación de administrador está activa pero otras superficies no",
+      "lockedDown": "todas las superficies de autenticación están activas",
+      "unknown": "la seguridad no está informada"
+    },
+    "backup": {
+      "age": "el último backup fue {{age}}",
+      "none": "aún no hay ningún backup",
+      "unknown": "los backups no están informados"
+    },
+    "actions": {
+      "reviewSecurity": "Revisar seguridad",
+      "createBackup": "Crear un backup"
+    }
+  },
+  "chart": {
+    "summary": "{{label}}: {{count}} muestras, última {{latest}} %, rango {{min}}–{{max}} %"
+  }
 }

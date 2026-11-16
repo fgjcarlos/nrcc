@@ -754,7 +754,8 @@ test('dashboard labels container-scoped resource metrics returned by the API', a
   await login(page)
   const resourceMetrics = page.getByTestId('resource-metrics')
   await expect(resourceMetrics).toContainText('Container scope')
-  if (!memory?.available) await expect(resourceMetrics).toContainText('—')
+  // T8: an unavailable metric is labelled, not dashed.
+  if (!memory?.available) await expect(resourceMetrics).toContainText('Not reported')
 })
 
 test('environment action reaches a live Node-RED flow after its restart', async ({ page }) => {

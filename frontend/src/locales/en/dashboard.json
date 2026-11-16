@@ -46,9 +46,7 @@
   "recentActivity": "Recent activity",
   "noEvents": "No events",
   "noEventsRecorded": "No events recorded for backups or scheduler yet.",
-  "systemOverview": "System overview",
   "overview": "Overview",
-  "liveTelemetry": "Live telemetry",
   "systemHealth": "System Health",
   "environmentOk": "Environment OK",
   "checkEnvironment": "Check environment for issues",
@@ -56,12 +54,12 @@
     "title": "Runtime",
     "restartButton": "Restart",
     "restartingButton": "Restarting…",
-    "openButton": "Open"
+    "openButton": "Open Node-RED editor"
   },
   "overviewTiles": {
     "securityPosture": {
       "title": "Security posture",
-      "subtitle": "Authentication + transport surfaces configured on Node-RED",
+      "subtitle": "Node-RED authentication and transport",
       "cta": "Open Security",
       "surfaces": {
         "adminAuth": "Admin auth",
@@ -76,8 +74,10 @@
       "overall": {
         "success": "Locked down",
         "warning": "Partial",
-        "danger": "Exposed"
-      }
+        "danger": "Exposed",
+        "notReported": "Not reported"
+      },
+      "statusAria": "Security posture: {{state}}"
     },
     "backupHealth": {
       "title": "Backup health",
@@ -90,16 +90,18 @@
       "never": "Never",
       "noSnapshotsYet": "No snapshots yet",
       "noAutomaticRuns": "No automatic runs yet",
-      "unknownDate": "—",
-      "backupIdPrefix": "id",
-      "countSuffix": "backups",
-      "cta": "Open Recovery",
+      "cta": "Open Backups",
       "statusAria": "Backup status: {{state}}",
       "statuses": {
         "scheduled": "Scheduled",
         "withAlerts": "Needs attention",
-        "notScheduled": "Not scheduled"
-      }
+        "notScheduled": "Not scheduled",
+        "notReported": "Not reported"
+      },
+      "notReported": "Not reported",
+      "lastError": "Last automatic run failed:",
+      "backupCount_one": "{{count}} backup",
+      "backupCount_other": "{{count}} backups"
     },
     "nodeRedHealth": {
       "title": "Node-RED health",
@@ -116,7 +118,17 @@
       "deploymentNative": "Native deployment",
       "deploymentDocker": "Docker deployment",
       "deploymentNone": "Not installed",
-      "deploymentUnknown": "Unknown deployment"
+      "deploymentUnknown": "Unknown deployment",
+      "notReported": "Not reported",
+      "imageLabel": "NRCC image",
+      "actionsLabel": "Node-RED actions",
+      "statuses": {
+        "running": "Running",
+        "stopped": "Stopped",
+        "error": "Error",
+        "detected": "Detected",
+        "unknown": "Not reported"
+      }
     }
   },
   "hostWarning": {
@@ -127,5 +139,33 @@
   "dockerWarning": "Docker container is not running correctly. Some features may not work.",
   "deploymentDocker": "Docker",
   "deploymentNative": "Native",
-  "deploymentUnknown": "Not detected"
+  "deploymentUnknown": "Not detected",
+  "summary": {
+    "sentence": "{{runtime}}, {{security}} and {{backup}}.",
+    "runtime": {
+      "running": "Node-RED is running",
+      "stopped": "Node-RED is stopped",
+      "error": "Node-RED reports an error",
+      "detected": "Node-RED is detected but not running",
+      "unknown": "Node-RED status is not reported"
+    },
+    "security": {
+      "exposed": "the editor has no admin authentication",
+      "partial": "admin authentication is on but other surfaces are off",
+      "lockedDown": "every authentication surface is on",
+      "unknown": "security is not reported"
+    },
+    "backup": {
+      "age": "the last backup was {{age}}",
+      "none": "there is no backup yet",
+      "unknown": "backups are not reported"
+    },
+    "actions": {
+      "reviewSecurity": "Review security",
+      "createBackup": "Create a backup"
+    }
+  },
+  "chart": {
+    "summary": "{{label}}: {{count}} samples, latest {{latest}}%, range {{min}}–{{max}}%"
+  }
 }

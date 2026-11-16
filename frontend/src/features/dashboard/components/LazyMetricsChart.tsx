@@ -12,7 +12,7 @@ interface LazyMetricsChartProps {
   data: MetricsSnapshot[];
   dataKey: keyof Omit<MetricsSnapshot, 'timestamp'>;
   label: string;
-  color: string;
+  colorVar?: `--${string}`;
   loading?: boolean;
 }
 
