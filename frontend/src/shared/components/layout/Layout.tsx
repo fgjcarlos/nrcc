@@ -16,7 +16,7 @@ function NavDrawer({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50">
       <div
-        className="absolute inset-0 bg-[color-mix(in_srgb,var(--ds-rail-bg)_55%,transparent)]"
+        className="motion-scrim absolute inset-0 bg-[color-mix(in_srgb,var(--ds-rail-bg)_55%,transparent)]"
         aria-hidden="true"
         onClick={onClose}
       />
@@ -26,7 +26,7 @@ function NavDrawer({ onClose }: { onClose: () => void }) {
         aria-modal="true"
         aria-label={t('common:layout.mainNavigation')}
         tabIndex={-1}
-        className="relative h-full w-64 max-w-[85vw]"
+        className="motion-overlay relative h-full w-64 max-w-[85vw] [--overlay-from:-8px_0]"
       >
         <Sidebar mode="drawer" onClose={onClose} />
       </div>

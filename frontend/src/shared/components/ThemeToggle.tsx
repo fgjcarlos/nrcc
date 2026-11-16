@@ -20,7 +20,7 @@ export function ThemeToggle() {
       aria-label={name}
     >
       <Icon className="h-5 w-5 text-ds-text-secondary" aria-hidden="true" />
-      <span className="hidden sm:inline">{label}</span>
+      <span className="hidden xl:inline">{label}</span>
     </button>
   );
 }

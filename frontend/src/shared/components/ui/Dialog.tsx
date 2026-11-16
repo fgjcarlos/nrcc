@@ -73,7 +73,7 @@ export function Dialog({
   return createPortal(
     // data-confirmation-dialog-portal: the top-layer hook pinned by #721 tests.
     <div
-      className="modal-overlay z-[100]"
+      className="modal-overlay motion-scrim z-[100]"
       data-confirmation-dialog-portal
       onClick={(event) => {
         if (event.target === event.currentTarget && dismissible && closeOnBackdrop) onClose();
@@ -87,7 +87,7 @@ export function Dialog({
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
         className={cn(
-          'flex max-h-full w-full flex-col overflow-hidden rounded-box border border-ds-border-default bg-ds-bg-elevated text-ds-text-primary shadow-glow',
+          'motion-overlay flex max-h-full w-full flex-col overflow-hidden rounded-box border border-ds-border-default bg-ds-bg-elevated text-ds-text-primary shadow-glow',
           SIZES[size]
         )}
       >
@@ -108,7 +108,7 @@ export function Dialog({
             onClick={onClose}
             disabled={!dismissible}
             aria-label={t('common:closeDialog')}
-            className="-mr-2 shrink-0 px-2"
+            className="-mr-2 min-w-11 shrink-0 px-2 md:min-w-0"
           >
             <X className="h-4 w-4" aria-hidden="true" />
           </Button>

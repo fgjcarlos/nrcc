@@ -719,36 +719,56 @@
     ],
     "motion": [
       {
-        "name": "contact-blade",
+        "name": "motion-ease",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "The one curve (exponential ease-out, --motion-ease). Every transition-* and ease-out utility resolves to it; no bounce, elastic or spring."
+      },
+      {
+        "name": "state-change",
         "value": "150ms cubic-bezier(0.16, 1, 0.3, 1)",
-        "purpose": "A change-circuit contact closing or opening; the one authored motion on the configuration surface."
+        "purpose": "State changes (--motion-state): contact close, chips, disclosure chevrons, toggles, colour and border changes on buttons, fields, rows and tabs."
       },
       {
         "name": "contact-stagger",
         "value": "60ms",
-        "purpose": "Per-contact delay (index × 60ms) so contacts close in sequence."
+        "purpose": "Per-contact delay (index × 60ms) so change-circuit contacts close in sequence."
       },
       {
-        "name": "state-color",
-        "value": "150ms ease-out",
-        "purpose": "Colour and background transitions on buttons, rows and tabs."
+        "name": "overlay-entrance",
+        "value": "180ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Dialog, drawer and palette entrance (--motion-overlay, .motion-overlay): opacity from 0 plus a 4–8px translate (--overlay-from). Exit is instant."
+      },
+      {
+        "name": "scrim-entrance",
+        "value": "150ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Overlay backdrop fade (.motion-scrim), opacity only."
+      },
+      {
+        "name": "loops",
+        "value": "spinner 1s linear; skeleton pulse",
+        "purpose": "The only infinite animations: loading spinners and skeleton shimmer. No decorative loops."
       },
       {
         "name": "reduced-motion",
-        "value": "prefers-reduced-motion: reduce → 0.001ms",
-        "purpose": "Global rule: every transition and animation collapses; state still shows."
+        "value": "prefers-reduced-motion: reduce → 0.001ms, delays 0s",
+        "purpose": "Global rule: every transition and animation collapses and every delay (including the inline contact stagger) is dropped; state still shows."
       }
     ],
     "breakpoints": [
       {
+        "name": "md",
+        "value": "768px",
+        "purpose": "Touch-target switch: below it every standalone target is at least 44×44px; from it at least 24×24px."
+      },
+      {
         "name": "lg",
         "value": "1024px",
-        "purpose": "Change circuit becomes a sticky 20rem right column; below it is a horizontal strip."
+        "purpose": "The ink rail sits beside the content; below it the rail is a drawer behind the header menu button and the header controls are icon-only."
       },
       {
         "name": "xl",
         "value": "1280px",
-        "purpose": "Circuit column widens to 21rem."
+        "purpose": "Change circuit becomes a sticky 20rem right column; below it is a horizontal strip above the form. Header theme and update labels show."
       }
     ],
     "themes": {
@@ -769,7 +789,7 @@
       "refersTo": "button-primary",
       "description": "The action button: sheet ground, conductor-blue edge and label. \"Review N changes\" under the circuit.",
       "html": "<button class=\"ds-btn-primary\" type=\"button\">Review 3 changes</button>",
-      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 36px; padding: 8px 16px; font: 500 0.875rem/1.43 'Overpass Variable', system-ui, sans-serif; color: var(--ds-on-tint-primary); background: var(--ds-bg-surface); border: 1px solid var(--color-primary); border-radius: 4px; cursor: pointer; transition: background-color 150ms ease-out; } .ds-btn-primary:hover { background: color-mix(in srgb, var(--color-primary) 10%, var(--ds-bg-surface)); } .ds-btn-primary:focus-visible { outline: 2px solid var(--ds-accent-primary); outline-offset: 2px; } .ds-btn-primary:disabled { opacity: 0.5; cursor: default; }"
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 36px; padding: 8px 16px; font: 500 0.875rem/1.43 'Overpass Variable', system-ui, sans-serif; color: var(--ds-on-tint-primary); background: var(--ds-bg-surface); border: 1px solid var(--color-primary); border-radius: 4px; cursor: pointer; transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-primary:hover { background: color-mix(in srgb, var(--color-primary) 10%, var(--ds-bg-surface)); } .ds-btn-primary:focus-visible { outline: 2px solid var(--ds-accent-primary); outline-offset: 2px; } .ds-btn-primary:disabled { opacity: 0.5; cursor: default; }"
     },
     {
       "name": "Solid Primary Button",
@@ -777,7 +797,7 @@
       "refersTo": "button-solid",
       "description": "Conductor-blue fill for the single committing action of a dialog.",
       "html": "<button class=\"ds-btn-solid\" type=\"button\">Apply</button>",
-      "css": ".ds-btn-solid { min-height: 36px; padding: 8px 16px; font: 600 0.875rem/1.43 'Overpass Variable', system-ui, sans-serif; color: var(--color-primary-content); background: var(--color-primary); border: 0; border-radius: 4px; cursor: pointer; transition: background-color 150ms ease-out; } .ds-btn-solid:hover { background: var(--ds-brand-hover); } .ds-btn-solid:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--ds-bg-base), 0 0 0 4px var(--ds-accent-primary); }"
+      "css": ".ds-btn-solid { min-height: 36px; padding: 8px 16px; font: 600 0.875rem/1.43 'Overpass Variable', system-ui, sans-serif; color: var(--color-primary-content); background: var(--color-primary); border: 0; border-radius: 4px; cursor: pointer; transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-solid:hover { background: var(--ds-brand-hover); } .ds-btn-solid:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--ds-bg-base), 0 0 0 4px var(--ds-accent-primary); }"
     },
     {
       "name": "Secondary Button",
@@ -785,7 +805,7 @@
       "refersTo": "button-secondary",
       "description": "Control-border edge, ink label. \"Unlock to edit settings.js\".",
       "html": "<button class=\"ds-btn-secondary\" type=\"button\">Unlock to edit settings.js</button>",
-      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 36px; padding: 8px 16px; font: 400 0.875rem/1.43 'Overpass Variable', system-ui, sans-serif; color: var(--color-base-content); background: var(--ds-bg-surface); border: 1px solid var(--ds-border-strong); border-radius: 4px; cursor: pointer; transition: background-color 150ms ease-out; } .ds-btn-secondary:hover { background: color-mix(in srgb, var(--ds-text-primary) 6%, var(--ds-bg-surface)); } .ds-btn-secondary:focus-visible { outline: 2px solid var(--ds-accent-primary); outline-offset: 2px; }"
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 36px; padding: 8px 16px; font: 400 0.875rem/1.43 'Overpass Variable', system-ui, sans-serif; color: var(--color-base-content); background: var(--ds-bg-surface); border: 1px solid var(--ds-border-strong); border-radius: 4px; cursor: pointer; transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-secondary:hover { background: color-mix(in srgb, var(--ds-text-primary) 6%, var(--ds-bg-surface)); } .ds-btn-secondary:focus-visible { outline: 2px solid var(--ds-accent-primary); outline-offset: 2px; }"
     },
     {
       "name": "Ghost Button",
@@ -793,7 +813,7 @@
       "refersTo": "button-ghost",
       "description": "Borderless secondary path, e.g. \"Discard changes\" under the circuit.",
       "html": "<button class=\"ds-btn-ghost\" type=\"button\">Discard changes</button>",
-      "css": ".ds-btn-ghost { min-height: 36px; padding: 8px 12px; font: 400 0.875rem/1.43 'Overpass Variable', system-ui, sans-serif; color: var(--ds-text-secondary); background: transparent; border: 1px solid transparent; border-radius: 4px; cursor: pointer; transition: background-color 150ms ease-out, color 150ms ease-out; } .ds-btn-ghost:hover { color: var(--ds-text-primary); background: color-mix(in srgb, var(--ds-text-muted) 10%, var(--ds-bg-surface)); } .ds-btn-ghost:focus-visible { outline: 2px solid var(--ds-accent-primary); outline-offset: 2px; }"
+      "css": ".ds-btn-ghost { min-height: 36px; padding: 8px 12px; font: 400 0.875rem/1.43 'Overpass Variable', system-ui, sans-serif; color: var(--ds-text-secondary); background: transparent; border: 1px solid transparent; border-radius: 4px; cursor: pointer; transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1), color 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-ghost:hover { color: var(--ds-text-primary); background: color-mix(in srgb, var(--ds-text-muted) 10%, var(--ds-bg-surface)); } .ds-btn-ghost:focus-visible { outline: 2px solid var(--ds-accent-primary); outline-offset: 2px; }"
     },
     {
       "name": "Field with Terminal Label",
@@ -801,7 +821,7 @@
       "refersTo": "input",
       "description": "Every settings field is labelled by its settings.js key in mono, a middle dot, then the human label.",
       "html": "<div class=\"ds-field\"><label class=\"ds-field-label\" for=\"ds-uiport\"><span class=\"ds-key\">uiPort</span><span aria-hidden=\"true\">·</span><span>UI Port</span></label><input class=\"ds-input\" id=\"ds-uiport\" aria-label=\"UI Port (uiPort)\" value=\"1880\"></div>",
-      "css": ".ds-field { display: grid; gap: 4px; } .ds-field-label { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 6px; font: 400 0.75rem/1.33 'Overpass Variable', system-ui, sans-serif; color: var(--ds-text-secondary); } .ds-key { font: 600 0.75rem/1.33 'Overpass Mono', ui-monospace, monospace; color: var(--ds-text-primary); } .ds-input { width: 100%; padding: 8px 12px; font: 400 0.875rem/1.43 'Overpass Variable', system-ui, sans-serif; color: var(--ds-text-primary); background: var(--ds-bg-elevated); border: 1px solid var(--ds-border-strong); border-radius: 4px; outline: none; transition: border-color 150ms ease-out, box-shadow 150ms ease-out; } .ds-input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 24%, transparent); } .ds-input:focus-visible { outline: 2px solid var(--ds-accent-primary); outline-offset: 2px; }"
+      "css": ".ds-field { display: grid; gap: 4px; } .ds-field-label { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 6px; font: 400 0.75rem/1.33 'Overpass Variable', system-ui, sans-serif; color: var(--ds-text-secondary); } .ds-key { font: 600 0.75rem/1.33 'Overpass Mono', ui-monospace, monospace; color: var(--ds-text-primary); } .ds-input { width: 100%; padding: 8px 12px; font: 400 0.875rem/1.43 'Overpass Variable', system-ui, sans-serif; color: var(--ds-text-primary); background: var(--ds-bg-elevated); border: 1px solid var(--ds-border-strong); border-radius: 4px; outline: none; transition: border-color 150ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 24%, transparent); } .ds-input:focus-visible { outline: 2px solid var(--ds-accent-primary); outline-offset: 2px; }"
     },
     {
       "name": "Section Tabs",
@@ -809,7 +829,7 @@
       "refersTo": "tab",
       "description": "WAI-ARIA tablist on a hairline baseline; the selected tab carries a 2px conductor-blue underline.",
       "html": "<div class=\"ds-tabs\" role=\"tablist\" aria-label=\"Sections\"><button class=\"ds-tab\" role=\"tab\" aria-selected=\"true\">Basic</button><button class=\"ds-tab\" role=\"tab\" aria-selected=\"false\" tabindex=\"-1\">Editor</button><button class=\"ds-tab\" role=\"tab\" aria-selected=\"false\" tabindex=\"-1\">Logging</button></div>",
-      "css": ".ds-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--ds-border-subtle); } .ds-tab { margin-bottom: -1px; min-height: 36px; padding: 8px 12px; font: 500 0.875rem/1.43 'Overpass Variable', system-ui, sans-serif; color: var(--ds-text-muted); background: none; border: 0; border-bottom: 2px solid transparent; cursor: pointer; transition: color 150ms ease-out, border-color 150ms ease-out; } .ds-tab:hover { color: var(--ds-text-primary); border-bottom-color: var(--ds-border-strong); } .ds-tab[aria-selected=\"true\"] { color: var(--ds-on-tint-primary); border-bottom-color: var(--color-primary); } .ds-tab:focus-visible { outline: 2px solid var(--ds-accent-primary); outline-offset: 2px; }"
+      "css": ".ds-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--ds-border-subtle); } .ds-tab { margin-bottom: -1px; min-height: 36px; padding: 8px 12px; font: 500 0.875rem/1.43 'Overpass Variable', system-ui, sans-serif; color: var(--ds-text-muted); background: none; border: 0; border-bottom: 2px solid transparent; cursor: pointer; transition: color 150ms cubic-bezier(0.16, 1, 0.3, 1), border-color 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-tab:hover { color: var(--ds-text-primary); border-bottom-color: var(--ds-border-strong); } .ds-tab[aria-selected=\"true\"] { color: var(--ds-on-tint-primary); border-bottom-color: var(--color-primary); } .ds-tab:focus-visible { outline: 2px solid var(--ds-accent-primary); outline-offset: 2px; }"
     },
     {
       "name": "Page Header with REV Designator",

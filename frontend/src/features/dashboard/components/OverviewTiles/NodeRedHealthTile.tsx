@@ -132,7 +132,7 @@ export function NodeRedHealthTile({
         </p>
         <Link
           to="/configuration"
-          className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-ds-on-tint-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ds-accent-primary sm:min-h-0"
+          className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-ds-on-tint-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ds-accent-primary md:min-h-6"
           data-testid="overview-node-red-link"
         >
           {t('dashboard:overviewTiles.nodeRedHealth.cta')}
@@ -187,7 +187,7 @@ export function NodeRedHealthTile({
             type="button"
             onClick={onOpenNodeRed}
             data-testid="overview-node-red-open"
-            className="action-btn-secondary min-h-11 sm:min-h-9"
+            className="action-btn-secondary min-h-11 md:min-h-9"
           >
             <ExternalLink className="h-4 w-4" aria-hidden="true" />
             {t('dashboard:runtimeCard.openButton')}
@@ -200,7 +200,7 @@ export function NodeRedHealthTile({
             onClick={onRequestRestart}
             disabled={isRestarting || !canRestart}
             data-testid="overview-node-red-restart"
-            className="action-btn-ghost min-h-11 disabled:cursor-not-allowed sm:min-h-9"
+            className="action-btn-ghost min-h-11 disabled:cursor-not-allowed md:min-h-9"
           >
             <RefreshCw className={cn('h-4 w-4', isRestarting && 'animate-spin')} aria-hidden="true" />
             {isRestarting ? t('dashboard:runtimeCard.restartingButton') : t('dashboard:runtimeCard.restartButton')}

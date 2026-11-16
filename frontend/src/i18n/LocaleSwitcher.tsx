@@ -15,7 +15,8 @@ export function LocaleSwitcher() {
       role="group"
       aria-label={t('common:languageSelector')}
       data-testid="locale-switcher"
-      className="inline-flex h-11 items-stretch overflow-hidden rounded-field border border-ds-border-strong bg-ds-bg-surface text-xs"
+      // Outline, not border: it paints over the buttons so they keep the full 44px target.
+      className="inline-flex h-11 items-stretch overflow-hidden rounded-field outline outline-1 -outline-offset-1 outline-ds-border-strong bg-ds-bg-surface text-xs"
     >
       {SUPPORTED_LOCALES.map((lng) => {
         const isActive = active === lng;
@@ -31,7 +32,7 @@ export function LocaleSwitcher() {
               void i18n.changeLanguage(lng);
             }}
             className={
-              'min-w-9 px-2 font-mono font-semibold uppercase transition-colors ' +
+              'min-w-11 px-2 font-mono font-semibold uppercase transition-colors ' +
               (isActive
                 ? 'bg-ds-accent-dim text-ds-on-tint-primary shadow-[inset_0_-2px_0_var(--ds-accent-primary)]'
                 : 'text-ds-text-secondary hover:bg-base-200 hover:text-ds-text-primary')

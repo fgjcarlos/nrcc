@@ -68,7 +68,7 @@ const NodeRedEnvironmentCard = ({ env }: { env: NodeRedEnvironment }) => {
         {env.settingsPath && (
           <div>
             <p className="text-xs uppercase tracking-wider text-ds-text-muted mb-1">{t('bootstrap:settingsPath')}</p>
-            <p className="text-xs text-base-content/70 truncate font-mono" title={env.settingsPath}>
+            <p className="break-all font-mono text-xs text-base-content/70" title={env.settingsPath}>
               {env.settingsPath}
             </p>
           </div>
@@ -77,7 +77,7 @@ const NodeRedEnvironmentCard = ({ env }: { env: NodeRedEnvironment }) => {
         {env.userDir && (
           <div>
             <p className="text-xs uppercase tracking-wider text-ds-text-muted mb-1">{t('bootstrap:userDirectory')}</p>
-            <p className="text-xs text-base-content/70 truncate font-mono" title={env.userDir}>
+            <p className="break-all font-mono text-xs text-base-content/70" title={env.userDir}>
               {env.userDir}
             </p>
           </div>
@@ -106,7 +106,7 @@ const SettingsCard = ({ settings }: { settings: SettingsDocument }) => {
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div>
         <p className="text-xs uppercase tracking-wider text-ds-text-muted mb-1">{t('bootstrap:path')}</p>
-        <p className="text-xs text-base-content/70 truncate font-mono" title={settings.path}>
+        <p className="break-all font-mono text-xs text-base-content/70" title={settings.path}>
           {settings.path}
         </p>
       </div>
@@ -136,7 +136,7 @@ const SettingsCard = ({ settings }: { settings: SettingsDocument }) => {
       {settings.backupPath && (
         <div>
           <p className="text-xs uppercase tracking-wider text-ds-text-muted mb-1">{t('bootstrap:backupPath')}</p>
-          <p className="text-xs text-base-content/70 truncate font-mono" title={settings.backupPath}>
+          <p className="break-all font-mono text-xs text-base-content/70" title={settings.backupPath}>
             {settings.backupPath}
           </p>
         </div>

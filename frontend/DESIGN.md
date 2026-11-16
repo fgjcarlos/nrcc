@@ -201,7 +201,11 @@ Conductor colours on a warm drawing sheet; every hue has one job, and the job ho
 
 ## Layout
 
-Dense, column-based operating layout. At `lg` (1024px) and up, Configuration is a two-column grid: the settings form takes the remaining width and the change circuit is a sticky right column of 20rem (21rem from `xl`, 1280px), with a 24px gap. Below `lg` the circuit becomes a sticky horizontal strip above the form: six contact symbols on a horizontal conductor and a one-line summary ("Step 3 of 6 · Validate · Waiting").
+Dense, column-based operating layout. From `lg` (1024px) the ink rail (16rem) sits beside the content; below `lg` it is a drawer opened from the header menu button, and the header controls are icon-only (the command palette below `lg`, the theme and update labels below `xl`) so the header never needs a second row. At `xl` (1280px) and up, Configuration is a two-column grid: the settings form takes the remaining width and the change circuit is a sticky right column of 20rem, with a 24px gap. Below `xl` the circuit becomes a sticky horizontal strip above the form: six contact symbols on a horizontal conductor and a one-line summary ("Step 3 of 6 · Validate · Waiting"). The column waits for `xl` because at `lg` the rail already takes 16rem and a column would leave the form narrower than a phone.
+
+**Breakpoints.** `md` (768px) is the touch-target switch, `lg` (1024px) the rail, `xl` (1280px) the circuit column. Below `md` every standalone target (buttons, text controls, tabs, standalone links, icon buttons) is at least 44×44px; from `md` up at least 24×24px. A global rule in `src/index.css` holds the 44px height for buttons and text controls below `md`, so a call site's `min-h-*` utility only applies from `md` up; other targets use `min-h-11 md:min-h-6`-style pairs.
+
+**Nothing scrolls sideways.** The document never scrolls horizontally at any width from 320px (`e2e/responsive.spec.ts` checks 320 and 768). Grid and flex children that hold text carry `min-w-0`; rows wrap instead of scrolling (tab lists wrap onto a second line); tables stack into labelled rows below `sm` (640px) through the shared `<Table stacked>`; paths, ids and package names break anywhere (`break-all`) rather than truncate; content takes no fixed pixel widths.
 
 Spacing runs on a 4px base: 4px inside label rows, 8px between a control and its neighbours and inside the circuit foot, 12px between contacts and between header items, 16px between page blocks, 24px between columns. The page header sits on a hairline rule (12px below it), and sections are separated by hairline rules rather than by cards.
 
@@ -216,6 +220,17 @@ The system is flat. Depth comes from tonal grounds (sunken, sheet, raised sheet)
 ### Named Rules
 **The Hairline Rule.** Elevation is a 1px border plus at most `--ds-shadow-raised`. If a surface needs more separation, use a ground change or a rule line, not a bigger shadow.
 
+## Motion
+
+Motion explains a state change or an arriving overlay; it never decorates. One curve, two durations, defined once in `src/index.css` (`--motion-ease`, `--motion-state`, `--motion-overlay`) and wired into Tailwind's default transition, so every `transition-*` and `ease-out` utility uses them.
+
+- **Curve:** exponential ease-out, `cubic-bezier(0.16, 1, 0.3, 1)`. No bounce, elastic or spring easing or keyframes.
+- **State changes, 150ms:** a contact closing, chips, disclosure chevrons, toggles, and colour or border changes on buttons, fields, rows and tabs. Animate colour, opacity and transform only; never width, height or position (the rail collapses instantly).
+- **Overlays, 150–200ms:** dialogs, the navigation drawer, the review drawer and the command palette enter with opacity plus a 4–8px translate toward their resting place (`.motion-overlay`, 180ms; direction from `--overlay-from`). Their scrim fades in over 150ms (`.motion-scrim`). Exit is instant.
+- **The authored moment:** the change circuit closes its contacts in sequence, 60ms per contact index. It is the only staggered motion in the product.
+- **Loops:** only loading spinners (1s linear) and skeleton shimmer run indefinitely. A pending action shows a spinner, not a pulsing icon. Charts do not animate (`isAnimationActive={false}`).
+- **Reduced motion:** under `prefers-reduced-motion: reduce` one global rule at the end of `src/index.css` collapses every transition and animation to 0.001ms and every delay to 0s, inline styles included, so the contact stagger and the overlay entrances are instant. State still changes; only the movement goes. `pnpm run test:appearance` pins the grammar and the reduced-motion path.
+
 ## Shapes
 
 Drafting geometry: near-square corners, straight 1px conductors, and IEC symbols drawn with a 1.5px square-capped stroke. Selectors (checkbox, radio) take 2px corners; fields, buttons, panels and banners take 4px (`--radius-field`, `--radius-box`). Status chips take 2px corners like selectors; only the toggle track and knob are fully round. Dashed strokes mean "not confirmed" (an unknown contact blade) or the rollback return path; solid strokes mean a drawn conductor.
@@ -228,7 +243,7 @@ The NRCC mark is the closed IEC normally-open contact: a conductor entering two 
 
 ### Buttons
 Flat sheet, conductor-coloured edge; the colour is the job.
-- **Shape:** 4px corners (`{rounded.field}`), 36px minimum height on the configuration surface.
+- **Shape:** 4px corners (`{rounded.field}`), 36px minimum height (44px below `md`).
 - **Primary (action):** sheet ground, conductor-blue 1px border and label, 8px 16px padding, 500 weight. Hover lays a 10% blue tint over the sheet. "Review N changes" under the circuit is the canonical instance.
 - **Solid primary:** conductor-blue fill with white (dark: drawing-sunken) label, 600 weight; hover goes to `conductor-blue-hover`.
 - **Secondary:** sheet ground, control-border edge, ink label; hover lays a 6% ink tint over the sheet. "Unlock to edit settings.js" is the canonical instance.
@@ -244,7 +259,7 @@ Flat sheet, conductor-coloured edge; the colour is the job.
 - **Toggle:** a 44×24px round track. Off is a control-border outline on the sunken ground with a muted knob; on is a conductor-blue fill with a sheet-coloured knob. It exposes `aria-pressed`.
 
 ### Navigation
-- **Tabs (section tablist):** a WAI-ARIA tablist with roving tabindex on a hairline baseline. Each tab is 36px high, 14px at 500 weight, with an icon. Unselected tabs are muted ink with a transparent 2px underline that turns control-border on hover; the selected tab is conductor-blue text over a 2px blue underline.
+- **Tabs (section tablist):** a WAI-ARIA tablist with roving tabindex on a hairline baseline. Each tab is 36px high (44px below `md`), 14px at 500 weight, with an icon. Tabs that do not fit wrap onto another line; the tablist never scrolls sideways. Unselected tabs are muted ink with a transparent 2px underline that turns control-border on hover; the selected tab is conductor-blue text over a 2px blue underline.
 - **Sidebar links:** the active link takes a 12% blue tint, a control-border edge and a 2px inset blue bar on its leading edge.
 - **Ink rail:** `--ds-rail-bg` and `--ds-rail-text` define an ink navigation rail (light: ink; dark: `rail-dark`). The app shell applies it: the sidebar sits on the rail ground and the selected link carries an action-blue edge bar.
 
@@ -256,7 +271,7 @@ The page title (Title type) shares a baseline with its designator `REV` plus the
 
 ### Change Circuit (signature)
 The gated change sequence as a single-line schematic.
-- **Structure:** an ordered list of six contacts, Edit, Diff, Validate, Backup, Apply and Ready, numbered `K1`–`K6` in Designator type. They hang on one continuous 1px conductor drawn in the control-border colour on whole pixels: vertical in the `lg` column, horizontal in the narrow strip.
+- **Structure:** an ordered list of six contacts, Edit, Diff, Validate, Backup, Apply and Ready, numbered `K1`–`K6` in Designator type. They hang on one continuous 1px conductor drawn in the control-border colour on whole pixels: vertical in the `xl` column, horizontal in the narrow strip.
 - **Symbol:** an IEC normally-open contact, 20×20px. It has two terminal stubs and a blade that pivots on the lower terminal, drawn with a 1.5px square-capped stroke. Open: the blade is rotated −30° off the line. Closed: the blade lies on the line, a 4×4px green-yellow square with an ink stroke sits beside it, and the stroke turns to ink.
 - **State vocabulary (text, symbol, colour):**
   - **Waiting** (`idle`): not reached; open blade, muted.
@@ -266,9 +281,9 @@ The gated change sequence as a single-line schematic.
   - **Failed** (`failed`): the stage that failed; open blade, critical red, with the server error code in mono underneath.
   - **Not confirmed** (`unknown`): the outcome was not observed; dashed blade, muted.
 - **Proof:** each contact carries one 12px proof line ("3 changes", "Diff reviewed", "Taken before write", "Readiness OK") and, when relevant, a mono designator line with the error code or the invalid settings keys.
-- **Rollback branch:** when the server restored the backup after a failed restart or readiness check, a dashed critical-red branch runs from Apply back to Backup (drawn from `lg` up). A note under the circuit carries the rollback glyph, the `RB` designator and the outcome ("Rollback: restored from backup" or "Rollback failed: runtime recovery unsuccessful") at every width.
+- **Rollback branch:** when the server restored the backup after a failed restart or readiness check, a dashed critical-red branch runs from Apply back to Backup (drawn from `xl` up). A note under the circuit carries the rollback glyph, the `RB` designator and the outcome ("Rollback: restored from backup" or "Rollback failed: runtime recovery unsuccessful") at every width.
 - **Foot:** the pending total and restart cost, right-aligned in 12px tabular type ("3 changes · 1 needs restart"), then the primary "Review N changes" button and, while edits are pending, the ghost "Discard changes".
-- **Motion:** closing or opening a contact is the one authored motion on the surface. The blade rotates over 150ms with `cubic-bezier(0.16, 1, 0.3, 1)`, with a 60ms stagger per contact index so contacts close in sequence. Under reduced motion it is instant.
+- **Motion:** closing or opening a contact is the one authored motion on the surface (see Motion). The blade rotates over 150ms with `cubic-bezier(0.16, 1, 0.3, 1)`, with a 60ms stagger per contact index so contacts close in sequence. Under reduced motion it is instant, with no stagger.
 - **Announcement:** a polite live region speaks the frontier step and its proof ("Validate: Failed. Rejected; nothing written").
 
 ## Do's and Don'ts

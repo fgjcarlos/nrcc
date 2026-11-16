@@ -70,8 +70,8 @@ describe('EnvVarModal polish', () => {
 
     const valueField = screen.getByTestId('env-var-value-field')
     expect(valueField).toHaveClass('min-h-12')
-    expect(valueField).toHaveClass('transition-all')
-    expect(valueField).toHaveClass('duration-150')
+    // DESIGN.md Motion: the minimum height holds the layout; nothing animates it.
+    expect(valueField).not.toHaveClass('transition-all')
   })
 
   it('renders the boolean value toggle as an accessible medium control with a status badge', () => {

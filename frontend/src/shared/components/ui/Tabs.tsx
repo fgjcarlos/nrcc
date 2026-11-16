@@ -29,8 +29,9 @@ function nextTabIndex(key: string, index: number, count: number): number | null 
 
 /**
  * WAI-ARIA tablist (DESIGN.md Navigation › Tabs): roving tabindex, automatic
- * activation on Left/Right/Home/End, 36px tabs on a hairline baseline, the
- * selected tab in conductor blue over a 2px underline. Pair with TabPanel.
+ * activation on Left/Right/Home/End, 36px tabs (44px below md) on a hairline
+ * baseline that wrap instead of scrolling, the selected tab in conductor blue
+ * over a 2px underline. Pair with TabPanel.
  */
 export function Tabs<T extends string>({ label, idBase, items, selected, onSelect, className }: TabsProps<T>) {
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -39,7 +40,7 @@ export function Tabs<T extends string>({ label, idBase, items, selected, onSelec
     <div
       role="tablist"
       aria-label={label}
-      className={cn('flex gap-1 overflow-x-auto border-b border-ds-border-subtle', className)}
+      className={cn('flex flex-wrap gap-x-1 border-b border-ds-border-subtle', className)}
     >
       {items.map((item, index) => {
         const Icon = item.icon;
@@ -63,7 +64,7 @@ export function Tabs<T extends string>({ label, idBase, items, selected, onSelec
               tabRefs.current[next]?.focus();
             }}
             className={cn(
-              '-mb-px flex min-h-9 items-center gap-2 border-b-2 px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors',
+              '-mb-px flex min-h-11 items-center gap-2 border-b-2 px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors md:min-h-9',
               isSelected
                 ? 'border-primary text-primary'
                 : 'border-transparent text-ds-text-muted hover:border-[var(--ds-border-strong)] hover:text-ds-text-primary'

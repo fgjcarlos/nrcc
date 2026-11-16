@@ -170,7 +170,7 @@ export function EnvVarModal({
             <label htmlFor={valueId} className="block text-xs text-ds-text-secondary">
               {t('env-vars:modalValueFieldLabel')}
             </label>
-            <div data-testid="env-var-value-field" className="min-h-12 transition-all duration-150">
+            <div data-testid="env-var-value-field" className="min-h-12">
               {renderValueInput()}
             </div>
             {validationErrors.value && (

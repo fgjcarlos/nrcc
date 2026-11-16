@@ -27,7 +27,7 @@ export function DashboardHeader({ summary, action }: DashboardHeaderProps) {
         <Link
           to={action.to}
           data-testid="overview-summary-action"
-          className="action-btn-primary min-h-11 shrink-0 self-start text-sm sm:min-h-9 sm:self-auto"
+          className="action-btn-primary min-h-11 shrink-0 self-start text-sm md:min-h-9 sm:self-auto"
         >
           {t(`dashboard:summary.actions.${action.labelKey}`)}
         </Link>
