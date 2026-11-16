@@ -6,8 +6,8 @@ import { EnvVarModal } from '@/features/env-vars/components';
 import { BulkImportModal } from '@/features/env-vars/components';
 import { DotenvEditor } from '@/features/env-vars/components';
 import { ConfirmationDialog, StateContainer } from '@/shared/components';
-import { EmptyState } from '@/shared/components/feedback';
-import { Table, TabPanel, Tabs } from '@/shared/components/ui';
+import { EmptyState, ErrorState } from '@/shared/components/feedback';
+import { Button, Table, TabPanel, Tabs } from '@/shared/components/ui';
 import { useEnvVarsData, useEnvVarsActions } from '@/features/env-vars/hooks';
 import { useAuth } from '@/features/auth/hooks';
 import { envService } from '@/features/env-vars/services';
@@ -18,7 +18,7 @@ export function EnvVarsView() {
   const { user } = useAuth();
 
   // Data queries
-  const { envVars, isLoading, refetchEnvVars } = useEnvVarsData();
+  const { envVars, isLoading, isError, refetchEnvVars } = useEnvVarsData();
 
   // Mutations
   const { createMutation, deleteMutation } = useEnvVarsActions();
@@ -30,6 +30,7 @@ export function EnvVarsView() {
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = useState<'table' | 'dotenv'>('table');
   const [nodeRedSyncState, setNodeRedSyncState] = useState<'idle' | 'loading' | 'synced' | 'unavailable' | 'error'>('idle');
+  // Server summary or failure reason; the sentence around it comes from the catalog.
   const [nodeRedSyncMessage, setNodeRedSyncMessage] = useState('');
   const didAutoImport = useRef(false);
   const isMounted = useRef(false);
@@ -57,7 +58,7 @@ export function EnvVarsView() {
 
   const syncFromNodeRed = useCallback(async () => {
     setNodeRedSyncState('loading');
-    setNodeRedSyncMessage('Synchronizing Node-RED environment entries…');
+    setNodeRedSyncMessage('');
     const result = await envService.importFromNodeRed(true);
     if (!isMounted.current) return;
 
@@ -68,7 +69,7 @@ export function EnvVarsView() {
     }
     if (result.lines.length > 0) refetchEnvVars();
     setNodeRedSyncState('synced');
-    setNodeRedSyncMessage(result.summary ? `Node-RED synchronized: ${result.summary}` : 'Node-RED environment entries are synchronized.');
+    setNodeRedSyncMessage(result.summary);
   }, [refetchEnvVars]);
 
   useEffect(() => {
@@ -129,58 +130,66 @@ export function EnvVarsView() {
   };
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-xs uppercase tracking-[0.24em] text-ds-text-muted">{t('env-vars:secretsLabel')}</p>
-          <h1 className="text-2xl font-bold text-base-content">{t('env-vars:pageTitle')}</h1>
+    <div className="space-y-4">
+      <header className="flex flex-col gap-3 border-b border-ds-border-subtle pb-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0 space-y-1">
+          <h1 className="text-xl font-bold text-ds-text-primary">{t('env-vars:pageTitle')}</h1>
+          <p className="max-w-[75ch] text-pretty text-sm text-ds-text-secondary">{t('env-vars:pageIntro')}</p>
         </div>
         {activeTab === 'table' && (
-          <div className="flex flex-wrap gap-2">
-            <button
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="secondary"
               onClick={() => void syncFromNodeRed()}
               disabled={nodeRedSyncState === 'loading'}
-              className="action-btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
               data-testid="import-from-node-red-button"
               title={t('env-vars:resyncTitle')}
+              className="min-h-11 sm:min-h-9"
             >
-              <Download className="w-4 h-4" />
+              <Download className="h-4 w-4" aria-hidden="true" />
               {nodeRedSyncState === 'loading' ? t('env-vars:resyncing') : t('env-vars:resyncNodeRed')}
-            </button>
-            <button
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
               onClick={() => setIsBulkOpen(true)}
-              className="action-btn-secondary"
               data-testid="bulk-import-button"
+              className="min-h-11 sm:min-h-9"
             >
-              <FileStack className="w-4 h-4" />
+              <FileStack className="h-4 w-4" aria-hidden="true" />
               {t('env-vars:bulkImport')}
-            </button>
-            <button onClick={() => openModal()} className="action-btn-primary">
-              <Plus className="w-4 h-4" />
+            </Button>
+            <Button type="button" onClick={() => openModal()} className="min-h-11 sm:min-h-9">
+              <Plus className="h-4 w-4" aria-hidden="true" />
               {t('env-vars:add')}
-            </button>
+            </Button>
           </div>
         )}
-      </div>
+      </header>
 
       {nodeRedSyncState !== 'idle' && (
         <div
           role="status"
           aria-live="polite"
           data-testid="node-red-sync-status"
-          className={`rounded-lg border px-4 py-3 text-sm ${
+          className={`rounded-box border px-3 py-2 text-sm ${
             nodeRedSyncState === 'error'
-              ? 'border-error/30 bg-error/10 text-ds-on-tint-error'
+              ? 'border-ds-danger/35 bg-ds-danger/10 text-ds-on-tint-error'
               : nodeRedSyncState === 'unavailable'
-                ? 'border-warning/30 bg-warning/10 text-ds-on-tint-warning'
-                : 'border-info/30 bg-info/10 text-base-content'
+                ? 'border-ds-warning/35 bg-ds-warning/10 text-ds-on-tint-warning'
+                : 'border-ds-border-subtle text-ds-text-secondary'
           }`}
         >
-          {nodeRedSyncState === 'unavailable'
-            ? `Node-RED synchronization is unavailable: ${nodeRedSyncMessage}`
-            : nodeRedSyncState === 'error'
-              ? `Could not synchronize Node-RED environment entries: ${nodeRedSyncMessage}`
-              : nodeRedSyncMessage}
+          {nodeRedSyncState === 'loading'
+            ? t('env-vars:syncLoading')
+            : nodeRedSyncState === 'unavailable'
+              ? t('env-vars:syncUnavailable', { reason: nodeRedSyncMessage })
+              : nodeRedSyncState === 'error'
+                ? t('env-vars:syncError', { reason: nodeRedSyncMessage })
+                : nodeRedSyncMessage
+                  ? t('env-vars:syncSynced', { summary: nodeRedSyncMessage })
+                  : t('env-vars:syncSyncedEmpty')}
         </div>
       )}
 
@@ -199,9 +208,10 @@ export function EnvVarsView() {
         {activeTab === 'table' ? (
           <StateContainer
             isLoading={isLoading}
-            isError={false}
+            isError={!!isError}
             isEmpty={envVars.length === 0}
-            emptySlot={<EmptyState title={t('env-vars:noEnvVarsConfigured')} />}
+            errorSlot={<ErrorState title={t('env-vars:loadError')} onRetry={() => void refetchEnvVars()} />}
+            emptySlot={<EmptyState title={t('env-vars:noEnvVarsConfigured')} description={t('env-vars:noEnvVarsHint')} />}
           >
             <Table stacked caption={t('env-vars:pageTitle')}>
               <thead>
@@ -233,7 +243,7 @@ export function EnvVarsView() {
         )}
       </TabPanel>
 
-       {/* Modal */}
+      {/* Modal */}
       {isModalOpen && (
         <EnvVarModal
           editing={!!editingVar}

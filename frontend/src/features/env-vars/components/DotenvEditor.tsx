@@ -7,15 +7,20 @@ import { Save, RefreshCw } from 'lucide-react';
 import { queryKeys } from '@/shared/lib/queryKeys';
 import { dotenvSchema } from '@/shared/validation/schemas';
 import { useT } from '@/i18n';
+import { StateContainer } from '@/shared/components';
+import { ErrorState } from '@/shared/components/feedback';
+import { Button, Textarea } from '@/shared/components/ui';
 
-// TAREA 3: Component for editing .env file
 export function DotenvEditor() {
   const { t } = useT();
   const queryClient = useQueryClient();
   const [content, setContent] = useState('');
   const [isEditing, setIsEditing] = useState(false);
 
-  const { isLoading: isLoadingContent } = useQuery({
+  // Parse and save failures stay next to the editor instead of in a toast.
+  const [inlineError, setInlineError] = useState<string | null>(null);
+
+  const { isLoading: isLoadingContent, isError: isLoadError, refetch } = useQuery({
     queryKey: queryKeys.dotenv.root,
     queryFn: async () => {
       const data = await envService.getDotenv();
@@ -41,17 +46,19 @@ export function DotenvEditor() {
           message = err.response.data.error.message;
         }
       }
-      toast.error(message);
+      setInlineError(message);
     },
   });
 
   const handleSave = () => {
     const result = dotenvSchema.safeParse(content);
     if (!result.success) {
-      const first = result.error.issues[0];
-      toast.error(`Invalid .env: ${first?.message ?? 'malformed content'}`);
+      // dotenvSchema puts the zero-based line index at path[1].
+      const index = Number(result.error.issues[0]?.path[1]);
+      setInlineError(t('env-vars:dotenvInvalidLine', { line: Number.isInteger(index) ? index + 1 : '?' }));
       return;
     }
+    setInlineError(null);
     saveMutation.mutate();
   };
 
@@ -59,76 +66,63 @@ export function DotenvEditor() {
     // Reload from server
     queryClient.invalidateQueries({ queryKey: queryKeys.dotenv.root });
     setIsEditing(false);
+    setInlineError(null);
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-start">
-        <div>
-          <h2 className="text-lg font-semibold text-base-content">{t('env-vars:dotenvTitle')}</h2>
-          <p className="text-sm text-ds-text-muted mt-1">
-            {t('env-vars:editorHelpText')}
+    <section aria-labelledby="dotenv-editor-title" className="space-y-3">
+      <div className="space-y-1">
+        <h2 id="dotenv-editor-title" className="text-sm font-semibold text-ds-text-primary">{t('env-vars:dotenvTitle')}</h2>
+        <p className="max-w-[75ch] text-pretty text-sm text-ds-text-secondary">{t('env-vars:editorHelpText')}</p>
+      </div>
+
+      <StateContainer
+        isLoading={isLoadingContent}
+        isError={isLoadError}
+        isEmpty={false}
+        errorSlot={<ErrorState title={t('env-vars:dotenvLoadError')} onRetry={() => void refetch()} />}
+      >
+        <Textarea
+          aria-labelledby="dotenv-editor-title"
+          value={content}
+          onChange={(e) => {
+            setContent(e.target.value);
+            setIsEditing(true);
+            setInlineError(null);
+          }}
+          placeholder={t('env-vars:dotenvPlaceholder')}
+          error={!!inlineError}
+          aria-describedby={inlineError ? 'dotenv-editor-error' : undefined}
+          className="h-64 font-mono"
+        />
+
+        {inlineError && (
+          <p
+            id="dotenv-editor-error"
+            role="alert"
+            className="mt-2 rounded-box border border-ds-danger/35 bg-ds-danger/10 px-3 py-2 text-sm text-ds-on-tint-error"
+          >
+            {inlineError}
           </p>
-        </div>
-      </div>
-
-      <div className="surface-card p-4">
-        {isLoadingContent ? (
-          <div className="flex items-center justify-center py-8">
-            <div className="loading loading-spinner loading-sm"></div>
-          </div>
-        ) : (
-          <>
-            <textarea
-              value={content}
-              onChange={(e) => {
-                setContent(e.target.value);
-                setIsEditing(true);
-              }}
-              placeholder={`# Variables de entorno para Node-RED
-# Formato: CLAVE=VALOR
-# Las líneas con # son comentarios
-
-# Base de datos
-# DB_HOST=localhost
-# DB_PORT=5432
-
-# MQTT
-# MQTT_USER=admin
-# MQTT_PASS=secret`}
-              className="w-full h-64 p-3 font-mono text-sm bg-base-100 border border-border rounded resize-none focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-            />
-
-            <div className="flex gap-2 mt-4">
-              <button
-                onClick={handleSave}
-                disabled={!isEditing || saveMutation.isPending}
-                className="action-btn-primary gap-2 flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Save className="w-4 h-4" />
-                {saveMutation.isPending ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    {t('env-vars:dotenvSaving')}
-                  </>
-                ) : (
-                  t('env-vars:dotenvSave')
-                )}
-              </button>
-              {isEditing && (
-                <button
-                  onClick={handleCancel}
-                  disabled={saveMutation.isPending}
-                  className="action-btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {t('common:cancel')}
-                </button>
-              )}
-            </div>
-          </>
         )}
-      </div>
-    </div>
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button type="button" onClick={handleSave} disabled={!isEditing || saveMutation.isPending}>
+            {saveMutation.isPending ? (
+              <RefreshCw className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+            ) : (
+              <Save className="h-4 w-4" aria-hidden="true" />
+            )}
+            {saveMutation.isPending ? t('env-vars:dotenvSaving') : t('env-vars:dotenvSave')}
+          </Button>
+          {isEditing && (
+            <Button type="button" variant="secondary" onClick={handleCancel} disabled={saveMutation.isPending}>
+              {t('common:cancel')}
+            </Button>
+          )}
+        </div>
+      </StateContainer>
+    </section>
   );
 }
 

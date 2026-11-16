@@ -1,6 +1,7 @@
 import { type EnvVar } from '@/features/env-vars/services/envService';
 import { Eye, EyeOff, Trash2, Pencil } from 'lucide-react';
 import { useT } from '@/i18n';
+import { StatusChip } from '@/shared/components/ui';
 
 export function EnvVarRow({ envVar, onDelete, onToggleSecret, onEdit, showSecret }: {
   envVar: EnvVar;
@@ -18,8 +19,14 @@ export function EnvVarRow({ envVar, onDelete, onToggleSecret, onEdit, showSecret
           {envVar.type === 'secret' ? (
             <>
               <span>{showSecret ? envVar.value : '••••••••'}</span>
-              <button onClick={() => onToggleSecret(envVar.key)} className="text-ds-text-muted hover:text-base-content">
-                {showSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              <button
+                type="button"
+                onClick={() => onToggleSecret(envVar.key)}
+                aria-label={t(showSecret ? 'env-vars:hideValue' : 'env-vars:showValue', { key: envVar.key })}
+                aria-pressed={showSecret}
+                className="rounded p-1 text-ds-text-muted hover:text-base-content"
+              >
+                {showSecret ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
               </button>
             </>
           ) : (
@@ -28,20 +35,16 @@ export function EnvVarRow({ envVar, onDelete, onToggleSecret, onEdit, showSecret
         </div>
       </td>
       <td data-label={t('env-vars:colType')}>
-        <span className={`whitespace-nowrap rounded-full px-2 py-1 text-xs ${
-          envVar.type === 'secret' ? 'bg-error/15 text-ds-on-tint-error' :
-          envVar.type === 'boolean' ? 'bg-info/15 text-ds-on-tint-info' :
-          envVar.type === 'number' ? 'bg-success/15 text-ds-on-tint-success' :
-          'bg-base-300/70 text-base-content'
-        }`}>{envVar.type}</span>
+        {/* Type and source are data, not state: neutral chips (colour is reserved for state). */}
+        <StatusChip size="sm" className="whitespace-nowrap">{envVar.type}</StatusChip>
         {envVar.type === 'secret' && (
           <span className="ml-2 text-xs text-ds-text-muted">{t('env-vars:runtimeOnly')}</span>
         )}
       </td>
       <td data-label={t('env-vars:colSource')}>
-        <span className="whitespace-nowrap rounded-full bg-base-300/70 px-2 py-1 text-xs text-base-content">
+        <StatusChip size="sm" className="whitespace-nowrap">
           {envVar.source === 'node-red' ? 'Node-RED' : 'NRCC'}
-        </span>
+        </StatusChip>
       </td>
       <td data-label={t('env-vars:colDescription')} className="text-ds-text-secondary">{envVar.description || '-'}</td>
       <td data-label={t('env-vars:colActions')} className="text-right">

@@ -33,6 +33,23 @@ describe('BulkImportModal', () => {
       expect(screen.getByText("missing '=' between key and value")).toBeInTheDocument();
     });
     expect(screen.getByRole('button', { name: /Import/ })).toBeDisabled();
+    expect(screen.getByRole('alert')).toHaveTextContent('1 line needs fixing before import.');
+  });
+
+  it('shows a request-level import error inline as an alert', async () => {
+    bulkImport.mockResolvedValueOnce({
+      lines: [],
+      issues: [{ line: 0, reason: 'bulk import exceeds 500 lines' }],
+      valid: false,
+      summary: 'bulk import exceeds 500 lines',
+    });
+    render(<BulkImportModal open onClose={vi.fn()} onImported={vi.fn()} />);
+
+    await userEvent.type(screen.getByPlaceholderText(/# KEY=VALUE/), 'A=1');
+    await userEvent.click(screen.getByRole('button', { name: 'Validate' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('bulk import exceeds 500 lines');
+    expect(screen.getByRole('button', { name: /Import/ })).toBeDisabled();
   });
 
   it('ignores a rapid double-click on Validate', async () => {

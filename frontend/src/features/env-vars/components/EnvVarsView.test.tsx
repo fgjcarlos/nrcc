@@ -59,6 +59,16 @@ describe('EnvVarsView', () => {
     await waitFor(() => expect(importFromNodeRed).toHaveBeenCalled());
   });
 
+  it('opens on the heading and a one-line intro, without a kicker', async () => {
+    render(<EnvVarsView />);
+
+    const heading = screen.getByRole('heading', { level: 1, name: 'Environment variables' });
+    expect(heading.previousElementSibling).toBeNull();
+    expect(screen.queryByText('Secrets')).toBeNull();
+    expect(screen.getByText('Variables Node-RED runs with. Any change restarts Node-RED if it is running.')).toBeInTheDocument();
+    await waitFor(() => expect(importFromNodeRed).toHaveBeenCalled());
+  });
+
   it('announces loading through the shared status instead of a table row', async () => {
     dataState.isLoading = true;
     render(<EnvVarsView />);
