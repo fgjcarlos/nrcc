@@ -32,7 +32,7 @@ export function ProfileView() {
     return (
       <div className="p-6">
         <h1 className="text-2xl font-bold text-base-content">{t('auth:profile.title')}</h1>
-        <p className="mt-2 text-base-content/60">{t('auth:profile.signInRequired')}</p>
+        <p className="mt-2 text-ds-text-muted">{t('auth:profile.signInRequired')}</p>
       </div>
     );
   }
@@ -71,9 +71,9 @@ export function ProfileView() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-base-content/50">{t('auth:profile.account')}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-ds-text-muted">{t('auth:profile.account')}</p>
         <h1 className="mt-2 text-2xl font-bold text-base-content">{t('auth:profile.title')}</h1>
-        <p className="mt-2 text-sm text-base-content/60">
+        <p className="mt-2 text-sm text-ds-text-muted">
           {t('auth:profile.reviewPrompt')}
         </p>
       </div>
@@ -85,21 +85,21 @@ export function ProfileView() {
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="truncate text-xl font-semibold text-base-content">{user.username}</h2>
-            <p className="mt-1 text-sm capitalize text-base-content/60">{user.role}</p>
+            <p className="mt-1 text-sm capitalize text-ds-text-secondary">{user.role}</p>
           </div>
         </div>
 
         <dl className="mt-6 grid gap-4 md:grid-cols-3">
           <div className="rounded-xl border border-border bg-base-200/45 p-4">
-            <dt className="text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('auth:profile.userId')}</dt>
+            <dt className="text-xs font-semibold uppercase tracking-wide text-ds-text-muted">{t('auth:profile.userId')}</dt>
             <dd className="mt-2 break-all text-sm text-base-content">{user.id}</dd>
           </div>
           <div className="rounded-xl border border-border bg-base-200/45 p-4">
-            <dt className="text-xs font-semibold uppercase tracking-wide text-base-content/50">Created</dt>
+            <dt className="text-xs font-semibold uppercase tracking-wide text-ds-text-muted">Created</dt>
             <dd className="mt-2 text-sm text-base-content">{formatDate(user.createdAt)}</dd>
           </div>
           <div className="rounded-xl border border-border bg-base-200/45 p-4">
-            <dt className="text-xs font-semibold uppercase tracking-wide text-base-content/50">{t('auth:profile.lastUpdated')}</dt>
+            <dt className="text-xs font-semibold uppercase tracking-wide text-ds-text-muted">{t('auth:profile.lastUpdated')}</dt>
             <dd className="mt-2 text-sm text-base-content">{formatDate(user.updatedAt)}</dd>
           </div>
         </dl>
@@ -108,7 +108,7 @@ export function ProfileView() {
       <section className="surface-card p-6">
         <div className="mb-5">
           <h2 className="text-lg font-semibold text-base-content">Password</h2>
-          <p className="mt-1 text-sm text-base-content/60">
+          <p className="mt-1 text-sm text-ds-text-secondary">
             Choose a new password with at least {MIN_PASSWORD_LENGTH} characters.
           </p>
         </div>

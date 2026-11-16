@@ -89,7 +89,7 @@ export function FlowsView() {
   const loadingSlot = (
     <div className="space-y-4">
       <div>
-        <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">{t('flows:aiPipeline')}</p>
+        <p className="text-xs uppercase tracking-[0.24em] text-ds-text-muted">{t('flows:aiPipeline')}</p>
         <h1 className="text-2xl font-bold text-base-content">{t('flows:title')}</h1>
       </div>
       <div className="space-y-3 animate-pulse">
@@ -103,7 +103,7 @@ export function FlowsView() {
   const errorSlot = (
     <div>
       <div>
-        <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">{t('flows:aiPipeline')}</p>
+        <p className="text-xs uppercase tracking-[0.24em] text-ds-text-muted">{t('flows:aiPipeline')}</p>
         <h1 className="text-2xl font-bold text-base-content">{t('flows:title')}</h1>
       </div>
       <div className="mt-4 rounded-2xl border border-error/20 bg-error/10 p-4 shadow-glow">
@@ -115,7 +115,7 @@ export function FlowsView() {
   const unavailableSlot = (
     <div>
       <div>
-        <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">{t('flows:aiPipeline')}</p>
+        <p className="text-xs uppercase tracking-[0.24em] text-ds-text-muted">{t('flows:aiPipeline')}</p>
         <h1 className="text-2xl font-bold text-base-content">{t('flows:title')}</h1>
       </div>
       <div className="mt-4 flex items-start gap-3 rounded-2xl border border-warning/20 bg-warning/10 p-4 shadow-glow">
@@ -132,8 +132,8 @@ export function FlowsView() {
 
   const emptySlot = (
     <div className="py-12 text-center">
-      <Activity className="mx-auto mb-4 h-12 w-12 text-base-content/40" />
-      <p className="text-base-content/60">{t('flows:noFlowsFound')}</p>
+      <Activity className="mx-auto mb-4 h-12 w-12 text-ds-text-muted" />
+      <p className="text-ds-text-muted">{t('flows:noFlowsFound')}</p>
     </div>
   );
 
@@ -150,10 +150,10 @@ export function FlowsView() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div>
-            <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">{t('flows:aiPipeline')}</p>
+            <p className="text-xs uppercase tracking-[0.24em] text-ds-text-muted">{t('flows:aiPipeline')}</p>
             <h1 className="text-2xl font-bold text-base-content">{t('flows:title')}</h1>
           </div>
-          <span className="text-sm text-base-content/60">
+          <span className="text-sm text-ds-text-muted">
             {t('flows:count', { count: flows.length })}
           </span>
         </div>
@@ -166,7 +166,7 @@ export function FlowsView() {
         {flows.length > 0 && (
           <button
             onClick={toggleSelectAll}
-            className="flex items-center gap-2 text-sm text-base-content/60 transition-colors hover:text-base-content"
+            className="flex items-center gap-2 text-sm text-ds-text-muted transition-colors hover:text-base-content"
           >
             {allSelected
               ? <CheckSquare className="w-4 h-4" />
@@ -213,7 +213,7 @@ export function FlowsView() {
               {analyzing ? t('flows:analyzing') : t('flows:analyzeWithAI')}
             </button>
             {!aiCapability.isReady && (
-              <span className="max-w-56 text-xs text-base-content/60" aria-live="polite">
+              <span className="max-w-56 text-xs text-ds-text-muted" aria-live="polite">
                 {aiCapability.message}
                 {canConfigureAI && (
                   <Link to="/configuration" className="ml-1 text-primary underline underline-offset-2">
@@ -250,7 +250,7 @@ function FlowCard({
       {/* Checkbox */}
       <button
         onClick={onToggleSelect}
-        className="mt-1 shrink-0 text-base-content/60 transition-colors hover:text-primary"
+        className="mt-1 shrink-0 text-ds-text-muted transition-colors hover:text-primary"
         aria-label={selected ? t('flows:deselectFlow') : t('flows:selectFlow')}
       >
         {selected
@@ -366,7 +366,7 @@ function AnalysisPanel({
             </div>
           )}
 
-          <p className="text-xs text-base-content/50">
+          <p className="text-xs text-ds-text-muted">
             {t('flows:analyzedAt', { date: new Date(result.analyzedAt).toLocaleString() })}
           </p>
         </div>

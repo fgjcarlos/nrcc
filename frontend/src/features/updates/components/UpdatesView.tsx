@@ -79,7 +79,7 @@ export function UpdatesView() {
     <div className="space-y-6 p-6">
       <div className="flex justify-between items-center">
         <div>
-          <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">{t('updates:maintenance')}</p>
+          <p className="text-xs uppercase tracking-[0.24em] text-ds-text-muted">{t('updates:maintenance')}</p>
           <h1 className="text-2xl font-bold text-base-content">{t('updates:title')}</h1>
         </div>
       </div>
@@ -92,14 +92,14 @@ export function UpdatesView() {
           <div className="space-y-4">
             <div className="flex flex-col items-center justify-center py-8">
               <Loader2 className="w-8 h-8 text-accent animate-spin mb-3" />
-              <p className="text-sm text-base-content/60">{t('updates:checking')}</p>
+              <p className="text-sm text-ds-text-muted">{t('updates:checking')}</p>
             </div>
           </div>
         ) : (
           <div className="space-y-3">
             {/* Current Version */}
             <div className="flex items-center justify-between">
-              <span className="text-base-content/60">{t('updates:currentVersion')}</span>
+              <span className="text-ds-text-muted">{t('updates:currentVersion')}</span>
               <span className="font-mono font-medium text-base-content">
                 {status?.currentVersion || t('updates:unknown')}
               </span>
@@ -108,7 +108,7 @@ export function UpdatesView() {
             {/* Latest Version */}
             {hasUpdate && (
               <div className="flex items-center justify-between">
-                <span className="text-base-content/60">{t('updates:latestVersion')}</span>
+                <span className="text-ds-text-muted">{t('updates:latestVersion')}</span>
                 <span className="font-mono font-medium text-base-content">
                   {status?.latestVersion || t('updates:unknown')}
                 </span>
@@ -117,13 +117,13 @@ export function UpdatesView() {
 
             {/* Last Checked */}
             <div className="flex items-center justify-between">
-              <span className="text-base-content/60">{t('updates:lastChecked')}</span>
+              <span className="text-ds-text-muted">{t('updates:lastChecked')}</span>
               <span className="text-sm text-base-content">{formatCheckedAt(status?.checkedAt)}</span>
             </div>
 
             {/* Status Badge */}
             <div className="flex items-center justify-between">
-              <span className="text-base-content/60">{t('updates:status')}</span>
+              <span className="text-ds-text-muted">{t('updates:status')}</span>
               {isChecking ? (
                 <span className="flex items-center gap-2 text-sm text-accent">
                   <Loader2 className="w-3 h-3 animate-spin" />
@@ -178,7 +178,7 @@ export function UpdatesView() {
                     <div className="flex-1">
                       <p className="text-sm font-medium text-base-content">{t('updates:createBackup')}</p>
                       {flowState?.state === 'BackingUp' && (
-                        <p className="text-xs text-base-content/60">{t('updates:backingUp')}</p>
+                        <p className="text-xs text-ds-text-muted">{t('updates:backingUp')}</p>
                       )}
                     </div>
                     {flowState?.state === 'BackingUp' && (
@@ -200,7 +200,7 @@ export function UpdatesView() {
                     <div className="flex-1">
                       <p className="text-sm font-medium text-base-content">{t('updates:updateNodeRed')}</p>
                       {flowState?.state === 'Applying' && (
-                        <p className="text-xs text-base-content/60">{t('updates:installing')}</p>
+                        <p className="text-xs text-ds-text-muted">{t('updates:installing')}</p>
                       )}
                     </div>
                     {flowState?.state === 'Applying' && (
@@ -308,7 +308,7 @@ export function UpdatesView() {
             <div className="h-8 rounded skeleton-dark"></div>
           </div>
         ) : history.length === 0 ? (
-          <p className="text-sm text-base-content/60">{t('updates:noHistory')}</p>
+          <p className="text-sm text-ds-text-muted">{t('updates:noHistory')}</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">

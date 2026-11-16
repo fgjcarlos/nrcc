@@ -61,7 +61,7 @@ export function UserTable({
                 <button
                   onClick={() => onDelete(user)}
                   disabled={user.id === currentUserId || (user.role === 'admin' && adminCount === 1)}
-                  className="min-h-6 text-sm text-ds-on-tint-error transition-colors hover:underline disabled:cursor-not-allowed disabled:text-base-content/40"
+                  className="min-h-6 text-sm text-ds-on-tint-error transition-colors hover:underline disabled:cursor-not-allowed disabled:text-base-content/40" // contrast-ok: disabled control, WCAG 1.4.3 exempts inactive UI
                 >
                   {t('common:delete')}
                 </button>

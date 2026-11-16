@@ -89,7 +89,7 @@ export function BackupListSection(props: BackupListSectionProps) {
         }
         emptySlot={
           <div className="glass-panel rounded-2xl border border-dashed border-border p-10 text-center">
-            <HardDrive className="mx-auto mb-3 h-10 w-10 text-base-content/40" />
+            <HardDrive className="mx-auto mb-3 h-10 w-10 text-ds-text-muted" />
             <p className="font-medium text-base-content">{t('backups:noBackupsYet')}</p>
             <p className="text-sm text-base-content/65">{t('common:createBackupDesc')}</p>
             <button onClick={onCreateBackup} disabled={isCreating} className="action-btn-primary mt-4">
@@ -104,7 +104,7 @@ export function BackupListSection(props: BackupListSectionProps) {
             <div className="surface-panel min-w-[760px] overflow-hidden">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-border text-left text-sm text-base-content/60">
+                  <tr className="border-b border-border text-left text-sm text-ds-text-muted">
                     <th className="py-3 pr-4">{t('common:type')}</th>
                     <th className="py-3 pr-4">{t('common:name')}</th>
                     <th className="py-3 pr-4">{t('common:date')}</th>
@@ -209,7 +209,7 @@ export function BackupListSection(props: BackupListSectionProps) {
           {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between">
-              <div className="text-sm text-base-content/60">
+              <div className="text-sm text-ds-text-muted">
                 {t('common:pageOf', { current: page, total: totalPages })}
               </div>
               <div className="flex gap-2">

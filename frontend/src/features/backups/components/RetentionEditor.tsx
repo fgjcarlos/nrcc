@@ -45,7 +45,7 @@ export function RetentionEditor({
             onChange={(e) => setManual(Number(e.target.value) || 1)}
             className="glass-panel w-full rounded-xl border border-border px-3 py-2 text-base-content focus:outline-none focus:ring-2 focus:ring-primary/50"
           />
-          <p className="text-xs text-base-content/55">{t('backups:daysKeepManual')}</p>
+          <p className="text-xs text-ds-text-muted">{t('backups:daysKeepManual')}</p>
         </label>
 
         <label className="space-y-2">
@@ -58,7 +58,7 @@ export function RetentionEditor({
             onChange={(e) => setAuto(Number(e.target.value) || 1)}
             className="glass-panel w-full rounded-xl border border-border px-3 py-2 text-base-content focus:outline-none focus:ring-2 focus:ring-primary/50"
           />
-          <p className="text-xs text-base-content/55">{t('backups:daysKeepAutomatic')}</p>
+          <p className="text-xs text-ds-text-muted">{t('backups:daysKeepAutomatic')}</p>
         </label>
 
         <label className="space-y-2">
@@ -71,7 +71,7 @@ export function RetentionEditor({
             onChange={(e) => setPreRestore(Number(e.target.value) || 1)}
             className="glass-panel w-full rounded-xl border border-border px-3 py-2 text-base-content focus:outline-none focus:ring-2 focus:ring-primary/50"
           />
-          <p className="text-xs text-base-content/55">{t('backups:daysKeepPreRestore')}</p>
+          <p className="text-xs text-ds-text-muted">{t('backups:daysKeepPreRestore')}</p>
         </label>
       </div>
 

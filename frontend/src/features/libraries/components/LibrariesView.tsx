@@ -79,7 +79,7 @@ export function LibrariesView() {
     <div className="space-y-8 p-4 sm:p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs uppercase tracking-[0.28em] text-base-content/50">{t('libraries:extensions')}</p>
+          <p className="text-xs uppercase tracking-[0.28em] text-ds-text-muted">{t('libraries:extensions')}</p>
           <h1 className="text-3xl font-bold tracking-tight text-base-content">{t('libraries:title')}</h1>
           <p className="mt-2 max-w-2xl text-sm text-base-content/65">{t('libraries:description')}</p>
         </div>
@@ -115,7 +115,7 @@ export function LibrariesView() {
             </div>
 
             {searching && (
-              <div className="mt-4 text-sm text-base-content/60">{t('libraries:searching')}</div>
+              <div className="mt-4 text-sm text-ds-text-muted">{t('libraries:searching')}</div>
             )}
 
             <div className="mt-4 space-y-2">
@@ -142,7 +142,7 @@ export function LibrariesView() {
                       </div>
                     )}
                     {typeof result.downloads === 'number' && (
-                      <div className="text-xs text-base-content/55">
+                      <div className="text-xs text-ds-text-muted">
                         {t('libraries:downloadsPerWeek', { count: result.downloads.toLocaleString() })}
                       </div>
                     )}
@@ -167,7 +167,7 @@ export function LibrariesView() {
               ))}
 
               {!searching && searchQuery.length >= 2 && searchResults.length === 0 && (
-                <div className="glass-panel rounded-2xl border border-dashed border-border px-4 py-8 text-center text-sm text-base-content/60">
+                <div className="glass-panel rounded-2xl border border-dashed border-border px-4 py-8 text-center text-sm text-ds-text-muted">
                   {t('libraries:noResults')}
                 </div>
               )}
@@ -188,14 +188,14 @@ export function LibrariesView() {
             {isError ? (
               <div className="rounded-2xl border border-error/40 bg-error/10 px-4 py-8 text-center">
                 <p className="font-medium text-error">{t('libraries:loadFailed')}</p>
-                <p className="mt-1 text-sm text-base-content/60">{t('libraries:loadHint')}</p>
+                <p className="mt-1 text-sm text-ds-text-muted">{t('libraries:loadHint')}</p>
               </div>
             ) : isLoading ? (
               <Skeleton variant="rect" rows={2} className="h-14" />
             ) : libraries.length === 0 ? (
               <div className="mt-4 rounded-2xl border border-dashed border-border px-4 py-8 text-center">
                 <p className="font-medium text-base-content">{t('libraries:empty')}</p>
-                <p className="mt-1 text-sm text-base-content/60">{t('libraries:emptyHint')}</p>
+                <p className="mt-1 text-sm text-ds-text-muted">{t('libraries:emptyHint')}</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -295,7 +295,7 @@ export function LibrariesView() {
                 ))}
                 {libraries.length > installedPageSize && (
                   <div className="flex flex-col gap-3 border-t border-border/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="text-xs font-medium text-base-content/55">
+                    <p className="text-xs font-medium text-ds-text-muted">
                       {t('libraries:showing', {
                         from: (installedPage - 1) * installedPageSize + 1,
                         to: Math.min(installedPage * installedPageSize, libraries.length),

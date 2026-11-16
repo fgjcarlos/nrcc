@@ -285,3 +285,4 @@ The gated change sequence as a single-line schematic.
 - **Don't** add gradients, glows, glass blur or shadows deeper than `--ds-shadow-raised`.
 - **Don't** wrap a settings key mid-word; break only after a dot.
 - **Don't** introduce a fourth type size.
+- **Don't** fade text with opacity (`text-base-content/50`) to rank it; use the three text tokens (ink, ink-secondary, ink-muted). Opacity mixes escape the token contrast check, and `pnpm run check:faded-text` rejects them below `/65`.

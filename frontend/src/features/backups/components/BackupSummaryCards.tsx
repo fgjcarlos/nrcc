@@ -34,11 +34,11 @@ export function BackupSummaryCards(props: BackupSummaryCardsProps) {
     <div className="grid gap-3 md:grid-cols-3">
       {/* Last Backup Card */}
       <div className="surface-card p-5">
-        <p className="text-xs uppercase tracking-[0.18em] text-base-content/45">{t('backups:lastBackupLabel')}</p>
+        <p className="text-xs uppercase tracking-[0.18em] text-ds-text-muted">{t('backups:lastBackupLabel')}</p>
         <div className="mt-2 text-lg font-semibold text-base-content">
           {latestBackup ? getBackupDisplayName(latestBackup) : t('backups:noBackupsShort')}
         </div>
-        <p className="mt-1 text-sm text-base-content/60">
+        <p className="mt-1 text-sm text-ds-text-muted">
           {latestBackup
             ? formatBackupDate(latestBackup.createdAt)
             : t('backups:createFirstLocal')}
@@ -48,7 +48,7 @@ export function BackupSummaryCards(props: BackupSummaryCardsProps) {
       {/* Next Execution Card */}
       <div className="surface-card p-5">
         <div className="flex items-center justify-between gap-3">
-          <p className="text-xs uppercase tracking-[0.18em] text-base-content/45">{t('backups:nextRunLabel')}</p>
+          <p className="text-xs uppercase tracking-[0.18em] text-ds-text-muted">{t('backups:nextRunLabel')}</p>
           <span
             className={cn(
               'inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium',
@@ -65,7 +65,7 @@ export function BackupSummaryCards(props: BackupSummaryCardsProps) {
         <div className="mt-2 text-lg font-semibold text-base-content">
           {schedulerStatus.nextRunAt ? formatBackupDate(schedulerStatus.nextRunAt) : t('backups:notScheduled')}
         </div>
-        <p className="mt-1 text-sm text-base-content/60">
+        <p className="mt-1 text-sm text-ds-text-muted">
           {schedulerStatus.schedule === 'custom' && schedulerStatus.customSchedule
             ? `${t('backups:cronPrefix')} ${schedulerStatus.customSchedule}`
             : schedulerStatus.activeSpec
@@ -76,9 +76,9 @@ export function BackupSummaryCards(props: BackupSummaryCardsProps) {
 
       {/* Storage Card */}
       <div className="surface-card p-5">
-        <p className="text-xs uppercase tracking-[0.18em] text-base-content/45">{t('backups:storageLabel')}</p>
+        <p className="text-xs uppercase tracking-[0.18em] text-ds-text-muted">{t('backups:storageLabel')}</p>
         <div className="mt-2 text-lg font-semibold text-base-content">{formatBackupSize(storage.totalSize)}</div>
-        <p className="mt-1 text-sm text-base-content/60">{t('backups:storageBackupsDetected', { count: storage.totalBackups })}</p>
+        <p className="mt-1 text-sm text-ds-text-muted">{t('backups:storageBackupsDetected', { count: storage.totalBackups })}</p>
       </div>
     </div>
   );

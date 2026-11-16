@@ -52,7 +52,7 @@ export function SchedulerHistory({
                   <div className="mt-1 text-xs text-error">{event.error}</div>
                 )}
                 {(event.prunedCount ?? 0) > 0 && (
-                  <div className="mt-1 text-xs text-base-content/60">
+                  <div className="mt-1 text-xs text-ds-text-muted">
                     Pruned {event.prunedCount} backups
                   </div>
                 )}
@@ -61,7 +61,7 @@ export function SchedulerHistory({
           </div>
 
           {showPagination && (
-            <div className="flex items-center justify-between gap-3 pt-2 text-xs text-base-content/60">
+            <div className="flex items-center justify-between gap-3 pt-2 text-xs text-ds-text-muted">
               <span>
                 Page {page} of {totalPages} ({total} total)
               </span>
@@ -87,7 +87,7 @@ export function SchedulerHistory({
           )}
         </>
       ) : (
-        <div className="rounded-2xl border border-dashed border-border bg-base-200/15 p-6 text-center text-sm text-base-content/60">
+        <div className="rounded-2xl border border-dashed border-border bg-base-200/15 p-6 text-center text-sm text-ds-text-muted">
           {t('backups:noSchedulerHistory')}
         </div>
       )}

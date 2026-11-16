@@ -10,7 +10,7 @@ interface MetricCardProps {
 export function MetricCard({ icon: Icon, label, value, warning }: MetricCardProps) {
   return (
     <div className="surface-card p-4">
-      <div className="mb-1 flex items-center gap-2 text-base-content/60">
+      <div className="mb-1 flex items-center gap-2 text-ds-text-muted">
         <Icon className="w-4 h-4" />
         <span className="text-sm">{label}</span>
       </div>

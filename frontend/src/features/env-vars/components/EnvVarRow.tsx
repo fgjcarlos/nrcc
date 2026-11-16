@@ -18,7 +18,7 @@ export function EnvVarRow({ envVar, onDelete, onToggleSecret, onEdit, showSecret
           {envVar.type === 'secret' ? (
             <>
               <span>{showSecret ? envVar.value : '••••••••'}</span>
-              <button onClick={() => onToggleSecret(envVar.key)} className="text-base-content/60 hover:text-base-content">
+              <button onClick={() => onToggleSecret(envVar.key)} className="text-ds-text-muted hover:text-base-content">
                 {showSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </>
@@ -35,7 +35,7 @@ export function EnvVarRow({ envVar, onDelete, onToggleSecret, onEdit, showSecret
           'bg-base-300/70 text-base-content'
         }`}>{envVar.type}</span>
         {envVar.type === 'secret' && (
-          <span className="ml-2 text-xs text-base-content/50">{t('env-vars:runtimeOnly')}</span>
+          <span className="ml-2 text-xs text-ds-text-muted">{t('env-vars:runtimeOnly')}</span>
         )}
       </td>
       <td data-label={t('env-vars:colSource')}>

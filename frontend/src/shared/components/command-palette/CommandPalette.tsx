@@ -303,7 +303,7 @@ export function CommandPalette() {
         aria-expanded={isOpen}
       >
         <span>{t('common:commandPalette')}</span>
-        <kbd className="rounded-md border border-border/70 bg-base-100 px-1.5 py-0.5 text-[0.65rem] text-base-content/60">{t('common:commandPaletteShortcut')}</kbd>
+        <kbd className="rounded-md border border-border/70 bg-base-100 px-1.5 py-0.5 text-[0.65rem] text-ds-text-muted">{t('common:commandPaletteShortcut')}</kbd>
       </button>
 
       {isOpen && (
@@ -325,7 +325,7 @@ export function CommandPalette() {
                 onKeyDown={onInputKeyDown}
                 placeholder="Search routes and actions…"
                 // input-bare: drawn into the palette, so it keeps its rule line instead of the field box.
-                className="input-bare w-full border-b border-border bg-transparent px-5 py-4 text-base text-base-content outline-none placeholder:text-base-content/45 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+                className="input-bare w-full border-b border-border bg-transparent px-5 py-4 text-base text-base-content outline-none placeholder:text-ds-text-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
                 role="combobox"
                 aria-expanded="true"
                 aria-controls="command-palette-results"
@@ -334,7 +334,7 @@ export function CommandPalette() {
 
               <div id="command-palette-results" role="listbox" className="max-h-[28rem] overflow-y-auto p-2">
                 {filteredCommands.length === 0 ? (
-                  <div className="px-4 py-8 text-center text-sm text-base-content/60">{t('common:noMatchingCommands')}</div>
+                  <div className="px-4 py-8 text-center text-sm text-ds-text-muted">{t('common:noMatchingCommands')}</div>
                 ) : (
                   filteredCommands.map((command, index) => (
                     <button
@@ -353,9 +353,9 @@ export function CommandPalette() {
                     >
                       <span>
                         <span className="block font-semibold">{command.title}</span>
-                        <span className="mt-1 block text-sm text-base-content/60">{command.description}</span>
+                        <span className="mt-1 block text-sm text-ds-text-muted">{command.description}</span>
                       </span>
-                      <span className="shrink-0 rounded-full border border-border px-2 py-1 text-[0.65rem] uppercase tracking-wide text-base-content/55">
+                      <span className="shrink-0 rounded-full border border-border px-2 py-1 text-[0.65rem] uppercase tracking-wide text-ds-text-muted">
                         {command.kind}
                       </span>
                     </button>
