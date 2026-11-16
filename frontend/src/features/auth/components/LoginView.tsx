@@ -7,15 +7,57 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { AlertCircle } from 'lucide-react';
+import { type ReactNode } from 'react';
 
 import { queryKeys } from '@/shared/lib/queryKeys';
 import { useT } from '@/i18n';
+import { Button, Input, buttonVariants } from '@/shared/components/ui';
+import { NrccMark } from '@/shared/components/NrccMark';
+// Messages are catalog keys; the view translates them at render.
 const loginSchema = z.object({
-  username: z.string().min(1, 'Username is required'),
-  password: z.string().min(1, 'Password is required'),
+  username: z.string().min(1, 'auth:login.errors.usernameRequired'),
+  password: z.string().min(1, 'auth:login.errors.passwordRequired'),
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
+
+/**
+ * Public auth page: the mark with its wordmark and purpose over one
+ * drawing sheet. Shared by Login and Setup; a calm single column.
+ */
+// children is optional so App's lazyNamed() accepts every export as a component.
+export function AuthPage({ children }: { children?: ReactNode }) {
+  const { t } = useT();
+  return (
+    <main className="auth-shell flex min-h-screen justify-center px-4 py-8 sm:items-center">
+      <div className="w-full max-w-sm space-y-6">
+        <div className="flex items-center gap-3">
+          {/* The wordmark beside it already names the product. */}
+          <span aria-hidden="true" className="flex">
+            <NrccMark tone="primary" size="sm" className="text-ds-text-primary" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm font-bold tracking-wide text-ds-text-primary">NRCC</p>
+            <p className="text-pretty text-xs text-ds-text-secondary">{t('auth:brand.purpose')}</p>
+          </div>
+        </div>
+        <section className="space-y-4 rounded-box border border-ds-border-default bg-ds-bg-surface p-4 sm:p-6">
+          {children}
+        </section>
+      </div>
+    </main>
+  );
+}
+
+/** Inline form-level failure; the form keeps the user's input. */
+export function AuthAlert({ children }: { children?: ReactNode }) {
+  return (
+    <div role="alert" className="flex gap-2 rounded-box border border-error px-3 py-2 text-sm text-error">
+      <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
+      <div className="min-w-0 space-y-1">{children}</div>
+    </div>
+  );
+}
 
 export function LoginView() {
   const { t } = useT();
@@ -44,111 +86,79 @@ export function LoginView() {
   const onSubmit = async (data: LoginFormData) => {
     try {
       await login(data.username, data.password);
-      toast.success('Logged in successfully!');
+      toast.success(t('auth:login.success'));
       navigate(from, { replace: true });
     } catch (err: unknown) {
-      const axiosError = err as { response?: { data?: { error?: { message?: string } } } };
-      const message = axiosError.response?.data?.error?.message || 'Invalid credentials';
+      // Copy by outcome: no response = network, then 401, 429, anything else.
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      const message =
+        status === undefined ? t('auth:login.errors.network')
+        : status === 401 ? t('auth:login.errors.invalidCredentials')
+        : status === 429 ? t('auth:login.errors.rateLimited')
+        : t('auth:login.errors.unexpected', { status });
+      // Inline only: the alert below the heading carries it, a toast would announce it twice.
       setError('root', { message });
-      toast.error(message);
     }
   };
 
-  // Show loading state while checking auth status
   if (isStatusLoading) {
     return (
-      <div className="auth-shell min-h-screen flex items-center justify-center px-4">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
-      </div>
+      <AuthPage>
+        <p role="status" className="text-sm text-ds-text-secondary">{t('auth:login.checkingStatus')}</p>
+      </AuthPage>
     );
   }
 
-  // If system is not initialized, show "Sistema no inicializado" card
   if (status?.initialized === false) {
     return (
-      <div className="auth-shell min-h-screen flex items-center justify-center px-4">
-        <div className="surface-card w-full max-w-md space-y-6 border border-border p-8">
-          <div className="text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-warning/15">
-              <AlertCircle className="h-6 w-6 text-warning" />
-            </div>
-            <h1 className="text-2xl font-bold text-base-content">{t('auth:login.systemNotInitialized')}</h1>
-            <p className="mt-2 text-base-content/70">
-              {t('auth:login.adminNotConfigured')}
-            </p>
-          </div>
-
-          <div className="pt-4">
-            <Link
-              to="/setup"
-              className="block w-full rounded-xl bg-primary px-4 py-2 text-center font-medium text-primary-content hover:bg-primary/90"
-            >
-              {t('auth:login.createAdminAction')}
-            </Link>
-          </div>
-        </div>
-      </div>
+      <AuthPage>
+        <h1 className="text-balance text-xl font-bold text-ds-text-primary">{t('auth:login.systemNotInitialized')}</h1>
+        <p className="text-sm text-ds-text-secondary">{t('auth:login.setupAction')}</p>
+        <Link to="/setup" className={buttonVariants({ variant: 'solid', size: 'lg', className: 'w-full' })}>
+          {t('auth:login.createAdminAction')}
+        </Link>
+      </AuthPage>
     );
   }
 
-  // Default: show login form
   return (
-    <div className="auth-shell min-h-screen flex items-center justify-center px-4">
-      <div className="surface-card w-full max-w-md space-y-6 border border-border p-8">
-        <div className="text-center">
-          <p className="mb-2 text-xs uppercase tracking-[0.24em] text-ds-text-muted">{t('auth:login.accessConsole')}</p>
-          <h1 className="text-2xl font-bold text-base-content">{t('common:productFullName')}</h1>
-          <p className="mt-2 text-base-content/70">{t('auth:login.signInPromptBody')}</p>
-        </div>
+    <AuthPage>
+      <h1 className="text-balance text-xl font-bold text-ds-text-primary">{t('auth:login.title')}</h1>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        {errors.root && <AuthAlert><p>{errors.root.message}</p></AuthAlert>}
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          {errors.root && (
-            <div className="rounded-xl border border-error/20 bg-error/10 p-3 text-sm text-error">
-              {errors.root.message}
-            </div>
-          )}
+        <Input
+          id="username"
+          type="text"
+          label={t('auth:login.usernameLabel')}
+          autoComplete="username"
+          autoCapitalize="none"
+          className="min-h-11"
+          error={errors.username?.message && t(errors.username.message)}
+          {...register('username')}
+        />
 
-          <div>
-            <label htmlFor="username" className="mb-1 block text-sm font-medium text-base-content">
-              {t('auth:login.usernameLabel')}
-            </label>
-            <input
-              id="username"
-              type="text"
-              {...register('username')}
-              className="w-full rounded-xl border border-border bg-base-100/70 px-3 py-2 text-base-content focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="admin"
-            />
-            {errors.username && (
-              <p className="mt-1 text-sm text-error">{errors.username.message}</p>
-            )}
-          </div>
+        <Input
+          id="password"
+          type="password"
+          label={t('auth:login.passwordLabel')}
+          autoComplete="current-password"
+          className="min-h-11"
+          error={errors.password?.message && t(errors.password.message)}
+          {...register('password')}
+        />
 
-          <div>
-            <label htmlFor="password" className="mb-1 block text-sm font-medium text-base-content">
-              {t('auth:login.passwordLabel')}
-            </label>
-            <input
-              id="password"
-              type="password"
-              {...register('password')}
-              className="w-full rounded-xl border border-border bg-base-100/70 px-3 py-2 text-base-content focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="••••••••"
-            />
-            {errors.password && (
-              <p className="mt-1 text-sm text-error">{errors.password.message}</p>
-            )}
-          </div>
-
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full rounded-xl bg-primary px-4 py-2 text-primary-content hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {isSubmitting ? t('auth:login.submitting') : t('auth:login.submit')}
-          </button>
-        </form>
-      </div>
-    </div>
+        <Button
+          type="submit"
+          variant="solid"
+          size="lg"
+          className="w-full"
+          disabled={isSubmitting}
+          aria-busy={isSubmitting}
+        >
+          {isSubmitting ? t('auth:login.submitting') : t('auth:login.submit')}
+        </Button>
+      </form>
+    </AuthPage>
   );
 }
