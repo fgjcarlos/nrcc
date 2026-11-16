@@ -38,6 +38,9 @@ func TestPresetsRoutes_Mounted(t *testing.T) {
 		{"admin preview malformed body", http.MethodPost, "/api/presets/https-tls-preset/preview", "{", admin, http.StatusBadRequest, "INVALID_REQUEST", ""},
 		{"unauthenticated preview", http.MethodPost, "/api/presets/https-tls-preset/preview", previewBody, "", http.StatusUnauthorized, "UNAUTHORIZED", ""},
 		{"viewer preview", http.MethodPost, "/api/presets/https-tls-preset/preview", previewBody, viewer, http.StatusForbidden, "FORBIDDEN", ""},
+		{"admin preview valid redacts", http.MethodPost, "/api/presets/https-tls-preset/preview", `{"content":"module.exports = {\n  credentialSecret: \"hunter2\",\n}\n"}`, admin, http.StatusOK, "", `credentialSecret: [redacted]`},
+		{"admin preview encoded traversal id", http.MethodPost, "/api/presets/..%2F..%2Fetc%2Fpasswd/preview", previewBody, admin, http.StatusNotFound, "PRESET_NOT_REGISTERED", ""},
+		{"admin preview empty content", http.MethodPost, "/api/presets/https-tls-preset/preview", `{"content":""}`, admin, http.StatusUnprocessableEntity, "SOURCE_NOT_EXPORTS", ""},
 	}
 
 	for _, tc := range cases {
