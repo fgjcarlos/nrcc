@@ -1,7 +1,11 @@
-import { LoaderCircle, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import type { BackupSummary } from '@/features/backups/services';
-import { formatBackupSize, getBackupSummary } from '@/features/backups/lib/formatters';
+import { formatBackupDate, formatBackupSize, getBackupDisplayName } from '@/features/backups/lib/formatters';
+import { StateContainer } from '@/shared/components';
+import { EmptyState } from '@/shared/components/feedback';
+import { Button, Table } from '@/shared/components/ui';
 import { useT } from '@/i18n';
+import { BackupTypeChip } from './BackupTypeChip';
 
 interface BackupDetail {
   files: Array<{
@@ -18,67 +22,76 @@ interface BackupDetailSectionProps {
   onClose: () => void;
 }
 
-const typeLabels: Record<BackupSummary['type'], string> = {
-  manual: 'Manual',
-  auto: 'Auto',
-  'pre-restore': 'Pre-restore',
-};
-
 export function BackupDetailSection(props: BackupDetailSectionProps) {
   const { backup, detail, isLoading, onClose } = props;
-  const { t } = useT();
+  const { t, i18n } = useT();
 
   if (!detail && !isLoading) {
     return null;
   }
 
+  const files = detail?.files ?? [];
+
   return (
-    <div className="surface-card p-6">
-      {/* Header */}
-      <div className="mb-4 flex items-center justify-between gap-4">
-        <div>
-          <h3 className="text-lg font-semibold text-base-content">{t('backups:backupDetailTitle')}</h3>
-          <p className="text-sm text-base-content/65">{getBackupSummary(backup, typeLabels)}</p>
+    <section aria-labelledby="backup-detail-title" className="space-y-3 py-4">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0 space-y-1">
+          <h2 id="backup-detail-title" className="text-sm font-semibold text-ds-text-primary">
+            {t('backups:detail.title')} · <span className="break-words">{getBackupDisplayName(backup)}</span>
+          </h2>
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs tabular-nums text-ds-text-secondary">
+            <BackupTypeChip type={backup.type} />
+            <span>{formatBackupDate(backup.createdAt, i18n.language) ?? t('backups:dateUnavailable')}</span>
+            <span aria-hidden="true">·</span>
+            <span>{formatBackupSize(backup.totalSize)}</span>
+          </p>
         </div>
-        <button onClick={onClose} className="icon-button text-ds-text-muted hover:text-base-content">
-          <X className="h-5 w-5" />
-        </button>
+        <Button
+          variant="ghost"
+          onClick={onClose}
+          aria-label={t('backups:detail.close')}
+          className="min-h-11 min-w-11 shrink-0 justify-center px-0 sm:min-h-9 sm:min-w-9"
+        >
+          <X className="h-4 w-4" aria-hidden="true" />
+        </Button>
       </div>
 
-      {/* Loading State */}
-      {isLoading && !detail ? (
-        <div className="flex items-center justify-center py-8">
-          <div className="text-center">
-            <LoaderCircle className="mx-auto mb-3 h-10 w-10 animate-spin text-ds-text-muted" />
-            <p className="text-sm text-base-content/65">{t('backups:loadingDetail')}</p>
-          </div>
-        </div>
-      ) : detail && detail.files && detail.files.length > 0 ? (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-left text-xs text-ds-text-muted">
-                <th className="py-3 pr-4">{t('backups:filePath')}</th>
-                <th className="py-3 pr-4 text-right">{t('backups:fileSize')}</th>
-                <th className="py-3 pr-4">{t('backups:fileChecksum')}</th>
+      <StateContainer
+        isLoading={isLoading && !detail}
+        isError={false}
+        isEmpty={files.length === 0}
+        loadingLabel={t('backups:detail.loading')}
+        emptySlot={<EmptyState title={t('backups:detail.empty')} />}
+      >
+        <Table stacked caption={t('backups:detail.title')}>
+          <thead>
+            <tr>
+              <th>{t('backups:detail.path')}</th>
+              <th className="text-right">{t('backups:detail.size')}</th>
+              <th>{t('backups:detail.checksum')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {files.map((file) => (
+              <tr key={file.path}>
+                <td data-label={t('backups:detail.path')} className="break-all font-mono text-xs">
+                  {file.path}
+                </td>
+                <td data-label={t('backups:detail.size')} className="whitespace-nowrap text-right tabular-nums">
+                  {formatBackupSize(file.size)}
+                </td>
+                <td
+                  data-label={t('backups:detail.checksum')}
+                  className="font-mono text-xs text-ds-text-secondary"
+                  title={file.checksum}
+                >
+                  {file.checksum.slice(0, 16)}…
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {detail.files.map((file, idx) => (
-                <tr key={idx} className="border-b border-border/50 hover:bg-base-200/15">
-                  <td className="py-2 pr-4 font-mono text-base-content">{file.path}</td>
-                  <td className="py-2 pr-4 text-right text-base-content/70">{formatBackupSize(file.size)}</td>
-                  <td className="py-2 pr-4 font-mono text-xs text-ds-text-secondary">{file.checksum.slice(0, 16)}…</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="rounded-lg border border-border bg-base-200/20 p-4 text-center">
-          <p className="text-sm text-base-content/65">{t('backups:noFilesInBackup')}</p>
-        </div>
-      )}
-    </div>
+            ))}
+          </tbody>
+        </Table>
+      </StateContainer>
+    </section>
   );
 }

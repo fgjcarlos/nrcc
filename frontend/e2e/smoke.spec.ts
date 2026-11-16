@@ -56,14 +56,12 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
     await page.goto('/backups')
     await expect(page.getByRole('button', { name: 'Manual smoke backup' })).toBeVisible()
     await page.locator('button[title="Restore"]').first().click()
-    await expect(page.getByText('Restaurar backup')).toBeVisible()
-    // The ConfirmationDialog listens for Enter when canConfirm() is true.
-    // We use the keyboard shortcut here because the dialog's overlay sits
-    // above the Confirm button in the stacking context — a click on the
-    // button itself is intercepted by the overlay. The keyboard path is
-    // the same code branch the user would hit by pressing Enter.
-    await page.locator('input[placeholder="backup-001"]').fill('backup-001')
-    await page.locator('input[placeholder="backup-001"]').press('Enter')
+    const dialog = page.getByRole('dialog', { name: 'Restore backup' })
+    await expect(dialog).toBeVisible()
+    // Enter in the token field submits the dialog form once the word matches.
+    const confirmation = dialog.getByLabel('Type "restore" to confirm')
+    await confirmation.fill('restore')
+    await confirmation.press('Enter')
     await expect(page.getByText('Restore dry path completed in test mode')).toBeVisible()
   })
 

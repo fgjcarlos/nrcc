@@ -1,16 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { validateCron } from '@/features/backups/lib/cronUtils';
 import { useT } from '@/i18n';
+import { Button, Input, Select } from '@/shared/components/ui';
 import { PRESET_CRON, cronFromDateTime, dateTimeFromCron } from './cronBuilder.helpers';
 
-const PRESET_LABELS: Record<string, string> = {
-  disabled: 'Disabled',
-  hourly: 'Hourly',
-  every6h: 'Every 6h',
-  daily: 'Daily',
-  weekly: 'Weekly',
-  custom: 'Custom (one-shot)',
-};
+const PRESETS = ['disabled', 'hourly', 'every6h', 'daily', 'weekly', 'custom'] as const;
+
+/** Catalog key of the current validation message, or '' when valid. */
+type ValidationKey = '' | 'invalidCron' | 'pickDateTime';
 
 export type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 export type PresetType = 'disabled' | 'hourly' | 'every6h' | 'daily' | 'weekly' | 'custom';
@@ -38,7 +35,7 @@ export function CronBuilder({
   const [customTime, setCustomTime] = useState('');
   const [showRawCron, setShowRawCron] = useState(false);
   const [rawCron, setRawCron] = useState('');
-  const [validationError, setValidationError] = useState('');
+  const [validationError, setValidationError] = useState<ValidationKey>('');
 
   // ponytail: derive the active cron expression from either the
   // picker (when schedule === 'custom') or the preset map. The
@@ -71,7 +68,7 @@ export function CronBuilder({
     setCustomDate('');
     setCustomTime('');
     setRawCron(customSchedule);
-    setValidationError(customSchedule && !validateCron(customSchedule) ? 'Invalid cron expression' : '');
+    setValidationError(customSchedule && !validateCron(customSchedule) ? 'invalidCron' : '');
   }, [schedule, customSchedule]);
 
   const handlePresetSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -110,7 +107,7 @@ export function CronBuilder({
       setValidationError('');
       onChange(cron);
     } else {
-      setValidationError('Pick a date and a time');
+      setValidationError('pickDateTime');
     }
   };
 
@@ -128,135 +125,123 @@ export function CronBuilder({
         setCustomTime(dt.time);
       }
     } else {
-      setValidationError('Invalid cron expression');
+      setValidationError('invalidCron');
     }
   };
 
+  const validationMessage = validationError ? t(`backups:scheduler.${validationError}`) : '';
+
   return (
     <div className="space-y-4">
-      <label className="space-y-2 block">
-        <span className="text-sm font-medium text-base-content">{t('backups:scheduleLabel')}</span>
-        <select
-          data-testid="preset-select"
-          value={schedule}
-          onChange={handlePresetSelect}
-          className="glass-panel w-full rounded-xl border border-border px-3 py-2 text-base-content focus:outline-none focus:ring-2 focus:ring-primary/50"
-        >
-          {(['disabled', 'hourly', 'every6h', 'daily', 'weekly', 'custom'] as PresetType[]).map((key) => (
-            <option key={key} value={key} data-testid={`preset-${key}`}>
-              {PRESET_LABELS[key]}
-            </option>
-          ))}
-        </select>
-      </label>
+      <Select
+        id="backup-schedule-frequency"
+        label={t('backups:scheduler.frequency')}
+        data-testid="preset-select"
+        value={schedule}
+        onChange={handlePresetSelect}
+      >
+        {PRESETS.map((key) => (
+          <option key={key} value={key} data-testid={`preset-${key}`}>
+            {t(`backups:scheduler.presets.${key}`)}
+          </option>
+        ))}
+      </Select>
 
-      {schedule !== 'disabled' && (
-        <div className="rounded-lg border border-border bg-base-content/5 px-3 py-2 text-sm text-base-content/75">
-          {schedule !== 'custom' && activeCron && (
-            <span>{t('backups:cronPrefix')} <code className="font-mono">{activeCron}</code></span>
+      {schedule !== 'disabled' && activeCron && (
+        <p className="text-xs text-ds-text-secondary">
+          {schedule === 'custom' && (
+            <span className="mr-2">{t('backups:scheduler.runsOnce', { date: customDate, time: customTime })}</span>
           )}
-          {schedule === 'custom' && activeCron && (
-            <span>
-              {t('backups:runsOnceOn')} <strong>{customDate}</strong> {t('backups:at')} <strong>{customTime}</strong>{' '}
-              ({t('backups:cronPrefix')} <code className="font-mono">{activeCron}</code>)
-            </span>
-          )}
-        </div>
+          <span className="whitespace-nowrap">
+            {t('backups:scheduler.cron')}{' '}
+            <code className="font-mono font-semibold text-ds-text-primary">{activeCron}</code>
+          </span>
+        </p>
       )}
 
       {schedule === 'custom' && (
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
-            <label className="space-y-1">
-              <span className="text-xs font-medium text-base-content/75">Date</span>
-              <input
-                type="date"
-                data-testid="custom-date"
-                value={customDate}
-                onChange={(e) => handlePickerChange({ date: e.target.value, time: customTime })}
-                className="glass-panel w-full rounded-xl border border-border px-3 py-2 text-base-content focus:outline-none focus:ring-2 focus:ring-primary/50"
-              />
-            </label>
-            <label className="space-y-1">
-              <span className="text-xs font-medium text-base-content/75">Time</span>
-              <input
-                type="time"
-                data-testid="custom-time"
-                value={customTime}
-                onChange={(e) => handlePickerChange({ date: customDate, time: e.target.value })}
-                className="glass-panel w-full rounded-xl border border-border px-3 py-2 text-base-content focus:outline-none focus:ring-2 focus:ring-primary/50"
-              />
-            </label>
+            <Input
+              id="backup-schedule-date"
+              label={t('backups:scheduler.date')}
+              type="date"
+              data-testid="custom-date"
+              value={customDate}
+              onChange={(e) => handlePickerChange({ date: e.target.value, time: customTime })}
+              error={validationError === 'pickDateTime'}
+            />
+            <Input
+              id="backup-schedule-time"
+              label={t('backups:scheduler.time')}
+              type="time"
+              data-testid="custom-time"
+              value={customTime}
+              onChange={(e) => handlePickerChange({ date: customDate, time: e.target.value })}
+              error={validationError === 'pickDateTime'}
+            />
           </div>
 
-          <label className="flex items-center gap-2 text-sm text-base-content/75">
+          <label className="flex min-h-6 cursor-pointer items-center gap-2 text-sm text-ds-text-secondary">
             <input
               type="checkbox"
               data-testid="custom-advanced-toggle"
               checked={showRawCron}
               onChange={(e) => setShowRawCron(e.target.checked)}
-              className="h-4 w-4"
+              className="checkbox checkbox-sm"
             />
-            {t('backups:advancedEditCron')}
+            {t('backups:scheduler.advanced')}
           </label>
 
           {showRawCron && (
-            <label className="space-y-2 block">
-              <span className="text-sm font-medium text-base-content">{t('backups:cronExpression')}</span>
-              <input
+            <div className="space-y-1">
+              <Input
+                id="backup-schedule-cron"
+                label={t('backups:scheduler.cronExpression')}
                 type="text"
                 data-testid="custom-cron-input"
                 value={rawCron}
                 onChange={(e) => setRawCron(e.target.value)}
                 onBlur={handleRawCronBlur}
-                placeholder="0 2 * * * (5-field format)"
-                className={`glass-panel w-full rounded-xl border px-3 py-2 text-base-content focus:outline-none focus:ring-2 ${
-                  validationError ? 'border-error focus:ring-error/50' : 'border-border focus:ring-primary/50'
-                }`}
+                placeholder="0 2 * * *"
+                spellCheck={false}
+                autoComplete="off"
+                aria-describedby="backup-schedule-cron-hint"
+                error={validationError === 'invalidCron'}
+                className="font-mono"
               />
-              <p className="text-xs text-ds-text-muted">
-                {t('backups:cronFormatHint')}
+              <p id="backup-schedule-cron-hint" className="text-xs text-ds-text-secondary">
+                {t('backups:scheduler.cronHint')}
               </p>
-            </label>
+            </div>
           )}
 
-          {validationError && (
-            <p className="text-xs text-error">{validationError}</p>
+          {validationMessage && (
+            <p role="alert" className="text-xs text-ds-on-tint-error">
+              {validationMessage}
+            </p>
           )}
         </div>
       )}
 
       {/* Save button + status indicator */}
       {onSave && (
-        <div className="flex items-center justify-between gap-3 pt-2">
-          <div className="flex items-center gap-2">
-            {saveState === 'saving' && (
-              <div className="flex items-center gap-2 text-sm text-ds-text-muted">
-                <div className="h-3 w-3 rounded-full bg-primary/60 animate-pulse" />
-                {t('common:saving')}
-              </div>
-            )}
-            {saveState === 'saved' && (
-              <div className="flex items-center gap-2 text-sm text-success">
-                <span className="inline-block h-3 w-3 rounded-full bg-success" />
-                {t('common:saved')}
-              </div>
-            )}
-            {saveState === 'error' && saveError && (
-              <div className="flex items-center gap-2 text-sm text-error">
-                <span className="inline-block h-3 w-3 rounded-full bg-error" />
-                {saveError}
-              </div>
-            )}
-          </div>
-          <button
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+          <p role="status" className="min-w-0 text-xs">
+            {saveState === 'saving' && <span className="text-ds-text-secondary">{t('common:saving')}</span>}
+            {saveState === 'saved' && <span className="text-ds-on-tint-success">{t('common:saved')}</span>}
+            {saveState === 'error' && saveError && <span className="text-ds-on-tint-error">{saveError}</span>}
+          </p>
+          <Button
+            type="button"
             onClick={onSave}
             disabled={saveState === 'saving'}
-            className="action-btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            aria-busy={saveState === 'saving'}
+            className="ml-auto"
             data-testid="cron-save-button"
           >
-            {saveState === 'saving' ? t('common:saving') : t('backups:saveSchedule')}
-          </button>
+            {t('backups:scheduler.save')}
+          </Button>
         </div>
       )}
     </div>

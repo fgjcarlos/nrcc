@@ -228,7 +228,7 @@ describe('BackupTable', () => {
     );
 
     expect(screen.getByText('Manual')).toBeInTheDocument();
-    expect(screen.getByText('Auto')).toBeInTheDocument();
+    expect(screen.getByText('Automatic')).toBeInTheDocument();
   });
 
   it('should sort ascending when clicking same header twice', () => {
@@ -288,7 +288,7 @@ describe('BackupTable', () => {
     );
 
     expect(screen.getByText('Manual')).toBeInTheDocument();
-    expect(screen.getByText('Auto')).toBeInTheDocument();
+    expect(screen.getByText('Automatic')).toBeInTheDocument();
     expect(screen.getByText('Pre-restore')).toBeInTheDocument();
   });
 

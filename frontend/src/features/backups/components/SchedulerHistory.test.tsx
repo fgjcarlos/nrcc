@@ -100,7 +100,7 @@ describe('SchedulerHistory', () => {
       />
     );
 
-    expect(screen.getAllByText(/Error/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Failed').length).toBeGreaterThan(0);
   });
 
   it('should show pagination controls when total > limit', () => {

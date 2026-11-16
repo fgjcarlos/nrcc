@@ -1,23 +1,28 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Archive, RefreshCw, AlertTriangle } from 'lucide-react';
-import { ConfirmationDialog } from '@/shared/components';
+import { Button } from '@/shared/components/ui';
 import {
   BackupSummaryCards,
   BackupListSection,
   BackupDetailSection,
   SchedulerConfigSection,
   RetentionPolicySection,
+  BackupActionDialog,
+  type BackupAction,
+  type SchedulerState,
 } from '@/features/backups/components';
 import { useBackupsData } from '@/features/backups/hooks/useBackupsData';
 import { useBackupsActions } from '@/features/backups/hooks/useBackupsActions';
-import { backupService, defaultBackupConfig, type BackupConfig, type BackupSummary } from '@/features/backups/services';
-import { useT } from '@/i18n';
 import {
-  getErrorMessage,
-  getBackupFileLabel,
-  getBackupDisplayName,
-} from '@/features/backups/lib/formatters';
+  backupService,
+  defaultBackupConfig,
+  type BackupConfig,
+  type BackupSchedulerStatus,
+  type BackupSummary,
+} from '@/features/backups/services';
+import { useT } from '@/i18n';
+import { getErrorMessage, getBackupFileLabel } from '@/features/backups/lib/formatters';
 import { cn } from '@/shared/lib';
 
 function isConfigDirty(left: BackupConfig, right: BackupConfig | undefined): boolean {
@@ -27,39 +32,23 @@ function isConfigDirty(left: BackupConfig, right: BackupConfig | undefined): boo
   return JSON.stringify(left) !== JSON.stringify(right);
 }
 
-function getSchedulerTone(status: any): 'healthy' | 'muted' | 'error' {
+/** A failed run is the only red state; unscheduled is a held gate (amber). */
+function getSchedulerState(status: BackupSchedulerStatus): SchedulerState {
   if (status.lastError) {
-    return 'error';
+    return 'failed';
   }
   if (status.enabled && status.scheduled) {
-    return 'healthy';
+    return 'scheduled';
   }
-  return 'muted';
+  return 'unscheduled';
 }
 
-function getSchedulerLabel(status: any): string {
-  if (status.lastError) {
-    return 'Requiere atención';
-  }
-  if (status.enabled && status.scheduled) {
-    return 'Programado';
-  }
-  return 'Sin programar';
-}
-
-type ConfirmConfig = {
-  isOpen: boolean;
-  title: string;
-  description: string;
-  confirmText: string;
-  variant: 'warning' | 'danger';
-  onConfirm: () => void;
-} | null;
+type PendingAction = { action: BackupAction; backup: BackupSummary } | null;
 
 export function BackupsView() {
   const [configDraft, setConfigDraft] = useState<BackupConfig>(defaultBackupConfig);
   const [selectedBackupId, setSelectedBackupId] = useState<string | null>(null);
-  const [confirmConfig, setConfirmConfig] = useState<ConfirmConfig>(null);
+  const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [backupListPage, setBackupListPage] = useState(1);
   const [backupListSort] = useState<'date' | 'size' | 'status'>('date');
   const [backupListOrder] = useState<'asc' | 'desc'>('desc');
@@ -128,8 +117,7 @@ export function BackupsView() {
     lastBackupId: undefined,
     lastError: undefined,
   };
-  const schedulerTone = getSchedulerTone(effectiveSchedulerStatus);
-  const schedulerLabel = getSchedulerLabel(effectiveSchedulerStatus);
+  const schedulerState = getSchedulerState(effectiveSchedulerStatus);
 
   // #483: surface a sync error banner when the live status / observability
   // queries failed. The cards below still render with cached or fallback
@@ -170,72 +158,55 @@ export function BackupsView() {
     actions.saveConfigMutation.mutate(configDraft);
   };
 
-  const handleRestore = (backup: BackupSummary) => {
-    const displayName = getBackupDisplayName(backup);
-    setConfirmConfig({
-      isOpen: true,
-      title: 'Restaurar backup',
-      description: `¿Querés restaurar ${displayName}? Se generará un backup de seguridad y Node-RED se reiniciará al terminar.`,
-      confirmText: backup.id,
-      variant: 'warning',
-      onConfirm: () => {
-        setConfirmConfig(null);
-        actions.restoreMutation.mutate(backup.id);
-      },
-    });
+  const confirmPendingAction = () => {
+    if (!pendingAction) return;
+    const { action, backup } = pendingAction;
+    setPendingAction(null);
+    if (action === 'restore') {
+      actions.restoreMutation.mutate(backup.id);
+    } else {
+      actions.deleteMutation.mutate(backup.id);
+    }
   };
 
-   const handleDelete = (backup: BackupSummary) => {
-     const displayName = getBackupDisplayName(backup);
-     setConfirmConfig({
-       isOpen: true,
-       title: t('common:deleteBackup'),
-       description: t('common:deleteBackupDescription', { name: displayName }),
-       confirmText: backup.id,
-       variant: 'danger',
-       onConfirm: () => {
-         setConfirmConfig(null);
-         actions.deleteMutation.mutate(backup.id);
-       },
-     });
-   };
-
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.24em] text-ds-text-muted">{t('backups:localBackupsLabel')}</p>
-          <h1 className="text-2xl font-bold text-base-content">{t('backups:backupsTitle')}</h1>
-          <p className="text-sm text-base-content/65">{t('backups:localBackupsSubtitle')}</p>
+    <div className="space-y-4">
+      <header className="flex flex-col gap-3 border-b border-ds-border-subtle pb-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0 space-y-1">
+          <h1 className="text-xl font-bold text-ds-text-primary">{t('backups:backupsTitle')}</h1>
+          <p className="max-w-[75ch] text-pretty text-sm text-ds-text-secondary">{t('backups:localBackupsSubtitle')}</p>
         </div>
 
-        <button
+        <Button
+          type="button"
           onClick={() => actions.createMutation.mutate()}
           disabled={actions.createMutation.isPending}
-          className="action-btn-primary"
+          className="min-h-11 shrink-0 self-start whitespace-nowrap sm:min-h-9 sm:self-auto"
         >
-          <Archive className={cn('h-4 w-4', actions.createMutation.isPending && 'animate-pulse')} />
+          <Archive
+            className={cn('h-4 w-4', actions.createMutation.isPending && 'animate-pulse motion-reduce:animate-none')}
+            aria-hidden="true"
+          />
           {t('backups:createBackupNow')}
-        </button>
-      </div>
+        </Button>
+      </header>
 
       {dataSyncError && (
         <div
           role="alert"
-          className="flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/10 p-3 mb-6"
+          className="flex flex-wrap items-start gap-3 rounded-box border border-ds-warning/35 bg-ds-warning/10 px-3 py-2"
         >
-          <AlertTriangle className="h-5 w-5 text-warning flex-shrink-0 mt-0.5" />
-          <div className="flex-1 text-sm">
-            <p className="font-medium text-base-content">
-              {t('backups:syncErrorTitle')}
-              {dataSyncError === 'status' ? t('backups:syncErrorStatusSuffix') : t('backups:syncErrorObservabilitySuffix')}.
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-ds-on-tint-warning" aria-hidden="true" />
+          <div className="min-w-0 flex-1 text-sm">
+            <p className="font-semibold text-ds-text-primary">
+              {t(dataSyncError === 'status' ? 'backups:syncError.status' : 'backups:syncError.observability')}
             </p>
-            <p className="text-base-content/70 mt-1">
-              {t('backups:syncErrorBody')}
-            </p>
+            <p className="mt-1 text-ds-text-secondary">{t('backups:syncError.body')}</p>
           </div>
-          <button
+          <Button
             type="button"
+            variant="secondary"
+            size="sm"
             onClick={() => {
               // Resync all four backup-related queries without a full page
               // reload — see issue #590 and auditoria/frontend.md HIGH-5.
@@ -244,119 +215,118 @@ export function BackupsView() {
               void backupsData.refetchObservability();
               void backupsData.refetchStorage();
             }}
-            className="flex items-center gap-1.5 rounded-md border border-base-content/20 px-2.5 py-1.5 text-xs font-medium hover:bg-base-content/5"
           >
-            <RefreshCw className="h-3.5 w-3.5" />
-            {t('backups:retrySync')}
-          </button>
+            <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+            {t('backups:syncError.retry')}
+          </Button>
         </div>
       )}
 
-      {/* Summary Cards Component */}
-      <BackupSummaryCards
-        latestBackup={backupsData.backups[0] || null}
-        schedulerStatus={effectiveSchedulerStatus}
-        schedulerTone={schedulerTone}
-        schedulerLabel={schedulerLabel}
-        storage={{
-          totalBackups: effectiveStorage.totalBackups,
-          totalSize: effectiveStorage.totalSize,
-        }}
-      />
-
-      {/* Backup List Section Component */}
-      <BackupListSection
-        backups={backupsData.backups}
-        isLoading={backupsData.backupsLoading}
-        isError={backupsData.backupsError}
-        selectedBackupId={selectedBackupId}
-        total={backupsData.backupList?.total ?? 0}
-        page={backupListPage}
-        isActionPending={actions.restoreMutation.isPending || actions.deleteMutation.isPending}
-        pendingActionId={pendingActionId}
-        onSelect={setSelectedBackupId}
-        onDownload={downloadBackup}
-        onRestore={handleRestore}
-        onDelete={handleDelete}
-        onPageChange={setBackupListPage}
-        isCreating={actions.createMutation.isPending}
-        onCreateBackup={() => actions.createMutation.mutate()}
-      />
-
-      {/* Backup Detail Section Component */}
-      {selectedBackup && (
-        <BackupDetailSection
-          backup={selectedBackup}
-          detail={backupsData.detail}
-          isLoading={selectedDetailLoading}
-          onClose={() => setSelectedBackupId(null)}
-        />
-      )}
-
-      {/* Schedule + Retention Grid */}
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* LEFT COLUMN: Schedule */}
-        <SchedulerConfigSection
-          configDraft={configDraft}
-          saveState={
-            actions.saveConfigMutation.isPending
-              ? 'saving'
-              : actions.saveConfigMutation.isError
-                ? 'error'
-                : configDirty
-                  ? 'idle'
-                  : 'saved'
-          }
-          saveError={actions.saveConfigMutation.error ? getErrorMessage(actions.saveConfigMutation.error, 'Error saving') : undefined}
-          onChange={(cron) => {
-            setConfigDraft((current) => ({
-              ...current,
-              customSchedule: cron,
-            }));
+      {/* One sheet: sections separated by hairline rules, no nested cards. */}
+      <div className="divide-y divide-ds-border-subtle">
+        <BackupSummaryCards
+          latestBackup={backupsData.backups[0] || null}
+          schedulerStatus={effectiveSchedulerStatus}
+          schedulerState={schedulerState}
+          storage={{
+            totalBackups: effectiveStorage.totalBackups,
+            totalSize: effectiveStorage.totalSize,
           }}
-          onPresetChange={(preset) => {
-            setConfigDraft((current) => {
-              const newSchedule = preset || 'disabled';
-              return {
+        />
+
+        {/* Backup List Section Component */}
+        <BackupListSection
+          backups={backupsData.backups}
+          isLoading={backupsData.backupsLoading}
+          isError={backupsData.backupsError}
+          selectedBackupId={selectedBackupId}
+          total={backupsData.backupList?.total ?? 0}
+          page={backupListPage}
+          isActionPending={actions.restoreMutation.isPending || actions.deleteMutation.isPending}
+          pendingActionId={pendingActionId}
+          onSelect={setSelectedBackupId}
+          onDownload={downloadBackup}
+          onRestore={(backup) => setPendingAction({ action: 'restore', backup })}
+          onDelete={(backup) => setPendingAction({ action: 'delete', backup })}
+          onRetry={() => void backupsData.refetchBackups()}
+          onPageChange={setBackupListPage}
+          isCreating={actions.createMutation.isPending}
+          onCreateBackup={() => actions.createMutation.mutate()}
+        />
+
+        {/* Backup Detail Section Component */}
+        {selectedBackup && (
+          <BackupDetailSection
+            backup={selectedBackup}
+            detail={backupsData.detail}
+            isLoading={selectedDetailLoading}
+            onClose={() => setSelectedBackupId(null)}
+          />
+        )}
+
+        {/* Schedule + Retention */}
+        <div className="grid gap-x-8 md:grid-cols-2 max-md:divide-y max-md:divide-ds-border-subtle">
+          {/* LEFT COLUMN: Schedule */}
+          <SchedulerConfigSection
+            configDraft={configDraft}
+            saveState={
+              actions.saveConfigMutation.isPending
+                ? 'saving'
+                : actions.saveConfigMutation.isError
+                  ? 'error'
+                  : configDirty
+                    ? 'idle'
+                    : 'saved'
+            }
+            saveError={actions.saveConfigMutation.error ? getErrorMessage(actions.saveConfigMutation.error, t('backups:couldNotSaveBackupConfiguration')) : undefined}
+            onChange={(cron) => {
+              setConfigDraft((current) => ({
                 ...current,
-                schedule: newSchedule as BackupConfig['schedule'],
-                enabled: newSchedule !== 'disabled',
-                customSchedule: newSchedule === 'custom' ? current.customSchedule : '',
-              };
-            });
-          }}
-          onSave={() => handleSaveConfig()}
-        />
+                customSchedule: cron,
+              }));
+            }}
+            onPresetChange={(preset) => {
+              setConfigDraft((current) => {
+                const newSchedule = preset || 'disabled';
+                return {
+                  ...current,
+                  schedule: newSchedule as BackupConfig['schedule'],
+                  enabled: newSchedule !== 'disabled',
+                  customSchedule: newSchedule === 'custom' ? current.customSchedule : '',
+                };
+              });
+            }}
+            onSave={() => handleSaveConfig()}
+          />
 
-        {/* RIGHT COLUMN: Retention */}
-        <RetentionPolicySection
-          retentionManual={configDraft.retentionManual}
-          retentionAuto={configDraft.retentionAuto}
-          retentionPreRestore={configDraft.retentionPreRestore}
-          isSaving={actions.retentionMutation.isPending}
-          onSave={(manual, auto, preRestore) => {
-            const updatedConfig = {
-              ...configDraft,
-              retentionManual: manual,
-              retentionAuto: auto,
-              retentionPreRestore: preRestore,
-            };
-            setConfigDraft(updatedConfig);
-            actions.retentionMutation.mutate(manual);
-          }}
-        />
+          {/* RIGHT COLUMN: Retention */}
+          <RetentionPolicySection
+            retentionManual={configDraft.retentionManual}
+            retentionAuto={configDraft.retentionAuto}
+            retentionPreRestore={configDraft.retentionPreRestore}
+            isSaving={actions.retentionMutation.isPending}
+            onSave={(manual, auto, preRestore) => {
+              const updatedConfig = {
+                ...configDraft,
+                retentionManual: manual,
+                retentionAuto: auto,
+                retentionPreRestore: preRestore,
+              };
+              setConfigDraft(updatedConfig);
+              actions.retentionMutation.mutate(manual);
+            }}
+          />
+        </div>
       </div>
 
-      {confirmConfig && (
-        <ConfirmationDialog
-          isOpen={confirmConfig.isOpen}
-          title={confirmConfig.title}
-          description={confirmConfig.description}
-          confirmText={confirmConfig.confirmText}
-          variant={confirmConfig.variant}
+      {pendingAction && (
+        <BackupActionDialog
+          key={`${pendingAction.action}-${pendingAction.backup.id}`}
+          action={pendingAction.action}
+          backup={pendingAction.backup}
           isPending={actions.restoreMutation.isPending || actions.deleteMutation.isPending}
-          onConfirm={confirmConfig.onConfirm}
-          onCancel={() => setConfirmConfig(null)}
+          onConfirm={confirmPendingAction}
+          onCancel={() => setPendingAction(null)}
         />
       )}
     </div>

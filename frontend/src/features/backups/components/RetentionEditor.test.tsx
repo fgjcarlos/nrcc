@@ -105,7 +105,9 @@ describe('RetentionEditor', () => {
     expect(manualInput.max).toBe('3650');
   });
 
-  it('should display descriptions for each field', () => {
+  // Retention is a count of backups kept per type (internal/service/backup.go
+  // pruneBackups), not a number of days: no field may describe it in days.
+  it('labels each field as a count of backups, never days', () => {
     render(
       <RetentionEditor
         retentionManual={7}
@@ -116,8 +118,9 @@ describe('RetentionEditor', () => {
       />
     );
 
-    expect(screen.getByText(/keep manual/i)).toBeInTheDocument();
-    expect(screen.getByText(/keep automatic/i)).toBeInTheDocument();
-    expect(screen.getByText(/keep pre-restore/i)).toBeInTheDocument();
+    expect(screen.getByLabelText('Manual backups')).toHaveValue(7);
+    expect(screen.getByLabelText('Automatic backups')).toHaveValue(30);
+    expect(screen.getByLabelText('Pre-restore snapshots')).toHaveValue(2);
+    expect(screen.queryByText(/days/i)).toBeNull();
   });
 });

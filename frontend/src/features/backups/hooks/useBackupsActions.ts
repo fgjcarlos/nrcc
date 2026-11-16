@@ -17,7 +17,7 @@ export function useBackupsActions() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.backups.config });
       await queryClient.invalidateQueries({ queryKey: queryKeys.backups.status });
       await queryClient.invalidateQueries({ queryKey: queryKeys.backups.observability });
-      toast.success(t('common:backupConfigurationSaved'));
+      toast.success(t('backups:configurationSaved'));
       return savedConfig;
     },
     onError: (error) => {

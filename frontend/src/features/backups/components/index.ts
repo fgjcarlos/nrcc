@@ -12,3 +12,5 @@ export { BackupListSection } from './BackupListSection';
 export { BackupDetailSection } from './BackupDetailSection';
 export { SchedulerConfigSection } from './SchedulerConfigSection';
 export { RetentionPolicySection } from './RetentionPolicySection';
+export { BackupActionDialog, type BackupAction } from './BackupActionDialog';
+export type { SchedulerState } from './BackupSummaryCards';
