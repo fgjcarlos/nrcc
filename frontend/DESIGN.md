@@ -218,7 +218,7 @@ The system is flat. Depth comes from tonal grounds (sunken, sheet, raised sheet)
 
 ## Shapes
 
-Drafting geometry: near-square corners, straight 1px conductors, and IEC symbols drawn with a 1.5px square-capped stroke. Selectors (checkbox, radio) take 2px corners; fields, buttons, panels and banners take 4px (`--radius-field`, `--radius-box`). Only the toggle track and knob and status chips are fully round. Dashed strokes mean "not confirmed" (an unknown contact blade) or the rollback return path; solid strokes mean a drawn conductor.
+Drafting geometry: near-square corners, straight 1px conductors, and IEC symbols drawn with a 1.5px square-capped stroke. Selectors (checkbox, radio) take 2px corners; fields, buttons, panels and banners take 4px (`--radius-field`, `--radius-box`). Status chips take 2px corners like selectors; only the toggle track and knob are fully round. Dashed strokes mean "not confirmed" (an unknown contact blade) or the rollback return path; solid strokes mean a drawn conductor.
 
 ## Components
 

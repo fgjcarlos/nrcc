@@ -1,29 +1,34 @@
 import { cva, type VariantProps } from 'class-variance-authority';
 
 /**
- * Button variant definitions
- * Extracted from Button.tsx to resolve fast-refresh lint warning
+ * Button variants: one button system. Each variant is an `.action-btn-*`
+ * class from src/index.css (DESIGN.md Buttons), the same classes the raw
+ * call sites use; daisyUI `.btn` is restyled to the same values there.
+ * md is the class default (36px); sm and lg only change the target.
+ * Extracted from Button.tsx to resolve fast-refresh lint warning.
  */
-export const buttonVariants = cva(
-  'inline-flex items-center justify-center font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-base-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none rounded-lg',
-  {
-    variants: {
-      variant: {
-        primary: 'btn-primary',
-        secondary: 'btn-secondary',
-        tertiary: 'btn-tertiary',
-      },
-      size: {
-        sm: 'px-3 py-1.5 text-sm gap-1.5',
-        md: 'px-4 py-2 text-sm gap-2',
-        lg: 'px-6 py-3 text-base gap-2.5',
-      },
+export const buttonVariants = cva('', {
+  variants: {
+    variant: {
+      // Action: sheet ground, conductor-blue edge and label.
+      primary: 'action-btn-primary',
+      // Conductor-blue fill.
+      solid: 'action-btn-solid',
+      secondary: 'action-btn-secondary',
+      ghost: 'action-btn-ghost',
+      // Destructive actions only.
+      danger: 'action-btn-danger',
     },
-    defaultVariants: {
-      variant: 'primary',
-      size: 'md',
+    size: {
+      sm: 'min-h-8 px-3 py-1 text-xs',
+      md: '',
+      lg: 'min-h-11 px-6',
     },
-  }
-);
+  },
+  defaultVariants: {
+    variant: 'primary',
+    size: 'md',
+  },
+});
 
 export type ButtonVariantProps = VariantProps<typeof buttonVariants>;

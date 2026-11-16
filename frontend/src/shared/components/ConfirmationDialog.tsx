@@ -159,7 +159,9 @@ export function ConfirmationDialog({
         };
       default:
         return {
-          button: 'bg-primary hover:bg-primary/90 text-primary-foreground',
+          // --color-primary-content, not a hard-coded or undefined label colour:
+          // dark fills carry dark text.
+          button: 'bg-primary hover:bg-primary/90 text-primary-content',
           icon: 'text-primary',
           border: 'border-border',
         };

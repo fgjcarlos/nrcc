@@ -30,11 +30,11 @@ export default {
         'ds-bg-elevated': 'var(--ds-bg-elevated)',
         'ds-bg-overlay': 'var(--ds-bg-overlay)',
 
-        // Borders (the --ds-border-* CSS tokens carry different values,
-        // so the utilities use dedicated --ds-ui-border-* variables)
-        'ds-border-subtle': 'var(--ds-ui-border-subtle)',
-        'ds-border-default': 'var(--ds-ui-border-default)',
-        'ds-border-strong': 'var(--ds-ui-border-strong)',
+        // Borders read the same-named CSS tokens: subtle and default are the
+        // hairline (decorative), strong is the control border (>=3:1).
+        'ds-border-subtle': 'var(--ds-border-subtle)',
+        'ds-border-default': 'var(--ds-border-default)',
+        'ds-border-strong': 'var(--ds-border-strong)',
 
         // Text
         'ds-text-primary': 'var(--ds-text-primary)',
@@ -60,20 +60,8 @@ export default {
         sans: ['Overpass Variable', 'system-ui', 'sans-serif'],
         mono: ['Overpass Mono', 'ui-monospace', 'monospace'],
       },
-      // ── Typography scale (issue #766 slice B) ─────────────────
-      // Named tokens for the typography hierarchy. Use Tailwind
-      // utilities like `text-ds-h1`, `text-ds-body` etc. so every page
-      // renders the same hierarchy. Pair with `font-semibold` /
-      // `font-medium` for explicit weight when needed.
-      fontSize: {
-        'ds-display': ['2.25rem', { lineHeight: '2.5rem', letterSpacing: '-0.01em', fontWeight: '700' }],
-        'ds-h1':      ['1.875rem', { lineHeight: '2.25rem', letterSpacing: '-0.01em', fontWeight: '700' }],
-        'ds-h2':      ['1.5rem',   { lineHeight: '2rem',    fontWeight: '600' }],
-        'ds-h3':      ['1.25rem',  { lineHeight: '1.75rem', fontWeight: '600' }],
-        'ds-body':    ['0.875rem', { lineHeight: '1.375rem', fontWeight: '400' }],
-        'ds-caption': ['0.75rem',  { lineHeight: '1rem',     fontWeight: '500' }],
-        'ds-eyebrow': ['0.68rem',  { lineHeight: '1rem',     letterSpacing: '0.24em', fontWeight: '600' }],
-      },
+      // Type sizes: DESIGN.md allows only 20, 14 and 12px, which are the
+      // stock text-xl, text-sm and text-xs utilities.
       // ── Density scale (issue #766 slice B) ────────────────────
       // Semantic vertical-rhythm tokens. `compact` for data-dense
       // list rows; `comfortable` for forms and cards (default);
