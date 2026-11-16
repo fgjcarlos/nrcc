@@ -6,6 +6,7 @@ import type { FlowVersionEntry, FlowDiff } from '../types';
 
 import { queryKeys } from '@/shared/lib/queryKeys';
 import { useT } from '@/i18n';
+import { Button, Dialog, DialogBody, DialogFooter } from '@/shared/components/ui';
 export function FlowVersionsView() {
   const queryClient = useQueryClient();
   const { t } = useT();
@@ -227,20 +228,24 @@ function RevertConfirm({
   t: (key: string, options?: Record<string, unknown>) => string;
 }) {
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onCancel()}>
-      <div className="surface-panel w-full max-w-md border border-border p-6 shadow-glow">
-        <h3 className="text-lg font-bold text-base-content mb-2">{t('flows:confirmRevert')}</h3>
-        <p className="text-sm text-muted-foreground mb-4">{t('flows:revertDescription')}</p>
-        <p className="text-xs font-mono text-muted-foreground mb-4">{versionId}</p>
-        <div className="flex justify-end gap-2">
-          <button onClick={onCancel} disabled={isPending} className="action-btn-secondary">
-            {t('common:cancel')}
-          </button>
-          <button onClick={onConfirm} disabled={isPending} className="action-btn-primary">
-            {isPending ? t('flows:reverting') : t('flows:revert')}
-          </button>
-        </div>
-      </div>
-    </div>
+    <Dialog
+      open
+      onClose={onCancel}
+      title={t('flows:confirmRevert')}
+      description={t('flows:revertDescription')}
+      dismissible={!isPending}
+    >
+      <DialogBody>
+        <p className="font-mono text-xs text-ds-text-secondary">{versionId}</p>
+      </DialogBody>
+      <DialogFooter>
+        <Button type="button" variant="secondary" onClick={onCancel} disabled={isPending}>
+          {t('common:cancel')}
+        </Button>
+        <Button type="button" variant="solid" onClick={onConfirm} disabled={isPending}>
+          {isPending ? t('flows:reverting') : t('flows:revert')}
+        </Button>
+      </DialogFooter>
+    </Dialog>
   );
 }

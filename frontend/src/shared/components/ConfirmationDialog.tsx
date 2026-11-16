@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useId } from 'react';
-import { createPortal } from 'react-dom';
-import { AlertTriangle, X } from 'lucide-react';
 import { useT } from '@/i18n';
+import { Button } from './ui/Button';
+import { Dialog, DialogBody, DialogFooter } from './ui/Dialog';
 
 export type ConfirmationVariant = 'danger' | 'warning' | 'default';
 
@@ -23,6 +23,9 @@ interface ConfirmationDialogProps {
   onCancel: () => void;
 }
 
+/** Destructive actions confirm on the danger button; everything else on the solid action. */
+const CONFIRM_VARIANT = { danger: 'danger', warning: 'solid', default: 'solid' } as const;
+
 export function ConfirmationDialog({
   isOpen,
   title,
@@ -39,10 +42,8 @@ export function ConfirmationDialog({
   const [acknowledged, setAcknowledged] = useState(false);
   const { t } = useT();
   const inputRef = useRef<HTMLInputElement>(null);
-  const dialogRef = useRef<HTMLDivElement>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
-  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
-  const titleId = useId();
+  const inputId = useId();
 
   // Memoize canConfirm to prevent stale closures in useEffect dependency array.
   // The Confirm button is enabled only when every gate has been satisfied:
@@ -65,66 +66,12 @@ export function ConfirmationDialog({
     }
   }, [isOpen]);
 
-  // Move focus into the modal and return it to the invoking control on close.
-  // The text gate is the safest useful target when present; otherwise Cancel
-  // avoids placing initial focus on a destructive action.
+  // Enter confirms from anywhere in the dialog. Escape, the focus trap and
+  // focus restore come from the shared Dialog. Native buttons already
+  // synthesize one click for Enter; handling it here as well would submit twice.
   useEffect(() => {
     if (!isOpen) return;
-
-    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
-    const focusTimer = window.setTimeout(() => {
-      (inputRef.current ?? cancelButtonRef.current)?.focus();
-    }, 0);
-
-    return () => {
-      window.clearTimeout(focusTimer);
-      const previouslyFocused = previouslyFocusedRef.current;
-      previouslyFocusedRef.current = null;
-      if (previouslyFocused?.isConnected) previouslyFocused.focus();
-    };
-  }, [isOpen]);
-
-  // Keep keyboard focus inside the modal and preserve keyboard shortcuts.
-  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!isOpen) return;
-
-      if (e.key === 'Escape' && !isPending) {
-        e.preventDefault();
-        onCancel();
-        return;
-      }
-
-      if (e.key === 'Tab') {
-        const dialog = dialogRef.current;
-        if (!dialog) return;
-
-        const focusable = Array.from(
-          dialog.querySelectorAll<HTMLElement>(
-            'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
-          )
-        );
-        if (focusable.length === 0) {
-          e.preventDefault();
-          dialog.focus();
-          return;
-        }
-
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-        const active = document.activeElement;
-        if (e.shiftKey && (active === first || !dialog.contains(active))) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && (active === last || !dialog.contains(active))) {
-          e.preventDefault();
-          first.focus();
-        }
-        return;
-      }
-
-      // Native buttons already synthesize one click for Enter. Handling that
-      // key globally as well would submit twice.
       if (
         e.key === 'Enter' &&
         !e.repeat &&
@@ -139,137 +86,77 @@ export function ConfirmationDialog({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, isPending, onCancel, onConfirm, canConfirm]);
+  }, [isOpen, isPending, onConfirm, canConfirm]);
 
-  if (!isOpen) return null;
-
-  const getVariantStyles = () => {
-    switch (variant) {
-      case 'danger':
-        return {
-          button: 'bg-error text-error-content hover:opacity-90',
-          icon: 'text-error',
-          border: 'border-border',
-        };
-      case 'warning':
-        return {
-          button: 'bg-warning text-warning-content hover:opacity-90',
-          icon: 'text-warning',
-          border: 'border-border',
-        };
-      default:
-        return {
-          // --color-primary-content, not a hard-coded or undefined label colour:
-          // dark fills carry dark text.
-          button: 'bg-primary hover:bg-primary/90 text-primary-content',
-          icon: 'text-primary',
-          border: 'border-border',
-        };
-    }
-  };
-
-  const styles = getVariantStyles();
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center"
-      data-confirmation-dialog-portal
+  return (
+    <Dialog
+      open={isOpen}
+      onClose={onCancel}
+      title={title}
+      description={description}
+      dismissible={!isPending}
+      // The text gate is the safest useful target when present; otherwise
+      // Cancel avoids placing initial focus on a destructive action.
+      initialFocusRef={confirmText ? inputRef : cancelButtonRef}
     >
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 modal-overlay"
-        aria-hidden="true"
-        onClick={isPending ? undefined : onCancel}
-      />
-
-      {/* Dialog */}
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        tabIndex={-1}
-        className={`relative z-[60] surface-panel border ${styles.border} w-full max-w-md mx-4 overflow-hidden shadow-glow`}
-      >
-        {/* Header */}
-        <div className="flex items-start justify-between border-b ghost-divider modal-inner p-6">
-          <div className="flex items-center gap-3">
-            <div className={`rounded-2xl bg-base-200/70 p-2 ${styles.icon}`}>
-              <AlertTriangle className="w-5 h-5" />
+      {(confirmText || children || acknowledgement) && (
+        <DialogBody className="space-y-4">
+          {confirmText && (
+            <div className="space-y-1">
+              <label htmlFor={inputId} className="block text-xs text-ds-text-secondary">
+                {t('typeToConfirmDelete', { identifier: confirmText })}
+              </label>
+              <input
+                id={inputId}
+                ref={inputRef}
+                type="text"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                placeholder={confirmText}
+                disabled={isPending}
+                autoComplete="off"
+                className="block w-full px-3 py-2 font-mono text-sm"
+              />
             </div>
-            <h3 id={titleId} className="text-lg font-semibold text-base-content">{title}</h3>
-          </div>
-          <button
-            onClick={onCancel}
-            disabled={isPending}
-            aria-label="Close dialog"
-            className="text-body-secondary transition-colors hover:text-base-content disabled:opacity-50"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+          )}
 
-        {/* Body */}
-        <div className="px-6 py-5">
-          <p className="text-base-content/70">{description}</p>
+          {children}
 
-           {confirmText && (
-             <div className="mt-4">
-               <label className="block text-sm font-medium text-base-content mb-2">
-                 {t('typeToConfirmDelete', { identifier: confirmText })}
-               </label>
-               <input
-                 ref={inputRef}
-                 type="text"
-                 value={inputValue}
-                 onChange={(e) => setInputValue(e.target.value)}
-                 placeholder={confirmText}
-                 disabled={isPending}
-                 className="glass-panel w-full rounded-xl border border-border px-3 py-2 text-base-content focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
-               />
-             </div>
-           )}
+          {acknowledgement && (
+            <label className="flex cursor-pointer select-none items-start gap-3">
+              <input
+                type="checkbox"
+                checked={acknowledged}
+                onChange={(e) => setAcknowledged(e.target.checked)}
+                disabled={isPending}
+                className="checkbox checkbox-sm mt-0.5"
+                data-testid="confirmation-dialog-ack"
+              />
+              <span className="text-sm text-ds-text-secondary">{acknowledgement}</span>
+            </label>
+          )}
+        </DialogBody>
+      )}
 
-           {children}
-
-           {acknowledgement && (
-             <label className="mt-4 flex items-start gap-3 cursor-pointer select-none">
-               <input
-                 type="checkbox"
-                 checked={acknowledged}
-                 onChange={(e) => setAcknowledged(e.target.checked)}
-                 disabled={isPending}
-                 className="checkbox checkbox-sm mt-0.5"
-                 data-testid="confirmation-dialog-ack"
-               />
-               <span className="text-sm text-base-content/80">{acknowledgement}</span>
-             </label>
-           )}
-        </div>
-
-         {/* Footer */}
-         <div className="flex justify-end gap-3 border-t ghost-divider modal-inner px-6 py-4">
-           <button
-             ref={cancelButtonRef}
-             onClick={onCancel}
-             disabled={isPending}
-             className="action-btn-secondary"
-           >
-             {t('cancel')}
-           </button>
-           <button
-             onClick={onConfirm}
-             disabled={!canConfirm() || isPending}
-             className={`px-4 py-2 rounded-xl ${styles.button} disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2`}
-           >
-             {isPending && (
-               <div className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent" />
-             )}
-             {isPending ? t('processing') : t('confirm')}
-           </button>
-         </div>
-      </div>
-    </div>,
-    document.body
+      <DialogFooter>
+        <Button ref={cancelButtonRef} type="button" variant="secondary" onClick={onCancel} disabled={isPending}>
+          {t('cancel')}
+        </Button>
+        <Button
+          type="button"
+          variant={CONFIRM_VARIANT[variant]}
+          onClick={onConfirm}
+          disabled={!canConfirm() || isPending}
+        >
+          {isPending && (
+            <span
+              className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent motion-reduce:animate-none"
+              aria-hidden="true"
+            />
+          )}
+          {isPending ? t('processing') : t('confirm')}
+        </Button>
+      </DialogFooter>
+    </Dialog>
   );
 }

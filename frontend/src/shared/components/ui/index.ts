@@ -10,3 +10,6 @@ export {
   type StatusChipProps,
   type StatusChipVariantProps,
 } from './StatusChip';
+export { Dialog, DialogBody, DialogFooter, type DialogProps } from './Dialog';
+export { Tabs, TabPanel, type TabItem, type TabsProps, type TabPanelProps } from './Tabs';
+export { Table, type TableProps } from './Table';

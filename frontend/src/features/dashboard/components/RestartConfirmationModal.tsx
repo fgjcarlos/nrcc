@@ -1,8 +1,7 @@
 import { useRef } from 'react';
-import { AlertTriangle, RefreshCw } from 'lucide-react';
-import { createPortal } from 'react-dom';
+import { RefreshCw } from 'lucide-react';
 import { useT } from '@/i18n';
-import { useModalKeyboard } from '@/shared/hooks/useModalKeyboard';
+import { Button, Dialog, DialogFooter } from '@/shared/components/ui';
 
 interface RestartConfirmationModalProps {
   isOpen: boolean;
@@ -12,52 +11,29 @@ interface RestartConfirmationModalProps {
 
 export function RestartConfirmationModal({ isOpen, onCancel, onConfirm }: RestartConfirmationModalProps) {
   const { t } = useT();
-  const dialogRef = useRef<HTMLDivElement>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
-  // Escape cancels, Tab stays inside, and initial focus lands on the
-  // non-destructive Cancel action (same contract as ConfirmationDialog).
-  useModalKeyboard({ isOpen, containerRef: dialogRef, onEscape: onCancel, initialFocusRef: cancelButtonRef });
 
-  if (!isOpen) {
-    return null;
-  }
-
-  // Portaled to document.body so `position: fixed` resolves against the
-  // viewport, not the surrounding main scroll container (which had a
-  // sticky header establishing a containing block). See issue #704.
-  return createPortal(
-    <div className="modal-overlay" onClick={onCancel}>
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        tabIndex={-1}
-        aria-labelledby="restart-confirmation-modal-title"
-        className="surface-panel w-full max-w-sm border border-border p-6 shadow-glow"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex flex-col items-center gap-3 pt-2 pb-4 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-warning/10 text-warning">
-            <AlertTriangle className="h-7 w-7" />
-          </div>
-          <div>
-            <h3 id="restart-confirmation-modal-title" className="text-lg font-bold">{t('dashboard:restart.title')}</h3>
-            <p className="mt-1 text-sm text-base-content/60">
-              {t('dashboard:restart.description')}
-            </p>
-          </div>
-        </div>
-        <div className="flex justify-end gap-2 pt-2">
-          <button ref={cancelButtonRef} onClick={onCancel} className="action-btn-secondary">
-            {t('common:cancel')}
-          </button>
-          <button onClick={onConfirm} className="action-btn-primary gap-2">
-            <RefreshCw className="h-4 w-4" />
-            {t('dashboard:restart.confirm')}
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body
+  // The shared Dialog portals to document.body (#704), so the backdrop
+  // covers the viewport rather than the scrolling main container. Initial
+  // focus lands on the non-destructive Cancel action.
+  return (
+    <Dialog
+      open={isOpen}
+      onClose={onCancel}
+      title={t('dashboard:restart.title')}
+      description={t('dashboard:restart.description')}
+      size="sm"
+      initialFocusRef={cancelButtonRef}
+    >
+      <DialogFooter>
+        <Button ref={cancelButtonRef} type="button" variant="secondary" onClick={onCancel}>
+          {t('common:cancel')}
+        </Button>
+        <Button type="button" onClick={onConfirm}>
+          <RefreshCw className="h-4 w-4" aria-hidden="true" />
+          {t('dashboard:restart.confirm')}
+        </Button>
+      </DialogFooter>
+    </Dialog>
   );
 }

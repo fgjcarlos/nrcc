@@ -71,20 +71,13 @@ export function BackupListSection(props: BackupListSectionProps) {
           <h2 className="text-lg font-semibold text-base-content">{t('backups:availableBackups')}</h2>
           <p className="text-sm text-base-content/65">{t('backups:downloadRestoreOrDelete')}</p>
         </div>
-        {isLoading && <span className="text-sm text-base-content/60">{t('flows:loading')}</span>}
       </div>
 
       <StateContainer
         isLoading={isLoading}
         isError={isError}
         isEmpty={backups.length === 0}
-        loadingSlot={
-          <div className="glass-panel rounded-2xl border border-border p-10 text-center">
-            <LoaderCircle className="mx-auto mb-3 h-10 w-10 animate-spin text-base-content/40" />
-            <p className="font-medium text-base-content">{t('common:loadingBackups')}</p>
-            <p className="text-sm text-base-content/65">{t('common:readingBackups')}</p>
-          </div>
-        }
+        loadingLabel={t('common:loadingBackups')}
         errorSlot={
           <div className="rounded-2xl border border-error/20 bg-error/8 p-6 text-sm text-base-content">
             <div className="flex items-center gap-2 font-medium text-error">
@@ -117,7 +110,7 @@ export function BackupListSection(props: BackupListSectionProps) {
                     <th className="py-3 pr-4">{t('common:date')}</th>
                     <th className="py-3 pr-4">{t('common:files')}</th>
                     <th className="py-3 pr-4">{t('common:size')}</th>
-                    <th className="py-3 pr-4">{t('backups:actions')}</th>
+                    <th className="py-3 pr-4">{t('backups:table.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>

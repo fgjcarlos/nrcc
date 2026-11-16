@@ -32,16 +32,16 @@ export function EmptyState({
     <div
       role="status"
       aria-live="polite"
-      className="flex flex-col items-center justify-center gap-3 rounded-xl border border-ds-border-default bg-base-200/30 px-6 py-12 text-center"
+      className="flex flex-col items-center justify-center gap-2 rounded-box border border-dashed border-ds-border-default px-6 py-10 text-center"
     >
       {icon ? (
-        <span aria-hidden="true" className="text-base-content/60">
+        <span aria-hidden="true" className="text-ds-text-muted">
           {icon}
         </span>
       ) : null}
-      <h3 className="text-base font-semibold text-base-content">{title}</h3>
+      <h3 className="text-sm font-semibold text-ds-text-primary">{title}</h3>
       {description ? (
-        <p className="max-w-sm text-sm text-base-content/65">{description}</p>
+        <p className="max-w-sm text-sm text-ds-text-secondary">{description}</p>
       ) : null}
       {hasAction ? (
         <Button type="button" onClick={onAction} className="mt-2">

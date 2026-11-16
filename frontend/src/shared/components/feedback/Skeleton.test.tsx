@@ -42,4 +42,14 @@ describe('Skeleton', () => {
     const el = screen.getByRole('status').firstElementChild;
     expect(el?.className).toMatch(/w-64/);
   });
+
+  it('draws on the sunken ground and renders several rows inside one status region', () => {
+    render(<Skeleton rows={3} className="h-10" aria-label="Loading libraries" />);
+    const status = screen.getByRole('status', { name: 'Loading libraries' });
+    expect(status.children).toHaveLength(3);
+    for (const row of Array.from(status.children)) {
+      expect(row).toHaveClass('bg-ds-bg-base', 'h-10');
+      expect(row).toHaveAttribute('aria-hidden', 'true');
+    }
+  });
 });

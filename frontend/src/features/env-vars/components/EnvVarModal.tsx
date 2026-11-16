@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useState, useEffect, useId } from 'react';
 import { type EnvVar } from '@/features/env-vars/services/envService';
 import { useT } from '@/i18n';
-import { useModalKeyboard } from '@/shared/hooks/useModalKeyboard';
+import { Button, Dialog, DialogBody, DialogFooter, Input, Select } from '@/shared/components/ui';
+import { fieldControlClass } from '@/shared/components/ui/useField';
 
 export function EnvVarModal({
   formData,
@@ -23,25 +23,10 @@ export function EnvVarModal({
   // Form-level validation state
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
-  // Lock the real document scroll; the modal is portaled outside the page shell.
-  useEffect(() => {
-    const previousBodyOverflow = document.body.style.overflow;
-    const previousHtmlOverflow = document.documentElement.style.overflow;
-
-    document.body.style.overflow = 'hidden';
-    document.documentElement.style.overflow = 'hidden';
-
-    return () => {
-      document.body.style.overflow = previousBodyOverflow;
-      document.documentElement.style.overflow = previousHtmlOverflow;
-    };
-  }, []);
-
-  // Escape closes, Tab stays inside the dialog, focus moves in on open and
-  // returns to the invoking control on close (ConfirmationDialog contract).
-  // The modal is only mounted while open.
-  const dialogRef = useRef<HTMLDivElement>(null);
-  useModalKeyboard({ isOpen: true, containerRef: dialogRef, onEscape: onCancel });
+  // The shared Dialog locks document scroll, traps focus, closes on Escape and
+  // returns focus to the invoking control. The modal is only mounted while open.
+  const valueId = useId();
+  const valueErrorId = `${valueId}-error`;
 
   // Validate form on formData changes. Depends on the active language
   // instead of the t() reference so the effect re-runs only when the
@@ -99,33 +84,36 @@ export function EnvVarModal({
   // Render type-aware value input
   const renderValueInput = () => {
     const isRequired = !editing && !formData.value;
+    // Raw inputs take the shared text-control boundary from src/index.css.
+    const textProps = {
+      id: valueId,
+      value: formData.value,
+      onChange: (e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, value: e.target.value }),
+      placeholder: editing ? '(leave empty to keep current)' : '',
+      className: fieldControlClass,
+      required: isRequired,
+      'aria-invalid': validationErrors.value ? true : undefined,
+      'aria-describedby': validationErrors.value ? valueErrorId : undefined,
+    };
 
     switch (formData.type) {
       case 'number':
-        return (
-          <input
-            type="number"
-            value={formData.value}
-            onChange={(e) => setFormData({ ...formData, value: e.target.value })}
-            placeholder={editing ? '(leave empty to keep current)' : ''}
-            className="glass-panel h-12 w-full rounded-xl border-0 px-3 text-base-content focus:outline-none focus-visible:ring-2 focus-visible:ring-ds-accent-primary"
-            required={isRequired}
-          />
-        );
+        return <input type="number" {...textProps} />;
 
       case 'boolean':
         return (
-          <div className="flex min-h-12 w-full items-center justify-between gap-3 px-3">
-            <span className="text-sm font-semibold text-base-content/70 uppercase tracking-wider">{t('env-vars:modalValueLabel')}:</span>
+          <div className="flex min-h-12 w-full items-center justify-between gap-3">
+            <span className="text-sm text-ds-text-secondary">{t('env-vars:modalValueLabel')}:</span>
             <label className="flex items-center gap-2">
               <span className="sr-only">{t('env-vars:modalBooleanValueLabel')}</span>
               <input
+                id={valueId}
                 type="checkbox"
                 checked={formData.value === 'true'}
                 onChange={(e) => setFormData({ ...formData, value: e.target.checked ? 'true' : 'false' })}
                 className="toggle toggle-primary toggle-md"
               />
-              <span className={`badge badge-primary text-xs font-bold`}>
+              <span className="badge badge-primary text-xs font-bold">
                 {formData.value === 'true' ? 'true' : 'false'}
               </span>
             </label>
@@ -133,146 +121,87 @@ export function EnvVarModal({
         );
 
       case 'secret':
-        return (
-          <input
-            type="password"
-            value={formData.value}
-            onChange={(e) => setFormData({ ...formData, value: e.target.value })}
-            placeholder={editing ? '(leave empty to keep current)' : ''}
-            className="glass-panel h-12 w-full rounded-xl border-0 px-3 text-base-content focus:outline-none focus-visible:ring-2 focus-visible:ring-ds-accent-primary"
-            required={isRequired}
-          />
-        );
+        return <input type="password" autoComplete="off" {...textProps} />;
 
       case 'string':
       default:
-        return (
-          <input
-            type="text"
-            value={formData.value}
-            onChange={(e) => setFormData({ ...formData, value: e.target.value })}
-            placeholder={editing ? '(leave empty to keep current)' : ''}
-            className="glass-panel h-12 w-full rounded-xl border-0 px-3 text-base-content focus:outline-none focus-visible:ring-2 focus-visible:ring-ds-accent-primary"
-            required={isRequired}
-          />
-        );
+        return <input type="text" {...textProps} />;
     }
   };
 
   // Check if form can be submitted
   const canSubmit = Object.keys(validationErrors).length === 0;
 
-  return createPortal(
-    <div className="modal-overlay" onClick={onCancel}>
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        tabIndex={-1}
-        aria-labelledby="env-var-modal-title"
-        className="surface-panel max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto border border-border p-6 shadow-glow"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-4 flex items-start justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">{t('env-vars:modalEnvironmentLabel')}</p>
-            <h2 id="env-var-modal-title" className="text-xl font-bold text-base-content">{editing ? t('env-vars:modalEditTitle') : t('env-vars:modalNewTitle')}</h2>
-          </div>
-        </div>
-        <form onSubmit={onSubmit} className="space-y-5">
-          {/* Key field */}
-          <div>
-            <label className="mb-2 block text-xs font-semibold text-base-content/70 uppercase tracking-wider">{t('env-vars:modalKeyLabel')}</label>
-            <input
-              type="text"
-              value={formData.key}
-              onChange={(e) => setFormData({ ...formData, key: e.target.value.toUpperCase() })}
-              disabled={editing}
-              placeholder="MY_VARIABLE"
-              className={`glass-panel w-full rounded-xl border px-3 py-2 text-base-content disabled:opacity-50 ${
-                validationErrors.key ? 'border-error' : 'border-border'
-              }`}
-              required
-            />
-            {validationErrors.key && (
-              <p className="mt-1 text-xs text-error">{validationErrors.key}</p>
-            )}
-          </div>
+  return (
+    <Dialog
+      open
+      onClose={onCancel}
+      title={editing ? t('env-vars:modalEditTitle') : t('env-vars:modalNewTitle')}
+    >
+      <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
+        <DialogBody className="space-y-4">
+          <Input
+            label={t('env-vars:modalKeyLabel')}
+            type="text"
+            value={formData.key}
+            onChange={(e) => setFormData({ ...formData, key: e.target.value.toUpperCase() })}
+            disabled={editing}
+            placeholder="MY_VARIABLE"
+            className="font-mono"
+            error={validationErrors.key}
+            required
+          />
 
-          {/* Type selector (moved before Value) */}
-          <div>
-            <label className="mb-2 block text-xs font-semibold text-base-content/70 uppercase tracking-wider">{t('env-vars:modalTypeLabel')}</label>
-            <select
-              value={formData.type}
-              onChange={(e) => handleTypeChange(e.target.value as EnvVar['type'])}
-              className="glass-panel w-full rounded-xl border border-border px-3 py-2 text-base-content"
-            >
-              <option value="string">{t('env-vars:typeString')}</option>
-              <option value="number">{t('env-vars:typeNumber')}</option>
-              <option value="boolean">{t('env-vars:typeBoolean')}</option>
-              <option value="secret">{t('env-vars:typeSecret')}</option>
-            </select>
-          </div>
+          {/* Type comes before Value: it decides the value control. */}
+          <Select
+            label={t('env-vars:modalTypeLabel')}
+            value={formData.type}
+            onChange={(e) => handleTypeChange(e.target.value as EnvVar['type'])}
+          >
+            <option value="string">{t('env-vars:typeString')}</option>
+            <option value="number">{t('env-vars:typeNumber')}</option>
+            <option value="boolean">{t('env-vars:typeBoolean')}</option>
+            <option value="secret">{t('env-vars:typeSecret')}</option>
+          </Select>
 
           {/* Type-aware Value field */}
-          <div>
-            <label className="mb-2 block text-xs font-semibold text-base-content/70 uppercase tracking-wider">{t('env-vars:modalValueFieldLabel')}</label>
-            <div
-              data-testid="env-var-value-field"
-              className={`min-h-12 rounded-xl border transition-all duration-150 ${
-                validationErrors.value ? 'border-error' : 'border-border'
-              }`}
-            >
+          <div className="space-y-1">
+            <label htmlFor={valueId} className="block text-xs text-ds-text-secondary">
+              {t('env-vars:modalValueFieldLabel')}
+            </label>
+            <div data-testid="env-var-value-field" className="min-h-12 transition-all duration-150">
               {renderValueInput()}
             </div>
             {validationErrors.value && (
-              <p className="mt-1 text-xs text-error">{validationErrors.value}</p>
+              <p id={valueErrorId} className="text-xs text-error">{validationErrors.value}</p>
             )}
           </div>
 
-          {/* Description field */}
-          <div>
-            <label className="mb-2 block text-xs font-semibold text-base-content/70 uppercase tracking-wider">{t('env-vars:modalDescriptionLabel')}</label>
-            <input
-              type="text"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="What this variable is for"
-              className="glass-panel w-full rounded-xl border border-border px-3 py-2 text-base-content"
-            />
-          </div>
+          <Input
+            label={t('env-vars:modalDescriptionLabel')}
+            type="text"
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            placeholder="What this variable is for"
+          />
+        </DialogBody>
 
-          {/* Action buttons */}
-          <div className="flex justify-end gap-2 pt-4">
-            <button
-              type="button"
-              onClick={onCancel}
-              disabled={isPending}
-              className="action-btn-secondary disabled:opacity-50"
-            >
-              {t('common:cancel')}
-            </button>
-            <button
-              type="submit"
-              disabled={!canSubmit || isPending}
-              className="action-btn-primary relative disabled:opacity-50"
-            >
-              {isPending ? (
-                <>
-                  <span className="opacity-0">{t('common:save')}</span>
-                  <span className="absolute inset-0 flex items-center justify-center">
-                    <span className="loading loading-spinner loading-sm"></span>
-                  </span>
-                </>
-              ) : (
-                'Save'
-              )}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>,
-    document.body
+        <DialogFooter>
+          <Button type="button" variant="secondary" onClick={onCancel} disabled={isPending}>
+            {t('common:cancel')}
+          </Button>
+          <Button type="submit" variant="solid" disabled={!canSubmit || isPending} className="relative">
+            {/* The label keeps the button width while the spinner shows. */}
+            <span className={isPending ? 'opacity-0' : undefined}>{t('common:save')}</span>
+            {isPending && (
+              <span className="absolute inset-0 flex items-center justify-center">
+                <span className="loading loading-spinner loading-sm"></span>
+              </span>
+            )}
+          </Button>
+        </DialogFooter>
+      </form>
+    </Dialog>
   );
 }
 

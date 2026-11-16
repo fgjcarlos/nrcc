@@ -5,7 +5,9 @@ import { EnvVarRow } from '@/features/env-vars/components';
 import { EnvVarModal } from '@/features/env-vars/components';
 import { BulkImportModal } from '@/features/env-vars/components';
 import { DotenvEditor } from '@/features/env-vars/components';
-import { ConfirmationDialog } from '@/shared/components';
+import { ConfirmationDialog, StateContainer } from '@/shared/components';
+import { EmptyState } from '@/shared/components/feedback';
+import { Table, TabPanel, Tabs } from '@/shared/components/ui';
 import { useEnvVarsData, useEnvVarsActions } from '@/features/env-vars/hooks';
 import { useAuth } from '@/features/auth/hooks';
 import { envService } from '@/features/env-vars/services';
@@ -128,13 +130,13 @@ export function EnvVarsView() {
 
   return (
     <div className="space-y-6 p-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">{t('env-vars:secretsLabel')}</p>
           <h1 className="text-2xl font-bold text-base-content">{t('env-vars:pageTitle')}</h1>
         </div>
         {activeTab === 'table' && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={() => void syncFromNodeRed()}
               disabled={nodeRedSyncState === 'loading'}
@@ -182,68 +184,54 @@ export function EnvVarsView() {
         </div>
       )}
 
-      {/* TAREA 3: Tab Navigation */}
-      <div className="tabs tabs-bordered">
-        <button
-          onClick={() => setActiveTab('table')}
-          className={`tab ${activeTab === 'table' ? 'tab-active' : ''}`}
-        >
-          {t('env-vars:tabConfigured')}
-        </button>
-        <button
-          onClick={() => setActiveTab('dotenv')}
-          className={`tab ${activeTab === 'dotenv' ? 'tab-active' : ''}`}
-        >
-          {t('env-vars:tabDotenv')}
-        </button>
-      </div>
+      <Tabs
+        label={t('env-vars:tabsLabel')}
+        idBase="env-vars"
+        items={[
+          { id: 'table', label: t('env-vars:tabConfigured') },
+          { id: 'dotenv', label: t('env-vars:tabDotenv') },
+        ]}
+        selected={activeTab}
+        onSelect={setActiveTab}
+      />
 
-      {/* Variables Table Tab */}
-      {activeTab === 'table' && (
-        <div className="surface-card overflow-hidden">
-          <table className="w-full">
-            <thead className="table-header-subtle">
-              <tr>
-                <th className="px-4 py-3 text-left text-sm font-medium text-base-content">{t('env-vars:colKey')}</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-base-content">{t('env-vars:colValue')}</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-base-content">{t('env-vars:colType')}</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-base-content">{t('env-vars:colSource')}</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-base-content">{t('env-vars:colDescription')}</th>
-                <th className="px-4 py-3 text-right text-sm font-medium text-base-content">{t('env-vars:colActions')}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {isLoading ? (
+      <TabPanel idBase="env-vars" selected={activeTab}>
+        {activeTab === 'table' ? (
+          <StateContainer
+            isLoading={isLoading}
+            isError={false}
+            isEmpty={envVars.length === 0}
+            emptySlot={<EmptyState title={t('env-vars:noEnvVarsConfigured')} />}
+          >
+            <Table stacked caption={t('env-vars:pageTitle')}>
+              <thead>
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-base-content/60">
-                    {t('common:loading')}
-                  </td>
+                  <th>{t('env-vars:colKey')}</th>
+                  <th>{t('env-vars:colValue')}</th>
+                  <th>{t('env-vars:colType')}</th>
+                  <th>{t('env-vars:colSource')}</th>
+                  <th>{t('env-vars:colDescription')}</th>
+                  <th className="text-right">{t('env-vars:colActions')}</th>
                 </tr>
-                ) : envVars.length === 0 ? (
-                  <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-base-content/60">
-                      {t('env-vars:noEnvVarsConfigured')}
-                    </td>
-                  </tr>
-                ) : (
-                  envVars.map((envVar) => (
-                    <EnvVarRow
-                      key={envVar.key}
-                      envVar={envVar}
-                      onDelete={handleDelete}
-                      onEdit={openModal}
-                      onToggleSecret={toggleSecret}
-                      showSecret={!!showSecrets[envVar.key]}
-                    />
-                  ))
-                )}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* .env Editor Tab - TAREA 3 */}
-      {activeTab === 'dotenv' && <DotenvEditor />}
+              </thead>
+              <tbody>
+                {envVars.map((envVar) => (
+                  <EnvVarRow
+                    key={envVar.key}
+                    envVar={envVar}
+                    onDelete={handleDelete}
+                    onEdit={openModal}
+                    onToggleSecret={toggleSecret}
+                    showSecret={!!showSecrets[envVar.key]}
+                  />
+                ))}
+              </tbody>
+            </Table>
+          </StateContainer>
+        ) : (
+          <DotenvEditor />
+        )}
+      </TabPanel>
 
        {/* Modal */}
       {isModalOpen && (

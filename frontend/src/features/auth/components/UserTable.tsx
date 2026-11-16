@@ -1,5 +1,6 @@
 import { type User } from '@/features/auth/services/authService';
 import { useT } from '@/i18n';
+import { Table } from '@/shared/components/ui';
 
 interface UserTableProps {
   users: User[];
@@ -19,132 +20,56 @@ export function UserTable({
   onChangePassword,
 }: UserTableProps) {
   const { t } = useT();
+  const linkButton = 'min-h-6 text-sm text-ds-on-tint-primary transition-colors hover:underline';
   return (
-    <>
-      {/* Desktop table (md+) */}
-      <div className="hidden md:block surface-card overflow-hidden">
-        <table className="w-full">
-          <thead className="table-header-subtle">
-            <tr>
-              <th className="px-4 py-3 text-left text-sm font-medium text-base-content">
-                {t('auth:usernameLabel')}
-              </th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-base-content">
-                {t('auth:roleLabel')}
-              </th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-base-content">
-                {t('auth:createdLabel')}
-              </th>
-              <th className="px-4 py-3 text-right text-sm font-medium text-base-content">
-                {t('backups:actions')}
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {users.map((user) => (
-              <tr key={user.id} className="table-row-hover">
-                <td className="px-4 py-3 text-base-content">{user.username}</td>
-                <td className="px-4 py-3">
-                  <span
-                    className={`rounded-full px-2 py-1 text-xs ${
-                      user.role === 'admin'
-                        ? 'bg-info/15 text-ds-on-tint-info'
-                        : 'bg-base-300/70 text-base-content/70'
-                    }`}
-                  >
-                    {user.role}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-sm text-base-content/60">
-                  {new Date(user.createdAt).toLocaleDateString()}
-                </td>
-                <td className="px-4 py-3 text-right space-x-2">
-                  <button
-                    onClick={() => onEdit(user)}
-                    className="text-sm text-primary transition-colors hover:underline"
-                  >
-                    {t('auth:editUser')}
-                  </button>
-                  <button
-                    onClick={() => onChangePassword(user)}
-                    className="text-sm text-primary transition-colors hover:underline"
-                  >
-                    {t('auth:changePassword')}
-                  </button>
-                  <button
-                    onClick={() => onDelete(user)}
-                    disabled={user.id === currentUserId || (user.role === 'admin' && adminCount === 1)}
-                    className="text-sm text-error transition-colors hover:underline disabled:text-base-content/40 disabled:cursor-not-allowed"
-                  >
-                    {t('common:delete')}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Mobile cards (< md) */}
-      <div className="md:hidden space-y-4">
+    // One table; below sm each user becomes a labelled card.
+    <Table stacked>
+      <thead>
+        <tr>
+          <th>{t('auth:usernameLabel')}</th>
+          <th>{t('auth:roleLabel')}</th>
+          <th>{t('auth:createdLabel')}</th>
+          <th className="text-right">{t('backups:table.actions')}</th>
+        </tr>
+      </thead>
+      <tbody>
         {users.map((user) => (
-          <div key={user.id} className="surface-card rounded-lg p-4 border border-border">
-            <div className="space-y-3">
-              <div>
-                <p className="text-xs text-base-content/60 uppercase tracking-wider">
-                  {t('auth:usernameLabel')}
-                </p>
-                <p className="text-base font-medium text-base-content">{user.username}</p>
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-base-content/60 uppercase tracking-wider">
-                    {t('auth:roleLabel')}
-                  </p>
-                  <span
-                    className={`inline-block rounded-full px-2 py-1 text-xs ${
-                      user.role === 'admin'
-                        ? 'bg-info/15 text-ds-on-tint-info'
-                        : 'bg-base-300/70 text-base-content/70'
-                    }`}
-                  >
-                    {user.role}
-                  </span>
-                </div>
-                <div>
-                  <p className="text-xs text-base-content/60 uppercase tracking-wider">
-                    {t('auth:createdLabel')}
-                  </p>
-                  <p className="text-sm text-base-content/60">
-                    {new Date(user.createdAt).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-              <div className="flex gap-2 pt-2">
-                <button
-                  onClick={() => onEdit(user)}
-                  className="flex-1 text-sm text-primary transition-colors hover:underline"
-                >
+          <tr key={user.id}>
+            <td data-label={t('auth:usernameLabel')} className="font-medium">{user.username}</td>
+            <td data-label={t('auth:roleLabel')}>
+              <span
+                className={`rounded-full px-2 py-1 text-xs ${
+                  user.role === 'admin'
+                    ? 'bg-info/15 text-ds-on-tint-info'
+                    : 'bg-base-300/70 text-base-content/70'
+                }`}
+              >
+                {user.role}
+              </span>
+            </td>
+            <td data-label={t('auth:createdLabel')} className="text-ds-text-secondary">
+              {new Date(user.createdAt).toLocaleDateString()}
+            </td>
+            <td data-label={t('backups:table.actions')} className="text-right">
+              <div className="flex flex-wrap justify-end gap-x-3 gap-y-1">
+                <button onClick={() => onEdit(user)} className={linkButton}>
                   {t('auth:editUser')}
                 </button>
-                <button
-                  onClick={() => onChangePassword(user)}
-                  className="flex-1 text-sm text-primary transition-colors hover:underline"
-                >
+                <button onClick={() => onChangePassword(user)} className={linkButton}>
                   {t('auth:changePassword')}
                 </button>
                 <button
                   onClick={() => onDelete(user)}
                   disabled={user.id === currentUserId || (user.role === 'admin' && adminCount === 1)}
-                  className="flex-1 text-sm text-error transition-colors hover:underline disabled:text-base-content/40 disabled:cursor-not-allowed"
+                  className="min-h-6 text-sm text-ds-on-tint-error transition-colors hover:underline disabled:cursor-not-allowed disabled:text-base-content/40"
                 >
                   {t('common:delete')}
                 </button>
               </div>
-            </div>
-          </div>
+            </td>
+          </tr>
         ))}
-      </div>
-    </>
+      </tbody>
+    </Table>
   );
 }

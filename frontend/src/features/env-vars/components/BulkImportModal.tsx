@@ -1,7 +1,8 @@
 import { useMemo, useRef, useState } from 'react';
-import { X, CheckCircle2, AlertTriangle, ClipboardPaste } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, ClipboardPaste } from 'lucide-react';
 import { envService, type BulkEnvResult } from '../services/envService';
 import { useT } from '@/i18n';
+import { Button, Dialog, DialogBody, DialogFooter, Table, Textarea } from '@/shared/components/ui';
 
 interface BulkImportModalProps {
   open: boolean;
@@ -30,8 +31,6 @@ export function BulkImportModal({ open, onClose, onImported }: BulkImportModalPr
     for (const iss of report.issues) map.set(iss.line, iss.reason);
     return map;
   }, [report]);
-
-  if (!open) return null;
 
   const linesForRender = content.split('\n');
 
@@ -83,106 +82,94 @@ export function BulkImportModal({ open, onClose, onImported }: BulkImportModalPr
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-3xl rounded-lg bg-base-100 shadow-xl">
-        <div className="flex items-center justify-between border-b border-base-300 px-5 py-3">
-          <h2 className="text-lg font-semibold">{t('env-vars:bulkTitle')}</h2>
-          <button type="button" className="btn btn-ghost btn-sm" onClick={onClose} aria-label={t('common:close')}>
-            <X size={18} />
-          </button>
-        </div>
+    // A stray backdrop click must not throw away pasted lines.
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title={t('env-vars:bulkTitle')}
+      description={t('env-vars:bulkHelp')}
+      size="lg"
+      closeOnBackdrop={false}
+    >
+      <DialogBody className="space-y-4">
+        <Textarea
+          aria-label={t('env-vars:bulkTitle')}
+          className="h-48 font-mono text-xs"
+          placeholder={PLACEHOLDER}
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+        />
 
-        <div className="space-y-4 px-5 py-4">
-          <p className="text-sm text-base-content/70">
-            {t('env-vars:bulkHelp')}
-          </p>
-
-          <textarea
-            className="textarea textarea-bordered h-48 w-full font-mono text-xs"
-            placeholder={PLACEHOLDER}
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-          />
-
-          <div className="flex flex-wrap items-center gap-2">
-            <button type="button" className="btn btn-primary btn-sm" onClick={handleValidate} disabled={loading}>
-              {t('env-vars:bulkValidate')}
-            </button>
-            <button
-              type="button"
-              className="btn btn-success btn-sm"
-              onClick={handleCommit}
-              disabled={loading || !report?.valid}
-            >
-              <CheckCircle2 size={14} />
-              {t('env-vars:bulkImportAction')}
-            </button>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={handlePasteExample}>
-              <ClipboardPaste size={14} />
-              {t('env-vars:bulkExample')}
-            </button>
+        {(report || error) && (
+          <p role="status" className="flex flex-wrap gap-x-3 text-sm">
             {report && (
-              <span
-                className={
-                  report.valid
-                    ? 'text-sm text-success'
-                    : 'text-sm text-error'
-                }
-              >
+              <span className={report.valid ? 'text-ds-on-tint-success' : 'text-ds-on-tint-error'}>
                 {report.summary}
               </span>
             )}
-            {error && <span className="text-sm text-error">{error}</span>}
-          </div>
+            {error && <span className="text-ds-on-tint-error">{error}</span>}
+          </p>
+        )}
 
-          {report && (
-            <div className="rounded border border-base-300">
-              <table className="table table-xs">
-                <thead>
-                  <tr>
-                    <th>{t('env-vars:bulkLine')}</th>
-                    <th>{t('env-vars:bulkKey')}</th>
-                    <th>{t('env-vars:bulkValue')}</th>
-                    <th>{t('env-vars:bulkType')}</th>
-                    <th>{t('env-vars:bulkStatus')}</th>
+        {report && (
+          <Table>
+            <thead>
+              <tr>
+                <th>{t('env-vars:bulkLine')}</th>
+                <th>{t('env-vars:bulkKey')}</th>
+                <th>{t('env-vars:bulkValue')}</th>
+                <th>{t('env-vars:bulkType')}</th>
+                <th>{t('env-vars:bulkStatus')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {linesForRender.map((line, idx) => {
+                const lineNum = idx + 1;
+                const trimmed = line.trim();
+                if (trimmed === '' || trimmed.startsWith('#')) return null;
+                const parsed = report.lines.find((l) => l.line === lineNum);
+                const issue = issueByLine.get(lineNum);
+                return (
+                  <tr key={lineNum} className={issue ? 'bg-error/10' : undefined}>
+                    <td className="font-mono">{lineNum}</td>
+                    <td className="font-mono">{parsed?.key ?? trimmed.split('=')[0] ?? ''}</td>
+                    <td className="font-mono break-all">
+                      {parsed?.value ?? (trimmed.includes('=') ? trimmed.split('=').slice(1).join('=') : '')}
+                    </td>
+                    <td>{parsed?.type ?? '—'}</td>
+                    <td>
+                      {issue ? (
+                        <span className="flex items-center gap-1 text-ds-on-tint-error">
+                          <AlertTriangle size={12} aria-hidden="true" />
+                          {issue}
+                        </span>
+                      ) : parsed ? (
+                        t('env-vars:bulkOk')
+                      ) : (
+                        ''
+                      )}
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {linesForRender.map((line, idx) => {
-                    const lineNum = idx + 1;
-                    const trimmed = line.trim();
-                    if (trimmed === '' || trimmed.startsWith('#')) return null;
-                    const parsed = report.lines.find((l) => l.line === lineNum);
-                    const issue = issueByLine.get(lineNum);
-                    return (
-                      <tr key={lineNum} className={issue ? 'bg-error/10' : parsed ? 'bg-success/5' : ''}>
-                        <td className="font-mono">{lineNum}</td>
-                        <td className="font-mono">{parsed?.key ?? trimmed.split('=')[0] ?? ''}</td>
-                        <td className="font-mono break-all">
-                          {parsed?.value ?? (trimmed.includes('=') ? trimmed.split('=').slice(1).join('=') : '')}
-                        </td>
-                        <td>{parsed?.type ?? '—'}</td>
-                        <td>
-                          {issue ? (
-                            <span className="flex items-center gap-1 text-error">
-                              <AlertTriangle size={12} />
-                              {issue}
-                            </span>
-                          ) : parsed ? (
-                            t('env-vars:bulkOk')
-                          ) : (
-                            ''
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+                );
+              })}
+            </tbody>
+          </Table>
+        )}
+      </DialogBody>
+
+      <DialogFooter>
+        <Button type="button" variant="ghost" onClick={handlePasteExample} className="mr-auto">
+          <ClipboardPaste size={14} aria-hidden="true" />
+          {t('env-vars:bulkExample')}
+        </Button>
+        <Button type="button" variant="secondary" onClick={handleValidate} disabled={loading}>
+          {t('env-vars:bulkValidate')}
+        </Button>
+        <Button type="button" variant="solid" onClick={handleCommit} disabled={loading || !report?.valid}>
+          <CheckCircle2 size={14} aria-hidden="true" />
+          {t('env-vars:bulkImportAction')}
+        </Button>
+      </DialogFooter>
+    </Dialog>
   );
 }

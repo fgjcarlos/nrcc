@@ -6,8 +6,8 @@ import { useEffect, useRef, type RefObject } from 'react';
  * Keyboard contract for modal dialogs, following the pattern already used
  * by ConfirmationDialog:
  *  - on open, remember the focused element and move focus into the dialog
- *    (the `initialFocusRef` target, else the first focusable control, else
- *    the dialog container itself);
+ *    (the `initialFocusRef` target, else the first focusable control inside
+ *    `initialFocusScopeRef` or the container, else the container itself);
  *  - Escape calls `onEscape` unless `escapeDisabled` is set;
  *  - Tab and Shift+Tab wrap inside the dialog;
  *  - on close or unmount, focus returns to the remembered element.
@@ -27,6 +27,8 @@ export interface UseModalKeyboardOptions {
   containerRef: RefObject<HTMLElement | null>;
   onEscape: () => void;
   initialFocusRef?: RefObject<HTMLElement | null>;
+  /** Where the first focusable control is looked up; lets a dialog skip its header close button. */
+  initialFocusScopeRef?: RefObject<HTMLElement | null>;
   escapeDisabled?: boolean;
 }
 
@@ -39,6 +41,7 @@ export function useModalKeyboard({
   containerRef,
   onEscape,
   initialFocusRef,
+  initialFocusScopeRef,
   escapeDisabled = false,
 }: UseModalKeyboardOptions): void {
   // Keep the latest callback without re-running the focus effect.
@@ -54,8 +57,12 @@ export function useModalKeyboard({
     const previouslyFocused = document.activeElement as HTMLElement | null;
     const container = containerRef.current;
     if (container) {
+      const scope = initialFocusScopeRef?.current;
       const target =
-        initialFocusRef?.current ?? focusableWithin(container)[0] ?? container;
+        initialFocusRef?.current ??
+        (scope && focusableWithin(scope)[0]) ??
+        focusableWithin(container)[0] ??
+        container;
       target.focus();
     }
 
@@ -63,7 +70,7 @@ export function useModalKeyboard({
       if (previouslyFocused?.isConnected) previouslyFocused.focus();
     };
     // Refs are stable, so focus moves only when the dialog opens or closes.
-  }, [isOpen, containerRef, initialFocusRef]);
+  }, [isOpen, containerRef, initialFocusRef, initialFocusScopeRef]);
 
   // Escape and focus trap.
   useEffect(() => {
