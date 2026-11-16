@@ -136,6 +136,19 @@ jobs:
       - name: WCAG AA contrast guard (both themes)
         run: pnpm check:contrast
 
+      # Opacity-faded text (text-base-content/NN below 65) escapes the token
+      # contrast guard above; this guard and its own tests reject it.
+      - name: Faded-text guard
+        run: |
+          pnpm test:faded-text
+          pnpm check:faded-text
+
+      # Impeccable's deterministic design detector (no LLM, no API key).
+      # Pinned to the version the repository's design skill was built with;
+      # exit 2 means findings and fails the job, advisories do not.
+      - name: Design detector (Impeccable)
+        run: npx --yes impeccable@4.9.0 detect --github src
+
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
 
