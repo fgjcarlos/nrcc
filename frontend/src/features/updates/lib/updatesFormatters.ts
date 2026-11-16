@@ -2,24 +2,21 @@
  * Formatter functions for Updates feature
  */
 
-export function formatCheckedAt(checkedAtStr: string | undefined): string {
-  if (!checkedAtStr) return 'Never';
+type Translate = (key: string, options?: Record<string, unknown>) => string;
 
-  try {
-    const date = new Date(checkedAtStr);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
+export function formatCheckedAt(checkedAtStr: string | undefined, t: Translate, locale?: string): string {
+  const date = checkedAtStr ? new Date(checkedAtStr) : null;
+  // Go marshals an unset time as 0001-01-01: that is "never checked", not a date.
+  if (!date || Number.isNaN(date.getTime()) || date.getUTCFullYear() < 2000) return t('updates:never');
 
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
-    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+  const diffMins = Math.floor((Date.now() - date.getTime()) / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
 
-    return date.toLocaleDateString();
-  } catch {
-    return 'Unknown';
-  }
+  if (diffMins < 1) return t('updates:justNow');
+  if (diffMins < 60) return t('updates:minutesAgo', { count: diffMins });
+  if (diffHours < 24) return t('updates:hoursAgo', { count: diffHours });
+  if (diffDays < 7) return t('updates:daysAgo', { count: diffDays });
+
+  return date.toLocaleDateString(locale);
 }
