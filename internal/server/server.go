@@ -105,6 +105,7 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 	configSvc := service.NewConfigServiceWithHost(dataDir, hostSvc)
 	configHandler := handler.NewConfigHandler(configSvc)
 	settingsHandler := handler.NewSettingsHandler(configSvc)
+	presetsHandler := handler.NewPresetsHandler()
 	systemHandler := handler.NewSystemHandler()
 	systemHandler.SetEdgeMode(config.EdgeMode())
 	bootstrapHandler := handler.NewBootstrapHandler(hostSvc)
@@ -334,6 +335,16 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 			// Both reads and writes are admin-only on the router.
 			r.With(middleware.RequireAdmin).Get("/raw", settingsHandler.GetRaw)
 			r.With(middleware.RequireAdmin).Post("/raw", settingsHandler.SaveRaw)
+		})
+
+		// Curated presets (#764 slice 3). Admin-only like /api/settings/raw:
+		// the preview takes and returns settings.js source, and the confirmed
+		// write goes through POST /api/settings/raw.
+		r.Route("/api/presets", func(r chi.Router) {
+			r.With(middleware.RequireAdmin).Get("/", presetsHandler.List)
+			r.With(middleware.RequireAdmin).Post("/{id}/preview", func(w http.ResponseWriter, r *http.Request) {
+				presetsHandler.Preview(w, r, chi.URLParam(r, "id"))
+			})
 		})
 
 		r.Route("/api/bootstrap", func(r chi.Router) {
