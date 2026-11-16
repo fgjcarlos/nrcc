@@ -27,6 +27,12 @@ const LoginView = lazyNamed(
   'LoginView',
 );
 
+// Dev-only brand book (S5). Vite folds import.meta.env.DEV to false in
+// production builds, so this import and its chunk are dropped from dist.
+const StyleguideView = import.meta.env.DEV
+  ? lazyNamed(() => import('@/features/styleguide/StyleguideView'), 'StyleguideView')
+  : null;
+
 // Feature views (protected routes with layout)
 const DashboardView = lazyNamed(
   () => import('@/features/dashboard/components/DashboardView'),
@@ -170,6 +176,9 @@ function AppRoutes() {
       <Route path="/" element={<RootRedirect />} />
       <Route path="/setup" element={publicRouteElement('setup', <SetupView />)} />
       <Route path="/login" element={publicRouteElement('login', <LoginView />)} />
+      {StyleguideView && (
+        <Route path="/styleguide" element={publicRouteElement('styleguide', <StyleguideView />)} />
+      )}
 
       {/* Protected routes with layout */}
       <Route path="/" element={<Layout />}>
