@@ -1,4 +1,5 @@
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -8,6 +9,7 @@ import { useAuth } from '@/features/auth/hooks/useAuth';
 import { queryKeys } from '@/shared/lib/queryKeys';
 import { cn } from '@/shared/lib/utils';
 import { useT } from '@/i18n';
+import { useModalKeyboard } from '@/shared/hooks/useModalKeyboard';
 
 type CommandKind = 'navigation' | 'service' | 'external';
 
@@ -35,6 +37,7 @@ export function CommandPalette() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isExecuting, setIsExecuting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { t } = useT();
   const queryClient = useQueryClient();
@@ -54,141 +57,61 @@ export function CommandPalette() {
     setActiveIndex(0);
   };
 
-  const commands = useMemo<Command[]>(
-    () => [
-      {
-        id: 'nav-overview',
-        title: 'Go to Overview',
-        description: 'Open runtime health, host metrics, and quick actions.',
-        keywords: ['home', 'status', 'runtime', 'overview'],
-        kind: 'navigation',
-        run: () => navigate('/overview'),
-      },
-      {
-        id: 'nav-configuration',
-        title: 'Go to Configuration',
-        description: 'Open Node-RED configuration settings.',
-        keywords: ['settings', 'config', 'node-red'],
-        kind: 'navigation',
-        run: () => navigate('/configuration'),
-      },
-      {
-        id: 'nav-update-maintenance',
-        title: 'Go to Update Maintenance',
-        description: 'Check and apply authorized NRCC updates.',
-        keywords: ['updates', 'upgrade', 'release', 'version'],
-        kind: 'navigation',
-        adminOnly: true,
-        run: () => navigate('/maintenance/updates'),
-      },
-      {
-        id: 'nav-library-maintenance',
-        title: 'Go to Library Maintenance',
-        description: 'Manage authorized Node-RED libraries.',
-        keywords: ['libraries', 'nodes', 'packages', 'palette'],
-        kind: 'navigation',
-        adminOnly: true,
-        run: () => navigate('/maintenance/libraries'),
-      },
-      {
-        id: 'nav-bootstrap',
-        title: 'Go to Bootstrap',
-        description: 'Open host prerequisites and setup status.',
-        keywords: ['setup', 'host', 'prerequisites'],
-        kind: 'navigation',
-        run: () => navigate('/bootstrap'),
-      },
-      {
-        id: 'nav-environment',
-        title: 'Go to Environment Variables',
-        description: 'Manage runtime environment values.',
-        keywords: ['env', 'variables', 'secrets'],
-        kind: 'navigation',
-        run: () => navigate('/environment'),
-      },
-      {
-        id: 'nav-recovery',
-        title: 'Go to Recovery',
-        description: 'Open backup history, restore options, and schedule settings.',
-        keywords: ['archive', 'restore', 'snapshot'],
-        kind: 'navigation',
-        run: () => navigate('/backups'),
-      },
-      {
-        id: 'nav-profile',
-        title: 'Go to Profile',
-        description: 'Open your account profile.',
-        keywords: ['account', 'password', 'user'],
-        kind: 'navigation',
-        run: () => navigate('/profile'),
-      },
-      {
-        id: 'nav-users',
-        title: 'Go to User Management',
-        description: 'Manage NRCC users and roles.',
-        keywords: ['admin', 'permissions', 'roles'],
-        kind: 'navigation',
-        adminOnly: true,
-        run: () => navigate('/settings/users'),
-      },
-      {
-        id: 'runtime-restart',
-        title: 'Restart Node-RED',
-        description: 'Restart the Node-RED runtime service.',
-        keywords: ['service', 'runtime', 'reload'],
-        kind: 'service',
-        adminOnly: true,
-        confirmMessage: 'Restart Node-RED now? Active flows may be briefly interrupted.',
-        run: async () => {
-          await dashboardService.restartNodeRed();
-          queryClient.invalidateQueries({ queryKey: queryKeys.runtime.status });
-        },
-      },
-      {
-        id: 'runtime-start',
-        title: 'Start Node-RED',
-        description: 'Start the Node-RED runtime service.',
-        keywords: ['service', 'runtime', 'up'],
-        kind: 'service',
-        adminOnly: true,
-        confirmMessage: 'Start Node-RED now?',
-        run: async () => {
-          await dashboardService.startNodeRed();
-          queryClient.invalidateQueries({ queryKey: queryKeys.runtime.status });
-        },
-      },
-      {
-        id: 'runtime-stop',
-        title: 'Stop Node-RED',
-        description: 'Stop the Node-RED runtime service.',
-        keywords: ['service', 'runtime', 'down'],
-        kind: 'service',
-        adminOnly: true,
-        confirmMessage: 'Stop Node-RED now? Automation flows will stop running.',
-        run: async () => {
-          await dashboardService.stopNodeRed();
-          queryClient.invalidateQueries({ queryKey: queryKeys.runtime.status });
-        },
-      },
-      {
-        id: 'backup-now',
-        title: 'Backup Now',
-        description: 'Create a manual backup immediately.',
-        keywords: ['snapshot', 'archive', 'manual'],
-        kind: 'service',
-        adminOnly: true,
-        confirmMessage: 'Create a manual backup now?',
-        run: async () => {
-          await backupService.create('manual');
-          queryClient.invalidateQueries({ queryKey: queryKeys.backups.listRoot });
-          queryClient.invalidateQueries({ queryKey: queryKeys.backups.status });
-          queryClient.invalidateQueries({ queryKey: queryKeys.backups.observability });
-        },
-      },
+  const commands = useMemo<Command[]>(() => {
+    // Navigation titles reuse each page's h1 key, like the sidebar.
+    const go = (id: string, page: string, path: string, keywords: string[], adminOnly?: boolean): Command => ({
+      id: `nav-${id}`,
+      title: t('common:palette.goTo', { page: t(page) }),
+      description: t(`common:palette.describe.${id}`),
+      keywords,
+      kind: 'navigation',
+      adminOnly,
+      run: () => navigate(path),
+    });
+    const service = (id: string, keywords: string[], run: () => Promise<void>): Command => ({
+      id,
+      title: t(`common:palette.${id}.title`),
+      description: t(`common:palette.${id}.description`),
+      keywords,
+      kind: 'service',
+      adminOnly: true,
+      confirmMessage: t(`common:palette.${id}.confirm`),
+      run,
+    });
+    const refreshRuntime = () => queryClient.invalidateQueries({ queryKey: queryKeys.runtime.status });
+
+    return [
+      go('overview', 'dashboard:overview', '/overview', ['home', 'status', 'runtime', 'overview']),
+      go('configuration', 'configuration:pageTitle', '/configuration', ['settings', 'config', 'node-red']),
+      go('updates', 'updates:title', '/maintenance/updates', ['updates', 'upgrade', 'release', 'version', 'maintenance'], true),
+      go('libraries', 'libraries:title', '/maintenance/libraries', ['libraries', 'nodes', 'packages', 'palette', 'maintenance'], true),
+      go('bootstrap', 'bootstrap:bootstrapTitle', '/bootstrap', ['setup', 'host', 'prerequisites', 'bootstrap']),
+      go('environment', 'env-vars:pageTitle', '/environment', ['env', 'variables', 'secrets']),
+      go('backups', 'backups:backupsTitle', '/backups', ['archive', 'restore', 'snapshot', 'recovery']),
+      go('profile', 'common:profile', '/profile', ['account', 'password', 'user']),
+      go('users', 'auth:userManagement', '/settings/users', ['admin', 'permissions', 'roles'], true),
+      service('restart', ['service', 'runtime', 'reload'], async () => {
+        await dashboardService.restartNodeRed();
+        void refreshRuntime();
+      }),
+      service('start', ['service', 'runtime', 'up'], async () => {
+        await dashboardService.startNodeRed();
+        void refreshRuntime();
+      }),
+      service('stop', ['service', 'runtime', 'down'], async () => {
+        await dashboardService.stopNodeRed();
+        void refreshRuntime();
+      }),
+      service('backupNow', ['snapshot', 'archive', 'manual'], async () => {
+        await backupService.create('manual');
+        queryClient.invalidateQueries({ queryKey: queryKeys.backups.listRoot });
+        queryClient.invalidateQueries({ queryKey: queryKeys.backups.status });
+        queryClient.invalidateQueries({ queryKey: queryKeys.backups.observability });
+      }),
       {
         id: 'open-node-red-editor',
-        title: 'Open Node-RED Editor',
-        description: 'Open the local Node-RED editor in a new tab.',
+        title: t('common:palette.openEditor.title'),
+        description: t('common:palette.openEditor.description'),
         keywords: ['editor', 'external', 'localhost'],
         kind: 'external',
         run: () => {
@@ -200,9 +123,8 @@ export function CommandPalette() {
           window.open(`http://localhost:${safePort}`, '_blank', 'noopener,noreferrer');
         },
       },
-    ],
-    [navigate, queryClient, uiPort],
-  );
+    ];
+  }, [navigate, queryClient, uiPort, t]);
 
   const availableCommands = useMemo(
     () => commands.filter((command) => !command.adminOnly || isAdmin),
@@ -229,11 +151,8 @@ export function CommandPalette() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
-  useEffect(() => {
-    if (isOpen) {
-      requestAnimationFrame(() => inputRef.current?.focus());
-    }
-  }, [isOpen]);
+  // Focus the search on open, trap Tab, close on Escape, return focus.
+  useModalKeyboard({ isOpen, containerRef: dialogRef, onEscape: closePalette, initialFocusRef: inputRef });
 
   useEffect(() => {
     setActiveIndex(0);
@@ -253,12 +172,12 @@ export function CommandPalette() {
     setIsExecuting(true);
     try {
       await command.run();
-      toast.success('Command executed', { description: command.title });
+      toast.success(t('common:palette.executed'), { description: command.title });
       closePalette();
     } catch (error) {
-      toast.error('Command failed', {
+      toast.error(t('common:palette.failed'), {
         description:
-          error instanceof Error ? error.message : 'Unable to complete the command.',
+          error instanceof Error ? error.message : t('common:palette.failedFallback'),
         duration: 8000,
       });
     } finally {
@@ -275,12 +194,6 @@ export function CommandPalette() {
   };
 
   const onInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      closePalette();
-      return;
-    }
-
     if (event.key === 'ArrowDown') {
       event.preventDefault();
       setActiveIndex((current) => (filteredCommands.length ? (current + 1) % filteredCommands.length : 0));
@@ -297,22 +210,24 @@ export function CommandPalette() {
     <>
       <button
         type="button"
-        className="hidden rounded-xl border border-border/70 bg-base-300/45 px-3 py-2 text-sm font-medium text-base-content/75 transition hover:border-primary/60 hover:text-base-content focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:inline-flex sm:items-center sm:gap-2"
+        className="inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-field border border-ds-border-strong bg-ds-bg-surface px-3 text-sm font-medium text-ds-text-primary transition-colors hover:bg-base-200"
         onClick={() => setIsOpen(true)}
         aria-haspopup="dialog"
         aria-expanded={isOpen}
       >
-        <span>{t('common:commandPalette')}</span>
-        <kbd className="rounded-md border border-border/70 bg-base-100 px-1.5 py-0.5 text-[0.65rem] text-ds-text-muted">{t('common:commandPaletteShortcut')}</kbd>
+        <Search className="h-5 w-5 text-ds-text-secondary md:hidden" aria-hidden="true" />
+        <span className="sr-only md:not-sr-only">{t('common:commandPalette')}</span>
+        <kbd className="hidden rounded-selector border border-ds-border-default bg-ds-bg-base px-1.5 py-0.5 font-mono text-xs text-ds-text-muted md:inline">{t('common:commandPaletteShortcut')}</kbd>
       </button>
 
       {isOpen && (
-        <div className="fixed inset-0 z-[70] bg-neutral/60 p-4 backdrop-blur-sm" role="presentation" onMouseDown={closePalette}>
+        <div className="fixed inset-0 z-[70] bg-[color-mix(in_srgb,var(--ds-rail-bg)_55%,transparent)] p-4" role="presentation" onMouseDown={closePalette}>
           <div
+            ref={dialogRef}
             role="dialog"
             aria-modal="true"
-            aria-label="Command palette"
-            className="mx-auto mt-16 w-full max-w-2xl overflow-hidden rounded-2xl border border-border bg-base-100 shadow-2xl"
+            aria-label={t('common:commandPalette')}
+            className="mx-auto mt-16 w-full max-w-2xl overflow-hidden rounded-box border border-ds-border-default bg-ds-bg-elevated shadow-[var(--ds-shadow-raised)]"
             onMouseDown={(event) => event.stopPropagation()}
           >
             <form onSubmit={onSubmit}>
@@ -323,9 +238,9 @@ export function CommandPalette() {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 onKeyDown={onInputKeyDown}
-                placeholder="Search routes and actions…"
+                placeholder={t('common:palette.searchPlaceholder')}
                 // input-bare: drawn into the palette, so it keeps its rule line instead of the field box.
-                className="input-bare w-full border-b border-border bg-transparent px-5 py-4 text-base text-base-content outline-none placeholder:text-ds-text-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+                className="input-bare w-full border-b border-ds-border-default bg-transparent px-5 py-4 text-sm text-base-content outline-none placeholder:text-ds-text-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
                 role="combobox"
                 aria-expanded="true"
                 aria-controls="command-palette-results"
@@ -344,19 +259,19 @@ export function CommandPalette() {
                       role="option"
                       aria-selected={index === activeIndex}
                       className={cn(
-                        'flex w-full items-start justify-between gap-4 rounded-xl px-4 py-3 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
-                        index === activeIndex ? 'bg-primary/12 text-base-content' : 'hover:bg-base-200 text-base-content/85',
+                        'flex w-full items-start justify-between gap-4 rounded-field px-4 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                        index === activeIndex ? 'bg-ds-accent-dim text-ds-text-primary' : 'text-ds-text-primary hover:bg-base-200',
                       )}
                       onMouseEnter={() => setActiveIndex(index)}
                       onClick={() => void executeCommand(command)}
                       disabled={isExecuting}
                     >
                       <span>
-                        <span className="block font-semibold">{command.title}</span>
-                        <span className="mt-1 block text-sm text-ds-text-muted">{command.description}</span>
+                        <span className="block text-sm font-semibold">{command.title}</span>
+                        <span className="mt-1 block text-xs text-ds-text-secondary">{command.description}</span>
                       </span>
-                      <span className="shrink-0 rounded-full border border-border px-2 py-1 text-[0.65rem] uppercase tracking-wide text-ds-text-muted">
-                        {command.kind}
+                      <span className="shrink-0 rounded-selector border border-ds-border-default px-2 py-0.5 text-xs text-ds-text-secondary">
+                        {t(`common:palette.kind.${command.kind}`)}
                       </span>
                     </button>
                   ))

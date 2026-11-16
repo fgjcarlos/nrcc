@@ -57,6 +57,19 @@ describe('NrccMark', () => {
     expect(mark.className).toMatch(/text-ds-brand-primary/);
   });
 
+  it('draws an opaque tile on the 4px box radius (T6)', () => {
+    render(<NrccMark />);
+    const mark = screen.getByTestId('nrcc-mark');
+    expect(mark).toHaveClass('rounded-box');
+    expect(mark).not.toHaveClass('rounded-xl');
+    expect(mark.className).not.toMatch(/bg-[^\s]+\/\d+/);
+  });
+
+  it('applies the rail tone on the ink navigation rail', () => {
+    render(<NrccMark tone="rail" />);
+    expect(screen.getByTestId('nrcc-mark').className).toContain('text-[var(--ds-rail-text)]');
+  });
+
   it('applies the muted tone', () => {
     render(<NrccMark tone="muted" />);
     const mark = screen.getByTestId('nrcc-mark');

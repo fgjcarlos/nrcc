@@ -54,7 +54,7 @@ test.describe('Issue #766 slice G W4 — WCAG 2.1 AA gate', () => {
   test('configuration page has no critical or serious axe violations', async ({ page }) => {
     await login(page)
     await page.goto('/configuration')
-    await expect(page.getByRole('heading', { name: 'Node-RED Configuration', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Configuration', exact: true })).toBeVisible()
     // The raw settings.js editor renders after its fixture loads.
     await expect(page.getByRole('textbox', { name: 'Advanced settings.js' })).toHaveValue(/fixture settings\.js/)
     await expectNoAxeBlockers(page, 'configuration')

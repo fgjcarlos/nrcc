@@ -110,8 +110,6 @@ describe('CommandPalette', () => {
     expect(screen.queryByRole('option', { name: 'Go to Docker' })).not.toBeInTheDocument();
     expect(screen.queryByRole('option', { name: 'Go to Flows' })).not.toBeInTheDocument();
     expect(screen.queryByRole('option', { name: 'Go to Files' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('option', { name: 'Go to Updates' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('option', { name: 'Go to Libraries' })).not.toBeInTheDocument();
   });
 
   it('executes route navigation from the keyboard', async () => {
@@ -132,13 +130,13 @@ describe('CommandPalette', () => {
     const user = userEvent.setup();
 
     await user.keyboard('{Control>}k{/Control}');
-    await user.type(screen.getByRole('combobox', { name: /search commands/i }), 'update maintenance');
+    await user.type(screen.getByRole('combobox', { name: /search commands/i }), 'updates');
     await user.keyboard('{Enter}');
 
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/maintenance/updates'));
 
     await user.keyboard('{Control>}k{/Control}');
-    await user.type(screen.getByRole('combobox', { name: /search commands/i }), 'library maintenance');
+    await user.type(screen.getByRole('combobox', { name: /search commands/i }), 'libraries');
     await user.keyboard('{Enter}');
 
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/maintenance/libraries'));
@@ -169,9 +167,9 @@ describe('CommandPalette', () => {
     expect(screen.getByText(/no matching commands/i)).toBeInTheDocument();
 
     await user.clear(screen.getByRole('combobox', { name: /search commands/i }));
-    await user.type(screen.getByRole('combobox', { name: /search commands/i }), 'library maintenance');
+    await user.type(screen.getByRole('combobox', { name: /search commands/i }), 'libraries');
 
-    expect(screen.queryByRole('option', { name: /go to library maintenance/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /go to libraries/i })).not.toBeInTheDocument();
     expect(screen.getByText(/no matching commands/i)).toBeInTheDocument();
   });
 });

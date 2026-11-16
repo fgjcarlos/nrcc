@@ -219,10 +219,10 @@ describe('sidebar navigation (#365)', () => {
     });
     expect(screen.queryByText('Overview page')).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('link', { name: /Update Maintenance/ }));
+    await userEvent.click(screen.getByRole('link', { name: 'Updates' }));
     await waitFor(() => expect(screen.getByText('Updates page')).toBeInTheDocument());
 
-    await userEvent.click(screen.getByRole('link', { name: /Library Maintenance/ }));
+    await userEvent.click(screen.getByRole('link', { name: 'Libraries' }));
     await waitFor(() => expect(screen.getByText('Libraries page')).toBeInTheDocument());
   });
 });

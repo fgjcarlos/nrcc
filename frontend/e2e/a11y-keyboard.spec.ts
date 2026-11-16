@@ -141,14 +141,15 @@ test.describe('Issue #889 — mobile navigation by keyboard', () => {
     await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible()
     await expectPinnedTheme(page)
 
-    const nav = page.getByRole('navigation', { name: 'Navegación principal' })
+    const nav = page.getByRole('navigation', { name: 'Main navigation' })
     await expect(nav).toBeHidden()
 
-    // Reach the drawer toggle from the top of the page.
+    // Reach the drawer toggle (the header menu button) from the top of the page.
+    const menuButton = page.getByRole('button', { name: 'Open main navigation' })
     let toggleReached = false
     for (let i = 0; i < 5 && !toggleReached; i += 1) {
       await page.keyboard.press('Tab')
-      toggleReached = await page.evaluate(() => document.activeElement?.id === 'sidebar-drawer')
+      toggleReached = await menuButton.evaluate((el) => el === document.activeElement)
     }
     expect(toggleReached, 'drawer toggle is reachable with Tab').toBe(true)
     await page.keyboard.press('Space')
@@ -188,16 +189,17 @@ test.describe('Issue #966 — tablet navigation by keyboard', () => {
     await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible()
 
     // Drawer-mode sidebar content: no collapse control below lg.
-    await expect(page.getByRole('button', { name: /navegación/i })).toBeHidden()
+    await expect(page.getByRole('button', { name: /(collapse|expand) navigation/i })).toBeHidden()
 
-    const nav = page.getByRole('navigation', { name: 'Navegación principal' })
+    const nav = page.getByRole('navigation', { name: 'Main navigation' })
     await expect(nav).toBeHidden()
 
-    // Reach the drawer toggle from the top of the page.
+    // Reach the drawer toggle (the header menu button) from the top of the page.
+    const menuButton = page.getByRole('button', { name: 'Open main navigation' })
     let toggleReached = false
     for (let i = 0; i < 5 && !toggleReached; i += 1) {
       await page.keyboard.press('Tab')
-      toggleReached = await page.evaluate(() => document.activeElement?.id === 'sidebar-drawer')
+      toggleReached = await menuButton.evaluate((el) => el === document.activeElement)
     }
     expect(toggleReached, 'drawer toggle is reachable with Tab').toBe(true)
     await page.keyboard.press('Space')

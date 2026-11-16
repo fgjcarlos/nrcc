@@ -120,6 +120,11 @@
     --ds-verified-fill:        #c9b81a;
     --ds-rail-bg:              #0a0b0d;
     --ds-rail-text:            #e9e7df;
+    --ds-rail-text-muted:      #a3a7af; /* 8.2:1 on the rail */
+    --ds-rail-accent:          #7fa6ea; /* 8.0:1 on the rail, 6.1:1 on selected */
+    --ds-rail-selected:        #1f2735;
+    --ds-rail-hover:           #1c1d1e;
+    --ds-rail-hairline:        #22262d;
     /* Elevation: hairline border plus at most this shadow */
     --ds-shadow-raised:        0 1px 2px rgb(0 0 0 / 0.4);
 
@@ -208,6 +213,11 @@
     --ds-verified-fill:        #c9b81a;
     --ds-rail-bg:              #15171c;
     --ds-rail-text:            #e9e7df;
+    --ds-rail-text-muted:      #a3a7af; /* 7.4:1 on the rail */
+    --ds-rail-accent:          #7fa6ea; /* 7.3:1 on the rail, 5.3:1 on selected */
+    --ds-rail-selected:        #283141;
+    --ds-rail-hover:           #26282c;
+    --ds-rail-hairline:        #2e323a;
     /* Elevation: hairline border plus at most this shadow */
     --ds-shadow-raised:        0 1px 2px rgb(21 23 28 / 0.08);
 
@@ -268,10 +278,40 @@
   }
 
   /* ── Main Navigation Shell ───────────────────────────────── */
-  .app-sidebar-shell,
   .app-topbar-shell {
     border-color: var(--ds-border-default);
     background: var(--ds-bg-surface);
+  }
+
+  /* Ink navigation rail (DESIGN.md): ink in light, near-black in dark.
+     The light conductor blue fails 3:1 on ink, so the rail selects and
+     focuses with its own accent. */
+  .app-sidebar-shell {
+    border-color: var(--ds-rail-hairline);
+    background: var(--ds-rail-bg);
+    color: var(--ds-rail-text);
+  }
+
+  .rail-hairline {
+    border-color: var(--ds-rail-hairline);
+  }
+
+  .rail-muted {
+    color: var(--ds-rail-text-muted);
+  }
+
+  .rail-control {
+    color: var(--ds-rail-text-muted);
+  }
+
+  .rail-control:hover {
+    background: var(--ds-rail-hover);
+    color: var(--ds-rail-text);
+  }
+
+  .rail-control:focus-visible {
+    outline: 2px solid var(--ds-rail-accent);
+    outline-offset: 2px;
   }
 
   .topbar-signal-icon,
@@ -281,35 +321,24 @@
   }
 
   .api-status-chip,
-  .theme-toggle-shell,
-  .sidebar-collapse-button {
-    border-color: var(--ds-border-default);
+  .theme-toggle-shell {
+    border-color: var(--ds-border-strong);
     background: var(--ds-bg-surface);
   }
 
-  .theme-toggle-shell:hover,
-  .sidebar-collapse-button:hover {
+  .theme-toggle-shell:hover {
     background: color-mix(in srgb, var(--color-primary) 10%, var(--ds-bg-surface));
-    border-color: var(--ds-border-strong);
   }
 
-  .sidebar-nav-link {
-    border: 1px solid transparent;
-  }
-
-  .sidebar-nav-link:hover {
-    background: color-mix(in srgb, var(--color-primary) 8%, transparent);
-    border-color: var(--ds-border-default);
-  }
-
-  .sidebar-nav-link-active {
-    background: color-mix(in srgb, var(--color-primary) 12%, transparent);
-    border-color: var(--ds-border-strong);
-    box-shadow: inset 2px 0 0 var(--color-primary);
+  .sidebar-nav-link-active,
+  .sidebar-nav-link-active:hover {
+    background: var(--ds-rail-selected);
+    color: var(--ds-rail-text);
+    box-shadow: inset 2px 0 0 var(--ds-rail-accent);
   }
 
   .sidebar-nav-link-active svg {
-    color: var(--ds-on-tint-primary); /* #965: readable on the primary tint */
+    color: var(--ds-rail-accent);
   }
 
   /* ── Panels and cards: flat sheet, hairline, minimal shadow ─ */

@@ -37,7 +37,7 @@ export const COLOUR_TOKENS: ColourToken[] = [
   { token: '--ds-on-tint-warning', name: 'warning-amber-text', job: 'Warning: state words and the read-only notice.', against: '--ds-bg-surface', min: 4.5 },
   { token: '--ds-border-default', name: 'hairline', job: 'Line: decorative dividers and panel edges, never a control edge.', against: '--ds-bg-void', min: null },
   { token: '--ds-border-strong', name: 'control-border', job: 'Line: every control edge and the circuit conductor (WCAG 1.4.11).', against: '--ds-bg-base', min: 3 },
-  { token: '--ds-rail-bg', name: 'rail', job: 'Rail: the ink navigation rail ground (not applied to the chrome yet).', against: '--ds-rail-text', min: 4.5 },
+  { token: '--ds-rail-bg', name: 'rail', job: 'Rail: the ink navigation rail ground.', against: '--ds-rail-text', min: 4.5 },
 ];
 
 export const GROUND_NAMES: Record<string, string> = {

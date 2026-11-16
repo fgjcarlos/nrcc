@@ -59,7 +59,7 @@
   "aiLoading": "Cargando ajustes del proveedor de IA…",
   "aiProvider": "Proveedor de IA",
   "aiProviderDesc": "Configura la asistencia opcional de IA con revisión previa.",
-  "pageTitle": "Configuración de Node-RED",
+  "pageTitle": "Configuración",
   "sectionsLabel": "Secciones de configuración",
   "discardChanges": "Descartar cambios",
   "runtimeVersionLabel": "Versión del runtime",

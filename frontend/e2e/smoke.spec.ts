@@ -43,11 +43,10 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
 
   test('backup creation uses fixture responses', async ({ page }) => {
     await login(page)
-    // Issue #763 renamed the sidebar label to "Recovery" (/backups keeps
-    // the "Backups" page heading). Slice D adds an "Open Recovery" CTA
-    // on BackupHealthTile too — scope to the sidebar so Playwright's
-    // strict-mode locators resolve to a single element.
-    await page.getByTestId('app-sidebar').getByRole('link', { name: /Recovery/ }).click()
+    // T6: the sidebar label equals the page heading ("Backups"). Slice D
+    // adds an "Open Recovery" CTA on BackupHealthTile too — scope to the
+    // sidebar so Playwright's strict-mode locators resolve to one element.
+    await page.getByTestId('app-sidebar').getByRole('link', { name: 'Backups', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Backups', exact: true })).toBeVisible()
     await page.getByRole('button', { name: /Create backup now/ }).first().click()
     await expect(page.getByRole('button', { name: 'Manual smoke backup' })).toBeVisible()
@@ -79,12 +78,12 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
     // /libraries moved under /maintenance/*. Exercise the canonical routes.
     const pages: Array<{ url: string; heading: string }> = [
       { url: '/overview', heading: 'Overview' },
-      { url: '/bootstrap', heading: 'Bootstrap & Environment' },
-      { url: '/configuration', heading: 'Node-RED Configuration' },
+      { url: '/bootstrap', heading: 'Host & environment' },
+      { url: '/configuration', heading: 'Configuration' },
       { url: '/backups', heading: 'Backups' },
-      { url: '/environment', heading: 'Environment Variables' },
-      { url: '/maintenance/updates', heading: 'Node-RED Updates' },
-      { url: '/maintenance/libraries', heading: 'npm Libraries' },
+      { url: '/environment', heading: 'Environment variables' },
+      { url: '/maintenance/updates', heading: 'Updates' },
+      { url: '/maintenance/libraries', heading: 'Libraries' },
     ]
 
     for (const { url, heading } of pages) {

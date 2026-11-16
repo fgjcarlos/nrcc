@@ -1,6 +1,6 @@
 {
   "extensions": "Extensions",
-  "title": "npm Libraries",
+  "title": "Libraries",
   "description": "Search, install and remove Node-RED libraries from a single operational console.",
   "installedCount": "Installed: {{count}}",
   "searchCount": "Search: {{count}} results",

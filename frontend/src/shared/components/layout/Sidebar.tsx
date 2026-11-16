@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState, type ComponentType } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   ChevronLeft,
@@ -12,195 +12,157 @@ import {
   Shield,
   SlidersHorizontal,
   UsersRound,
+  X,
 } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useT } from '@/i18n';
-import { NrccMark } from '@/shared/components';
+import { NrccMark } from '@/shared/components/NrccMark';
 import { UserMenu } from './UserMenu';
 
-const navItems = [
-  { to: '/overview', label: 'Overview', icon: Gauge },
-  { to: '/configuration', label: 'Configuration', icon: Settings },
-  { to: '/security', label: 'Security', icon: Shield },
-  { to: '/environment', label: 'Environment', icon: SlidersHorizontal },
-  { to: '/backups', label: 'Recovery', icon: DatabaseBackup },
-  { to: '/bootstrap', label: 'Bootstrap', icon: HardDrive },
+type NavItemDef = { to: string; labelKey: string; icon: ComponentType<{ className?: string }> };
+
+// Each label is its page's h1 key, so nav and heading cannot drift apart.
+const navItems: NavItemDef[] = [
+  { to: '/overview', labelKey: 'dashboard:overview', icon: Gauge },
+  { to: '/configuration', labelKey: 'configuration:pageTitle', icon: Settings },
+  { to: '/security', labelKey: 'security:title', icon: Shield },
+  { to: '/environment', labelKey: 'env-vars:pageTitle', icon: SlidersHorizontal },
+  { to: '/backups', labelKey: 'backups:backupsTitle', icon: DatabaseBackup },
+  { to: '/bootstrap', labelKey: 'bootstrap:bootstrapTitle', icon: HardDrive },
 ];
 
-const adminItems = [
-  { to: '/settings/users', label: 'Users', icon: UsersRound },
-];
-
-const maintenanceItems = [
-  { to: '/maintenance/updates', label: 'Update Maintenance', icon: RotateCw },
-  { to: '/maintenance/libraries', label: 'Library Maintenance', icon: Library },
+const adminItems: NavItemDef[] = [
+  { to: '/settings/users', labelKey: 'auth:userManagement', icon: UsersRound },
+  { to: '/maintenance/updates', labelKey: 'updates:title', icon: RotateCw },
+  { to: '/maintenance/libraries', labelKey: 'libraries:title', icon: Library },
 ];
 
 const STORAGE_KEY = 'sidebar-collapsed';
-// Must match Tailwind's `lg` breakpoint (min-width: 1024px, no custom
-// screens in tailwind.config.js): Layout.tsx keeps the drawer closed and
-// Header.tsx hides its toggle above this width (#966).
-const MOBILE_BREAKPOINT = 1024;
+const ADMIN_GROUP_ID = 'nav-admin-group';
 
-export function Sidebar() {
+function NavItem({ item, iconOnly, onNavigate }: { item: NavItemDef; iconOnly: boolean; onNavigate?: () => void }) {
+  const { t } = useT();
+  const label = t(item.labelKey);
+  return (
+    <li>
+      <NavLink
+        to={item.to}
+        onClick={onNavigate}
+        title={iconOnly ? label : undefined}
+        aria-label={iconOnly ? label : undefined}
+        className={({ isActive }) =>
+          cn(
+            'rail-control flex min-h-11 items-center gap-3 rounded-field px-3 text-sm font-medium transition-colors duration-150',
+            iconOnly && 'justify-center px-0',
+            isActive && 'sidebar-nav-link-active font-semibold',
+          )
+        }
+      >
+        <item.icon className="h-5 w-5 shrink-0 stroke-[1.8]" aria-hidden="true" />
+        {!iconOnly && <span className="truncate">{label}</span>}
+      </NavLink>
+    </li>
+  );
+}
+
+export interface SidebarProps {
+  /** `rail`: persistent, collapsible (lg and up). `drawer`: inside the mobile drawer. */
+  mode?: 'rail' | 'drawer';
+  /** Drawer mode: closes the drawer (close button, followed link). */
+  onClose?: () => void;
+}
+
+/**
+ * Sidebar: the ink navigation rail (DESIGN.md). Labelled links (icon
+ * plus text) that collapse to icons on desktop; admin links sit in one
+ * labelled "Administration" group shown only to admins.
+ */
+export function Sidebar({ mode = 'rail', onClose }: SidebarProps) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { t } = useT();
   const isAdmin = user?.role === 'admin';
-  
-  const [isMobile, setIsMobile] = useState(window.innerWidth < MOBILE_BREAKPOINT);
-  const [collapsed, setCollapsed] = useState(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? stored === 'true' : false;
-  });
+  const isDrawer = mode === 'drawer';
 
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
-    };
-    
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(STORAGE_KEY) === 'true');
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, String(collapsed));
   }, [collapsed]);
 
-  const toggleCollapsed = () => setCollapsed(!collapsed);
+  const iconOnly = collapsed && !isDrawer;
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
-  const navLinkClass = (isActive: boolean) =>
-    cn(
-      'sidebar-nav-link group flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-base-content/72 transition-all duration-150',
-      'hover:text-base-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45',
-      collapsed && !isMobile ? 'justify-center px-0' : '',
-      isActive && 'sidebar-nav-link-active text-base-content'
-    );
-
-  const NavContent = () => (
-    <>
-      <div className={cn(
-        'border-b ghost-divider',
-        collapsed && !isMobile ? 'p-3' : 'p-4'
-      )}>
-        <div className={cn(
-          'flex items-center gap-3',
-          collapsed && !isMobile ? 'justify-center' : 'justify-between'
-        )}>
-          {(!collapsed || isMobile) && (
-            <div className="flex min-w-0 items-center gap-3">
-              <NrccMark tone="primary" size="md" />
-              <div className="min-w-0">
-                <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-ds-text-muted">Orchestrator</p>
-                <h1 className="truncate text-lg font-bold leading-tight text-base-content">Node-RED</h1>
-                <p className="text-xs text-base-content/65">{t('common:productShortName')}</p>
-              </div>
-            </div>
-          )}
-          {collapsed && !isMobile && (
-            <NrccMark tone="primary" size="sm" />
-          )}
-          {!isMobile && (
-            <button
-              onClick={toggleCollapsed}
-              className="sidebar-collapse-button grid h-9 w-9 place-items-center rounded-xl border text-base-content/70 transition-colors hover:text-base-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45"
-              aria-label={collapsed ? 'Expandir navegación' : 'Contraer navegación'}
-            >
-              {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-            </button>
-          )}
-        </div>
-      </div>
-
-      <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Navegación principal">
-        <ul className="space-y-1.5">
-          {navItems.map((item) => (
-            <li key={item.to}>
-              <NavLink
-                to={item.to}
-                className={({ isActive }) => navLinkClass(isActive)}
-                title={collapsed && !isMobile ? item.label : undefined}
-              >
-                <item.icon className="h-5 w-5 flex-shrink-0 stroke-[1.8] text-ds-text-muted transition-colors group-hover:text-accent" />
-                {(!collapsed || isMobile) && <span className="truncate">{item.label}</span>}
-              </NavLink>
-            </li>
-          ))}
-
-          {isAdmin && (
-            <>
-              <li className="py-3">
-                <div className="h-px bg-[var(--ds-border-default)]" />
-              </li>
-              {adminItems.map((item) => (
-                <li key={item.to}>
-                  <NavLink
-                    to={item.to}
-                    className={({ isActive }) => navLinkClass(isActive)}
-                    title={collapsed && !isMobile ? item.label : undefined}
-                  >
-                    <item.icon className="h-5 w-5 flex-shrink-0 stroke-[1.8] text-ds-text-muted transition-colors group-hover:text-accent" />
-                    {(!collapsed || isMobile) && <span className="truncate">{item.label}</span>}
-                  </NavLink>
-                </li>
-              ))}
-
-              {maintenanceItems.length > 0 && (
-                <>
-                  <li className="pt-3">
-                    {(!collapsed || isMobile) && (
-                      <p className="px-3 pb-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-ds-text-muted">
-                        {t('common:maintenanceLabel')}
-                      </p>
-                    )}
-                    {collapsed && !isMobile && (
-                      <div className="h-px bg-[var(--ds-border-default)]" aria-hidden="true" />
-                    )}
-                  </li>
-                  {maintenanceItems.map((item) => (
-                    <li key={item.to}>
-                      <NavLink
-                        to={item.to}
-                        className={({ isActive }) => navLinkClass(isActive)}
-                        title={collapsed && !isMobile ? item.label : undefined}
-                      >
-                        <item.icon className="h-5 w-5 flex-shrink-0 stroke-[1.8] text-ds-text-muted transition-colors group-hover:text-accent" />
-                        {(!collapsed || isMobile) && <span className="truncate">{item.label}</span>}
-                      </NavLink>
-                    </li>
-                  ))}
-                </>
-              )}
-            </>
-          )}
-        </ul>
-      </nav>
-
-      {user && (
-        <div className="border-t ghost-divider p-3">
-          <UserMenu user={user} onLogout={handleLogout} />
-        </div>
-      )}
-    </>
-  );
-
   return (
     <aside
       data-testid="app-sidebar"
       className={cn(
-        'app-sidebar-shell flex h-full min-h-full flex-col border-r',
-        collapsed && !isMobile ? 'w-16' : 'w-64',
-        'transition-all duration-200'
+        'app-sidebar-shell flex h-full min-h-full flex-col border-r transition-[width] duration-200',
+        iconOnly ? 'w-16' : 'w-64',
       )}
     >
-      <NavContent />
+      <div className={cn('rail-hairline flex min-h-16 items-center gap-2 border-b', iconOnly ? 'flex-col justify-center p-2' : 'px-3')}>
+        <NrccMark tone="rail" size="sm" />
+        {!iconOnly && <span className="flex-1 text-sm font-bold tracking-wide">NRCC</span>}
+        {isDrawer ? (
+          <button
+            type="button"
+            onClick={onClose}
+            className="rail-control grid h-11 w-11 place-items-center rounded-field"
+            aria-label={t('common:layout.closeNavigation')}
+          >
+            <X className="h-5 w-5" aria-hidden="true" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setCollapsed((current) => !current)}
+            className="rail-control grid h-9 w-9 place-items-center rounded-field"
+            aria-label={collapsed ? t('common:layout.expandNavigation') : t('common:layout.collapseNavigation')}
+            aria-expanded={!collapsed}
+          >
+            {collapsed ? <ChevronRight className="h-4 w-4" aria-hidden="true" /> : <ChevronLeft className="h-4 w-4" aria-hidden="true" />}
+          </button>
+        )}
+      </div>
+
+      <nav className="flex-1 overflow-y-auto px-2 py-3" aria-label={t('common:layout.mainNavigation')}>
+        <ul className="space-y-1">
+          {navItems.map((item) => (
+            <NavItem key={item.to} item={item} iconOnly={iconOnly} onNavigate={onClose} />
+          ))}
+        </ul>
+
+        {isAdmin && (
+          <div role="group" aria-labelledby={ADMIN_GROUP_ID} className="mt-4">
+            <p
+              id={ADMIN_GROUP_ID}
+              className={cn(
+                'rail-muted px-3 pb-1 text-xs font-semibold uppercase tracking-wider',
+                iconOnly && 'sr-only',
+              )}
+            >
+              {t('common:layout.administration')}
+            </p>
+            {iconOnly && <div className="rail-hairline mx-2 mb-2 border-t" aria-hidden="true" />}
+            <ul className="space-y-1">
+              {adminItems.map((item) => (
+                <NavItem key={item.to} item={item} iconOnly={iconOnly} onNavigate={onClose} />
+              ))}
+            </ul>
+          </div>
+        )}
+      </nav>
+
+      {user && (
+        <div className="rail-hairline border-t p-2">
+          <UserMenu user={user} onLogout={handleLogout} compact={iconOnly} />
+        </div>
+      )}
     </aside>
   );
 }

@@ -288,17 +288,14 @@ anchored to the bottom edge below that breakpoint:
   semantics inside the sheet as on the desktop modal. The sheet is
   scrollable so long diff lists remain reachable.
 
-### Sidebar drawer overlay
+### Navigation drawer (below `lg`)
 
-The sidebar drawer overlay shipped with an `<label aria-label="...">`
-which axe flagged as an ARIA prohibited-attribute combination (the
-`<label>` element already carries an implicit accessible name from its
-`for` attribute; ARIA forbids layering an additional `aria-label` on a
-generic `<label>`). The fix replaces the aria-label with a
-`<span class="sr-only">` child carrying the new i18n key
-`common:layout.closeSidebar`. Keyboard behaviour is unchanged: clicking
-or pressing Enter while the label is focused still untoggles the
-drawer's hidden checkbox and closes the sidebar.
+Below the `lg` breakpoint the ink navigation rail opens as a modal
+drawer from the 44px "Open main navigation" header button. It reuses
+`useModalKeyboard`: focus moves into the drawer and stays there, Escape
+or the close button closes it, focus returns to the menu button, and
+following a link closes it. (This replaced the earlier hidden-checkbox
+drawer and its `common:layout.closeSidebar` label.)
 
 ### prefers-reduced-motion (W4-a)
 
