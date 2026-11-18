@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Layout } from './Layout'
@@ -53,7 +54,7 @@ describe('Layout shell visual hierarchy', () => {
 
     const contentShell = screen.getByTestId('page-content-shell')
     expect(contentShell).toHaveClass('surface-panel')
-    expect(contentShell).toHaveClass('rounded-2xl')
+    expect(contentShell).toHaveClass('rounded-box')
     expect(contentShell).toHaveClass('border')
     expect(screen.getByText('Dashboard content')).toBeInTheDocument()
   })
@@ -63,23 +64,26 @@ describe('Layout shell visual hierarchy', () => {
 
     expect(screen.getByTestId('app-sidebar')).toHaveClass('app-sidebar-shell')
     expect(screen.getByTestId('app-topbar')).toHaveClass('app-topbar-shell')
-    expect(screen.getByRole('button', { name: /tema:/i })).toHaveClass('theme-toggle-shell')
+    expect(screen.getByRole('button', { name: /theme:/i })).toHaveClass('theme-toggle-shell')
   })
 
   // Issue #966: the sidebar must switch to drawer mode at the same `lg`
   // (1024px) breakpoint the DaisyUI drawer (Layout.tsx) and the toggle
   // (Header.tsx) use, not at its own narrower constant.
-  it('renders drawer-mode navigation at tablet width even when collapsed', () => {
+  it('renders drawer-mode navigation at tablet width even when collapsed', async () => {
     window.innerWidth = 900
     localStorage.setItem('sidebar-collapsed', 'true')
     renderShell()
 
-    const sidebar = screen.getByTestId('app-sidebar')
+    // Below lg the rail lives in the drawer the header's menu button opens.
+    expect(screen.queryByTestId('app-sidebar')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Open main navigation' }))
+    const sidebar = within(screen.getByRole('dialog')).getByTestId('app-sidebar')
     // A collapsed desktop sidebar would render w-16 and hide the labels.
     expect(sidebar).toHaveClass('w-64')
     expect(sidebar).not.toHaveClass('w-16')
     expect(screen.getByRole('link', { name: 'Configuration' })).toHaveTextContent('Configuration')
-    expect(screen.queryByRole('button', { name: /navegación/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /(collapse|expand) navigation/i })).not.toBeInTheDocument()
   })
 
   it('keeps the collapsible desktop sidebar above the lg breakpoint', () => {
@@ -88,6 +92,6 @@ describe('Layout shell visual hierarchy', () => {
     renderShell()
 
     expect(screen.getByTestId('app-sidebar')).toHaveClass('w-16')
-    expect(screen.getByRole('button', { name: /Expandir navegación/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Expand navigation' })).toBeInTheDocument()
   })
 })

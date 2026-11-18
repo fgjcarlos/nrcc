@@ -220,6 +220,10 @@ The system is flat. Depth comes from tonal grounds (sunken, sheet, raised sheet)
 
 Drafting geometry: near-square corners, straight 1px conductors, and IEC symbols drawn with a 1.5px square-capped stroke. Selectors (checkbox, radio) take 2px corners; fields, buttons, panels and banners take 4px (`--radius-field`, `--radius-box`). Status chips take 2px corners like selectors; only the toggle track and knob are fully round. Dashed strokes mean "not confirmed" (an unknown contact blade) or the rollback return path; solid strokes mean a drawn conductor.
 
+### The mark
+
+The NRCC mark is the closed IEC normally-open contact: a conductor entering two terminal rings bridged by a heavier blade, on a 16-unit grid. Keep one terminal-ring diameter (4 units, a quarter of the glyph) clear on every side, and never draw the glyph below 16px, where the rings fill in. The favicon sets it in ink on a drawing-white tile.
+
 ## Components
 
 ### Buttons
@@ -242,7 +246,7 @@ Flat sheet, conductor-coloured edge; the colour is the job.
 ### Navigation
 - **Tabs (section tablist):** a WAI-ARIA tablist with roving tabindex on a hairline baseline. Each tab is 36px high, 14px at 500 weight, with an icon. Unselected tabs are muted ink with a transparent 2px underline that turns control-border on hover; the selected tab is conductor-blue text over a 2px blue underline.
 - **Sidebar links:** the active link takes a 12% blue tint, a control-border edge and a 2px inset blue bar on its leading edge.
-- **Ink rail:** `--ds-rail-bg` and `--ds-rail-text` define an ink navigation rail (light: ink; dark: `rail-dark`). The app chrome does not apply it yet; see the Do's and Don'ts.
+- **Ink rail:** `--ds-rail-bg` and `--ds-rail-text` define an ink navigation rail (light: ink; dark: `rail-dark`). The app shell applies it: the sidebar sits on the rail ground and the selected link carries an action-blue edge bar.
 
 ### Lock banner
 The raw `settings.js` editor is locked by default. The locked state is a 4px-cornered banner with a control-border edge, 14px secondary text explaining the lock and the backup, and a secondary "Unlock to edit settings.js" button beside the text. Unlocking requires an acknowledgement dialog. The section states plainly that direct editing bypasses the change circuit.

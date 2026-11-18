@@ -59,7 +59,7 @@
   "aiLoading": "Loading AI provider settings…",
   "aiProvider": "AI Provider",
   "aiProviderDesc": "Configure optional, review-first AI flow assistance.",
-  "pageTitle": "Node-RED Configuration",
+  "pageTitle": "Configuration",
   "sectionsLabel": "Configuration sections",
   "discardChanges": "Discard Changes",
   "runtimeVersionLabel": "Runtime version",

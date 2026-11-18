@@ -26,7 +26,7 @@ function ClosedContact() {
 }
 
 const nrccMarkVariants = cva(
-  'inline-flex shrink-0 items-center justify-center rounded-xl border ' +
+  'inline-flex shrink-0 items-center justify-center rounded-box border ' +
     'transition-colors focus-visible:outline-none focus-visible:ring-2 ' +
     'focus-visible:ring-offset-2 focus-visible:ring-offset-base-100 ' +
     'focus-visible:ring-ds-accent-primary',
@@ -34,11 +34,12 @@ const nrccMarkVariants = cva(
     variants: {
       tone: {
         // Used by the Header topbar mark.
-        accent: 'border-ds-border-default text-ds-accent-primary bg-ds-bg-elevated/60',
-        // Used by the Sidebar brand mark.
-        primary: 'border-ds-border-default text-ds-brand-primary bg-ds-bg-elevated/60',
+        accent: 'border-ds-border-default text-ds-accent-primary bg-ds-bg-elevated',
+        primary: 'border-ds-border-default text-ds-brand-primary bg-ds-bg-elevated',
         // Subdued mark used inside dense rows.
-        muted: 'border-ds-border-default text-base-content/70 bg-base-300/60',
+        muted: 'border-ds-border-default text-base-content/70 bg-base-300',
+        // Used by the ink navigation rail (Sidebar).
+        rail: 'border-[var(--ds-rail-hairline)] text-[var(--ds-rail-text)] bg-transparent',
       },
       size: {
         sm: 'h-9 w-9 [&_svg]:h-4 [&_svg]:w-4',

@@ -760,7 +760,7 @@ test('dashboard labels container-scoped resource metrics returned by the API', a
 test('environment action reaches a live Node-RED flow after its restart', async ({ page }) => {
   await seedProbeFlow()
   await login(page)
-  await page.getByRole('link', { name: 'Environment', exact: true }).click()
+  await page.getByRole('link', { name: 'Environment variables', exact: true }).click()
   await page.getByRole('button', { name: 'Add' }).click()
   await page.getByPlaceholder('MY_VARIABLE').fill('NRCC_E2E_PROBE')
   await page.getByTestId('env-var-value-field').locator('input').fill('propagated-through-node-red')
@@ -780,7 +780,7 @@ test('environment action reaches a live Node-RED flow after its restart', async 
 test('environment page imports a Node-RED global entry automatically on route entry', async ({ page }) => {
   await seedProbeFlow()
   await login(page)
-  await page.getByRole('link', { name: 'Environment', exact: true }).click()
+  await page.getByRole('link', { name: 'Environment variables', exact: true }).click()
 
   await expect(page.getByText('NODE_RED_E2E_IMPORTED')).toBeVisible()
   await expect(page.getByRole('cell', { name: 'Node-RED', exact: true })).toBeVisible()

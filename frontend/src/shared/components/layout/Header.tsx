@@ -1,105 +1,58 @@
 import { Menu } from 'lucide-react';
-import { StatusChip, ThemeToggle, NrccMark } from '@/shared/components';
+import { ThemeToggle } from '@/shared/components/ThemeToggle';
+import { NrccMark } from '@/shared/components/NrccMark';
 import { UpdateNotificationChip } from '@/features/updates/components/UpdateNotificationChip';
 import { CommandPalette } from '@/shared/components/command-palette';
 import { useAppChrome } from '@/features/system/hooks/useAppChrome';
-import { NodeRedVersionChip } from '@/features/system/components/NodeRedVersionChip';
-import { CompatModeChip } from '@/features/system/components/CompatModeChip';
+import { RuntimeStatusPill } from '@/features/system/components/RuntimeStatusPill';
 import { LocaleSwitcher, useT } from '@/i18n';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+export interface HeaderProps {
+  /** Below `lg`: show the menu button and the brand (the rail is a drawer). */
+  compact?: boolean;
+  navOpen?: boolean;
+  onOpenNav?: () => void;
+}
 
 /**
- * Header — issue #766 slice C
- *
- * The persistent topbar. Slice C turns the right-hand control strip
- * into a coherent "runtime context" panel: detected Node-RED version,
- * configuration mode (editable/read-only), edge deployment flag, and
- * the API base URL. Every chip is built on the StatusChip surface
- * landed in slice B; nothing in this file invents a new visual
- * primitive.
- *
- * The chips are read from useAppChrome(), which refetches
- * /api/system/info and /api/bootstrap/status at the dashboard's own
- * cadence (10s and 30s respectively). Fields that have not yet
- * resolved render their neutral "loading" state.
+ * Header: the persistent top bar. One runtime status (the same host
+ * status Configuration shows) plus the app controls. The brand appears
+ * here only when the rail is hidden, so "NRCC" shows once per screen.
+ * Below `md` the status wraps onto its own row so it stays visible.
  */
-export function Header() {
+export function Header({ compact = false, navOpen = false, onOpenNav }: HeaderProps) {
   const { t } = useT();
   const chrome = useAppChrome();
-  const apiHost = (() => {
-    try {
-      return new URL(API_URL).host || API_URL;
-    } catch {
-      return API_URL;
-    }
-  })();
 
   return (
     <header
       role="banner"
       data-testid="app-topbar"
-      className="app-topbar-shell sticky top-0 z-40 border-b px-3 py-3 sm:px-5"
+      className="app-topbar-shell sticky top-0 z-40 border-b px-3 py-2 sm:px-5"
     >
-      <div className="flex min-h-14 items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          {/* `drawer-button` lets daisyUI draw the keyboard focus ring of the
-              transparent drawer checkbox on this visible label (#889). */}
-          <label
-            htmlFor="sidebar-drawer"
-            className="drawer-button btn btn-ghost btn-square btn-sm rounded-xl border border-border/70 bg-base-300/45 text-base-content/80 lg:hidden"
-          >
-            {/* The accessible name lives on the drawer checkbox (Layout.tsx);
-                axe prohibits aria-label on a <label> element. */}
-            <Menu className="w-5 h-5" aria-hidden="true" />
-          </label>
-          <div className="flex min-w-0 items-center gap-3">
-            <NrccMark tone="accent" size="md" />
-            <div className="min-w-0 leading-tight">
-              <span className="block text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-ds-text-muted">{t('common:productShortName')}</span>
-              <span className="block truncate text-sm font-semibold text-base-content sm:text-base">{t('common:productFullName')}</span>
-            </div>
+      <div className="flex flex-wrap items-center gap-2 md:flex-nowrap md:gap-3">
+        {compact && (
+          <div className="flex min-w-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={onOpenNav}
+              aria-expanded={navOpen}
+              aria-haspopup="dialog"
+              aria-label={t('common:layout.openNavigation')}
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-field border border-ds-border-strong bg-ds-bg-surface text-ds-text-primary hover:bg-base-200"
+            >
+              <Menu className="h-5 w-5" aria-hidden="true" />
+            </button>
+            <NrccMark tone="accent" size="sm" />
+            <span className="text-sm font-bold tracking-wide text-ds-text-primary">NRCC</span>
           </div>
+        )}
+
+        <div className="order-last w-full md:order-none md:w-auto">
+          <RuntimeStatusPill {...chrome} />
         </div>
 
-        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-          {/* Runtime context chips — slice C */}
-          <div
-            className="hidden items-center gap-1.5 md:flex"
-            data-testid="app-runtime-context"
-            aria-label={t('common:appChrome.nodeRedVersionLabel')}
-          >
-            <NodeRedVersionChip version={chrome.nodeRedVersion} />
-            <CompatModeChip
-              editable={chrome.configurationEditable}
-              mode={chrome.configurationMode}
-              runtimeVersion={chrome.configurationRuntimeVersion ?? chrome.nodeRedVersion}
-              reason={chrome.configurationReason}
-            />
-            <StatusChip
-              variant={chrome.edgeMode ? 'info' : 'neutral'}
-              size="sm"
-              ariaLabel={t('common:appChrome.edgeModeAria', {
-                state: chrome.edgeMode ? 'on' : 'off',
-              })}
-              data-testid="edge-mode-chip"
-            >
-              {chrome.edgeMode
-                ? t('common:appChrome.edgeModeEnabled')
-                : t('common:appChrome.edgeModeDisabled')}
-            </StatusChip>
-            <StatusChip
-              variant="neutral"
-              size="sm"
-              ariaLabel={t('common:appChrome.apiBaseAria', { url: apiHost })}
-              data-testid="api-base-chip"
-              className="hidden xl:inline-flex"
-            >
-              {t('common:appChrome.apiBaseLabel')}: {apiHost}
-            </StatusChip>
-          </div>
-
-          {/* Application chrome — existing controls */}
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           <CommandPalette />
           <UpdateNotificationChip />
           <LocaleSwitcher />

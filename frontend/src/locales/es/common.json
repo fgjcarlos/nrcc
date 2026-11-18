@@ -12,7 +12,12 @@
   "noDataYet": "Sin datos",
   "layout": {
     "skipToContent": "Saltar al contenido principal",
-    "closeSidebar": "Cerrar barra lateral"
+    "mainNavigation": "Navegación principal",
+    "openNavigation": "Abrir navegación principal",
+    "closeNavigation": "Cerrar navegación principal",
+    "collapseNavigation": "Contraer navegación",
+    "expandNavigation": "Expandir navegación",
+    "administration": "Administración"
   },
   "delete": "Eliminar",
   "add": "Añadir",
@@ -59,7 +64,6 @@
   "commandPaletteShortcut": "⌘/Ctrl K",
   "searchCommands": "Buscar comandos",
   "noMatchingCommands": "No hay comandos que coincidan",
-  "maintenanceLabel": "Mantenimiento",
   "appChrome": {
     "nodeRedVersionLabel": "Node-RED",
     "nodeRedVersionUnknown": "desconocida",
@@ -72,7 +76,60 @@
     "edgeModeEnabled": "Modo edge: activado",
     "edgeModeDisabled": "Modo edge: desactivado",
     "edgeModeAria": "Modo de despliegue edge {{state}}",
-    "apiBaseLabel": "API",
-    "apiBaseAria": "URL base de la API {{url}}"
+    "runtimeChecking": "Comprobando runtime…",
+    "runtimeUnknown": "Estado desconocido",
+    "runtimeDetails": "Detalles del runtime"
+  },
+  "themeToggleLabel": "Tema: {{theme}}",
+  "locale": {
+    "active": "Activo: {{code}}",
+    "switchTo": "Cambiar a {{code}}"
+  },
+  "palette": {
+    "searchPlaceholder": "Buscar rutas y acciones…",
+    "goTo": "Ir a {{page}}",
+    "kind": {
+      "navigation": "navegación",
+      "service": "servicio",
+      "external": "externo"
+    },
+    "executed": "Comando ejecutado",
+    "failed": "El comando falló",
+    "failedFallback": "No se pudo completar el comando.",
+    "describe": {
+      "overview": "Abre la salud del runtime, las métricas del host y las acciones rápidas.",
+      "configuration": "Abre la configuración de Node-RED.",
+      "updates": "Comprueba y aplica actualizaciones autorizadas de NRCC.",
+      "libraries": "Gestiona las bibliotecas autorizadas de Node-RED.",
+      "bootstrap": "Abre los requisitos del host y el estado de la instalación.",
+      "environment": "Gestiona los valores de entorno del runtime.",
+      "backups": "Abre el historial de respaldos, las opciones de restauración y la programación.",
+      "profile": "Abre tu perfil de cuenta.",
+      "users": "Gestiona los usuarios y roles de NRCC."
+    },
+    "restart": {
+      "title": "Reiniciar Node-RED",
+      "description": "Reinicia el servicio del runtime de Node-RED.",
+      "confirm": "¿Reiniciar Node-RED ahora? Los flujos activos pueden interrumpirse brevemente."
+    },
+    "start": {
+      "title": "Iniciar Node-RED",
+      "description": "Inicia el servicio del runtime de Node-RED.",
+      "confirm": "¿Iniciar Node-RED ahora?"
+    },
+    "stop": {
+      "title": "Detener Node-RED",
+      "description": "Detiene el servicio del runtime de Node-RED.",
+      "confirm": "¿Detener Node-RED ahora? Los flujos de automatización dejarán de ejecutarse."
+    },
+    "backupNow": {
+      "title": "Respaldar ahora",
+      "description": "Crea un respaldo manual inmediatamente.",
+      "confirm": "¿Crear un respaldo manual ahora?"
+    },
+    "openEditor": {
+      "title": "Abrir el editor de Node-RED",
+      "description": "Abre el editor local de Node-RED en una pestaña nueva."
+    }
   }
 }

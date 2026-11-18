@@ -1,6 +1,6 @@
 {
   "extensions": "Extensiones",
-  "title": "Bibliotecas npm",
+  "title": "Bibliotecas",
   "description": "Busca, instala y elimina bibliotecas de Node-RED desde una única consola operativa.",
   "installedCount": "Instaladas: {{count}}",
   "searchCount": "Búsqueda: {{count}} resultados",

@@ -387,8 +387,8 @@ export function LogoSection() {
         </div>
       </Specimen>
       <Specimen
-        name="Clear space and minimum size (proposed)"
-        caption="Not yet in DESIGN.md. Proposed from the grid: keep one terminal-ring diameter (4 units, a quarter of the glyph) clear on every side, and never draw the glyph below 16px (1×), where the rings fill in."
+        name="Clear space and minimum size"
+        caption="Keep one terminal-ring diameter (4 units, a quarter of the glyph) clear on every side, and never draw the glyph below 16px (1×), where the rings fill in."
       >
         <div className="flex flex-wrap items-center gap-8">
           <div className="border border-ds-border-strong p-8">

@@ -20,7 +20,7 @@
   "backupPath": "Backup Path",
   "recommendations": "Recommendations",
   "systemLabel": "System",
-  "bootstrapTitle": "Bootstrap & Environment",
+  "bootstrapTitle": "Host & environment",
   "errorLoadingStatus": "Error loading environment status",
   "systemStatus": "System Status",
   "platform": "Platform",

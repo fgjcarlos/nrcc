@@ -9,7 +9,7 @@
   "deleteDialogTitle": "Delete environment variable",
   "deleteDialogDescription": "Are you sure you want to delete {{key}}? Node-RED will restart.",
   "secretsLabel": "Secrets",
-  "pageTitle": "Environment Variables",
+  "pageTitle": "Environment variables",
   "resyncTitle": "Resynchronize environment entries from Node-RED 5 global-config",
   "resyncing": "Resyncing…",
   "resyncNodeRed": "Resync Node-RED",

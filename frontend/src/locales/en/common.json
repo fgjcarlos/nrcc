@@ -12,7 +12,12 @@
   "noDataYet": "No data yet",
   "layout": {
     "skipToContent": "Skip to main content",
-    "closeSidebar": "Close sidebar"
+    "mainNavigation": "Main navigation",
+    "openNavigation": "Open main navigation",
+    "closeNavigation": "Close main navigation",
+    "collapseNavigation": "Collapse navigation",
+    "expandNavigation": "Expand navigation",
+    "administration": "Administration"
   },
   "delete": "Delete",
   "add": "Add",
@@ -59,7 +64,6 @@
   "commandPaletteShortcut": "⌘/Ctrl K",
   "searchCommands": "Search commands",
   "noMatchingCommands": "No matching commands",
-  "maintenanceLabel": "Maintenance",
   "appChrome": {
     "nodeRedVersionLabel": "Node-RED",
     "nodeRedVersionUnknown": "unknown",
@@ -72,7 +76,60 @@
     "edgeModeEnabled": "Edge mode: on",
     "edgeModeDisabled": "Edge mode: off",
     "edgeModeAria": "Edge deployment mode {{state}}",
-    "apiBaseLabel": "API",
-    "apiBaseAria": "API base URL {{url}}"
+    "runtimeChecking": "Checking runtime…",
+    "runtimeUnknown": "Status unknown",
+    "runtimeDetails": "Runtime details"
+  },
+  "themeToggleLabel": "Theme: {{theme}}",
+  "locale": {
+    "active": "Active: {{code}}",
+    "switchTo": "Switch to {{code}}"
+  },
+  "palette": {
+    "searchPlaceholder": "Search routes and actions…",
+    "goTo": "Go to {{page}}",
+    "kind": {
+      "navigation": "navigation",
+      "service": "service",
+      "external": "external"
+    },
+    "executed": "Command executed",
+    "failed": "Command failed",
+    "failedFallback": "Unable to complete the command.",
+    "describe": {
+      "overview": "Open runtime health, host metrics, and quick actions.",
+      "configuration": "Open Node-RED configuration settings.",
+      "updates": "Check and apply authorized NRCC updates.",
+      "libraries": "Manage authorized Node-RED libraries.",
+      "bootstrap": "Open host prerequisites and setup status.",
+      "environment": "Manage runtime environment values.",
+      "backups": "Open backup history, restore options, and schedule settings.",
+      "profile": "Open your account profile.",
+      "users": "Manage NRCC users and roles."
+    },
+    "restart": {
+      "title": "Restart Node-RED",
+      "description": "Restart the Node-RED runtime service.",
+      "confirm": "Restart Node-RED now? Active flows may be briefly interrupted."
+    },
+    "start": {
+      "title": "Start Node-RED",
+      "description": "Start the Node-RED runtime service.",
+      "confirm": "Start Node-RED now?"
+    },
+    "stop": {
+      "title": "Stop Node-RED",
+      "description": "Stop the Node-RED runtime service.",
+      "confirm": "Stop Node-RED now? Automation flows will stop running."
+    },
+    "backupNow": {
+      "title": "Backup Now",
+      "description": "Create a manual backup immediately.",
+      "confirm": "Create a manual backup now?"
+    },
+    "openEditor": {
+      "title": "Open Node-RED Editor",
+      "description": "Open the local Node-RED editor in a new tab."
+    }
   }
 }

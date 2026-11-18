@@ -20,7 +20,7 @@
   "backupPath": "Ruta de respaldo",
   "recommendations": "Recomendaciones",
   "systemLabel": "Sistema",
-  "bootstrapTitle": "Bootstrap y entorno",
+  "bootstrapTitle": "Host y entorno",
   "errorLoadingStatus": "Error al cargar el estado del entorno",
   "systemStatus": "Estado del sistema",
   "platform": "Plataforma",
