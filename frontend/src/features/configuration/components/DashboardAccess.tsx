@@ -2,13 +2,24 @@ import { useEffect, useMemo, useState } from 'react';
 import { AxiosError } from 'axios';
 import api from '@/shared/lib';
 import { useT } from '@/i18n';
+import { Button, Input, Select } from '@/shared/components/ui';
 
 type State = 'available' | 'absent' | 'malformed' | 'unknown';
 type Discovery = { packages: { state: State }; flows: { state: State }; legacy?: { path: string }; flowFuse: unknown[]; uiBases: { nodeId: string; path?: string; state: State }[] };
 type Target = 'legacy' | 'flowfuse';
+// One inline outcome line: `status` for progress and success, `alert` for failures (no toasts on this flow).
+type Outcome = { role: 'status' | 'alert'; key: string; tone?: 'success' };
 
 const ok = <T,>(response: { data: { data: T } }) => response.data.data;
+const i18n = (key: string) => `security:dashboardAccess.${key}`;
+const box = 'rounded-box border px-3 py-2 text-sm';
+const tones = {
+  alert: 'border-ds-danger/40 bg-ds-danger/10 text-ds-on-tint-error',
+  success: 'border-ds-success/40 bg-ds-success/10 text-ds-on-tint-success',
+  warning: 'border-ds-warning/40 bg-ds-warning/10 text-ds-on-tint-warning',
+};
 
+/** Dashboard HTTP/Socket.IO policy form. Rendered inside the /security row, which carries its title. */
 export function DashboardAccess({ editable, expectedRevision, onApplied }: { editable: boolean; expectedRevision?: string; onApplied: () => void }) {
   const { t } = useT();
   const [discovery, setDiscovery] = useState<Discovery>();
@@ -16,9 +27,9 @@ export function DashboardAccess({ editable, expectedRevision, onApplied }: { edi
   const [recipe, setRecipe] = useState('basic-auth');
   const [username, setUsername] = useState('');
   const [secret, setSecret] = useState('');
-  const [status, setStatus] = useState('Loading dashboard discovery…');
+  const [status, setStatus] = useState<Outcome | null>({ role: 'status', key: i18n('loading') });
   const [saving, setSaving] = useState(false);
-  useEffect(() => { void api.get('/dashboards/discovery').then(ok<Discovery>).then((value) => { setDiscovery(value); setStatus(''); }).catch(() => setStatus('Dashboard discovery could not be loaded. Refresh before applying access.')); }, []);
+  useEffect(() => { void api.get('/dashboards/discovery').then(ok<Discovery>).then((value) => { setDiscovery(value); setStatus(null); }).catch(() => setStatus({ role: 'alert', key: i18n('discoveryFailed') })); }, []);
   const eligible = useMemo(() => {
     if (!discovery || discovery.packages.state !== 'available') return false;
     return target === 'legacy'
@@ -26,30 +37,40 @@ export function DashboardAccess({ editable, expectedRevision, onApplied }: { edi
       : discovery.flows.state === 'available' && discovery.flowFuse.length > 0 && discovery.uiBases.length > 0 && discovery.uiBases.every((base) => base.state === 'available' && base.path);
   }, [discovery, target]);
   const formDisabled = !editable || !expectedRevision || saving;
-  const paths = discovery?.uiBases.map((base) => base.path || `${base.nodeId} (path unavailable)`).join(', ') || 'none discovered';
+  const stateText = (state?: State) => t(i18n(`states.${state ?? 'unknown'}`), { defaultValue: state });
+  const paths = discovery?.uiBases.map((base) => base.path || t(i18n('pathUnavailable'), { nodeId: base.nodeId })).join(', ') || t(i18n('noneDiscovered'));
+  const legacyMissing = Boolean(discovery) && !discovery?.legacy;
   const apply = async () => {
     if (formDisabled || !eligible || !secret || (recipe === 'basic-auth' && !username)) return;
-    setSaving(true); setStatus('');
+    setSaving(true); setStatus(null);
     try {
       await api.post('/dashboards/access', { target, recipe, secret, ...(recipe === 'basic-auth' ? { username } : {}), expectedRevision });
-      setSecret(''); setStatus('Dashboard access was applied transactionally.'); onApplied();
+      setSecret(''); setStatus({ role: 'status', key: i18n('applied'), tone: 'success' }); onApplied();
     } catch (error) {
       const code = error instanceof AxiosError ? error.response?.data?.error?.code : '';
-      setStatus(code === 'SETTINGS_REVISION_CONFLICT' ? 'Settings changed elsewhere. Refresh, review the redacted preview, then retry.' : code === 'APPLY_IN_FLIGHT' ? 'Another transaction is in progress. Wait for it to finish, then retry.' : 'The transaction did not complete. Any failed readiness check is rolled back; review runtime readiness, then retry.');
+      setStatus({ role: 'alert', key: code === 'SETTINGS_REVISION_CONFLICT' ? 'security:applyErrors.revisionConflict' : code === 'APPLY_IN_FLIGHT' ? 'security:applyErrors.inFlight' : 'security:applyErrors.generic' });
     } finally { setSaving(false); }
   };
-  return <section aria-labelledby="dashboard-access-title" className="space-y-6">
-    <div><h2 id="dashboard-access-title" className="text-lg font-medium">{t('configuration:dashboardAccess.title')}</h2><p className="text-sm text-base-content/65">{t('configuration:dashboardAccess.subtitle')}</p></div>
-    <div role="status" aria-live="polite" className="rounded-xl border border-border bg-base-200/35 p-4 text-sm"><strong>{t('configuration:dashboardAccess.discovery')}</strong> {t('configuration:dashboardAccess.discoverySummary', { packages: discovery?.packages.state ?? t('common:unknown'), flows: discovery?.flows.state ?? t('common:unknown'), legacy: discovery?.legacy ? `${discovery.legacy.path} (deprecated)` : t('configuration:dashboardAccess.absent'), paths })}</div>
-    <aside aria-label={t('configuration:dashboardAccess.previewLabel')} className="rounded-xl border border-border bg-base-200/35 p-4 text-sm"><h3 className="font-medium">{t('configuration:dashboardAccess.previewTitle')}</h3><p>{t('configuration:dashboardAccess.previewBody', { target, recipe })}</p></aside>
-    {status && <p role="status" aria-live="polite" className="rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm text-warning">{status}</p>}
-    {!editable && <p role="status" className="rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm text-warning">{t('configuration:dashboardAccess.readOnly')}</p>}
+  return <div className="max-w-2xl space-y-4">
+    <p className="text-sm text-ds-text-secondary"><strong className="font-semibold text-ds-text-primary">{t(i18n('discovery'))}</strong> {t(i18n('discoverySummary'), { packages: stateText(discovery?.packages.state), flows: stateText(discovery?.flows.state), legacy: discovery?.legacy ? t(i18n('legacyPath'), { path: discovery.legacy.path }) : stateText('absent'), paths })}</p>
+    <aside aria-label={t(i18n('previewLabel'))} className={`${box} border-ds-border-subtle bg-ds-bg-surface`}><h3 className="font-semibold text-ds-text-primary">{t(i18n('previewTitle'))}</h3><p className="text-ds-text-secondary">{t(i18n('previewBody'), { target, recipe })}</p></aside>
+    {status && <p key={status.role} role={status.role} className={status.role === 'alert' ? `${box} ${tones.alert}` : status.tone ? `${box} ${tones.success}` : 'text-sm text-ds-text-secondary'}>{t(status.key)}</p>}
+    {!editable && <p role="status" className={`${box} ${tones.warning}`}>{t(i18n('readOnly'))}</p>}
     <fieldset disabled={formDisabled} className="space-y-4">
-      <label className="block text-sm">{t('configuration:dashboardAccess.target')}<select aria-label="Dashboard target" className="select select-bordered mt-1 w-full" value={target} onChange={(event) => setTarget(event.target.value as Target)}><option value="legacy">{t('configuration:dashboardAccess.legacyOption')}{discovery?.legacy ? ` (${discovery.legacy.path})` : ` ${t('configuration:dashboardAccess.unavailable')}`}</option><option value="flowfuse">{t('configuration:dashboardAccess.flowFuseOption', { count: discovery?.uiBases.length ?? 0 })}</option></select></label>
-      <label className="block text-sm">{t('configuration:dashboardAccess.recipe')}<select aria-label="Access recipe" className="select select-bordered mt-1 w-full" value={recipe} onChange={(event) => setRecipe(event.target.value)}><option value="basic-auth">{t('configuration:dashboardAccess.basicAuth')}</option><option value="reverse-proxy-sso">{t('configuration:dashboardAccess.reverseProxySso')}</option></select></label>
-      {recipe === 'basic-auth' && <label className="block text-sm">{t('configuration:dashboardAccess.username')}<input className="input input-bordered mt-1 w-full" value={username} onChange={(event) => setUsername(event.target.value)} /></label>}
-      <label className="block text-sm">{t('configuration:dashboardAccess.secret')}<input className="input input-bordered mt-1 w-full" type="password" value={secret} onChange={(event) => setSecret(event.target.value)} /></label>
-      <button type="button" className="action-btn-primary" disabled={formDisabled || !eligible || !secret || (recipe === 'basic-auth' && !username)} onClick={apply}>{saving ? t('configuration:dashboardAccess.applying') : t('configuration:dashboardAccess.apply')}</button>
+      <div className="space-y-1">
+        <Select id="dashboard-access-target" label={t(i18n('target'))} aria-describedby={legacyMissing ? 'dashboard-access-target-help' : undefined} value={target} onChange={(event) => setTarget(event.target.value as Target)}>
+          <option value="legacy" disabled={legacyMissing}>{t(i18n('legacyOption'))}</option>
+          <option value="flowfuse">{t(i18n('flowFuseOption'), { count: discovery?.uiBases.length ?? 0 })}</option>
+        </Select>
+        {legacyMissing && <p id="dashboard-access-target-help" className="text-xs text-ds-text-secondary">{t(i18n('legacyUnavailable'))}</p>}
+      </div>
+      <Select id="dashboard-access-recipe" label={t(i18n('recipe'))} value={recipe} onChange={(event) => setRecipe(event.target.value)}>
+        <option value="basic-auth">{t(i18n('basicAuth'))}</option>
+        <option value="reverse-proxy-sso">{t(i18n('reverseProxySso'))}</option>
+      </Select>
+      {recipe === 'basic-auth' && <Input id="dashboard-access-username" label={t(i18n('username'))} value={username} onChange={(event) => setUsername(event.target.value)} />}
+      <Input id="dashboard-access-secret" label={t(i18n('secret'))} type="password" value={secret} onChange={(event) => setSecret(event.target.value)} />
+      <Button type="button" disabled={formDisabled || !eligible || !secret || (recipe === 'basic-auth' && !username)} onClick={apply}>{saving ? t(i18n('applying')) : t(i18n('apply'))}</Button>
     </fieldset>
-  </section>;
+  </div>;
 }

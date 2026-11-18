@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { useConfigurationData, useConfigurationActions, useConfigurationDiff, useConfigurationSave, fieldValidationMap } from '../hooks';
 import { useT } from '@/i18n';
+import type { HostStatusWithCodes } from '@/features/bootstrap/types';
 import { ConfirmationDialog } from '@/shared/components/ConfirmationDialog';
 import { LoadingBoundary } from '@/shared/components/feedback';
 import { TabPanel, Tabs } from '@/shared/components/ui';
@@ -165,7 +166,7 @@ export function ConfigurationView() {
   const savingRef = useRef(false);
 
   // Data and actions hooks
-  const { t } = useT();
+  const { t, i18n } = useT();
   const rawErrorId = useId();
   // Names the raw settings.js editor after its section heading (#889 axe `label`).
   const rawSettingsHeadingId = useId();
@@ -334,13 +335,12 @@ export function ConfigurationView() {
       : null;
   const revision = data.settingsDoc?.revision?.fingerprint;
   const restartCount = Object.values(diff.fields).filter((f) => f.pending && f.restart === 'hard').length;
-  const host = data.hostStatus as (typeof data.hostStatus & { portless?: { installed?: boolean } }) | undefined;
-  const recommendations = host
-    ? [
-        host.nodeRed.detected && host.portless?.installed === false ? t('configuration:host.recommendPortless') : null,
-        host.settings?.path && host.settings.writable === false ? t('configuration:host.recommendWritable') : null,
-      ].filter((r): r is string => r !== null)
-    : [];
+  // Localize each backend recommendation by its stable code (shared with Host & environment); unknown codes keep the backend text.
+  const host = data.hostStatus as HostStatusWithCodes | undefined;
+  const recommendations = (host?.recommendations ?? []).map((message, index) => {
+    const key = `bootstrap:recommendation.${host?.recommendationCodes?.[index]}`;
+    return host?.recommendationCodes?.[index] && i18n.exists(key) ? t(key) : message;
+  });
   const configViewState = data.configLoading
     ? { status: 'pending' as const }
     : data.configError
@@ -405,8 +405,8 @@ export function ConfigurationView() {
             )}
           </dl>
         )}
-        {recommendations.map((recommendation) => (
-          <p key={recommendation} className="text-xs text-ds-text-secondary">{recommendation}</p>
+        {recommendations.map((recommendation, index) => (
+          <p key={index} className="text-xs text-ds-text-secondary">{recommendation}</p>
         ))}
       </ConfigurationHeader>
 

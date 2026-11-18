@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -38,7 +38,9 @@ vi.mock('@/features/bootstrap/services', () => ({
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 import { ConfigurationView } from './ConfigurationView';
-import { I18nProvider } from '@/i18n';
+import { I18nProvider, i18n } from '@/i18n';
+import enBootstrap from '@/locales/en/bootstrap.json';
+import esBootstrap from '@/locales/es/bootstrap.json';
 
 function renderConfiguration() {
   const queryClient = new QueryClient({
@@ -898,5 +900,53 @@ describe('ConfigurationView (finish review round 2)', () => {
     expect(banner).toHaveClass('flex-wrap');
     const text = within(banner).getByText(/^Locked\./);
     expect(text.className).toMatch(/flex-\[1_1_14rem\]/);
+  });
+});
+
+describe('ConfigurationView (host recommendations from recommendationCodes)', () => {
+  const PORTLESS_ES_BACKEND = 'Opcional: instala Portless para exponer nrcc o Node-RED con URLs HTTPS .localhost, LAN o Tailscale.';
+  const withRecommendations = (recommendations: string[], recommendationCodes?: string[]) =>
+    mocks.getStatus.mockResolvedValue({
+      data: {
+        data: {
+          nodeRed: { mode: 'docker', detected: true, version: '5.0.6' },
+          settings: { path: '/etc/node-red/settings.js' },
+          configuration: { runtimeVersion: '5.0.6', source: 'detected', mode: 'editable', editable: true },
+          recommendations,
+          recommendationCodes,
+        },
+        success: true,
+        timestamp: '',
+      },
+    });
+
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+  });
+
+  it('localizes each recommendation by its code in Spanish', async () => {
+    withRecommendations([PORTLESS_ES_BACKEND, 'Otorga permisos'], ['portless_optional', 'settings_not_writable']);
+    await i18n.changeLanguage('es');
+    renderConfiguration();
+
+    expect(await screen.findByText(esBootstrap.recommendation.portless_optional)).toBeInTheDocument();
+    expect(screen.getByText(esBootstrap.recommendation.settings_not_writable)).toBeInTheDocument();
+    expect(screen.queryByText(PORTLESS_ES_BACKEND)).not.toBeInTheDocument();
+  });
+
+  it('localizes each recommendation by its code in English', async () => {
+    withRecommendations([PORTLESS_ES_BACKEND], ['portless_optional']);
+    renderConfiguration();
+
+    expect(await screen.findByText(enBootstrap.recommendation.portless_optional)).toBeInTheDocument();
+    expect(screen.queryByText(PORTLESS_ES_BACKEND)).not.toBeInTheDocument();
+  });
+
+  it('falls back to the backend string for an unknown code or a backend without codes', async () => {
+    withRecommendations(['Backend says hello', 'Older backend text'], ['future_code']);
+    renderConfiguration();
+
+    expect(await screen.findByText('Backend says hello')).toBeInTheDocument();
+    expect(screen.getByText('Older backend text')).toBeInTheDocument();
   });
 });

@@ -3,8 +3,6 @@
     "installationDetected": "Installation detected",
     "nodeRedNotDetected": "(no Node-RED detected)",
     "pathNotDetected": "no path detected",
-    "recommendPortless": "Optional: install Portless to expose nrcc or Node-RED with HTTPS .localhost, LAN or Tailscale URLs.",
-    "recommendWritable": "Grant write access to settings.js so nrcc can save changes.",
     "revisionTitle": "settings.js revision {{fingerprint}}"
   },
   "advanced": {
@@ -71,28 +69,6 @@
   "rotateSecretTitle": "Rotate credential secret",
   "rotateSecretDescription": "Saving a new credential secret invalidates the encryption of every stored credential. Existing flows with encrypted credentials will need to be re-entered or restored from a backup taken before this rotation. Continue only if you understand the impact.",
   "rotateSecretAcknowledgement": "I understand that existing encrypted credentials must be re-entered after this rotation.",
-  "dashboardAccess": {
-    "title": "Dashboard Access",
-    "subtitle": "Configure a reviewed access policy without exposing credentials.",
-    "discovery": "Discovery:",
-    "discoverySummary": "packages {{packages}}; flows {{flows}}; legacy {{legacy}}; FlowFuse paths {{paths}}.",
-    "previewLabel": "Redacted dashboard policy preview",
-    "previewTitle": "Redacted policy preview",
-    "previewBody": "Target: {{target}}. Recipe: {{recipe}}. Credentials, hashes, and authorization values are never shown.",
-    "readOnly": "Dashboard Access is read-only because this runtime configuration is not editable.",
-    "target": "Dashboard target",
-    "legacyOption": "Legacy dashboard (deprecated)",
-    "unavailable": "(unavailable)",
-    "flowFuseOption": "FlowFuse dashboard ({{count}} ui-base paths)",
-    "recipe": "Access recipe",
-    "basicAuth": "Basic authentication",
-    "reverseProxySso": "Reverse proxy SSO",
-    "username": "Username",
-    "secret": "Access secret",
-    "applying": "Applying…",
-    "apply": "Apply dashboard access",
-    "absent": "absent"
-  },
   "fieldStatus": {
     "header": {
       "field": "Field",

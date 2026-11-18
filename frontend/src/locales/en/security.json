@@ -100,6 +100,35 @@
   "dashboardAccess": {
     "title": "Dashboard access",
     "summary": "Protects Node-RED Dashboard pages and their Socket.IO connection.",
-    "notReported": "Not reported"
+    "notReported": "Not reported",
+    "discovery": "Discovery:",
+    "discoverySummary": "packages {{packages}}; flows {{flows}}; legacy {{legacy}}; FlowFuse paths {{paths}}.",
+    "previewLabel": "Redacted dashboard policy preview",
+    "previewTitle": "Redacted policy preview",
+    "previewBody": "Target: {{target}}. Recipe: {{recipe}}. Credentials, hashes, and authorization values are never shown.",
+    "readOnly": "Dashboard Access is read-only because this runtime configuration is not editable.",
+    "target": "Dashboard target",
+    "legacyOption": "Legacy dashboard (deprecated)",
+    "flowFuseOption": "FlowFuse dashboard ({{count}} ui-base paths)",
+    "recipe": "Access recipe",
+    "basicAuth": "Basic authentication",
+    "reverseProxySso": "Reverse proxy SSO",
+    "username": "Username",
+    "secret": "Access secret",
+    "applying": "Applying…",
+    "apply": "Apply dashboard access",
+    "loading": "Loading dashboard discovery…",
+    "discoveryFailed": "Dashboard discovery could not be loaded. Refresh before applying access.",
+    "applied": "Dashboard access was applied transactionally.",
+    "states": {
+      "available": "available",
+      "absent": "absent",
+      "malformed": "malformed",
+      "unknown": "unknown"
+    },
+    "legacyPath": "{{path}} (deprecated)",
+    "pathUnavailable": "{{nodeId}} (path unavailable)",
+    "noneDiscovered": "none discovered",
+    "legacyUnavailable": "No legacy dashboard was discovered, so it cannot be selected."
   }
 }

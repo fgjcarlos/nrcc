@@ -100,6 +100,35 @@
   "dashboardAccess": {
     "title": "Acceso al dashboard",
     "summary": "Protege las páginas del Dashboard de Node-RED y su conexión Socket.IO.",
-    "notReported": "Sin informar"
+    "notReported": "Sin informar",
+    "discovery": "Descubrimiento:",
+    "discoverySummary": "paquetes {{packages}}; flows {{flows}}; legacy {{legacy}}; rutas FlowFuse {{paths}}.",
+    "previewLabel": "Previsualización con datos ocultos",
+    "previewTitle": "Previsualización de política con datos ocultos",
+    "previewBody": "Objetivo: {{target}}. Receta: {{recipe}}. Las credenciales, hashes y valores de autorización nunca se muestran.",
+    "readOnly": "El Acceso al dashboard es de solo lectura porque esta configuración no es editable.",
+    "target": "Objetivo del dashboard",
+    "legacyOption": "Dashboard legacy (deprecado)",
+    "flowFuseOption": "Dashboard FlowFuse ({{count}} rutas ui-base)",
+    "recipe": "Receta de acceso",
+    "basicAuth": "Autenticación básica",
+    "reverseProxySso": "SSO por proxy inverso",
+    "username": "Usuario",
+    "secret": "Secreto de acceso",
+    "applying": "Aplicando…",
+    "apply": "Aplicar acceso al dashboard",
+    "loading": "Cargando el descubrimiento de dashboards…",
+    "discoveryFailed": "No se pudo cargar el descubrimiento de dashboards. Recarga antes de aplicar el acceso.",
+    "applied": "El acceso al dashboard se aplicó en una transacción.",
+    "states": {
+      "available": "disponible",
+      "absent": "ausente",
+      "malformed": "malformado",
+      "unknown": "desconocido"
+    },
+    "legacyPath": "{{path}} (deprecado)",
+    "pathUnavailable": "{{nodeId}} (ruta no disponible)",
+    "noneDiscovered": "ninguna detectada",
+    "legacyUnavailable": "No se ha detectado ningún dashboard legacy, así que no se puede seleccionar."
   }
 }
