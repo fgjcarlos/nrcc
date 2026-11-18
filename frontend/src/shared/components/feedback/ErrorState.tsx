@@ -35,14 +35,14 @@ export function ErrorState({
     <div
       role="alert"
       aria-live="assertive"
-      className="flex flex-col items-center justify-center gap-3 rounded-xl border border-ds-danger/40 bg-ds-danger/8 px-6 py-12 text-center"
+      className="flex flex-col items-center justify-center gap-2 rounded-box border border-error px-6 py-10 text-center"
     >
-      <span aria-hidden="true" className="text-ds-danger">
-        {icon ?? <AlertCircle className="h-8 w-8" />}
+      <span aria-hidden="true" className="text-ds-on-tint-error">
+        {icon ?? <AlertCircle className="h-6 w-6" />}
       </span>
-      <h3 className="text-base font-semibold text-base-content">{title}</h3>
+      <h3 className="text-sm font-semibold text-ds-text-primary">{title}</h3>
       {description ? (
-        <p className="max-w-sm text-sm text-base-content/70">{description}</p>
+        <p className="max-w-sm text-sm text-ds-text-secondary">{description}</p>
       ) : null}
       {onRetry ? (
         <Button type="button" variant="secondary" onClick={onRetry} className="mt-2">

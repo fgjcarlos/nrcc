@@ -7,8 +7,8 @@ import { useT } from '@/i18n';
  *
  * Loading placeholder that preserves layout while data is pending.
  * The outer div is the screen-reader-landmark (`role="status"` +
- * `aria-busy="true"` + a visually-hidden label) and the inner div is
- * the visual block. The shimmer respects `prefers-reduced-motion`
+ * `aria-busy="true"` + a visually-hidden label) and the inner divs are
+ * the visual blocks (`rows` of them), drawn on the sunken ground. The shimmer respects `prefers-reduced-motion`
  * via Tailwind's `motion-reduce:animate-none` utility so users who
  * have opted out of motion see a static block.
  */
@@ -17,15 +17,17 @@ export type SkeletonVariant = 'text' | 'rect' | 'circle';
 
 export interface SkeletonProps extends HTMLAttributes<HTMLDivElement> {
   variant?: SkeletonVariant;
+  /** Number of blocks inside the one status region. */
+  rows?: number;
 }
 
 const variantClasses: Record<SkeletonVariant, string> = {
-  text: 'h-3 w-full rounded',
-  rect: 'h-32 w-full rounded-lg',
+  text: 'h-3 w-full rounded-box',
+  rect: 'h-32 w-full rounded-box',
   circle: 'h-12 w-12 rounded-full',
 };
 
-export function Skeleton({ variant = 'text', className, ...rest }: SkeletonProps) {
+export function Skeleton({ variant = 'text', rows = 1, className, ...rest }: SkeletonProps) {
   const { t } = useT();
 
   return (
@@ -33,17 +35,21 @@ export function Skeleton({ variant = 'text', className, ...rest }: SkeletonProps
       role="status"
       aria-busy="true"
       aria-label={t('common:loading')}
+      className="space-y-2"
       {...rest}
     >
-      <div
-        aria-hidden="true"
-        className={cn(
-          'bg-base-300/60 motion-reduce:animate-none',
-          'animate-pulse',
-          variantClasses[variant],
-          className,
-        )}
-      />
+      {Array.from({ length: rows }, (_, index) => (
+        <div
+          key={index}
+          aria-hidden="true"
+          className={cn(
+            'bg-ds-bg-base motion-reduce:animate-none',
+            'animate-pulse',
+            variantClasses[variant],
+            className,
+          )}
+        />
+      ))}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Skeleton } from '@/shared/components/feedback';
 import { useLibrariesData } from '@/features/libraries/hooks/useLibrariesData';
 import { useLibrariesActions } from '@/features/libraries/hooks/useLibrariesActions';
 import { ChevronLeft, ChevronRight, ExternalLink, Trash2 } from 'lucide-react';
@@ -190,10 +191,7 @@ export function LibrariesView() {
                 <p className="mt-1 text-sm text-base-content/60">{t('libraries:loadHint')}</p>
               </div>
             ) : isLoading ? (
-              <div className="animate-pulse space-y-2">
-                <div className="h-14 rounded-2xl skeleton-dark"></div>
-                <div className="h-14 rounded-2xl skeleton-dark"></div>
-              </div>
+              <Skeleton variant="rect" rows={2} className="h-14" />
             ) : libraries.length === 0 ? (
               <div className="mt-4 rounded-2xl border border-dashed border-border px-4 py-8 text-center">
                 <p className="font-medium text-base-content">{t('libraries:empty')}</p>

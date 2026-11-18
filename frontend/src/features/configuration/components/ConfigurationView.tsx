@@ -21,14 +21,6 @@ import { SETTINGS_KEYS } from '../lib/fieldLabels';
 const settingsKeys = (fields: string[]) =>
   fields.map((f) => SETTINGS_KEYS[f as keyof NodeRedConfigFormData] ?? f);
 
-/** Roving tabindex: the next tab index for Left/Right/Home/End, else null. */
-function nextTabIndex(key: string, index: number, count: number): number | null {
-  if (key === 'ArrowRight') return (index + 1) % count;
-  if (key === 'ArrowLeft') return (index - 1 + count) % count;
-  if (key === 'Home') return 0;
-  if (key === 'End') return count - 1;
-  return null;
-}
 import {
   Server, Shield, Activity, Palette,
   Save, Lock, LockOpen, Bot
@@ -37,6 +29,7 @@ import { useConfigurationData, useConfigurationActions, useConfigurationDiff, us
 import { useT } from '@/i18n';
 import { ConfirmationDialog } from '@/shared/components/ConfirmationDialog';
 import { LoadingBoundary } from '@/shared/components/feedback';
+import { TabPanel, Tabs } from '@/shared/components/ui';
 
 // ============================================
 // Sections Configuration
@@ -143,7 +136,6 @@ const INITIAL_FORM_DATA: NodeRedConfigFormData = {
 export function ConfigurationView() {
   // UI state
   const [activeTab, setActiveTab] = useState('basic');
-  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [formData, setFormData] = useState<NodeRedConfigFormData>(INITIAL_FORM_DATA);
   const [rawSettingsContent, setRawSettingsContent] = useState('');
   // Raw-settings editor gate (issue #364): the textarea is read-only by
@@ -439,59 +431,21 @@ export function ConfigurationView() {
 
       <div className="min-w-0 space-y-4 lg:col-start-1 lg:row-start-1">
       {/* Sections: a WAI-ARIA tablist with roving tabindex. */}
-      <div
-        role="tablist"
-        aria-label={t('configuration:sectionsLabel')}
-        className="flex gap-1 overflow-x-auto border-b border-ds-border-subtle"
-      >
-        {SECTIONS.map((section, index) => {
-          const Icon = section.icon;
-          const selected = activeTab === section.id;
-          return (
-            <button
-              key={section.id}
-              ref={(el) => { tabRefs.current[index] = el; }}
-              type="button"
-              role="tab"
-              id={`config-tab-${section.id}`}
-              aria-selected={selected}
-              aria-controls={`config-panel-${section.id}`}
-              tabIndex={selected ? 0 : -1}
-              onClick={() => setActiveTab(section.id)}
-              onKeyDown={(event) => {
-                const next = nextTabIndex(event.key, index, SECTIONS.length);
-                if (next === null) return;
-                event.preventDefault();
-                setActiveTab(SECTIONS[next].id);
-                tabRefs.current[next]?.focus();
-              }}
-              className={cn(
-                '-mb-px flex min-h-9 items-center gap-2 border-b-2 px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors',
-                selected
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-ds-text-muted hover:border-[var(--ds-border-strong)] hover:text-ds-text-primary'
-              )}
-            >
-              <Icon className="h-4 w-4" aria-hidden="true" />
-              {section.label}
-            </button>
-          );
-        })}
-      </div>
+      <Tabs
+        label={t('configuration:sectionsLabel')}
+        idBase="config"
+        items={SECTIONS}
+        selected={activeTab}
+        onSelect={setActiveTab}
+      />
 
-      <div
-        role="tabpanel"
-        id={`config-panel-${activeTab}`}
-        aria-labelledby={`config-tab-${activeTab}`}
-        tabIndex={0}
-        className="focus-visible:outline-offset-4"
-      >
+      <TabPanel idBase="config" selected={activeTab}>
         {readOnly ? (
           <div className="rounded-box border border-warning/40 bg-warning/10 p-4 text-sm text-warning" role="status">
             {t('configuration:controlsUnavailable')}
           </div>
         ) : activeTab === 'ai' ? <AIProviderSettings /> : <ActiveComponent settings={formData} onUpdate={handleUpdateField} disabled={isSaving} fieldErrors={fieldValidationMap(diff.fields)} />}
-      </div>
+      </TabPanel>
 
       {/* Curated preset catalogue — slice 3 of #764 */}
       <AdvancedSettings

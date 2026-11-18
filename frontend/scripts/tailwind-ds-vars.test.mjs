@@ -39,8 +39,10 @@ const EXPECTED = {
     'ds-bg-elevated': '#1d2128',
     'ds-bg-overlay': '#1d2128',
     'ds-border-subtle': '#2a2f37',
-    'ds-border-default': '#6b717c',
-    'ds-border-strong': '#9a9ea6',
+    // Utility names match the --ds-border-* CSS tokens: default is the
+    // hairline, strong the control border (L19 naming trap).
+    'ds-border-default': '#2a2f37',
+    'ds-border-strong': '#6b717c',
     'ds-text-primary': '#e9e7df',
     'ds-text-secondary': '#c3c1b8',
     'ds-text-tertiary': '#9a9ea6',
@@ -61,8 +63,8 @@ const EXPECTED = {
     'ds-bg-elevated': '#ffffff',
     'ds-bg-overlay': '#ffffff',
     'ds-border-subtle': '#d6d4cb',
-    'ds-border-default': '#838891',
-    'ds-border-strong': '#5c626c',
+    'ds-border-default': '#d6d4cb',
+    'ds-border-strong': '#838891',
     'ds-text-primary': '#15171c',
     'ds-text-secondary': '#3d424b',
     'ds-text-tertiary': '#5c626c',
@@ -118,6 +120,9 @@ for (const [key, value] of Object.entries(twColors)) {
   const m = value.match(/^var\((--[a-z0-9-]+)\)$/);
   assert(Boolean(m), `${key} is var(--…)`, `found '${value}'`);
   if (m) varOf[key] = m[1];
+}
+for (const key of ['ds-border-subtle', 'ds-border-default', 'ds-border-strong']) {
+  assert(varOf[key] === `--${key}`, `${key} reads --${key}`, `found ${varOf[key] ?? '(none)'}`);
 }
 
 // ── 2. Each var is declared in both themes ───────────────────────

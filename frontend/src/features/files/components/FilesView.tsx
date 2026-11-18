@@ -1,5 +1,5 @@
 import { ChangeEvent, useMemo, useRef } from 'react';
-import { Download, File as FileIcon, RefreshCw, Trash2, Upload } from 'lucide-react';
+import { Download, File as FileIcon, Trash2, Upload } from 'lucide-react';
 import { StateContainer } from '@/shared/components/StateContainer';
 import { ConfirmationDialog } from '@/shared/components/ConfirmationDialog';
 import { Button } from '@/shared/components/ui/Button';
@@ -46,13 +46,6 @@ export function FilesView() {
       onSuccess: () => deleteDialog.close(),
     });
   };
-
-  const loadingSlot = (
-    <div className="flex flex-col items-center justify-center gap-3 py-12" role="status">
-      <RefreshCw className="h-8 w-8 animate-spin text-primary" aria-hidden="true" />
-      <p className="text-base-content/60">{t('files:loading')}</p>
-    </div>
-  );
 
   const errorSlot = (
     <div className="rounded-2xl border border-error/30 bg-error/10 px-4 py-8 text-center">
@@ -122,7 +115,7 @@ export function FilesView() {
             isLoading={isLoading}
             isError={isError}
             isEmpty={sortedFiles.length === 0}
-            loadingSlot={loadingSlot}
+            loadingLabel={t('files:loading')}
             errorSlot={errorSlot}
             emptySlot={emptySlot}
           >

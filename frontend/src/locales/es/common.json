@@ -1,6 +1,7 @@
 {
   "cancel": "Cancelar",
   "confirm": "Confirmar",
+  "typeToConfirmDelete": "Escribe \"{{identifier}}\" para confirmar",
   "confirmAction": "Confirmar acción",
   "processing": "Procesando...",
   "loading": "Cargando...",
@@ -25,6 +26,7 @@
   "save": "Guardar",
   "edit": "Editar",
   "close": "Cerrar",
+  "closeDialog": "Cerrar diálogo",
   "open": "Abrir",
   "back": "Atrás",
   "yes": "Sí",

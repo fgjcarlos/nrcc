@@ -38,7 +38,8 @@ try {
     ['loading indicator styling', /\.loading\{/],
     ['disabled control state', /:disabled/],
     ['visible focus state', /:focus-visible/],
-    ['custom typography utility', /\.text-ds-h1\{/],
+    // One button spec: the action classes carry the 36px DESIGN.md target.
+    ['action button minimum height', /\.action-btn-primary[^{]*\{[^}]*min-height:2\.25rem/],
     // Legacy glow utilities now resolve to the flat raised elevation.
     ['flattened shadow utility', /\.shadow-glow[,{][^}]*--tw-shadow:var\(--ds-shadow-raised\)/],
     ['DaisyUI box radius token', /--radius-box:4px/],
@@ -63,6 +64,10 @@ try {
     ['font CDN request', /fonts\.(googleapis|gstatic)\.com/],
     ['legacy font family', /font-family:[^;}]*(Inter|JetBrains)/],
     ['legacy Signal Prime hex', /#(d4472b|cf452a|bd3f27|0089b4|007aa0|e54233)\b/i],
+    // DESIGN.md has three type sizes; the retired ds-* scale must not return.
+    ['retired ds-* type scale', /\.text-ds-(display|h1|h2|h3|body|caption|eyebrow)\{/],
+    // Text controls get their boundary without !important (L19 cleanup).
+    ['!important on the text control rule', /\[data-theme\] (input|textarea|select)[^{]*\{[^}]*!important/],
   ]) {
     assert.doesNotMatch(css, pattern, `Built CSS still contains ${label}`);
   }

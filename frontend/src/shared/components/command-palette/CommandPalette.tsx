@@ -324,7 +324,8 @@ export function CommandPalette() {
                 onChange={(event) => setQuery(event.target.value)}
                 onKeyDown={onInputKeyDown}
                 placeholder="Search routes and actions…"
-                className="w-full border-b border-border bg-transparent px-5 py-4 text-base text-base-content outline-none placeholder:text-base-content/45 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+                // input-bare: drawn into the palette, so it keeps its rule line instead of the field box.
+                className="input-bare w-full border-b border-border bg-transparent px-5 py-4 text-base text-base-content outline-none placeholder:text-base-content/45 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
                 role="combobox"
                 aria-expanded="true"
                 aria-controls="command-palette-results"

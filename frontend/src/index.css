@@ -110,9 +110,6 @@
     --ds-accent-primary:       #7fa6ea;
     --ds-accent-hover:         #9ab9ef;
     --ds-accent-dim:           #24375a;
-    --ds-ui-border-subtle:     #2a2f37;
-    --ds-ui-border-default:    #6b717c;
-    --ds-ui-border-strong:     #9a9ea6;
     --ds-text-tertiary:        #9a9ea6;
     --ds-success:              #8cc66b;
     --ds-warning:              #e8b04a;
@@ -201,9 +198,6 @@
     --ds-accent-primary:       #2b5fb4;
     --ds-accent-hover:         #234e94;
     --ds-accent-dim:           #dbe4f3;
-    --ds-ui-border-subtle:     #d6d4cb;
-    --ds-ui-border-default:    #838891;
-    --ds-ui-border-strong:     #5c626c;
     --ds-text-tertiary:        #5c626c;
     --ds-success:              #2d6a22;
     --ds-warning:              #8a5a00;
@@ -357,58 +351,95 @@
     background-color: color-mix(in srgb, var(--ds-text-primary) 32%, transparent);
   }
 
-  /* ── Action Buttons — flat sheet, conductor-coloured border ── */
+  /* ── Action buttons: the one button spec (DESIGN.md Buttons) ──
+     <Button> renders these classes (constants/buttonVariants.ts) and
+     raw daisyUI .btn reaches the same values through its variables
+     (BUTTON OVERRIDES below). 4px field radius, 14px label, 36px
+     minimum target; inline-flex keeps an icon on the label's line. */
   .action-btn-primary,
+  .action-btn-solid,
   .action-btn-secondary,
   .action-btn-danger,
   .action-btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 text-sm transition-colors;
+    min-height: 2.25rem;
     cursor: pointer;
     background: var(--ds-bg-surface);
+    border: 1px solid transparent;
     border-radius: var(--radius-field);
   }
 
+  .action-btn-primary:focus-visible,
+  .action-btn-solid:focus-visible,
+  .action-btn-secondary:focus-visible,
+  .action-btn-danger:focus-visible,
+  .action-btn-ghost:focus-visible {
+    outline: 2px solid var(--ds-accent-primary);
+    outline-offset: 2px;
+  }
+
   .action-btn-primary:disabled,
+  .action-btn-solid:disabled,
   .action-btn-secondary:disabled,
   .action-btn-danger:disabled,
   .action-btn-ghost:disabled {
     cursor: default;
+    opacity: 0.5;
   }
 
+  /* Primary (action): sheet ground, conductor-blue edge and label. */
   .action-btn-primary {
-    @apply flex items-center gap-2 px-4 py-2 font-medium text-primary transition-colors disabled:opacity-50;
-    border: 1px solid var(--color-primary);
+    font-weight: 500;
+    color: var(--ds-on-tint-primary);
+    border-color: var(--color-primary);
   }
 
-  .action-btn-primary:hover {
+  .action-btn-primary:hover:not(:disabled) {
     background-color: color-mix(in srgb, var(--color-primary) 10%, var(--ds-bg-surface));
   }
 
-  /* inline-flex keeps an icon on the label's line (it wrapped above it). */
-  .action-btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2 text-base-content transition-colors disabled:opacity-50;
-    border: 1px solid var(--ds-border-strong);
+  /* Solid primary: conductor-blue fill; the label is --color-primary-content
+     (white in light, drawing-sunken in dark), never a hard-coded white. */
+  .action-btn-solid {
+    font-weight: 600;
+    color: var(--color-primary-content);
+    background: var(--color-primary);
+    border-color: var(--color-primary);
   }
 
-  .action-btn-secondary:hover {
+  .action-btn-solid:hover:not(:disabled) {
+    background-color: var(--ds-brand-hover);
+    border-color: var(--ds-brand-hover);
+  }
+
+  .action-btn-secondary {
+    color: var(--color-base-content);
+    border-color: var(--ds-border-strong);
+  }
+
+  .action-btn-secondary:hover:not(:disabled) {
     background-color: color-mix(in srgb, var(--ds-text-primary) 6%, var(--ds-bg-surface));
   }
 
+  /* Danger: destructive actions only (The Red Is Rare Rule). */
   .action-btn-danger {
-    @apply flex items-center gap-2 px-4 py-2 font-medium text-error transition-colors disabled:opacity-50;
-    border: 1px solid var(--color-error);
+    font-weight: 500;
+    color: var(--ds-on-tint-error);
+    border-color: var(--color-error);
   }
 
-  .action-btn-danger:hover {
+  .action-btn-danger:hover:not(:disabled) {
     background-color: color-mix(in srgb, var(--color-error) 10%, var(--ds-bg-surface));
   }
 
   .action-btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 px-3 py-2 text-base-content transition-colors disabled:opacity-50;
-    border: 1px solid transparent;
+    @apply px-3;
+    color: var(--color-base-content);
+    background: transparent;
   }
 
-  .action-btn-ghost:hover {
-    background-color: color-mix(in srgb, var(--ds-text-muted) 10%, var(--ds-bg-surface));
+  .action-btn-ghost:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--ds-text-muted) 10%, transparent);
   }
 
   /* ── Table Row Hover ───────────────────────────────────────── */
@@ -425,9 +456,119 @@
     background-color: var(--color-base-200);
   }
 
-  /* ── Skeleton Line ─────────────────────────────────────────── */
+  /* ── Data table (<Table>, DESIGN.md Tabular Data Rule) ──────
+     Hairline row rules, 12px sentence-case headers on the sunken
+     ground, 14px cells, tabular numerals, dense rows. */
+  .ds-table-wrap {
+    overflow-x: auto;
+    background: var(--ds-bg-surface);
+    border: 1px solid var(--ds-border-default);
+    border-radius: var(--radius-box);
+  }
+
+  .ds-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-base-content);
+  }
+
+  .ds-table th {
+    padding: 0.5rem 0.75rem;
+    text-align: start;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 600;
+    letter-spacing: normal;
+    text-transform: none;
+    color: var(--ds-text-secondary);
+    background: var(--ds-bg-base);
+    border-bottom: 1px solid var(--ds-border-default);
+  }
+
+  .ds-table td {
+    height: 2.5rem;
+    padding: 0.375rem 0.75rem;
+    vertical-align: middle;
+    border-bottom: 1px solid var(--ds-border-default);
+  }
+
+  .ds-table tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .ds-table tbody tr:hover {
+    background-color: color-mix(in srgb, var(--color-primary) 6%, transparent);
+  }
+
+  /* Stacked: below sm each row is a labelled card (the Users page pattern). */
+  @media (max-width: 639.98px) {
+    .ds-table-wrap[data-stacked] {
+      overflow: visible;
+      background: transparent;
+      border: 0;
+    }
+
+    .ds-table-wrap[data-stacked] thead {
+      @apply sr-only;
+    }
+
+    .ds-table-wrap[data-stacked] :is(table, tbody, tr) {
+      display: block;
+    }
+
+    .ds-table-wrap[data-stacked] tr {
+      padding: 0.25rem 0.75rem;
+      background: var(--ds-bg-surface);
+      border: 1px solid var(--ds-border-default);
+      border-radius: var(--radius-box);
+    }
+
+    .ds-table-wrap[data-stacked] tr + tr {
+      margin-top: 0.5rem;
+    }
+
+    .ds-table-wrap[data-stacked] td {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem 0.75rem;
+      align-items: center;
+      height: auto;
+      min-height: 2.25rem;
+      padding: 0.25rem 0;
+      overflow-wrap: anywhere;
+      text-align: start;
+    }
+
+    .ds-table-wrap[data-stacked] td + td {
+      border-top: 1px solid var(--ds-border-default);
+    }
+
+    .ds-table-wrap[data-stacked] td,
+    .ds-table-wrap[data-stacked] tbody tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .ds-table-wrap[data-stacked] td > * {
+      min-width: 0;
+    }
+
+    .ds-table-wrap[data-stacked] td::before {
+      content: attr(data-label);
+      text-align: start;
+      flex: 0 0 35%;
+      min-width: 5.5rem;
+      font-size: 0.75rem;
+      line-height: 1rem;
+      color: var(--ds-text-secondary);
+    }
+  }
+
+  /* ── Skeleton Line: the sunken ground (DESIGN.md Neutral) ──── */
   .skeleton-dark {
-    background-color: color-mix(in srgb, var(--ds-text-muted) 10%, transparent);
+    background-color: var(--ds-bg-base);
   }
 
   /* ── Modal Inner Panel (ConfirmationDialog) ────────────────── */
@@ -487,55 +628,93 @@
     line-height: 1.6;
     color: var(--ds-text-muted);
   }
-
-  .text-label {
-    font-weight: 500;
-    font-size: 0.75rem;
-    letter-spacing: 0.05em;
-    line-height: 1;
-    text-transform: uppercase;
-  }
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   BUTTON OVERRIDES — Theme-aware (conductor blue = action)
-   `[data-theme]` keeps the (0,2,0) specificity of the old per-theme
-   selectors so these still win over daisyUI's button styles.
+   BUTTON OVERRIDES — raw daisyUI .btn on the one button spec
+   daisyUI sits in a sublayer of utilities, so these stay unlayered.
+   They set daisyUI's own variables (--btn-bg, --btn-fg, --btn-border,
+   --size, --fontsize) rather than the properties, so a call site's
+   utilities still win and the values match the .action-btn-* classes.
    ═══════════════════════════════════════════════════════════════ */
 
-/* ── Primary: solid conductor blue ─────────────────────────── */
+/* Base = secondary: sheet ground, control-border edge, ink label. */
+[data-theme] .btn {
+  --btn-bg: var(--ds-bg-surface);
+  --btn-fg: var(--color-base-content);
+  --btn-border: var(--ds-border-strong);
+  --fontsize: 0.875rem;
+  font-weight: 400;
+  box-shadow: none;
+}
+
+/* md is 36px; daisyUI's own size classes keep their 24/32px targets. */
+[data-theme] .btn:where(:not(.btn-xs, .btn-sm, .btn-md, .btn-lg, .btn-xl)) {
+  --size: 2.25rem;
+}
+
+/* xs keeps a 24px target but the 12px label size (no fourth size). */
+[data-theme] .btn-xs {
+  --fontsize: 0.75rem;
+}
+
+[data-theme] .btn:hover:not(:disabled) {
+  --btn-bg: color-mix(in srgb, var(--ds-text-primary) 6%, var(--ds-bg-surface));
+  --btn-border: var(--ds-border-strong);
+}
+
+/* Solid primary: conductor-blue fill, --color-primary-content label. */
 [data-theme] .btn-primary {
-  @apply border-0 font-semibold;
-  background: var(--color-primary);
-  color: var(--color-primary-content);
+  --btn-bg: var(--color-primary);
+  --btn-fg: var(--color-primary-content);
+  --btn-border: var(--color-primary);
+  font-weight: 600;
 }
 
-[data-theme] .btn-primary:hover {
-  background: var(--ds-brand-hover);
+[data-theme] .btn-primary:hover:not(:disabled) {
+  --btn-bg: var(--ds-brand-hover);
+  --btn-border: var(--ds-brand-hover);
 }
 
-/* ── Secondary: control border ─────────────────────────────── */
-[data-theme] .btn-secondary {
-  @apply bg-transparent text-base-content;
-  border: 1px solid var(--ds-border-strong);
+[data-theme] .btn-ghost {
+  --btn-bg: transparent;
+  --btn-border: transparent;
 }
 
-/* ── Tertiary: Text-only accent ────────────────────────────── */
-[data-theme] .btn-tertiary {
-  @apply bg-transparent text-accent font-semibold;
-  border: none;
+[data-theme] .btn-ghost:hover:not(:disabled) {
+  --btn-bg: color-mix(in srgb, var(--ds-text-muted) 10%, transparent);
+  --btn-border: transparent;
 }
 
-[data-theme] .btn-tertiary:hover {
-  background-color: color-mix(in srgb, var(--color-primary) 8%, transparent);
+/* Danger: destructive actions only, red edge and label on the sheet. */
+[data-theme] .btn-error {
+  --btn-fg: var(--ds-on-tint-error);
+  --btn-border: var(--color-error);
+  font-weight: 500;
 }
 
-/* ── Ghost hover ───────────────────────────────────────────── */
-[data-theme] .btn-ghost:hover {
-  background-color: color-mix(in srgb, var(--ds-text-muted) 8%, transparent);
+[data-theme] .btn-error:hover:not(:disabled) {
+  --btn-bg: color-mix(in srgb, var(--color-error) 10%, var(--ds-bg-surface));
+  --btn-border: var(--color-error);
 }
 
-/* ── Semantic buttons: dark uses a tint, light a solid fill ── */
+[data-theme] .btn:focus-visible {
+  outline: 2px solid var(--ds-accent-primary);
+  outline-offset: 2px;
+}
+
+/* daisyUI blanks disabled buttons; the spec dims them instead. */
+[data-theme] .btn:is(:disabled, [disabled], .btn-disabled, [aria-disabled="true"]) {
+  opacity: 0.5;
+}
+
+[data-theme] .btn:is(:disabled, [disabled], .btn-disabled, [aria-disabled="true"]):not(.btn-success) {
+  background-color: var(--btn-bg);
+  color: var(--btn-fg);
+  border-color: var(--btn-border);
+}
+
+/* ── Success (one call site): dark uses a tint, light a solid fill ── */
 [data-theme="corporateDark"] .btn-success {
   @apply border-0 text-white font-medium;
   background-color: color-mix(in srgb, var(--color-success) 28%, transparent);
@@ -546,7 +725,8 @@
 }
 
 [data-theme="corporateLight"] .btn-success {
-  @apply border-0 text-white font-medium;
+  @apply border-0 font-medium;
+  color: var(--color-success-content);
   background-color: var(--color-success);
 }
 
@@ -554,120 +734,12 @@
   background-color: color-mix(in srgb, var(--color-success) 85%, var(--ds-text-primary));
 }
 
-[data-theme="corporateDark"] .btn-warning {
-  @apply border-0 font-medium;
-  color: var(--ds-text-primary);
-  background-color: color-mix(in srgb, var(--color-warning) 32%, transparent);
-}
-
-[data-theme="corporateDark"] .btn-warning:hover:not(:disabled) {
-  background-color: color-mix(in srgb, var(--color-warning) 44%, transparent);
-}
-
-[data-theme="corporateLight"] .btn-warning {
-  @apply border-0 font-medium;
-  color: var(--color-warning-content);
-  background-color: var(--color-warning);
-}
-
-[data-theme="corporateLight"] .btn-warning:hover:not(:disabled) {
-  background-color: color-mix(in srgb, var(--color-warning) 88%, var(--ds-text-primary));
-}
-
-[data-theme="corporateDark"] .btn-error {
-  @apply border-0 text-white font-medium;
-  background-color: color-mix(in srgb, var(--color-error) 28%, transparent);
-}
-
-[data-theme="corporateDark"] .btn-error:hover:not(:disabled) {
-  background-color: color-mix(in srgb, var(--color-error) 40%, transparent);
-}
-
-[data-theme="corporateLight"] .btn-error {
-  @apply border-0 text-white font-medium;
-  background-color: var(--color-error);
-}
-
-[data-theme="corporateLight"] .btn-error:hover:not(:disabled) {
-  background-color: color-mix(in srgb, var(--color-error) 85%, var(--ds-text-primary));
-}
-
-[data-theme="corporateDark"] .btn-info {
-  @apply border-0 text-white font-medium;
-  background-color: color-mix(in srgb, var(--color-info) 28%, transparent);
-}
-
-[data-theme="corporateDark"] .btn-info:hover:not(:disabled) {
-  background-color: color-mix(in srgb, var(--color-info) 40%, transparent);
-}
-
-[data-theme="corporateLight"] .btn-info {
-  @apply border-0 text-white font-medium;
-  background-color: var(--color-info);
-}
-
-[data-theme="corporateLight"] .btn-info:hover:not(:disabled) {
-  background-color: color-mix(in srgb, var(--color-info) 85%, var(--ds-text-primary));
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   BUTTON STATES — Focus, Active, Disabled
-   ═══════════════════════════════════════════════════════════════ */
-
-/* ── All Semantic Buttons: Clean, consistent feel ────────────── */
-.btn-success,
-.btn-warning,
-.btn-error,
-.btn-info {
+.btn-success {
   @apply transition-colors duration-150 ease-out;
-  position: relative;
 }
 
-/* Disabled state: Reduced opacity */
-.btn-success:disabled,
-.btn-warning:disabled,
-.btn-error:disabled,
-.btn-info:disabled {
-  @apply opacity-50 cursor-not-allowed;
-}
-
-/* Focus state: surface halo plus a currentColor ring */
-.btn-success:focus-visible,
-.btn-warning:focus-visible,
-.btn-error:focus-visible,
-.btn-info:focus-visible {
-  @apply outline-0;
-  box-shadow: 0 0 0 2px var(--ds-bg-base), 0 0 0 4px currentColor;
-  opacity: 1;
-}
-
-/* Active state: Subtle background deepening */
-.btn-success:active:not(:disabled),
-.btn-warning:active:not(:disabled),
-.btn-error:active:not(:disabled),
-.btn-info:active:not(:disabled) {
+.btn-success:active:not(:disabled) {
   @apply opacity-75;
-}
-
-/* ── Secondary button: Clean hover state ────────────────────── */
-[data-theme] .btn-secondary:hover:not(:disabled) {
-  background-color: color-mix(in srgb, var(--color-primary) 8%, transparent);
-  border-color: var(--color-primary);
-}
-
-/* Secondary: Focus state */
-.btn-secondary:focus-visible {
-  @apply outline-0;
-  box-shadow: 0 0 0 2px var(--ds-bg-base), 0 0 0 4px currentColor;
-}
-
-.btn-secondary:active:not(:disabled) {
-  @apply opacity-75;
-}
-
-/* ── Quick Action Buttons: Container-specific refinement ────── */
-.quick-action-btn {
-  /* Consistent appearance across all buttons */
 }
 
 /* Icon spin animation for loading states */
@@ -704,10 +776,11 @@
    DAISYUI OVERRIDES — Theme-aware (No-Line Rule)
    ═══════════════════════════════════════════════════════════════ */
 
-/* .border-border, .border-base-300 */
+/* .border-border, .border-base-300: unlayered, so they already beat
+   every utility; no !important, so the text-control rule below wins. */
 .border-border,
 .border-base-300 {
-  border-color: var(--ds-border-default) !important;
+  border-color: var(--ds-border-default);
 }
 
 /* .text-base-content — handled natively by daisyUI CSS variables (--bc).
@@ -836,14 +909,16 @@ aside.bg-base-100 {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   INPUT & SELECT ELEMENTS — control border (≥3:1, WCAG 1.4.11)
+   INPUT, TEXTAREA & SELECT — one control boundary (DESIGN.md Inputs)
+   Unlayered on purpose: it must beat call-site utilities such as
+   rounded-xl and border-0 on raw and .glass-panel inputs, so the
+   shared <Input>/<Select>/<Textarea> and every raw field draw the same
+   1px control border (≥3:1, WCAG 1.4.11) at the 4px field radius.
    ═══════════════════════════════════════════════════════════════ */
 
-[data-theme] input,
-[data-theme] textarea,
-[data-theme] select {
-  background-color: var(--ds-bg-elevated) !important;
-  border-color: var(--ds-border-strong) !important;
+[data-theme] :is(input, textarea, select) {
+  background-color: var(--ds-bg-elevated);
+  border-color: var(--ds-border-strong);
   color: var(--ds-text-primary);
 }
 
@@ -852,27 +927,58 @@ aside.bg-base-100 {
   color: var(--ds-text-muted);
 }
 
-[data-theme] input:focus,
-[data-theme] textarea:focus,
-[data-theme] select:focus {
-  border-color: var(--color-primary) !important;
-  background-color: var(--ds-bg-elevated) !important;
+/* Text-like controls only: selectors keep their 2px daisyUI shape, and
+   .input-bare opts out for a field drawn into its container (palette). */
+[data-theme] :is(textarea, select, input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="hidden"], [type="button"], [type="submit"], [type="reset"], [type="image"])):not(.input-bare) {
+  border-width: 1px;
+  border-style: solid;
+  border-radius: var(--radius-field);
+  transition: border-color 150ms ease-out, box-shadow 150ms ease-out;
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   INPUT FOCUS / ERROR RINGS — Theme-aware
-   ═══════════════════════════════════════════════════════════════ */
+[data-theme] :is(input, textarea, select):hover:not(:focus, :disabled, [readonly], [aria-invalid="true"]) {
+  border-color: var(--ds-text-muted);
+}
 
+[data-theme] :is(input, textarea, select):focus {
+  border-color: var(--color-primary);
+}
+
+[data-theme] :is(input, textarea, select):not(.input-bare):focus {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 24%, transparent);
+}
+
+[data-theme] :is(input, textarea, select):not(.input-bare):focus-visible {
+  outline: 2px solid var(--ds-accent-primary);
+  outline-offset: 2px;
+}
+
+/* Invalid outranks focus: the edge and glow stay critical while typing. */
+[data-theme] :is(input, textarea, select)[aria-invalid="true"]:not(.input-bare) {
+  border-color: var(--color-error);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-error) 24%, transparent);
+}
+
+[data-theme] :is(input, textarea, select):disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Read-only: the sunken ground; the edge stays so the field still reads as one. */
+[data-theme] :is(input, textarea)[readonly] {
+  background-color: var(--ds-bg-base);
+}
+
+/* Focus tint kept for the configuration select (FormFields); the text-control
+   rule above already draws it. */
 .input-focus-glow:focus {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 24%, transparent);
 }
 
-.input-error-glow {
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-error) 24%, transparent);
-}
-
 /* ═══════════════════════════════════════════════════════════════
    TABLE & THEAD STYLING — hairline rows on the sunken header
+   Legacy raw tables only: the shared <Table> (.ds-table, components
+   layer) is excluded so utilities on its cells keep working.
    ═══════════════════════════════════════════════════════════════ */
 
 [data-theme] table {
@@ -880,22 +986,22 @@ aside.bg-base-100 {
   border-collapse: collapse;
 }
 
-[data-theme="corporateDark"] table,
-[data-theme="corporateDark"] tbody td {
+[data-theme="corporateDark"] table:not(.ds-table),
+[data-theme="corporateDark"] table:not(.ds-table) tbody td {
   color: var(--ds-text-secondary);
 }
 
-[data-theme="corporateLight"] table,
-[data-theme="corporateLight"] tbody td {
+[data-theme="corporateLight"] table:not(.ds-table),
+[data-theme="corporateLight"] table:not(.ds-table) tbody td {
   color: var(--ds-text-primary);
 }
 
-[data-theme] thead {
+[data-theme] table:not(.ds-table) thead {
   background: var(--color-base-200);
   border-bottom: 1px solid var(--ds-border-default);
 }
 
-[data-theme] thead th {
+[data-theme] table:not(.ds-table) thead th {
   padding: 0.75rem 1rem;
   text-align: left;
   font-weight: 600;
@@ -905,16 +1011,16 @@ aside.bg-base-100 {
   color: var(--ds-text-muted);
 }
 
-[data-theme] tbody tr {
+[data-theme] table:not(.ds-table) tbody tr {
   border-bottom: 1px solid var(--ds-border-default);
   transition: background-color 150ms ease;
 }
 
-[data-theme] tbody tr:hover {
+[data-theme] table:not(.ds-table) tbody tr:hover {
   background-color: color-mix(in srgb, var(--color-primary) 6%, transparent);
 }
 
-[data-theme] tbody td {
+[data-theme] table:not(.ds-table) tbody td {
   padding: 0.75rem 1rem;
 }
 
