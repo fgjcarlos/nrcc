@@ -13,6 +13,13 @@ const (
 	StateFailed    UpdateState = "Failed"
 )
 
+// InProgress reports whether an update flow is running. Idle and the terminal
+// states (Completed, Failed) are startable: a terminal state stays visible to
+// pollers until the next update overwrites it.
+func (s UpdateState) InProgress() bool {
+	return s == StateBackingUp || s == StateApplying
+}
+
 // UpdateFlowState represents the current state of an update operation.
 // This struct tracks multi-stage update flows: BackingUp → Applying → Completed/Failed.
 type UpdateFlowState struct {

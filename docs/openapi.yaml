@@ -1845,7 +1845,8 @@ paths:
       description: |
         Starts an asynchronous update flow: BackingUp → Applying → Completed/Failed.
         Returns immediately with the current flow state. Poll `GET /api/updates/state`
-        every 500 ms to track progress.
+        every 500 ms to track progress. A new update can start from `Idle`,
+        `Completed` or `Failed`.
       security:
         - bearerAuth: []
       responses:
@@ -1858,7 +1859,13 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "409":
-          $ref: "#/components/responses/Conflict"
+          description: >-
+            `UPDATE_IN_PROGRESS`: an update flow is running (`BackingUp` or
+            `Applying`). Completed or failed flows do not block a new update.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
 
   /api/updates/state:
     get:

@@ -54,7 +54,8 @@ type backupCreator interface {
 // are sanitized to avoid exposing raw npm exit codes to the UI, and cache persists across restarts.
 //
 // Multi-stage Update Flow:
-// - State machine tracks: Idle → BackingUp → Applying → Completed/Failed
+// - State machine tracks: Idle → BackingUp → Applying → Completed/Failed;
+//   Completed/Failed are startable again (see model.UpdateState.InProgress)
 // - applyMu guards concurrent updates; only one update flow at a time
 // - flowState stores current operation state (thread-safe via flowStateMu)
 // - backupStore persists backup metadata to ./data/update_backups.json (max 5 entries)
@@ -447,10 +448,10 @@ func (s *UpdateService) applyContext() context.Context {
 }
 
 // ApplyUpdateWithBackup orchestrates the full update flow: BackingUp → Applying → Completed/Failed.
-// Only one update can proceed at a time; returns error if state != Idle.
+// Only one update can proceed at a time; returns error if a flow is in progress.
 // Flow:
 //  1. Acquire applyMu lock
-//  2. Check flowState.State == StateIdle; return error if not
+//  2. Check the state is Idle, Completed or Failed; return error if not
 //  3. Set state = BackingUp
 //  4. Call CreateBackup; persist to catalog
 //  5. Set state = Applying
@@ -469,9 +470,9 @@ func (s *UpdateService) ApplyUpdateWithBackup(ctx context.Context) error {
 	}
 	defer s.applyMu.Unlock()
 
-	// Check if we can start: state must be Idle
+	// Check if we can start: no flow may be in progress
 	s.flowStateMu.RLock()
-	if s.flowState.State != model.StateIdle {
+	if s.flowState.State.InProgress() {
 		s.flowStateMu.RUnlock()
 		return fmt.Errorf("update cannot start: state is %s", s.flowState.State)
 	}
@@ -586,6 +587,17 @@ func (s *UpdateService) ApplyUpdate(ctx context.Context) error {
 	installed, err := s.versionFromExecutable(runCtx, managed)
 	if err != nil || installed != cached.LatestVersion {
 		return fmt.Errorf("%w (executable: %s, expected: %s, got: %s)", ErrUpdateVerificationFailed, managed.Executable, cached.LatestVersion, installed)
+	}
+
+	// The install is verified, so the cached status must stop offering it
+	// (otherwise it stays stale until the next poll, hours later).
+	s.cacheMu.Lock()
+	s.cache.CurrentVersion = installed
+	s.cache.UpdateAvailable = false
+	entry := s.cache
+	s.cacheMu.Unlock()
+	if err := s.store.Write(entry); err != nil {
+		fmt.Printf("warning: failed to write cache to disk: %v\n", err)
 	}
 
 	if err := s.postInstallAudit(runCtx, cached.LatestVersion); err != nil {

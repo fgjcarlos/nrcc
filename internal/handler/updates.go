@@ -92,7 +92,8 @@ func (h *UpdateHandler) GetCheck(w http.ResponseWriter, r *http.Request) {
 // POST /api/updates/apply
 //
 // Flow:
-// 1. Check if state is Idle; if not, return 409 Conflict
+// 1. If a flow is in progress (BackingUp/Applying), return 409 Conflict;
+//    Idle, Completed and Failed can all start a new update
 // 2. Launch asynchronous update flow: BackingUp → Applying → Completed/Failed
 // 3. Return 200 OK immediately with current state + backupId (if available)
 //
@@ -100,11 +101,11 @@ func (h *UpdateHandler) GetCheck(w http.ResponseWriter, r *http.Request) {
 // Once state reaches Completed/Failed, polling stops.
 //
 // Response on success: {success: true, state: "BackingUp", backupId: "..."}
-// Response on conflict: HTTP 409 {success: false, error: "update already in progress"}
+// Response on conflict: HTTP 409 {success: false, error: {code: "UPDATE_IN_PROGRESS", ...}}
 func (h *UpdateHandler) PostApply(w http.ResponseWriter, r *http.Request) {
 	// Check if an update is already in progress
 	flowState := h.svc.GetFlowState()
-	if flowState.State != model.StateIdle {
+	if flowState.State.InProgress() {
 		// Another update is already in progress
 		model.RespondError(w, http.StatusConflict, "UPDATE_IN_PROGRESS", 
 			"An update is already in progress. Please wait for it to complete.")
