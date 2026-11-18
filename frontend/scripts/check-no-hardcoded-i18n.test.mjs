@@ -46,7 +46,9 @@ function cleanup(dir) {
 }
 
 function writeFixture(tempSrc, name, content) {
-  fs.writeFileSync(path.join(tempSrc, name), content);
+  const target = path.join(tempSrc, name);
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(target, content);
 }
 
 function execGuard(patchedPath) {
@@ -101,6 +103,18 @@ const cases = [
       '  return <div>safe copy</div>;',
       '}',
     ].join('\n'),
+    expectViolation: true,
+  },
+  {
+    name: 'the dev-only styleguide (src/features/styleguide) may carry English labels',
+    file: 'features/styleguide/Guide.tsx',
+    content: 'export const Guide = () => <p>Developer documentation copy</p>;',
+    expectViolation: false,
+  },
+  {
+    name: 'a styleguide directory anywhere else is still checked',
+    file: 'shared/styleguide/Guide.tsx',
+    content: 'export const Guide = () => <p>Developer documentation copy</p>;',
     expectViolation: true,
   },
 ];

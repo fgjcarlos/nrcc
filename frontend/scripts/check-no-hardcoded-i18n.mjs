@@ -5,6 +5,10 @@ import { fileURLToPath } from 'node:url';
 const frontendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const sourceRoot = path.join(frontendRoot, 'src');
 const skippedDirectories = new Set(['locales', '__test__']);
+// Dev-only developer documentation (S5: the /styleguide route is absent
+// from production builds), so its own labels are English constants.
+// Matched by exact path under src/, not by directory name.
+const skippedSourcePaths = new Set(['features/styleguide']);
 const brands = new Set([
   'NRCC', 'Node-RED', 'daisyUI', 'JSON', 'JSX', 'ESLint', 'TypeScript',
   'Vite', 'Vitest', 'Playwright', 'Restish', 'OpenAPI', 'adminAuth',
@@ -21,7 +25,9 @@ function walk(directory) {
   const files = [];
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
     if (entry.isDirectory()) {
-      if (!skippedDirectories.has(entry.name)) files.push(...walk(path.join(directory, entry.name)));
+      const child = path.join(directory, entry.name);
+      const fromSource = path.relative(sourceRoot, child).split(path.sep).join('/');
+      if (!skippedDirectories.has(entry.name) && !skippedSourcePaths.has(fromSource)) files.push(...walk(child));
       continue;
     }
     if (entry.isFile() && /\.tsx$/.test(entry.name) && !/\.test\.tsx$/.test(entry.name)) files.push(path.join(directory, entry.name));
