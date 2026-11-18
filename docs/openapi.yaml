@@ -3105,8 +3105,25 @@ components:
           $ref: "#/components/schemas/ConfigurationCapabilities"
         recommendations:
           type: array
+          description: |
+            Human-readable recommendations, kept for existing consumers. The text
+            is not localized; clients should prefer `recommendationCodes`.
           items:
             type: string
+        recommendationCodes:
+          type: array
+          description: |
+            Stable machine code for each entry in `recommendations`, in the same
+            order and with the same length. Clients localize the code and fall
+            back to the matching `recommendations` string for codes they do not
+            know. Omitted when there are no recommendations.
+          items:
+            type: string
+            description: |
+              Known codes: `portless_optional` (Node-RED is detected and Portless
+              is not installed), `settings_not_writable` (NRCC cannot write the
+              settings.js it edits). New codes may be added.
+          example: [portless_optional]
 
     CpuInfo:
       type: object

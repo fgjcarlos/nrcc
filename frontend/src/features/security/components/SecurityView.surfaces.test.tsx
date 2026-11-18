@@ -10,6 +10,7 @@ import { server } from '@/test/msw/server';
 import { authUsersResponse, editableHostStatus, securityCenterConfig } from '@/test/msw/fixtures';
 import enSecurity from '@/locales/en/security.json';
 import esSecurity from '@/locales/es/security.json';
+import esConfiguration from '@/locales/es/configuration.json';
 import { SecurityView } from './SecurityView';
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -170,13 +171,19 @@ describe('SecurityView surfaces (T10)', () => {
     await waitForLoadedForm();
 
     await user.click(editToggle('boundary-httpNodeAuth'));
+    await user.type(screen.getByTestId('boundary-httpNodeAuth-user'), '-es');
     await user.click(screen.getByRole('button', { name: esSecurity.httpNodeAuth.save }));
+    await user.click(screen.getByRole('button', { name: esConfiguration.reviewPanel.apply }));
     await waitFor(() =>
       expect(screen.getByTestId('boundary-httpNodeAuth-error')).toHaveTextContent(
         esSecurity.applyErrors.revisionConflict,
       ),
     );
-    expect(toast.error).toHaveBeenCalledWith(esSecurity.applyErrors.revisionConflict);
+    // P1 #1: the outcome is on the circuit's live region, not on a toast.
+    expect(within(surface('boundary-httpNodeAuth')).getByTestId('change-circuit-live')).toHaveTextContent(
+      `${esConfiguration.circuit.steps.validate}: ${esConfiguration.circuit.state.failed}`,
+    );
+    expect(toast.error).not.toHaveBeenCalled();
 
     // DashboardAccess lives in features/configuration and is checked there.
     const owned = [...document.querySelectorAll('[data-testid="security-view"] > *')].filter(

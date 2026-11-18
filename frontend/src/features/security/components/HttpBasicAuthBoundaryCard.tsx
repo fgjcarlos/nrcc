@@ -1,15 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ConfirmationDialog } from '@/shared/components/ConfirmationDialog';
 import { StatusChip } from '@/shared/components/ui';
 import { useT } from '@/i18n';
+import { ReviewChangesPanel } from '@/features/configuration/components/ReviewChangesPanel';
 import {
   applySecurityPatch,
   applyErrorKey,
   detectLegacyAliases,
-  reportApplyError,
-  reportApplySuccess,
 } from './securityCenterHelpers';
 import { SecuritySurface } from './SecuritySurface';
+import { basicAuthReview, migrationRows } from '../lib/securityReview';
+import { useSurfaceApply } from '../lib/useSurfaceApply';
 
 const ANCHORS = { httpNodeAuth: 'http-node-auth', httpStaticAuth: 'http-static-auth' } as const;
 
@@ -58,9 +59,10 @@ export function HttpBasicAuthBoundaryCard({
   const { t } = useT();
   const [value, setValue] = useState<BasicAuthForm>({ user: '', pass: '' });
   const [saving, setSaving] = useState(false);
+  // Synchronous guard: a same-tick double click must not start two applies.
+  const savingRef = useRef(false);
   const [confirmMigration, setConfirmMigration] = useState(false);
   const [error, setError] = useState<string>();
-  const [appliedAt, setAppliedAt] = useState<number | null>(null);
 
   const surfaceConfigured = Boolean(config?.user);
   const legacyAliases = detectLegacyAliases(rawSettingsContent);
@@ -87,11 +89,26 @@ export function HttpBasicAuthBoundaryCard({
   }, [config]);
 
   const i18n = (suffix: string) => `security:${surface}.${suffix}`;
+  const legacyAlias = surface === 'httpNodeAuth' ? 'nodeHttpAuth' : 'staticAuth';
+  const reviewEntries = [
+    ...migrationRows(isLegacySurface ? [legacyAlias] : [], t),
+    ...basicAuthReview(surface, config, value, t),
+  ];
+  const review = useSurfaceApply(reviewEntries.length, value, editable);
+
+  const edit = (patch: Partial<BasicAuthForm>) => {
+    setValue((current) => ({ ...current, ...patch }));
+    review.edited();
+  };
 
   const apply = async () => {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    const count = reviewEntries.length;
     setConfirmMigration(false);
     setSaving(true);
     setError(undefined);
+    review.started(count);
 
     const patch =
       value.user.trim().length === 0
@@ -104,25 +121,24 @@ export function HttpBasicAuthBoundaryCard({
           };
 
     const result = await applySecurityPatch(patch, expectedRevision);
+    savingRef.current = false;
     setSaving(false);
+    // The circuit and its live region carry the outcome; no toast.
+    review.settled(count, result);
     if (result.status === 'applied') {
-      // The lint rule flags Date.now() as impure; this call runs from
-      // the Save button click handler (an event), not from render, so
-      // purity is preserved. Capture once to keep the call out of
-      // the setState callback.
-      const ts = Date.now();
-      setAppliedAt(ts);
-      reportApplySuccess(t(i18n('applied')));
       onApplied();
     } else {
-      const message = t(applyErrorKey(result.error?.status));
-      setError(message);
-      reportApplyError(message);
+      setError(t(applyErrorKey(result.error?.status)));
     }
   };
 
-  const save = async () => {
+  // Save opens the review drawer; its Apply is the confirmation.
+  const save = () => review.openReview();
+
+  const applyFromReview = async () => {
+    // The legacy migration keeps its own acknowledgement, after the review.
     if (isLegacySurface) {
+      review.closeReview();
       setConfirmMigration(true);
       return;
     }
@@ -136,6 +152,7 @@ export function HttpBasicAuthBoundaryCard({
       testId={`boundary-${surface}`}
       title={t(i18n('title'))}
       summary={t(i18n('subtitle'))}
+      circuit={{ circuit: review.circuit, pendingCount: reviewEntries.length }}
       status={
         <StatusChip
           variant={variant}
@@ -193,9 +210,7 @@ export function HttpBasicAuthBoundaryCard({
             className="input input-bordered mt-1 min-h-11 w-full md:min-h-0"
             data-testid={`boundary-${surface}-user`}
             value={value.user}
-            onChange={(event) => {
-              setValue((current) => ({ ...current, user: event.target.value }));
-            }}
+            onChange={(event) => edit({ user: event.target.value })}
           />
         </label>
         <label className="text-sm">
@@ -205,9 +220,7 @@ export function HttpBasicAuthBoundaryCard({
             data-testid={`boundary-${surface}-pass`}
             type="password"
             value={value.pass}
-            onChange={(event) => {
-              setValue((current) => ({ ...current, pass: event.target.value }));
-            }}
+            onChange={(event) => edit({ pass: event.target.value })}
           />
           {value.storedPass && (
             <p
@@ -229,19 +242,19 @@ export function HttpBasicAuthBoundaryCard({
           >
             {saving ? t(i18n('saving')) : t(i18n('save'))}
           </button>
-          {appliedAt && !error && (
-            <p
-              role="status"
-              aria-live="polite"
-              className="text-sm text-ds-on-tint-success"
-              data-testid={`boundary-${surface}-applied`}
-            >
-              {t(i18n('appliedLabel'))}
-            </p>
-          )}
         </div>
       </fieldset>
     </SecuritySurface>
+
+      <ReviewChangesPanel
+        isOpen={review.reviewOpen}
+        entries={reviewEntries}
+        pendingCount={reviewEntries.length}
+        target="settings.js"
+        isPending={saving}
+        onApply={applyFromReview}
+        onCancel={review.closeReview}
+      />
 
       <ConfirmationDialog
         isOpen={confirmMigration}

@@ -75,7 +75,7 @@ func (s *HostService) Detect() model.HostStatus {
 	}
 	status.Settings = s.resolveSettings(status)
 	status.Configuration = ResolveConfigurationCapabilities(status.NodeRed.Version, status.Settings)
-	status.Recommendations = s.buildRecommendations(status)
+	status.Recommendations, status.RecommendationCodes = s.buildRecommendations(status)
 	status.Ready = status.NodeRed.Detected && status.Settings.Path != ""
 
 	return status
@@ -302,15 +302,21 @@ func (s *HostService) resolveSettings(status model.HostStatus) model.SettingsDoc
 	return info
 }
 
-func (s *HostService) buildRecommendations(status model.HostStatus) []string {
-	var items []string
+// buildRecommendations returns the legacy human strings and their stable codes,
+// index-aligned. The strings stay byte-for-byte for existing consumers; new
+// clients localize the codes instead.
+func (s *HostService) buildRecommendations(status model.HostStatus) (messages, codes []string) {
+	add := func(code, message string) {
+		codes = append(codes, code)
+		messages = append(messages, message)
+	}
 	if status.NodeRed.Detected && !status.Portless.Installed {
-		items = append(items, "Opcional: instala Portless para exponer nrcc o Node-RED con URLs HTTPS .localhost, LAN o Tailscale.")
+		add(model.RecommendationPortlessOptional, "Opcional: instala Portless para exponer nrcc o Node-RED con URLs HTTPS .localhost, LAN o Tailscale.")
 	}
 	if status.Settings.Path != "" && !status.Settings.Writable {
-		items = append(items, "Otorga permisos de escritura sobre settings.js para que nrcc pueda guardar cambios.")
+		add(model.RecommendationSettingsNotWritable, "Otorga permisos de escritura sobre settings.js para que nrcc pueda guardar cambios.")
 	}
-	return items
+	return messages, codes
 }
 
 func (s *HostService) defaultNativeUserDir() string {

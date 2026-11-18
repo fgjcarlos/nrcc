@@ -80,12 +80,6 @@ beforeEach(() => {
   mocks.getStatus.mockResolvedValue({ data: { data: { nodeRed: { mode: 'docker', detected: true, version: '5.0.6' }, settings: { path: '/etc/node-red/settings.js' }, configuration: { runtimeVersion: '5.0.6', adapter: 'node-red-5', catalogVersion: '5.0.6', source: 'detected', mode: 'editable', editable: true } }, success: true, timestamp: '' } });
 });
 
-// Apply in the review drawer asks for confirmation before saving.
-async function confirmApply(user: ReturnType<typeof userEvent.setup>) {
-  const dialog = await screen.findByRole('dialog', { name: 'Apply changes?' });
-  await user.click(within(dialog).getByRole('button', { name: /^confirm$/i }));
-}
-
 // T9: the change circuit's "Review N changes" action replaced the
 // floating Save button as the entry to the review drawer.
 function reviewAction() {
@@ -334,6 +328,25 @@ describe('ConfigurationView (issue #762 — Security tab for credentialSecret / 
     expect(secretInput.value).toBe('final-rotation-passphrase');
   });
 
+  // PRODUCT.md: secrets are masked before any diff is shown.
+  it('prints typed secrets in the review drawer as the redaction marker', async () => {
+    const user = userEvent.setup();
+    renderConfiguration();
+
+    await user.click(await screen.findByRole('tab', { name: /^TLS & Secrets$/ }));
+    await user.type(screen.getByLabelText('Credential Secret (credentialSecret)'), 'typed-credential-secret');
+    await user.type(screen.getByLabelText('Private Key Passphrase (https.passphrase)'), 'typed-key-passphrase');
+    await user.click(reviewAction());
+    const panel = await screen.findByTestId('review-changes-panel');
+
+    for (const id of ['credentialSecret', 'httpsPassphrase']) {
+      const values = within(within(panel).getByTestId(`review-changes-panel-row-${id}`)).getAllByText(/^(—|\[redacted\])$/);
+      expect(values.map((v) => v.textContent)).toEqual(['—', '[redacted]']);
+    }
+    expect(document.body.textContent).not.toContain('typed-credential-secret');
+    expect(document.body.textContent).not.toContain('typed-key-passphrase');
+  });
+
   // Rotation is opt-in: blank credentialSecret must NOT be sent.
   it('omits credentialSecret from the save payload when the rotation field is blank', async () => {
     const user = userEvent.setup();
@@ -351,7 +364,6 @@ describe('ConfigurationView (issue #762 — Security tab for credentialSecret / 
     await user.click(reviewAction());
     const reviewPanel = await screen.findByTestId('review-changes-panel');
     await user.click(within(reviewPanel).getByTestId('review-changes-panel-apply'));
-    await confirmApply(user);
 
     await waitFor(() => expect(updateSpy).toHaveBeenCalled());
     const payload = updateSpy.mock.calls[0][0] as Record<string, unknown>;
@@ -388,14 +400,13 @@ describe('ConfigurationView (issue #762 — Security tab for credentialSecret / 
     await user.click(reviewAction());
     const reviewPanel = await screen.findByTestId('review-changes-panel');
     await user.click(within(reviewPanel).getByTestId('review-changes-panel-apply'));
-    await confirmApply(user);
 
     await waitFor(() => expect(updateSpy).toHaveBeenCalled());
     expect(updateSpy.mock.calls[0][1]).toBe('rev-42');
   });
 });
 
-describe('ConfigurationView (review drawer Apply — confirm, feedback, single submit)', () => {
+describe('ConfigurationView (review drawer Apply — single confirmation, feedback, single submit)', () => {
   function deferredUpdate() {
     const handle: { resolve: (v: unknown) => void; reject: (e: unknown) => void } = {
       resolve: () => undefined,
@@ -416,30 +427,75 @@ describe('ConfigurationView (review drawer Apply — confirm, feedback, single s
     vi.spyOn(configModule.configService, 'updateConfig').mockImplementation(updateSpy);
   }
 
-  async function openApplyConfirmation(user: ReturnType<typeof userEvent.setup>) {
+  async function openReview(user: ReturnType<typeof userEvent.setup>) {
     await user.click(await screen.findByRole('tab', { name: /^TLS & Secrets$/ }));
     await user.click(findToggleButton(/^Require HTTPS$/));
     await user.click(reviewAction());
     const panel = await screen.findByTestId('review-changes-panel');
-    await user.click(within(panel).getByTestId('review-changes-panel-apply'));
-    const dialog = await screen.findByRole('dialog', { name: 'Apply changes?' });
-    return { panel, dialog };
+    return { panel, apply: within(panel).getByTestId('review-changes-panel-apply') };
   }
 
-  it('asks for confirmation before saving; Cancel sends nothing and keeps the drawer', async () => {
+  it('one click on Apply in the drawer sends the request, with no second dialog', async () => {
     const user = userEvent.setup();
     const { updateSpy } = deferredUpdate();
     await spyUpdate(updateSpy);
     renderConfiguration();
 
-    const { panel, dialog } = await openApplyConfirmation(user);
-    expect(updateSpy).not.toHaveBeenCalled();
+    const { apply } = await openReview(user);
+    await user.click(apply);
 
-    await user.click(within(dialog).getByRole('button', { name: /^cancel$/i }));
+    await waitFor(() => expect(updateSpy).toHaveBeenCalledTimes(1));
+    // The drawer is the only dialog: no "Apply changes?" step after it.
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    expect(screen.queryByRole('dialog', { name: 'Apply changes?' })).not.toBeInTheDocument();
+  });
+
+  it('states the change count, the restart and the backup in the footer, focusing Cancel first', async () => {
+    const user = userEvent.setup();
+    renderConfiguration();
+
+    const { panel, apply } = await openReview(user);
+    const footer = within(panel).getByTestId('review-changes-panel-consequence');
+    expect(footer).toHaveTextContent('1 change · Node-RED restarts · backup taken first');
+    expect(apply).toHaveAccessibleName('Apply and restart Node-RED');
+    expect(apply).toHaveAccessibleDescription('1 change · Node-RED restarts · backup taken first');
     await waitFor(() =>
-      expect(screen.queryByRole('dialog', { name: 'Apply changes?' })).not.toBeInTheDocument(),
+      expect(within(panel.querySelector('footer') as HTMLElement).getByRole('button', { name: 'Cancel' })).toHaveFocus(),
     );
-    expect(panel).toBeInTheDocument();
+  });
+
+  it('cannot be dismissed while the apply is pending', async () => {
+    const user = userEvent.setup();
+    const { updateSpy, handle } = deferredUpdate();
+    await spyUpdate(updateSpy);
+    renderConfiguration();
+
+    const { panel, apply } = await openReview(user);
+    await user.click(apply);
+    await waitFor(() => expect(apply).toBeDisabled());
+
+    await user.keyboard('{Escape}');
+    for (const cancel of within(panel).getAllByRole('button', { name: 'Cancel' })) {
+      expect(cancel).toBeDisabled();
+      fireEvent.click(cancel);
+    }
+    fireEvent.click(screen.getByTestId('review-changes-panel-portal').firstElementChild as HTMLElement);
+    expect(screen.getByTestId('review-changes-panel')).toBeInTheDocument();
+
+    await act(async () => handle.resolve({ data: { data: {}, success: true, timestamp: '' } }));
+    await waitFor(() => expect(screen.queryByTestId('review-changes-panel')).not.toBeInTheDocument());
+    expect(updateSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('Escape before Apply closes the drawer and sends nothing', async () => {
+    const user = userEvent.setup();
+    const { updateSpy } = deferredUpdate();
+    await spyUpdate(updateSpy);
+    renderConfiguration();
+
+    await openReview(user);
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByTestId('review-changes-panel')).not.toBeInTheDocument());
     expect(updateSpy).not.toHaveBeenCalled();
   });
 
@@ -449,20 +505,15 @@ describe('ConfigurationView (review drawer Apply — confirm, feedback, single s
     await spyUpdate(updateSpy);
     renderConfiguration();
 
-    const { panel, dialog } = await openApplyConfirmation(user);
-    const confirm = within(dialog).getByRole('button', { name: /^confirm$/i });
+    const { apply } = await openReview(user);
     // Same-tick double click: the second click must not start a second save.
-    fireEvent.click(confirm);
-    fireEvent.click(confirm);
+    fireEvent.click(apply);
+    fireEvent.click(apply);
 
-    await waitFor(() => expect(confirm).toBeDisabled());
-    expect(within(dialog).getByText('Processing...')).toBeInTheDocument();
-    const apply = within(panel).getByTestId('review-changes-panel-apply');
-    expect(apply).toBeDisabled();
+    await waitFor(() => expect(apply).toBeDisabled());
     expect(apply).toHaveTextContent('Applying…');
     expect(reviewAction()).toBeDisabled();
 
-    await user.click(confirm);
     await user.click(apply);
     expect(updateSpy).toHaveBeenCalledTimes(1);
 
@@ -480,9 +531,9 @@ describe('ConfigurationView (review drawer Apply — confirm, feedback, single s
     await spyUpdate(updateSpy);
     renderConfiguration();
 
-    const { panel, dialog } = await openApplyConfirmation(user);
-    await user.click(within(dialog).getByRole('button', { name: /^confirm$/i }));
-    await waitFor(() => expect(within(panel).getByTestId('review-changes-panel-apply')).toBeDisabled());
+    const { apply } = await openReview(user);
+    await user.click(apply);
+    await waitFor(() => expect(apply).toBeDisabled());
 
     await act(async () => handle.reject(new Error('boom')));
     await waitFor(() => expect(screen.queryByTestId('review-changes-panel')).not.toBeInTheDocument());
@@ -495,22 +546,7 @@ describe('ConfigurationView (review drawer Apply — confirm, feedback, single s
     expect(updateSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('Escape in the confirmation closes only the confirmation', async () => {
-    const user = userEvent.setup();
-    const { updateSpy } = deferredUpdate();
-    await spyUpdate(updateSpy);
-    renderConfiguration();
-
-    await openApplyConfirmation(user);
-    await user.keyboard('{Escape}');
-    await waitFor(() =>
-      expect(screen.queryByRole('dialog', { name: 'Apply changes?' })).not.toBeInTheDocument(),
-    );
-    expect(screen.getByTestId('review-changes-panel')).toBeInTheDocument();
-    expect(updateSpy).not.toHaveBeenCalled();
-  });
-
-  it('credentialSecret rotation skips the extra confirmation and shows its own progress', async () => {
+  it('credentialSecret rotation keeps its own confirmation and shows its own progress', async () => {
     const user = userEvent.setup();
     const { updateSpy, handle } = deferredUpdate();
     await spyUpdate(updateSpy);
@@ -523,7 +559,7 @@ describe('ConfigurationView (review drawer Apply — confirm, feedback, single s
     await user.click(within(panel).getByTestId('review-changes-panel-apply'));
 
     const dialog = await screen.findByRole('dialog', { name: 'Rotate credential secret' });
-    expect(screen.queryByRole('dialog', { name: 'Apply changes?' })).not.toBeInTheDocument();
+    expect(updateSpy).not.toHaveBeenCalled();
     await user.click(within(dialog).getByTestId('confirmation-dialog-ack'));
     const confirm = within(dialog).getByRole('button', { name: /^confirm$/i });
     fireEvent.click(confirm);
@@ -660,7 +696,6 @@ describe('ConfigurationView (change circuit)', () => {
     await user.click(findToggleButton(/^Require HTTPS$/));
     await user.click(screen.getByRole('button', { name: 'Review 1 change' }));
     await user.click(within(await screen.findByTestId('review-changes-panel')).getByTestId('review-changes-panel-apply'));
-    await confirmApply(user);
 
     await waitFor(async () => {
       const steps = await circuitSteps();
@@ -697,7 +732,6 @@ describe('ConfigurationView (change circuit)', () => {
     await user.click(findToggleButton(/^Require HTTPS$/));
     await user.click(screen.getByRole('button', { name: 'Review 1 change' }));
     await user.click(within(await screen.findByTestId('review-changes-panel')).getByTestId('review-changes-panel-apply'));
-    await confirmApply(user);
 
     const ready = (await circuitSteps())[5];
     await waitFor(() => expect(within(ready).getByText('Failed')).toBeInTheDocument());
@@ -726,7 +760,6 @@ describe('ConfigurationView (change circuit)', () => {
     await user.click(findToggleButton(/^Require HTTPS$/));
     await user.click(screen.getByRole('button', { name: 'Review 1 change' }));
     await user.click(within(await screen.findByTestId('review-changes-panel')).getByTestId('review-changes-panel-apply'));
-    await confirmApply(user);
 
     await waitFor(async () => {
       const steps = await circuitSteps();

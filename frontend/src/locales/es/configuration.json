@@ -149,13 +149,13 @@
     "groupNone": "Otros ({{count}})",
     "configuredLabel": "Actual",
     "newLabel": "Nuevo",
-    "apply": "Aplicar",
+    "apply": "Aplicar y reiniciar Node-RED",
+    "consequence_one": "{{count}} cambio · Node-RED se reinicia · respaldo antes de escribir",
+    "consequence_other": "{{count}} cambios · Node-RED se reinicia · respaldo antes de escribir",
     "cancel": "Cancelar",
     "applying": "Aplicando…",
     "applied": "Aplicado correctamente.",
-    "appliedError": "Error al aplicar: {{message}}",
-    "confirmTitle": "¿Aplicar cambios?",
-    "confirmDescription": "Se escribirán {{count}} cambio(s) pendiente(s) en {{target}}. Node-RED puede reiniciarse, lo que puede tardar un poco."
+    "appliedError": "Error al aplicar: {{message}}"
   },
   "topology": {
     "subtitle": "NRCC edita settings.js; Node-RED lo lee al (re)iniciar.",

@@ -1,250 +1,167 @@
+import { Fragment, type ReactNode } from 'react';
 import { useEnvironment } from '@/features/bootstrap/hooks/useEnvironment';
-import {
-  AlertCircle,
-  CheckCircle2,
-  AlertTriangle,
-  Loader,
-  FileText,
-  Settings,
-  Container,
-} from 'lucide-react';
-import { cn } from '@/shared/lib';
+import type { HostStatusWithCodes } from '@/features/bootstrap/types';
+import { ErrorState, Skeleton } from '@/shared/components/feedback';
+import { StatusChip } from '@/shared/components/ui';
 import { useT } from '@/i18n';
-import type { NodeRedEnvironment, SettingsDocument } from '@/shared/types';
 
-const NodeRedEnvironmentCard = ({ env }: { env: NodeRedEnvironment }) => {
-  const { t } = useT();
-  const modeLabel = {
-    native: t('bootstrap:modeNative'),
-    docker: t('bootstrap:modeDocker'),
-    none: t('bootstrap:modeNone'),
-    unknown: t('bootstrap:modeUnknown'),
-  }[env.mode] || env.mode;
+const designator = 'font-mono text-xs font-semibold tabular-nums text-ds-text-primary';
 
-  const modeColor = {
-    native: 'text-info',
-    docker: 'text-primary',
-    none: 'text-warning',
-    unknown: 'text-error',
-  }[env.mode] || 'text-base-content';
-
+/** A path in mono that wraps after a slash; mid-segment only if one segment cannot fit at all. */
+function PathDesignator({ value }: { value: string }) {
   return (
-    <div className="surface-card border border-border rounded-lg p-6">
-      <div className="flex items-center gap-3 mb-4">
-        <Container className="w-5 h-5 text-body-secondary" />
-        <h3 className="font-semibold text-base-content">{t('bootstrap:nodeRedEnvironment')}</h3>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-wider text-ds-text-muted mb-1">{t('bootstrap:mode')}</p>
-          <p className={cn('text-lg font-semibold', modeColor)}>{modeLabel}</p>
-        </div>
-        
-        <div>
-          <p className="text-xs uppercase tracking-wider text-ds-text-muted mb-1">{t('bootstrap:status')}</p>
-          <div className="flex items-center gap-2">
-            {env.running ? (
-              <>
-                <CheckCircle2 className="w-5 h-5 text-success" />
-                <span className="text-lg font-semibold text-success">{t('bootstrap:running')}</span>
-              </>
-            ) : (
-              <>
-                <AlertCircle className="w-5 h-5 text-warning" />
-                <span className="text-lg font-semibold text-warning">{t('bootstrap:notRunning')}</span>
-              </>
-            )}
-          </div>
-        </div>
+    <code className={`${designator} wrap-anywhere`}>
+      {value.split('/').map((part, index) => (
+        <Fragment key={index}>
+          {index > 0 && <>/<wbr /></>}
+          {part}
+        </Fragment>
+      ))}
+    </code>
+  );
+}
 
-        {env.version && (
-          <div>
-            <p className="text-xs uppercase tracking-wider text-ds-text-muted mb-1">{t('bootstrap:version')}</p>
-            <p className="text-sm text-base-content">{env.version}</p>
-          </div>
-        )}
-
-        {env.settingsPath && (
-          <div>
-            <p className="text-xs uppercase tracking-wider text-ds-text-muted mb-1">{t('bootstrap:settingsPath')}</p>
-            <p className="break-all font-mono text-xs text-base-content/70" title={env.settingsPath}>
-              {env.settingsPath}
-            </p>
-          </div>
-        )}
-
-        {env.userDir && (
-          <div>
-            <p className="text-xs uppercase tracking-wider text-ds-text-muted mb-1">{t('bootstrap:userDirectory')}</p>
-            <p className="break-all font-mono text-xs text-base-content/70" title={env.userDir}>
-              {env.userDir}
-            </p>
-          </div>
-        )}
-
-        {env.containerName && (
-          <div>
-            <p className="text-xs uppercase tracking-wider text-ds-text-muted mb-1">{t('bootstrap:containerName')}</p>
-            <p className="text-sm text-base-content font-mono">{env.containerName}</p>
-          </div>
-        )}
-      </div>
+function Fact({ label, children, wide }: { label: string; children: ReactNode; wide?: boolean }) {
+  return (
+    <div className={wide ? 'min-w-0 space-y-1 sm:col-span-2' : 'min-w-0 space-y-1'}>
+      <dt className="text-xs text-ds-text-secondary">{label}</dt>
+      <dd>{children}</dd>
     </div>
   );
-};
+}
 
-const SettingsCard = ({ settings }: { settings: SettingsDocument }) => {
-  const { t } = useT();
+function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
-  <div className="surface-card border border-border rounded-lg p-6">
-    <div className="flex items-center gap-3 mb-4">
-      <FileText className="w-5 h-5 text-body-secondary" />
-      <h3 className="font-semibold text-base-content">{t('bootstrap:settingsFile')}</h3>
-    </div>
+    <section aria-labelledby={id} className="space-y-3 py-4">
+      <h2 id={id} className="text-sm font-semibold text-ds-text-primary">{title}</h2>
+      {children}
+    </section>
+  );
+}
 
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div>
-        <p className="text-xs uppercase tracking-wider text-ds-text-muted mb-1">{t('bootstrap:path')}</p>
-        <p className="break-all font-mono text-xs text-base-content/70" title={settings.path}>
-          {settings.path}
-        </p>
-      </div>
+function HostDetails({ host }: { host: HostStatusWithCodes }) {
+  const { t, i18n } = useT();
+  const env = host.nodeRed;
+  const settings = host.settings;
+  const recommendations = host.recommendations ?? [];
+  const modeKey = { native: 'modeNative', docker: 'modeDocker', none: 'modeNone', unknown: 'modeUnknown' }[env.mode];
+  const sourceKey = { env: 'sourceEnv', detected: 'sourceDetected', 'nrcc-data': 'sourceNrccData' }[settings.source];
 
-      <div>
-        <p className="text-xs uppercase tracking-wider text-ds-text-muted mb-1">{t('bootstrap:source')}</p>
-        <p className="text-sm text-base-content">{settings.source}</p>
-      </div>
+  // Known codes come from the catalog; anything else keeps the backend text.
+  const recommendationText = (message: string, index: number) => {
+    const key = `bootstrap:recommendation.${host.recommendationCodes?.[index]}`;
+    return host.recommendationCodes?.[index] && i18n.exists(key) ? t(key) : message;
+  };
 
-      <div>
-        <p className="text-xs uppercase tracking-wider text-ds-text-muted mb-1">{t('bootstrap:writable')}</p>
-        <div className="flex items-center gap-2">
-          {settings.writable ? (
-            <>
-              <CheckCircle2 className="w-4 h-4 text-success" />
-              <span className="text-sm text-success font-medium">{t('common:yes')}</span>
-            </>
-          ) : (
-            <>
-              <AlertCircle className="w-4 h-4 text-error" />
-              <span className="text-sm text-error font-medium">{t('common:no')}</span>
-            </>
+  return (
+    <div className="divide-y divide-ds-border-subtle">
+      <Section id="bootstrap-runtime-title" title={t('bootstrap:runtimeTitle')}>
+        <dl className="grid gap-x-8 gap-y-3 sm:grid-cols-2">
+          <Fact label={t('bootstrap:mode')}>
+            <StatusChip size="sm" variant="neutral">{modeKey ? t(`bootstrap:${modeKey}`) : env.mode}</StatusChip>
+          </Fact>
+          {env.detected && (
+            <Fact label={t('bootstrap:process')}>
+              <StatusChip size="sm" variant={env.running ? 'success' : 'warning'}>
+                {t(env.running ? 'bootstrap:running' : 'bootstrap:notRunning')}
+              </StatusChip>
+            </Fact>
           )}
-        </div>
-      </div>
+          <Fact label={t('bootstrap:version')}>
+            {env.version
+              ? <span className={designator}>{env.version}</span>
+              : <span className="text-sm text-ds-text-secondary">{t('bootstrap:notReported')}</span>}
+          </Fact>
+          <Fact label={t('bootstrap:platform')}>
+            <span className={designator}>{host.platform}</span>
+          </Fact>
+          {env.containerName && (
+            // Native installs report their systemd unit in containerName (internal/service/host.go).
+            <Fact label={t(env.mode === 'docker' ? 'bootstrap:containerName' : 'bootstrap:serviceUnit')}>
+              <span className={`${designator} wrap-anywhere`}>{env.containerName}</span>
+            </Fact>
+          )}
+          {env.userDir && (
+            <Fact label={t('bootstrap:userDirectory')} wide>
+              <PathDesignator value={env.userDir} />
+            </Fact>
+          )}
+          {env.settingsPath && (
+            <Fact label={t('bootstrap:defaultSettingsPath')} wide>
+              <PathDesignator value={env.settingsPath} />
+              {env.settingsPath !== settings.path && (
+                <p className="mt-1 max-w-[75ch] text-xs text-ds-text-secondary">{t('bootstrap:defaultSettingsHint')}</p>
+              )}
+            </Fact>
+          )}
+        </dl>
+      </Section>
 
-      {settings.backupPath && (
-        <div>
-          <p className="text-xs uppercase tracking-wider text-ds-text-muted mb-1">{t('bootstrap:backupPath')}</p>
-          <p className="break-all font-mono text-xs text-base-content/70" title={settings.backupPath}>
-            {settings.backupPath}
-          </p>
-        </div>
+      <Section id="bootstrap-settings-title" title={t('bootstrap:editedTitle')}>
+        <dl className="grid gap-x-8 gap-y-3 sm:grid-cols-2">
+          <Fact label={t('bootstrap:path')} wide>
+            <PathDesignator value={settings.path} />
+          </Fact>
+          <Fact label={t('bootstrap:source')}>
+            {sourceKey
+              ? <span className="text-sm text-ds-text-primary">{t(`bootstrap:${sourceKey}`)}</span>
+              : <span className={designator}>{settings.source}</span>}
+          </Fact>
+          <Fact label={t('bootstrap:writeAccess')}>
+            <StatusChip size="sm" variant={settings.writable ? 'success' : 'warning'}>
+              {t(settings.writable ? 'bootstrap:writable' : 'bootstrap:notWritable')}
+            </StatusChip>
+          </Fact>
+          <Fact label={t('bootstrap:latestBackup')} wide>
+            {settings.backupPath
+              ? <PathDesignator value={settings.backupPath} />
+              : <span className="text-sm text-ds-text-secondary">{t('bootstrap:noBackup')}</span>}
+          </Fact>
+        </dl>
+      </Section>
+
+      {recommendations.length > 0 && (
+        <Section id="bootstrap-recommendations-title" title={t('bootstrap:recommendations')}>
+          <ul className="max-w-[75ch] list-disc space-y-2 pl-5 text-sm text-ds-text-primary">
+            {recommendations.map((message, index) => (
+              <li key={index}>{recommendationText(message, index)}</li>
+            ))}
+          </ul>
+        </Section>
       )}
     </div>
-  </div>
   );
-};
-
-const RecommendationsCard = ({ recommendations }: { recommendations: string[] }) => {
-  const { t } = useT();
-  return (
-  <div className="surface-card border border-border rounded-lg p-6">
-    <div className="flex items-center gap-3 mb-4">
-      <AlertTriangle className="w-5 h-5 text-warning" />
-      <h3 className="font-semibold text-base-content">{t('bootstrap:recommendations')}</h3>
-    </div>
-
-    <div className="space-y-2">
-      {recommendations.map((rec, idx) => (
-        <div key={idx} className="flex gap-3">
-          <div className="flex-shrink-0 pt-0.5">
-            <AlertTriangle className="w-4 h-4 text-warning" />
-          </div>
-          <p className="text-sm text-base-content/70">{rec}</p>
-        </div>
-      ))}
-    </div>
-  </div>
-  );
-};
+}
 
 export function BootstrapView() {
   const { t } = useT();
-  const { data: hostStatus, isLoading, error } = useEnvironment();
+  const { data: hostStatus, isLoading, error, refetch } = useEnvironment();
 
   return (
-    <div className="space-y-6 p-6">
-      {/* Header */}
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.28em] text-ds-text-muted">{t('bootstrap:systemLabel')}</p>
-          <h1 className="text-3xl font-bold tracking-tight text-base-content">{t('bootstrap:bootstrapTitle')}</h1>
+    <div className="space-y-4">
+      <header className="flex flex-col gap-3 border-b border-ds-border-subtle pb-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0 space-y-1">
+          <h1 className="text-xl font-bold text-ds-text-primary">{t('bootstrap:bootstrapTitle')}</h1>
+          <p className="max-w-[75ch] text-pretty text-sm text-ds-text-secondary">{t('bootstrap:intro')}</p>
         </div>
-      </div>
+        {hostStatus && (
+          <StatusChip size="sm" variant={hostStatus.ready ? 'success' : 'warning'} className="shrink-0 self-start sm:self-auto">
+            {t(hostStatus.ready ? 'bootstrap:ready' : 'bootstrap:notReady')}
+          </StatusChip>
+        )}
+      </header>
 
-      {isLoading && (
-        <div className="flex items-center justify-center py-12">
-          <Loader className="w-6 h-6 animate-spin text-primary" />
-        </div>
-      )}
+      {isLoading && <Skeleton rows={6} className="h-8" />}
 
       {error && (
-        <div className="alert alert-error">
-          <AlertTriangle className="w-5 h-5" />
-          <div>
-            <h3 className="font-semibold">{t('bootstrap:errorLoadingStatus')}</h3>
-            <p className="text-sm">{error instanceof Error ? error.message : t('common:unknownError')}</p>
-          </div>
-        </div>
+        <ErrorState
+          title={t('bootstrap:errorTitle')}
+          description={t('bootstrap:errorDescription')}
+          onRetry={() => void refetch()}
+        />
       )}
 
-      {hostStatus && (
-        <>
-          {/* Overall Status */}
-          <div className="surface-card border border-border rounded-lg p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <Settings className="w-5 h-5 text-body-secondary" />
-              <h2 className="text-xl font-semibold text-base-content">{t('bootstrap:systemStatus')}</h2>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs uppercase tracking-wider text-ds-text-muted mb-1">{t('bootstrap:platform')}</p>
-                <p className="text-lg font-semibold text-base-content">{hostStatus.platform}</p>
-              </div>
-
-              <div>
-                <p className="text-xs uppercase tracking-wider text-ds-text-muted mb-1">{t('bootstrap:overallStatus')}</p>
-                <div className="flex items-center gap-2">
-                  {hostStatus.ready ? (
-                    <>
-                      <CheckCircle2 className="w-5 h-5 text-success" />
-                      <span className="text-lg font-semibold text-success">{t('bootstrap:ready')}</span>
-                    </>
-                  ) : (
-                    <>
-                      <AlertCircle className="w-5 h-5 text-error" />
-                      <span className="text-lg font-semibold text-error">{t('bootstrap:notReady')}</span>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Node-RED Environment */}
-          <NodeRedEnvironmentCard env={hostStatus.nodeRed} />
-
-          {/* Settings */}
-          <SettingsCard settings={hostStatus.settings} />
-
-          {/* Recommendations */}
-          {hostStatus.recommendations && hostStatus.recommendations.length > 0 && (
-            <RecommendationsCard recommendations={hostStatus.recommendations} />
-          )}
-        </>
-      )}
+      {hostStatus && <HostDetails host={hostStatus} />}
     </div>
   );
 }

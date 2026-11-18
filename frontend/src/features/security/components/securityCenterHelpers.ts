@@ -9,7 +9,6 @@
  */
 
 import { AxiosError } from 'axios';
-import { toast } from 'sonner';
 import { configService } from '@/features/configuration/services';
 
 export interface ApplyError {
@@ -57,14 +56,6 @@ export function applyErrorKey(code: string | undefined): string {
     default:
       return 'security:applyErrors.generic';
   }
-}
-
-export function reportApplyError(message: string) {
-  toast.error(message);
-}
-
-export function reportApplySuccess(label: string) {
-  toast.success(label);
 }
 
 /** True when the value looks like a bcrypt hash (or empty for legacy). */
