@@ -676,7 +676,7 @@ test('cancelled configuration review sends no write and leaves source and runtim
     }
   })
   await page.getByTestId('app-sidebar').getByRole('link', { name: 'Configuration' }).click()
-  await page.getByRole('button', { name: 'Editor Theme' }).click()
+  await page.getByRole('tab', { name: 'Editor Theme' }).click()
   // The view resets the form when the saved config arrives, so the edit is
   // re-applied until it sticks.
   await expect(async () => {
@@ -689,14 +689,14 @@ test('cancelled configuration review sends no write and leaves source and runtim
   const footerCancel = panel.locator('footer').getByRole('button', { name: 'Cancel', exact: true })
 
   // Mouse: a real pointer click on the footer Cancel button.
-  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await page.getByRole('button', { name: /^Review \d+ changes?$/ }).click()
   await expect(panel).toBeVisible()
   await expect(panel.getByTestId('review-changes-panel-apply')).toBeEnabled()
   await footerCancel.click()
   await expect(panel).toBeHidden()
 
   // Keyboard: focus starts on Cancel, and Escape dismisses the panel.
-  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await page.getByRole('button', { name: /^Review \d+ changes?$/ }).click()
   await expect(panel).toBeVisible()
   await expect(footerCancel).toBeFocused()
   await page.keyboard.press('Escape')
@@ -843,7 +843,7 @@ test('unrelated visual edit keeps every admin account, permission and session ex
   // --- the unrelated visual edit, through the real screen ---------
   await login(page)
   await page.getByTestId('app-sidebar').getByRole('link', { name: 'Configuration' }).click()
-  await page.getByRole('button', { name: 'Editor Theme' }).click()
+  await page.getByRole('tab', { name: 'Editor Theme' }).click()
   // The configuration view loads the saved config asynchronously and resets
   // the form when it arrives, so the edit is re-applied until it sticks.
   await expect(async () => {
@@ -851,8 +851,8 @@ test('unrelated visual edit keeps every admin account, permission and session ex
     await page.waitForTimeout(300)
     expect(await page.getByLabel('Page Title').inputValue()).toBe('NRCC issue 881')
   }).toPass({ timeout: 30_000 })
-  await page.getByRole('button', { name: 'Save', exact: true }).click()
-  // Issue #766 slice F: the global Save button opens the review panel and
+  await page.getByRole('button', { name: /^Review \d+ changes?$/ }).click()
+  // The change circuit's "Review N changes" action opens the review panel and
   // the panel's Apply button performs the save.
   await page.getByTestId('review-changes-panel-apply').click()
   // Apply asks for confirmation before saving.
@@ -860,7 +860,9 @@ test('unrelated visual edit keeps every admin account, permission and session ex
     .getByRole('dialog', { name: 'Apply changes?' })
     .getByRole('button', { name: 'Confirm', exact: true })
     .click()
-  await expect(page.getByText('Configuration saved successfully')).toBeVisible()
+  // The change circuit carries the outcome (no toast): every contact closes
+  // and the polite live region reports the Ready contact's proof.
+  await expect(page.getByTestId('change-circuit-live')).toHaveText('Ready: Closed. Readiness OK')
 
   // --- the authentication model is unchanged ----------------------
   const afterResponse = await nrcc.get('/api/config', { headers })

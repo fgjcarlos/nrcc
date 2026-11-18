@@ -129,7 +129,7 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
 
     // Issue #766 slice A — 'Security' tab was renamed to 'TLS & Secrets'
     // because 'Security' now refers to the dedicated top-level section.
-    await page.getByRole('button', { name: 'TLS & Secrets' }).click()
+    await page.getByRole('tab', { name: 'TLS & Secrets' }).click()
     await expect(page.getByText('Credential Encryption')).toBeVisible()
     await expect(page.getByLabel('Credential Secret')).toBeVisible()
     await expect(page.getByText('HTTPS Redirect')).toBeVisible()

@@ -1,5 +1,5 @@
-import { useState, useEffect, useId, useRef } from 'react';
-import { toast } from 'sonner';
+import { useState, useEffect, useId, useMemo, useRef } from 'react';
+import { errorMessage } from '@/shared/lib/errorMessage';
 import { cn } from '@/shared/lib';
 import type { NodeRedConfigFormData } from '@/shared/types';
 import { settingsRawSchema } from '@/shared/validation/schemas';
@@ -13,9 +13,25 @@ import {
 import { AdvancedSettings } from './AdvancedSettings';
 import { ConfigurationHeader } from './ConfigurationHeader';
 import { ReviewChangesPanel } from './ReviewChangesPanel';
+import { ChangeCircuit } from './ChangeCircuit';
+import { applyErrorCode, deriveCircuit, type ApplyRun } from '../lib/changeCircuit';
+import { SETTINGS_KEYS } from '../lib/fieldLabels';
+
+/** Form field names to the settings.js keys shown as circuit designators. */
+const settingsKeys = (fields: string[]) =>
+  fields.map((f) => SETTINGS_KEYS[f as keyof NodeRedConfigFormData] ?? f);
+
+/** Roving tabindex: the next tab index for Left/Right/Home/End, else null. */
+function nextTabIndex(key: string, index: number, count: number): number | null {
+  if (key === 'ArrowRight') return (index + 1) % count;
+  if (key === 'ArrowLeft') return (index - 1 + count) % count;
+  if (key === 'Home') return 0;
+  if (key === 'End') return count - 1;
+  return null;
+}
 import {
   Server, Shield, Activity, Palette,
-  Save, LockOpen, AlertTriangle, Bot
+  Save, Lock, LockOpen, Bot
 } from 'lucide-react';
 import { useConfigurationData, useConfigurationActions, useConfigurationDiff, useConfigurationSave, fieldValidationMap } from '../hooks';
 import { useT } from '@/i18n';
@@ -127,26 +143,31 @@ const INITIAL_FORM_DATA: NodeRedConfigFormData = {
 export function ConfigurationView() {
   // UI state
   const [activeTab, setActiveTab] = useState('basic');
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [formData, setFormData] = useState<NodeRedConfigFormData>(INITIAL_FORM_DATA);
-  const [hasChanges, setHasChanges] = useState(false);
   const [rawSettingsContent, setRawSettingsContent] = useState('');
   // Raw-settings editor gate (issue #364): the textarea is read-only by
   // default. The user must click "Unlock to edit settings.js", acknowledge
   // the warning dialog, and only then can they edit and save. Re-locking
   // discards any in-flight edits.
   const [rawEditorUnlocked, setRawEditorUnlocked] = useState(false);
+  const [rawParseError, setRawParseError] = useState<string | null>(null);
   const [rawEditorSnapshot, setRawEditorSnapshot] = useState('');
   const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
 
-  // Issue #762 — credentialSecret rotation confirmation (handleSave
+  // Issue #762 — credentialSecret rotation confirmation (handleApplyFromPanel
   // gates when the operator typed a non-empty secret).
   const [rotationDialogOpen, setRotationDialogOpen] = useState(false);
 
-  // Issue #766 slice F (W4) — reviewable safe-apply panel. Opens when
-  // the operator clicks the global Save button. The actual save still
-  // goes through `handleSave` so the credentialSecret rotation dialog
+  // Issue #766 slice F (W4) — reviewable safe-apply panel. Opens from
+  // the change circuit's "Review N changes" action. The actual save
+  // still goes through `runSave` so the credentialSecret rotation dialog
   // and the raw-settings unlock flow remain the single source of truth.
   const [reviewPanelOpen, setReviewPanelOpen] = useState(false);
+  // T9 change circuit: the form state the operator last reviewed (the
+  // Diff contact) and the outcome of the last server transaction.
+  const [reviewedFormData, setReviewedFormData] = useState<NodeRedConfigFormData | null>(null);
+  const [applyRun, setApplyRun] = useState<ApplyRun>({ status: 'idle' });
   // Apply in the drawer asks for confirmation before saving.
   const [applyConfirmOpen, setApplyConfirmOpen] = useState(false);
   // Synchronous guard: the mutation's pending flag lands after a render,
@@ -155,6 +176,7 @@ export function ConfigurationView() {
 
   // Data and actions hooks
   const { t } = useT();
+  const rawErrorId = useId();
   // Names the raw settings.js editor after its section heading (#889 axe `label`).
   const rawSettingsHeadingId = useId();
 
@@ -183,7 +205,6 @@ export function ConfigurationView() {
   useEffect(() => {
     if (data.initialFormData) {
       setFormData(data.initialFormData);
-      setHasChanges(false);
     }
   }, [data.initialFormData]);
 
@@ -200,15 +221,14 @@ export function ConfigurationView() {
     value: string | number | boolean
   ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
-    setHasChanges(true);
+    // A new edit starts a new circuit; the last outcome no longer applies.
+    setApplyRun((run) => (run.status === 'running' ? run : { status: 'idle' }));
   };
 
-  const handleSave = async () => {
-    // Issue #766 slice F (W4) — reviewable safe-apply flow. Open the
-    // review panel first; the panel's Apply button drives the actual
-    // save via `handleApplyFromPanel` so the credentialSecret rotation
-    // dialog and the raw-settings unlock flow remain the single source
-    // of truth.
+  const handleReview = () => {
+    // Issue #766 slice F (W4) — reviewable safe-apply flow. The panel's
+    // Apply button drives the actual save via `handleApplyFromPanel`.
+    setReviewedFormData(formData);
     setReviewPanelOpen(true);
   };
 
@@ -216,8 +236,23 @@ export function ConfigurationView() {
   const runSave = async () => {
     if (savingRef.current) return null;
     savingRef.current = true;
+    const count = diff.pendingCount;
+    setApplyRun({ status: 'running', count });
     try {
-      return await save.save();
+      const outcome = await save.save();
+      setApplyRun(
+        outcome.ok
+          ? { status: 'succeeded', count }
+          : outcome.reason === 'mutation-failed'
+            ? { status: 'failed', count, code: applyErrorCode(outcome.error) }
+            // Gated outcomes stay on the circuit, not on a toast (THESIS).
+            : outcome.reason === 'validation-errors'
+              ? { status: 'held', count, reason: 'invalid', fields: settingsKeys(Object.keys(outcome.errors)) }
+              : outcome.reason === 'read-only'
+                ? { status: 'held', count, reason: 'readOnly' }
+                : { status: 'idle' },
+      );
+      return outcome;
     } finally {
       savingRef.current = false;
     }
@@ -238,32 +273,18 @@ export function ConfigurationView() {
     const outcome = await runSave();
     if (!outcome) return;
     setApplyConfirmOpen(false);
-    if (outcome.ok) {
-      setHasChanges(false);
-      setReviewPanelOpen(false);
-    } else if (outcome.reason === 'validation-errors') {
-      toast.error(`Fix ${Object.keys(outcome.errors).length} field${Object.keys(outcome.errors).length === 1 ? '' : 's'} before saving`);
-    } else if (outcome.reason === 'no-pending-changes') {
-      // Operator clicked Save without changing anything; treat as a
-      // soft no-op.
-      setReviewPanelOpen(false);
-    } else if (outcome.reason === 'read-only') {
-      toast.error('Configuration is read-only on this host');
-    }
+    // Every settled outcome closes the drawer: the circuit beside it carries
+    // the result (closed contacts, a held gate or the rollback branch), and
+    // the drawer would otherwise cover it. Review reopens it for a retry.
+    setReviewPanelOpen(false);
   };
 
   const handleConfirmRotation = async () => {
     // Keep the dialog open while saving so it shows its processing state.
     const outcome = await runSave();
     if (!outcome) return;
+    // The circuit carries every outcome of the rotation save.
     setRotationDialogOpen(false);
-    if (outcome.ok) {
-      setHasChanges(false);
-    } else if (outcome.reason === 'validation-errors') {
-      toast.error(`Fix ${Object.keys(outcome.errors).length} field${Object.keys(outcome.errors).length === 1 ? '' : 's'} before saving`);
-    } else if (outcome.reason === 'read-only') {
-      toast.error('Configuration is read-only on this host');
-    }
   };
 
   const handleCancelRotation = () => {
@@ -271,9 +292,11 @@ export function ConfigurationView() {
     setFormData((prev) => ({ ...prev, credentialSecret: undefined }));
   };
 
+  // Discard returns to the loaded configuration, not to the form defaults,
+  // so the circuit drops back to zero pending changes.
   const handleReset = () => {
-    setFormData(INITIAL_FORM_DATA);
-    setHasChanges(false);
+    setFormData(data.initialFormData ?? INITIAL_FORM_DATA);
+    setApplyRun({ status: 'idle' });
   };
 
   // Issue #364: locking the editor discards any in-flight edits and
@@ -281,6 +304,7 @@ export function ConfigurationView() {
   const handleCancelRawEdit = () => {
     setRawSettingsContent(rawEditorSnapshot);
     setRawEditorUnlocked(false);
+    setRawParseError(null);
   };
 
   // Called when the user clicks the "Save changes" button on the unlocked
@@ -289,7 +313,7 @@ export function ConfigurationView() {
   const handleSaveRawSettingsLocked = (content: string) => {
     const result = settingsRawSchema.safeParse(content);
     if (!result.success) {
-      toast.error(`Invalid settings.js: ${result.error.issues[0]?.message ?? 'syntax error'}`);
+      setRawParseError(result.error.issues[0]?.message ?? 'syntax error');
       return;
     }
     // Issue #878 — the raw editor sends the revision of the document it
@@ -304,6 +328,33 @@ export function ConfigurationView() {
   const ActiveComponent = SECTIONS.find(s => s.id === activeTab)?.component || BasicSettings;
   // `save` owns the mutation instance that actually runs the request.
   const isSaving = save.isPending;
+  const readOnly = data.hostStatus?.configuration?.editable === false;
+  const circuit = useMemo(
+    () =>
+      deriveCircuit({
+        pendingCount: diff.pendingCount,
+        invalidFields: settingsKeys(Object.keys(diff.validationErrors)),
+        reviewed: reviewedFormData === formData,
+        readOnly,
+        run: applyRun,
+      }),
+    [diff, reviewedFormData, formData, readOnly, applyRun],
+  );
+  // Inline errors under the raw editor: client syntax check, then the server.
+  const rawError = rawParseError
+    ? t('configuration:advanced.parseError', { message: rawParseError })
+    : actions.saveRawSettingsMutation.error
+      ? errorMessage(actions.saveRawSettingsMutation.error)
+      : null;
+  const revision = data.settingsDoc?.revision?.fingerprint;
+  const restartCount = Object.values(diff.fields).filter((f) => f.pending && f.restart === 'hard').length;
+  const host = data.hostStatus as (typeof data.hostStatus & { portless?: { installed?: boolean } }) | undefined;
+  const recommendations = host
+    ? [
+        host.nodeRed.detected && host.portless?.installed === false ? t('configuration:host.recommendPortless') : null,
+        host.settings?.path && host.settings.writable === false ? t('configuration:host.recommendWritable') : null,
+      ].filter((r): r is string => r !== null)
+    : [];
   const configViewState = data.configLoading
     ? { status: 'pending' as const }
     : data.configError
@@ -318,94 +369,129 @@ export function ConfigurationView() {
 
   return (
     <LoadingBoundary state={configViewState}>
-    <div className="space-y-6">
-      {/* Header (slice F W3) — page title + topology diagram */}
-      <ConfigurationHeader />
-      {/* Save / discard controls live next to the header but are not
-          part of it so the topology diagram keeps a tidy column. */}
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        {hasChanges && (
-          <button
-            type="button"
-            onClick={handleReset}
-            className="px-4 py-2 text-sm font-medium text-base-content/60 transition-colors hover:text-base-content"
-          >
-            {t('configuration:discardChanges')}
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={!diff.canSave || isSaving}
-          className="action-btn-primary"
-        >
-          <Save className="w-4 h-4" />
-          {isSaving ? t('common:saving') : t('common:save')}
-        </button>
-      </div>
-
-      {/* Host Status Info */}
-      {data.hostStatus && (
-        <div className="rounded-2xl border border-border bg-base-200/35 p-4">
-          <div className="flex flex-col gap-2 text-sm text-base-content/75">
-            <span>
-              {t('configuration:host.installationDetected')}: <strong className="text-base-content">{data.hostStatus.nodeRed.mode}</strong>
-              {data.hostStatus.nodeRed.detected ? '' : ` ${t('configuration:host.nodeRedNotDetected')}`}
+    <div className="space-y-4">
+      {/* Header (slice F W3, T9) — title, revision designator, one runtime status, host details */}
+      <ConfigurationHeader
+        designator={
+          revision && (
+            <span
+              className="font-mono text-xs font-semibold text-ds-text-primary"
+              title={t('configuration:host.revisionTitle', { fingerprint: revision })}
+            >
+              {`REV ${revision.slice(0, 8)}`}
             </span>
-              <span>
-                {t('configuration:runtimeVersionLabel')}: <strong className="text-base-content">{data.hostStatus.configuration?.runtimeVersion || data.hostStatus.nodeRed.version || t('common:unknown')}</strong>
+          )
+        }
+        status={
+          data.hostStatus && (
+            <p className="text-sm text-ds-text-secondary" data-testid="configuration-runtime-status">
+              <span className="font-mono tabular-nums">
+                {`Node-RED ${data.hostStatus.configuration?.runtimeVersion || data.hostStatus.nodeRed.version || t('common:unknown')}`}
               </span>
-              <span>
-                {t('configuration:configSourceLabel')}: <strong className="text-base-content">{data.hostStatus.configuration?.source || data.hostStatus.settings.source}</strong>
-              </span>
-              <span>
-                {t('configuration:editingLabel')}: <strong className={data.hostStatus.configuration?.editable === false ? 'text-warning' : 'text-success'}>
-                  {data.hostStatus.configuration?.editable === false ? t('configuration:readOnly') : t('configuration:editable')}
-                </strong>
-                {data.hostStatus.configuration?.reason && ` — ${data.hostStatus.configuration.reason}`}
-              </span>
-
-            {data.hostStatus.recommendations && data.hostStatus.recommendations.length > 0 && (
-              <span>{data.hostStatus.recommendations[0]}</span>
+              {' · '}
+              <strong className={cn('font-semibold', readOnly ? 'text-ds-on-tint-warning' : 'text-ds-on-tint-success')}>
+                {readOnly ? t('configuration:readOnly') : t('configuration:editable')}
+              </strong>
+            </p>
+          )
+        }
+      >
+        {data.hostStatus && (
+          <dl className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ds-text-secondary">
+            <div className="flex gap-1">
+              <dt>{t('configuration:host.installationDetected')}:</dt>
+              <dd className="font-semibold text-ds-text-primary">
+                {data.hostStatus.nodeRed.mode}
+                {data.hostStatus.nodeRed.detected ? '' : ` ${t('configuration:host.nodeRedNotDetected')}`}
+              </dd>
+            </div>
+            <div className="flex gap-1">
+              <dt>{t('configuration:configSourceLabel')}:</dt>
+              <dd className="font-semibold text-ds-text-primary">
+                {data.hostStatus.configuration?.source || data.hostStatus.settings.source}
+              </dd>
+            </div>
+            {data.hostStatus.configuration?.reason && (
+              <div className="flex gap-1">
+                <dt>{t('configuration:editingLabel')}:</dt>
+                <dd>{data.hostStatus.configuration.reason}</dd>
+              </div>
             )}
-          </div>
-        </div>
-      )}
+          </dl>
+        )}
+        {recommendations.map((recommendation) => (
+          <p key={recommendation} className="text-xs text-ds-text-secondary">{recommendation}</p>
+        ))}
+      </ConfigurationHeader>
 
-      {/* Tabs Navigation */}
-      <div className="border-b ghost-divider">
-        <nav className="flex space-x-1 overflow-x-auto" aria-label="Tabs">
-          {SECTIONS.map((section) => {
-            const Icon = section.icon;
-            return (
-              <button
-                key={section.id}
-                onClick={() => setActiveTab(section.id)}
-                className={cn(
-                  'flex items-center gap-2 border-b-2 px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors',
-                  activeTab === section.id
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-base-content/55 hover:border-border hover:text-base-content'
-                )}
-              >
-                <Icon className="w-4 h-4" />
-                {section.label}
-              </button>
-            );
-          })}
-        </nav>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-6 xl:grid-cols-[minmax(0,1fr)_21rem]">
+      {/* T9 change circuit: first in reading order so it sits above the
+          form as a strip below lg; a sticky right column from lg up. */}
+      <ChangeCircuit
+        className="lg:col-start-2 lg:row-start-1"
+        circuit={circuit}
+        pendingCount={diff.pendingCount}
+        restartCount={restartCount}
+        reviewDisabled={!diff.canSave || isSaving}
+        onReview={handleReview}
+        onDiscard={diff.pendingCount > 0 && !isSaving ? handleReset : undefined}
+      />
+
+      <div className="min-w-0 space-y-4 lg:col-start-1 lg:row-start-1">
+      {/* Sections: a WAI-ARIA tablist with roving tabindex. */}
+      <div
+        role="tablist"
+        aria-label={t('configuration:sectionsLabel')}
+        className="flex gap-1 overflow-x-auto border-b border-ds-border-subtle"
+      >
+        {SECTIONS.map((section, index) => {
+          const Icon = section.icon;
+          const selected = activeTab === section.id;
+          return (
+            <button
+              key={section.id}
+              ref={(el) => { tabRefs.current[index] = el; }}
+              type="button"
+              role="tab"
+              id={`config-tab-${section.id}`}
+              aria-selected={selected}
+              aria-controls={`config-panel-${section.id}`}
+              tabIndex={selected ? 0 : -1}
+              onClick={() => setActiveTab(section.id)}
+              onKeyDown={(event) => {
+                const next = nextTabIndex(event.key, index, SECTIONS.length);
+                if (next === null) return;
+                event.preventDefault();
+                setActiveTab(SECTIONS[next].id);
+                tabRefs.current[next]?.focus();
+              }}
+              className={cn(
+                '-mb-px flex min-h-9 items-center gap-2 border-b-2 px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors',
+                selected
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-ds-text-muted hover:border-[var(--ds-border-strong)] hover:text-ds-text-primary'
+              )}
+            >
+              <Icon className="h-4 w-4" aria-hidden="true" />
+              {section.label}
+            </button>
+          );
+        })}
       </div>
 
-       {/* Active Tab Content */}
-       <div className="surface-card p-6">
-          {data.hostStatus?.configuration?.editable === false ? (
-           <div className="rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm text-warning" role="status">
-             {t('configuration:controlsUnavailable')}
-           </div>
-          ) : activeTab === 'ai' ? <AIProviderSettings /> : <ActiveComponent settings={formData} onUpdate={handleUpdateField} disabled={isSaving} fieldErrors={fieldValidationMap(diff.fields)} />}
-       </div>
-
-
+      <div
+        role="tabpanel"
+        id={`config-panel-${activeTab}`}
+        aria-labelledby={`config-tab-${activeTab}`}
+        tabIndex={0}
+        className="focus-visible:outline-offset-4"
+      >
+        {readOnly ? (
+          <div className="rounded-box border border-warning/40 bg-warning/10 p-4 text-sm text-warning" role="status">
+            {t('configuration:controlsUnavailable')}
+          </div>
+        ) : activeTab === 'ai' ? <AIProviderSettings /> : <ActiveComponent settings={formData} onUpdate={handleUpdateField} disabled={isSaving} fieldErrors={fieldValidationMap(diff.fields)} />}
+      </div>
 
       {/* Curated preset catalogue — slice 3 of #764 */}
       <AdvancedSettings
@@ -415,30 +501,45 @@ export function ConfigurationView() {
       />
 
       {/* Raw Settings Editor — gated by issue #364 */}
-      <div className="surface-card p-6 space-y-4">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h2 id={rawSettingsHeadingId} className="text-lg font-semibold text-base-content">
+      <div className="space-y-4 border-t border-ds-border-subtle pt-4">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+          <div className="min-w-0">
+            <h2 id={rawSettingsHeadingId} className="text-sm font-semibold text-ds-text-primary">
               {t('configuration:advanced.title')}
             </h2>
-            <p className="text-sm text-base-content/65">
+            <p className="text-xs font-semibold uppercase tracking-wide text-ds-text-primary">
+              {t('configuration:advanced.directEdit')}
+            </p>
+            <p className="text-sm text-ds-text-secondary">
               {t('configuration:advanced.description')}
             </p>
           </div>
           {data.settingsDoc?.backupPath && (
-            <span className="text-xs text-base-content/55">
+            <span className="min-w-0 break-all text-xs text-ds-text-muted">
               {t('configuration:advanced.lastBackup', { path: data.settingsDoc.backupPath })}
             </span>
           )}
         </div>
 
+        {/* Locked is the safe default, so the banner is neutral ink with the
+            unlock control beside its text. */}
         {!rawEditorUnlocked && (
           <div
             data-testid="raw-settings-locked-banner"
-            className="flex items-center gap-2 rounded-xl border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning"
+            className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-box border border-[var(--ds-border-strong)] px-3 py-2 text-sm text-ds-text-secondary"
           >
-            <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-            <span>{t('configuration:advanced.lockedBadge')}</span>
+            <Lock className="h-4 w-4 shrink-0 text-ds-text-primary" aria-hidden="true" />
+            <span className="min-w-0 flex-[1_1_14rem]">{t('configuration:advanced.lockedBadge')}</span>
+            <button
+              type="button"
+              onClick={() => setUnlockDialogOpen(true)}
+              disabled={!data.settingsDoc?.writable || actions.saveRawSettingsMutation.isPending}
+              data-testid="raw-settings-unlock-btn"
+              className="action-btn-secondary min-h-9 text-sm"
+            >
+              <LockOpen className="h-4 w-4" aria-hidden="true" />
+              {t('configuration:advanced.unlockToEdit')}
+            </button>
           </div>
         )}
 
@@ -447,53 +548,54 @@ export function ConfigurationView() {
           onChange={(event) => {
             if (!rawEditorUnlocked) return;
             setRawSettingsContent(event.target.value);
+            setRawParseError(null);
+            if (actions.saveRawSettingsMutation.error) actions.saveRawSettingsMutation.reset();
           }}
           readOnly={!rawEditorUnlocked}
           aria-readonly={!rawEditorUnlocked}
           aria-labelledby={rawSettingsHeadingId}
+          aria-invalid={rawError ? true : undefined}
+          aria-describedby={rawError ? rawErrorId : undefined}
+          // Sized to the source: one row per line between 8 and 24, then scroll.
+          rows={Math.min(Math.max(rawSettingsContent.split('\n').length, 8), 24)}
           className={cn(
-            'min-h-[20rem] w-full rounded-2xl border border-border bg-base-100/80 p-4 font-mono text-sm text-base-content focus:outline-none focus:ring-2 focus:ring-primary',
-            !rawEditorUnlocked && 'cursor-not-allowed opacity-70'
+            'w-full resize-y overflow-auto rounded-box border border-border p-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-primary',
+            rawEditorUnlocked ? 'bg-base-100 text-base-content' : 'cursor-not-allowed bg-ds-bg-base text-ds-text-secondary'
           )}
           spellCheck={false}
         />
+        {rawError && (
+          <p id={rawErrorId} role="alert" className="text-sm text-ds-on-tint-error" data-testid="raw-settings-error">
+            {rawError}
+          </p>
+        )}
 
-        <div className="flex justify-end gap-2">
-          {!rawEditorUnlocked ? (
+        {rawEditorUnlocked && (
+          <div className="flex justify-end gap-2">
             <button
               type="button"
-              onClick={() => setUnlockDialogOpen(true)}
-              disabled={!data.settingsDoc?.writable || actions.saveRawSettingsMutation.isPending}
-              data-testid="raw-settings-unlock-btn"
+              onClick={handleCancelRawEdit}
+              disabled={actions.saveRawSettingsMutation.isPending}
+              data-testid="raw-settings-cancel-btn"
               className="action-btn-secondary"
             >
-              <LockOpen className="w-4 h-4" />
-              {t('configuration:advanced.unlockToEdit')}
+              {t('configuration:advanced.cancelEdit')}
             </button>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={handleCancelRawEdit}
-                disabled={actions.saveRawSettingsMutation.isPending}
-                data-testid="raw-settings-cancel-btn"
-                className="action-btn-secondary"
-              >
-                {t('configuration:advanced.cancelEdit')}
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSaveRawSettingsLocked(rawSettingsContent)}
-                disabled={!data.settingsDoc?.writable || actions.saveRawSettingsMutation.isPending}
-                data-testid="raw-settings-save-btn"
-                className="action-btn-primary"
-              >
-                <Save className="w-4 h-4" />
-                {actions.saveRawSettingsMutation.isPending ? t('configuration:advanced.savingRaw') : t('common:saveChanges')}
-              </button>
-            </>
-          )}
-        </div>
+            <button
+              type="button"
+              onClick={() => handleSaveRawSettingsLocked(rawSettingsContent)}
+              disabled={!data.settingsDoc?.writable || actions.saveRawSettingsMutation.isPending}
+              data-testid="raw-settings-save-btn"
+              className="action-btn-primary"
+            >
+              <Save className="w-4 h-4" />
+              {actions.saveRawSettingsMutation.isPending ? t('configuration:advanced.savingRaw') : t('configuration:advanced.saveRaw')}
+            </button>
+          </div>
+        )}
+      </div>
+
+      </div>
       </div>
 
       <ConfirmationDialog

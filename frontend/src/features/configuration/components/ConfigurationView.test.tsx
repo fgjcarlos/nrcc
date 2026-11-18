@@ -22,6 +22,13 @@ vi.mock('@/features/configuration/services', () => ({
   },
   fileService: { uploadImage: vi.fn(), deleteImage: vi.fn(), listImages: vi.fn() },
   settingsService: { getRaw: mocks.getRaw, saveRaw: vi.fn() },
+  // The AI Provider tab loads its own config when the tablist reaches it.
+  aiService: {
+    getConfig: vi.fn().mockResolvedValue({ enabled: false, provider: 'offline' }),
+    getStatus: vi.fn().mockResolvedValue({ status: 'disabled' }),
+    saveConfig: vi.fn(),
+    testConfig: vi.fn(),
+  },
 }));
 
 vi.mock('@/features/bootstrap/services', () => ({
@@ -79,11 +86,16 @@ async function confirmApply(user: ReturnType<typeof userEvent.setup>) {
   await user.click(within(dialog).getByRole('button', { name: /^confirm$/i }));
 }
 
+// T9: the change circuit's "Review N changes" action replaced the
+// floating Save button as the entry to the review drawer.
+function reviewAction() {
+  return screen.getByRole('button', { name: /^Review \d+ changes?$/ });
+}
+
 async function switchToTab(user: ReturnType<typeof userEvent.setup>, label: string) {
-  // The tab buttons render an icon + the label. The accessible name
-  // for the <button> is the visible label (the icon is aria-hidden via
-  // lucide-react), so getByRole with `name` is the stable selector.
-  const tab = await screen.findByRole('button', { name: new RegExp(`^${label}$`) });
+  // The sections are a tablist; each tab's accessible name is its
+  // visible label (the icon is aria-hidden).
+  const tab = await screen.findByRole('tab', { name: new RegExp(`^${label}$`) });
   await user.click(tab);
 }
 
@@ -116,15 +128,15 @@ describe('ConfigurationView (issue #366 — toggles were reset on every render)'
     const toggle = findToggleButton(/^Allow Node Installation$/);
     // Fixture has no editorTheme.palette.editable, the transformer
     // defaults it to true, so the toggle starts in the "on" state.
-    expect(toggle.className).toContain('bg-primary');
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
 
     await user.click(toggle);
-    await waitFor(() => expect(toggle.className).toContain('bg-muted'));
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-pressed', 'false'));
 
-    const saveButton = screen.getByText('Save', { selector: 'button' });
+    const saveButton = reviewAction();
     await user.click(saveButton).catch(() => undefined);
 
-    expect(toggle.className).toContain('bg-muted');
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
   });
 });
 
@@ -274,30 +286,30 @@ describe('ConfigurationView (issue #762 — Security tab for credentialSecret / 
     const user = userEvent.setup();
     renderConfiguration();
 
-    await user.click(await screen.findByRole('button', { name: /^TLS & Secrets$/ }));
+    await user.click(await screen.findByRole('tab', { name: /^TLS & Secrets$/ }));
 
     // credentialSecret + https use the shared Input (label+id).
     // requireHttps is a ToggleField with no htmlFor link.
-    expect(screen.getByLabelText('Credential Secret')).toBeInTheDocument();
+    expect(screen.getByLabelText('Credential Secret (credentialSecret)')).toBeInTheDocument();
     expect(screen.getByText(/^Require HTTPS$/)).toBeInTheDocument();
-    expect(screen.getByLabelText('Private Key Path')).toBeInTheDocument();
-    expect(screen.getByLabelText('Certificate Path')).toBeInTheDocument();
-    expect(screen.getByLabelText('CA Bundle Path')).toBeInTheDocument();
-    expect(screen.getByLabelText('HTTPS Port')).toBeInTheDocument();
-    expect(screen.getByLabelText('Private Key Passphrase')).toBeInTheDocument();
+    expect(screen.getByLabelText('Private Key Path (https.key)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Certificate Path (https.cert)')).toBeInTheDocument();
+    expect(screen.getByLabelText('CA Bundle Path (https.ca)')).toBeInTheDocument();
+    expect(screen.getByLabelText('HTTPS Port (https.port)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Private Key Passphrase (https.passphrase)')).toBeInTheDocument();
   });
 
   it('gates credentialSecret rotation behind a confirmation dialog and clears the field on cancel', async () => {
     const user = userEvent.setup();
     renderConfiguration();
 
-    await user.click(await screen.findByRole('button', { name: /^TLS & Secrets$/ }));
-    const secretInput = screen.getByLabelText('Credential Secret') as HTMLInputElement;
+    await user.click(await screen.findByRole('tab', { name: /^TLS & Secrets$/ }));
+    const secretInput = screen.getByLabelText('Credential Secret (credentialSecret)') as HTMLInputElement;
     await user.type(secretInput, 'new-rotation-passphrase');
 
-    // Issue #766 slice F (W4) — Save opens the review panel first;
+    // Issue #766 slice F (W4) — the review action opens the panel first;
     // the rotation dialog is gated by clicking Apply inside the panel.
-    await user.click(screen.getByText('Save', { selector: 'button' }));
+    await user.click(reviewAction());
     const reviewPanel = await screen.findByTestId('review-changes-panel');
     await user.click(within(reviewPanel).getByTestId('review-changes-panel-apply'));
 
@@ -312,7 +324,7 @@ describe('ConfigurationView (issue #762 — Security tab for credentialSecret / 
 
     // Re-enter and confirm: the value sticks after acknowledgement.
     await user.type(secretInput, 'final-rotation-passphrase');
-    await user.click(screen.getByText('Save', { selector: 'button' }));
+    await user.click(reviewAction());
     const secondReview = await screen.findByTestId('review-changes-panel');
     await user.click(within(secondReview).getByTestId('review-changes-panel-apply'));
     const secondDialog = await screen.findByRole('dialog');
@@ -331,12 +343,12 @@ describe('ConfigurationView (issue #762 — Security tab for credentialSecret / 
 
     renderConfiguration();
 
-    await user.click(await screen.findByRole('button', { name: /^TLS & Secrets$/ }));
+    await user.click(await screen.findByRole('tab', { name: /^TLS & Secrets$/ }));
     await user.click(findToggleButton(/^Require HTTPS$/));
-    await user.type(screen.getByLabelText('Private Key Path'), '/etc/node-red/key.pem');
-    // Issue #766 slice F (W4) — Save opens the review panel first;
+    await user.type(screen.getByLabelText('Private Key Path (https.key)'), '/etc/node-red/key.pem');
+    // Issue #766 slice F (W4) — the review action opens the panel first;
     // the actual save dispatches when the operator clicks Apply.
-    await user.click(screen.getByText('Save', { selector: 'button' }));
+    await user.click(reviewAction());
     const reviewPanel = await screen.findByTestId('review-changes-panel');
     await user.click(within(reviewPanel).getByTestId('review-changes-panel-apply'));
     await confirmApply(user);
@@ -371,9 +383,9 @@ describe('ConfigurationView (issue #762 — Security tab for credentialSecret / 
 
     renderConfiguration();
 
-    await user.click(await screen.findByRole('button', { name: /^TLS & Secrets$/ }));
+    await user.click(await screen.findByRole('tab', { name: /^TLS & Secrets$/ }));
     await user.click(findToggleButton(/^Require HTTPS$/));
-    await user.click(screen.getByText('Save', { selector: 'button' }));
+    await user.click(reviewAction());
     const reviewPanel = await screen.findByTestId('review-changes-panel');
     await user.click(within(reviewPanel).getByTestId('review-changes-panel-apply'));
     await confirmApply(user);
@@ -405,9 +417,9 @@ describe('ConfigurationView (review drawer Apply — confirm, feedback, single s
   }
 
   async function openApplyConfirmation(user: ReturnType<typeof userEvent.setup>) {
-    await user.click(await screen.findByRole('button', { name: /^TLS & Secrets$/ }));
+    await user.click(await screen.findByRole('tab', { name: /^TLS & Secrets$/ }));
     await user.click(findToggleButton(/^Require HTTPS$/));
-    await user.click(screen.getByText('Save', { selector: 'button' }));
+    await user.click(reviewAction());
     const panel = await screen.findByTestId('review-changes-panel');
     await user.click(within(panel).getByTestId('review-changes-panel-apply'));
     const dialog = await screen.findByRole('dialog', { name: 'Apply changes?' });
@@ -448,7 +460,7 @@ describe('ConfigurationView (review drawer Apply — confirm, feedback, single s
     const apply = within(panel).getByTestId('review-changes-panel-apply');
     expect(apply).toBeDisabled();
     expect(apply).toHaveTextContent('Applying…');
-    expect(screen.getByText('Saving...', { selector: 'button' })).toBeDisabled();
+    expect(reviewAction()).toBeDisabled();
 
     await user.click(confirm);
     await user.click(apply);
@@ -460,7 +472,9 @@ describe('ConfigurationView (review drawer Apply — confirm, feedback, single s
     expect(updateSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('closes the confirmation but keeps the drawer usable when the save fails', async () => {
+  // T9: no failure toast. The drawer closes so the change circuit beside it
+  // shows the failed contact; the review action reopens it for a retry.
+  it('closes the drawer on a failed save so the circuit shows the outcome', async () => {
     const user = userEvent.setup();
     const { updateSpy, handle } = deferredUpdate();
     await spyUpdate(updateSpy);
@@ -471,13 +485,13 @@ describe('ConfigurationView (review drawer Apply — confirm, feedback, single s
     await waitFor(() => expect(within(panel).getByTestId('review-changes-panel-apply')).toBeDisabled());
 
     await act(async () => handle.reject(new Error('boom')));
-    await waitFor(() =>
-      expect(screen.queryByRole('dialog', { name: 'Apply changes?' })).not.toBeInTheDocument(),
-    );
-    expect(screen.getByTestId('review-changes-panel')).toBeInTheDocument();
-    const apply = within(panel).getByTestId('review-changes-panel-apply');
-    expect(apply).toBeEnabled();
-    expect(apply).toHaveTextContent('Apply');
+    await waitFor(() => expect(screen.queryByTestId('review-changes-panel')).not.toBeInTheDocument());
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByTestId('change-circuit-live')).toHaveTextContent('Validate: Not confirmed');
+
+    await user.click(reviewAction());
+    const reopened = await screen.findByTestId('review-changes-panel');
+    expect(within(reopened).getByTestId('review-changes-panel-apply')).toBeEnabled();
     expect(updateSpy).toHaveBeenCalledTimes(1);
   });
 
@@ -502,9 +516,9 @@ describe('ConfigurationView (review drawer Apply — confirm, feedback, single s
     await spyUpdate(updateSpy);
     renderConfiguration();
 
-    await user.click(await screen.findByRole('button', { name: /^TLS & Secrets$/ }));
-    await user.type(screen.getByLabelText('Credential Secret'), 'new-rotation-passphrase');
-    await user.click(screen.getByText('Save', { selector: 'button' }));
+    await user.click(await screen.findByRole('tab', { name: /^TLS & Secrets$/ }));
+    await user.type(screen.getByLabelText('Credential Secret (credentialSecret)'), 'new-rotation-passphrase');
+    await user.click(reviewAction());
     const panel = await screen.findByTestId('review-changes-panel');
     await user.click(within(panel).getByTestId('review-changes-panel-apply'));
 
@@ -522,5 +536,334 @@ describe('ConfigurationView (review drawer Apply — confirm, feedback, single s
     await act(async () => handle.resolve({ data: { data: {}, success: true, timestamp: '' } }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(updateSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+// T9 — the change circuit replaces the floating Save button. It is the
+// gated sequence Edit → Diff → Validate → Backup → Apply → Ready.
+describe('ConfigurationView (change circuit)', () => {
+  const STEP_NAMES = ['Edit', 'Diff', 'Validate', 'Backup', 'Apply', 'Ready'];
+
+  async function circuitSteps() {
+    const circuit = await screen.findByRole('list', { name: 'Change circuit' });
+    return within(circuit).getAllByRole('listitem');
+  }
+
+  async function spyUpdate(impl: Mock) {
+    const configModule = await import('@/features/configuration/services');
+    vi.spyOn(configModule.configService, 'updateConfig').mockImplementation(impl);
+  }
+
+  it('renders the six contacts in order, each with its state in text', async () => {
+    renderConfiguration();
+    const steps = await circuitSteps();
+    expect(steps).toHaveLength(6);
+    steps.forEach((step, index) => {
+      expect(within(step).getByText(STEP_NAMES[index])).toBeInTheDocument();
+      expect(within(step).getByText(`K${index + 1}`)).toBeInTheDocument();
+    });
+    // No pending edit: nothing is reached yet. "Open" is reserved for a
+    // failed or blocked step, so the idle circuit says "Waiting".
+    for (const step of steps) {
+      expect(within(step).getByText('Waiting')).toBeInTheDocument();
+      expect(within(step).queryByText('Open')).not.toBeInTheDocument();
+    }
+    expect(screen.getByText('Step 1 of 6 · Edit · Waiting')).toBeInTheDocument();
+  });
+
+  it('marks the Edit contact "Open" when the runtime is read-only', async () => {
+    mocks.getStatus.mockResolvedValue({ data: { data: { nodeRed: { mode: 'docker', detected: true, version: '5.0.6' }, settings: { path: '/etc/node-red/settings.js' }, configuration: { runtimeVersion: '5.0.6', adapter: 'node-red-5', catalogVersion: '5.0.6', source: 'detected', mode: 'read-only', editable: false } }, success: true, timestamp: '' } });
+    renderConfiguration();
+
+    await screen.findByText('Read-only runtime');
+    const [edit] = await circuitSteps();
+    expect(within(edit).getByText('Open')).toBeInTheDocument();
+  });
+
+  // 320–390px overflow guard: jsdom has no layout, so this pins the
+  // classes that keep the circuit from widening the page. The grid needs an
+  // explicit minmax(0,1fr) column, the circuit and its list must be allowed
+  // to shrink, and no step may force its min-content width.
+  it('keeps the circuit shrinkable so it cannot widen the page on narrow screens', async () => {
+    renderConfiguration();
+    const circuit = await screen.findByTestId('change-circuit');
+    expect(circuit).toHaveClass('min-w-0');
+    expect(circuit.parentElement).toHaveClass('grid-cols-1');
+    const list = screen.getByTestId('change-circuit-steps');
+    expect(list).toHaveClass('min-w-0');
+    expect(list.className).not.toMatch(/overflow-x-auto|min-w-max/);
+    for (const step of within(list).getAllByRole('listitem')) {
+      expect(step.className).not.toMatch(/min-w-max/);
+    }
+    const review = screen.getByRole('button', { name: 'No changes to review' });
+    expect(review).toHaveClass('w-full');
+  });
+
+  it('registers each change live: pending count, restart cost and step states', async () => {
+    const user = userEvent.setup();
+    renderConfiguration();
+
+    expect(await screen.findByRole('button', { name: 'No changes to review' })).toBeDisabled();
+
+    await user.click(await screen.findByRole('tab', { name: /^TLS & Secrets$/ }));
+    await user.click(findToggleButton(/^Require HTTPS$/));
+    expect(screen.getByRole('button', { name: 'Review 1 change' })).toBeEnabled();
+    expect(screen.getByTestId('change-circuit-total')).toHaveTextContent('1 change');
+
+    await user.click(await screen.findByRole('tab', { name: /^Basic$/ }));
+    const port = screen.getByLabelText('UI Port (uiPort)');
+    await user.clear(port);
+    await user.type(port, '1881');
+    expect(screen.getByRole('button', { name: 'Review 2 changes' })).toBeEnabled();
+    expect(screen.getByTestId('change-circuit-total')).toHaveTextContent('2 changes · 1 needs restart');
+
+    const [edit, diff] = await circuitSteps();
+    expect(within(edit).getByText('Closed')).toBeInTheDocument();
+    expect(within(edit).getByText('2 changes')).toBeInTheDocument();
+    expect(within(diff).getByText('Pending')).toBeInTheDocument();
+    expect(within(diff).getByText('Not reviewed')).toBeInTheDocument();
+    expect(screen.getByTestId('change-circuit-live')).toHaveTextContent('Diff: Pending');
+  });
+
+  it('discards back to the loaded configuration, leaving zero pending changes', async () => {
+    const user = userEvent.setup();
+    renderConfiguration();
+
+    await user.click(await screen.findByRole('tab', { name: /^TLS & Secrets$/ }));
+    await user.click(findToggleButton(/^Require HTTPS$/));
+    await user.click(screen.getByRole('button', { name: 'Discard Changes' }));
+
+    expect(screen.getByRole('button', { name: 'No changes to review' })).toBeDisabled();
+    expect(screen.getByTestId('change-circuit-total')).toHaveTextContent('0 changes');
+  });
+
+  it('opens the review drawer from "Review N changes" and closes the Diff contact', async () => {
+    const user = userEvent.setup();
+    renderConfiguration();
+
+    await user.click(await screen.findByRole('tab', { name: /^TLS & Secrets$/ }));
+    await user.click(findToggleButton(/^Require HTTPS$/));
+    await user.click(screen.getByRole('button', { name: 'Review 1 change' }));
+
+    expect(await screen.findByTestId('review-changes-panel')).toBeInTheDocument();
+    const [, diff] = await circuitSteps();
+    expect(within(diff).getByText('Closed')).toBeInTheDocument();
+    expect(within(diff).getByText('Diff reviewed')).toBeInTheDocument();
+  });
+
+  it('closes every contact after the server confirms the apply', async () => {
+    const user = userEvent.setup();
+    await spyUpdate(vi.fn().mockResolvedValue({ data: { data: {}, success: true, timestamp: '' } }));
+    renderConfiguration();
+
+    await user.click(await screen.findByRole('tab', { name: /^TLS & Secrets$/ }));
+    await user.click(findToggleButton(/^Require HTTPS$/));
+    await user.click(screen.getByRole('button', { name: 'Review 1 change' }));
+    await user.click(within(await screen.findByTestId('review-changes-panel')).getByTestId('review-changes-panel-apply'));
+    await confirmApply(user);
+
+    await waitFor(async () => {
+      const steps = await circuitSteps();
+      for (const step of steps) expect(within(step).getByText('Closed')).toBeInTheDocument();
+    });
+    const steps = await circuitSteps();
+    expect(within(steps[3]).getByText('Taken before write')).toBeInTheDocument();
+    expect(within(steps[5]).getByText('Readiness OK')).toBeInTheDocument();
+    // No toast: the circuit and its live region carry the outcome.
+    const { toast } = await import('sonner');
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(screen.getByTestId('change-circuit-live')).toHaveTextContent('Ready: Closed. Readiness OK');
+  });
+
+  it('opens the Ready contact and shows the rollback branch when readiness fails', async () => {
+    const user = userEvent.setup();
+    await spyUpdate(
+      vi.fn().mockRejectedValue({
+        response: {
+          status: 500,
+          data: {
+            success: false,
+            error: {
+              code: 'RUNTIME_READINESS_FAILED',
+              message: 'Configuration apply failed because Node-RED did not become ready',
+            },
+          },
+        },
+      }),
+    );
+    renderConfiguration();
+
+    await user.click(await screen.findByRole('tab', { name: /^TLS & Secrets$/ }));
+    await user.click(findToggleButton(/^Require HTTPS$/));
+    await user.click(screen.getByRole('button', { name: 'Review 1 change' }));
+    await user.click(within(await screen.findByTestId('review-changes-panel')).getByTestId('review-changes-panel-apply'));
+    await confirmApply(user);
+
+    const ready = (await circuitSteps())[5];
+    await waitFor(() => expect(within(ready).getByText('Failed')).toBeInTheDocument());
+    expect(within(ready).getByText('Readiness failed')).toBeInTheDocument();
+    expect(within(ready).getByText('RUNTIME_READINESS_FAILED')).toBeInTheDocument();
+    const [, , validate, backup, apply] = await circuitSteps();
+    expect(within(validate).getByText('Closed')).toBeInTheDocument();
+    expect(within(backup).getByText('Closed')).toBeInTheDocument();
+    expect(within(apply).getByText('Closed')).toBeInTheDocument();
+    const rollback = screen.getByTestId('change-circuit-rollback');
+    expect(rollback).toHaveTextContent('Rollback: restored from backup');
+    // Text plus a drawn symbol, so the outcome reads on the mobile strip too
+    // (the side branch is only drawn from lg up).
+    expect(within(rollback).getByTestId('rollback-symbol')).toHaveAttribute('data-outcome', 'restored');
+    const { toast } = await import('sonner');
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(screen.getByTestId('change-circuit-live')).toHaveTextContent('Ready: Failed');
+  });
+
+  it('marks the outcome as not confirmed when the server gives no stage', async () => {
+    const user = userEvent.setup();
+    await spyUpdate(vi.fn().mockRejectedValue(new Error('timeout of 120000ms exceeded')));
+    renderConfiguration();
+
+    await user.click(await screen.findByRole('tab', { name: /^TLS & Secrets$/ }));
+    await user.click(findToggleButton(/^Require HTTPS$/));
+    await user.click(screen.getByRole('button', { name: 'Review 1 change' }));
+    await user.click(within(await screen.findByTestId('review-changes-panel')).getByTestId('review-changes-panel-apply'));
+    await confirmApply(user);
+
+    await waitFor(async () => {
+      const steps = await circuitSteps();
+      for (const step of steps.slice(2)) expect(within(step).getByText('Not confirmed')).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('change-circuit-rollback')).not.toBeInTheDocument();
+  });
+});
+
+// Finish review (T9 follow-up): schematic designators, gated outcomes on
+// the circuit, a real tablist and the direct-edit lock region.
+describe('ConfigurationView (finish review)', () => {
+  it('renders the sections as a tablist with roving focus and arrow keys', async () => {
+    const user = userEvent.setup();
+    renderConfiguration();
+
+    const tablist = await screen.findByRole('tablist', { name: 'Configuration sections' });
+    const tabs = within(tablist).getAllByRole('tab');
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['Basic', 'TLS & Secrets', 'Logging', 'Editor Theme', 'AI Provider']);
+    expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
+    expect(tabs[0]).toHaveAttribute('tabindex', '0');
+    for (const tab of tabs.slice(1)) {
+      expect(tab).toHaveAttribute('aria-selected', 'false');
+      expect(tab).toHaveAttribute('tabindex', '-1');
+    }
+    const panel = screen.getByRole('tabpanel', { name: 'Basic' });
+    expect(tabs[0]).toHaveAttribute('aria-controls', panel.id);
+
+    tabs[0].focus();
+    await user.keyboard('{ArrowRight}');
+    expect(tabs[1]).toHaveFocus();
+    expect(tabs[1]).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tabpanel', { name: 'TLS & Secrets' })).toBeInTheDocument();
+    await user.keyboard('{End}');
+    expect(tabs[4]).toHaveFocus();
+    await user.keyboard('{ArrowRight}');
+    expect(tabs[0]).toHaveFocus();
+    await user.keyboard('{ArrowLeft}');
+    expect(tabs[4]).toHaveFocus();
+    await user.keyboard('{Home}');
+    expect(tabs[0]).toHaveFocus();
+    expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('labels each field with its settings.js key as the terminal designator', async () => {
+    renderConfiguration();
+
+    const port = await screen.findByLabelText('UI Port (uiPort)');
+    const label = document.querySelector(`label[for="${port.id}"]`) as HTMLElement;
+    expect(within(label).getByText('uiPort')).toHaveClass('font-mono');
+    expect(within(label).getByText('UI Port')).toBeInTheDocument();
+    // Nested keys use their settings.js path.
+    expect(screen.getByRole('button', { name: 'Disable Editor (disableEditor)' })).toBeInTheDocument();
+  });
+
+  it('shows the settings.js revision as the header designator', async () => {
+    mocks.getRaw.mockResolvedValue({
+      data: {
+        data: {
+          content: 'module.exports = {};\n',
+          path: '/etc/node-red/settings.js',
+          writable: true,
+          revision: { fingerprint: '9f2c1b0d4e5a6f7c8d9e', algorithm: 'sha256' },
+        },
+        success: true,
+        timestamp: '',
+      },
+    });
+    renderConfiguration();
+
+    expect(await screen.findByText('REV 9f2c1b0d')).toHaveClass('font-mono');
+  });
+
+  it('holds the Validate contact open with the invalid keys as its proof', async () => {
+    const user = userEvent.setup();
+    renderConfiguration();
+
+    const port = await screen.findByLabelText('UI Port (uiPort)');
+    await user.clear(port);
+    await user.type(port, '70000');
+
+    const validate = within(await screen.findByRole('list', { name: 'Change circuit' })).getAllByRole('listitem')[2];
+    expect(within(validate).getByText('Open')).toBeInTheDocument();
+    expect(within(validate).getByText('1 field invalid')).toBeInTheDocument();
+    expect(within(validate).getByText('uiPort')).toBeInTheDocument();
+  });
+
+  it('marks the raw editor as a direct edit with the unlock control in the lock banner', async () => {
+    renderConfiguration();
+
+    const banner = await screen.findByTestId('raw-settings-locked-banner');
+    expect(within(banner).getByTestId('raw-settings-unlock-btn')).toBeInTheDocument();
+    expect(banner).toHaveTextContent(/Unlock to edit settings\.js/);
+    expect(banner).toHaveTextContent(/backup is taken before any write/i);
+    expect(screen.getByText(/bypasses the change circuit/i)).toBeInTheDocument();
+  });
+
+  it('shows a settings.js syntax error inline under the editor, not as a toast', async () => {
+    const user = userEvent.setup();
+    const { toast } = await import('sonner');
+    renderConfiguration();
+
+    await user.click(await screen.findByTestId('raw-settings-unlock-btn'));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByTestId('confirmation-dialog-ack'));
+    await user.click(within(dialog).getByRole('button', { name: /confirm/i }));
+
+    const textarea = await screen.findByDisplayValue(/module\.exports/);
+    fireEvent.change(textarea, { target: { value: 'module.exports = {' } });
+    await user.click(screen.getByTestId('raw-settings-save-btn'));
+
+    const error = await screen.findByTestId('raw-settings-error');
+    expect(error).toHaveTextContent(/Invalid settings\.js/);
+    expect(textarea).toHaveAttribute('aria-invalid', 'true');
+    expect(textarea).toHaveAttribute('aria-describedby', error.id);
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+});
+
+describe('ConfigurationView (finish review round 2)', () => {
+  it('lets long settings.js keys break only after a dot', async () => {
+    const user = userEvent.setup();
+    renderConfiguration();
+    await user.click(await screen.findByRole('tab', { name: /^Editor Theme$/ }));
+
+    const select = screen.getByLabelText('Theme (editorTheme.codeEditor.options.theme)');
+    const key = within(document.querySelector(`label[for="${select.id}"]`) as HTMLElement)
+      .getByText('editorTheme.codeEditor.options.theme');
+    expect(key.className).not.toMatch(/break-all/);
+    expect(key.querySelectorAll('wbr')).toHaveLength(3);
+  });
+
+  it('keeps the lock banner text wide enough to push the unlock button below it', async () => {
+    renderConfiguration();
+    const banner = await screen.findByTestId('raw-settings-locked-banner');
+    expect(banner).toHaveClass('flex-wrap');
+    const text = within(banner).getByText(/^Locked\./);
+    expect(text.className).toMatch(/flex-\[1_1_14rem\]/);
   });
 });

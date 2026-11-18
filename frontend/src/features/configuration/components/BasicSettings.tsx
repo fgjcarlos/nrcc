@@ -1,9 +1,7 @@
-import { Server } from 'lucide-react';
 import { InputField, ToggleField } from './FormFields';
 import { FieldStatusChip } from './FieldStatusChip';
 import type { NodeRedConfigFormData } from '@/shared/types';
 import type { FieldDiff } from '../hooks/useConfigurationDiff';
-import { useT } from '@/i18n';
 
 interface BasicSettingsProps {
   settings: NodeRedConfigFormData;
@@ -20,18 +18,13 @@ interface BasicSettingsProps {
 }
 
 export function BasicSettings({ settings, onUpdate, disabled, fieldErrors }: BasicSettingsProps) {
-  const { t } = useT();
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 mb-4">
-        <Server className="w-5 h-5 text-base-content/60" />
-        <h3 className="text-lg font-medium text-base-content">{t('configuration:basicSettings')}</h3>
-      </div>
-
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-1">
           <InputField
             label="UI Port"
+            field="uiPort"
             value={settings.uiPort}
             onChange={(v) => onUpdate('uiPort', v as number)}
             type="number"
@@ -45,6 +38,7 @@ export function BasicSettings({ settings, onUpdate, disabled, fieldErrors }: Bas
         <div className="space-y-1">
           <InputField
             label="UI Host"
+            field="uiHost"
             value={settings.uiHost}
             onChange={(v) => onUpdate('uiHost', v as string)}
             placeholder="0.0.0.0"
@@ -57,6 +51,7 @@ export function BasicSettings({ settings, onUpdate, disabled, fieldErrors }: Bas
         <div className="space-y-1">
           <InputField
             label="Admin Root"
+            field="httpAdminRoot"
             value={settings.httpAdminRoot}
             onChange={(v) => onUpdate('httpAdminRoot', v as string)}
             placeholder="/"
@@ -69,6 +64,7 @@ export function BasicSettings({ settings, onUpdate, disabled, fieldErrors }: Bas
         <div className="space-y-1">
           <InputField
             label="Node Root"
+            field="httpNodeRoot"
             value={settings.httpNodeRoot}
             onChange={(v) => onUpdate('httpNodeRoot', v as string)}
             placeholder="/"
@@ -81,6 +77,7 @@ export function BasicSettings({ settings, onUpdate, disabled, fieldErrors }: Bas
         <div className="md:col-span-2 space-y-1">
           <ToggleField
             label="Disable Editor"
+            field="disableEditor"
             value={settings.disableEditor}
             onChange={(v) => onUpdate('disableEditor', v)}
             help="Prevent the editor UI from being served"

@@ -2,7 +2,10 @@
   "host": {
     "installationDetected": "Instalación detectada",
     "nodeRedNotDetected": "(sin Node-RED detectado)",
-    "pathNotDetected": "sin ruta detectada"
+    "pathNotDetected": "sin ruta detectada",
+    "recommendPortless": "Opcional: instala Portless para exponer nrcc o Node-RED con URLs HTTPS .localhost, LAN o Tailscale.",
+    "recommendWritable": "Otorga permisos de escritura sobre settings.js para que nrcc pueda guardar cambios.",
+    "revisionTitle": "Revisión de settings.js {{fingerprint}}"
   },
   "advanced": {
     "title": "Ajustes avanzados de settings.js",
@@ -14,14 +17,17 @@
     "unlockAcknowledgement": "Entiendo que un guardado incorrecto puede bloquear el inicio de Node-RED.",
     "saveRaw": "Guardar settings.js sin procesar",
     "savingRaw": "Guardando settings.js...",
-    "lockedBadge": "Bloqueado - haz clic en \"Desbloquear para editar\" para realizar cambios",
-    "cancelEdit": "Cancelar"
+    "lockedBadge": "Bloqueado. Selecciona \"Desbloquear para editar settings.js\" para editar el archivo directamente; se toma un respaldo antes de cualquier escritura.",
+    "cancelEdit": "Cancelar",
+    "directEdit": "Edición directa · no pasa por el circuito de cambios (sin revisión del diff)",
+    "parseError": "settings.js no válido: {{message}}"
   },
   "preset": {
     "confirmApply": "Confirmar aplicación",
     "acknowledgement": "Entiendo que al confirmar un preset se reescribirá la clave gestionada en settings.js y el valor original no se podrá recuperar a menos que exista un respaldo.",
     "loadingCurated": "Cargando presets curados...",
     "loadError": "No se pudieron cargar los presets.",
+    "unavailable": "Los presets curados no están disponibles en este servidor de NRCC.",
     "sectionLabel": "Presets curados",
     "title": "Presets curados",
     "description": "Recetas verificadas para ajustes avanzados de Node-RED 5. Cada preset declara las superficies editor / HTTP / Socket.IO que toca y nunca reescribe código del operador fuera de su alcance declarado.",
@@ -54,6 +60,7 @@
   "aiProvider": "Proveedor de IA",
   "aiProviderDesc": "Configura la asistencia opcional de IA con revisión previa.",
   "pageTitle": "Configuración de Node-RED",
+  "sectionsLabel": "Secciones de configuración",
   "discardChanges": "Descartar cambios",
   "runtimeVersionLabel": "Versión del runtime",
   "configSourceLabel": "Origen de configuración",
@@ -193,5 +200,60 @@
     "nodeRed": "Node-RED + Dashboard",
     "arrowNrccSettings": "edita",
     "arrowSettingsNodeRed": "carga"
+  },
+  "circuit": {
+    "title": "Circuito de cambios",
+    "summary": "Paso {{index}} de {{total}} · {{step}} · {{state}}",
+    "steps": {
+      "edit": "Editar",
+      "diff": "Diff",
+      "validate": "Validar",
+      "backup": "Respaldo",
+      "apply": "Aplicar",
+      "ready": "Listo"
+    },
+    "state": {
+      "idle": "En espera",
+      "blocked": "Abierto",
+      "active": "Pendiente",
+      "passed": "Cerrado",
+      "failed": "Fallido",
+      "unknown": "Sin confirmar"
+    },
+    "proof": {
+      "changes_one": "{{count}} cambio",
+      "changes_other": "{{count}} cambios",
+      "noChanges": "Sin cambios",
+      "readOnly": "Runtime de solo lectura",
+      "notReviewed": "Sin revisar",
+      "reviewed": "Diff revisado",
+      "invalid_one": "{{count}} campo no válido",
+      "invalid_other": "{{count}} campos no válidos",
+      "localValid": "Campos válidos; el servidor valida al aplicar",
+      "running": "Transacción en curso en el servidor",
+      "serverAccepted": "Aceptado por el servidor",
+      "rejected": "Rechazado; no se escribió nada",
+      "notReached": "No alcanzado",
+      "backupTaken": "Tomado antes de escribir",
+      "backupFailed": "Falló el respaldo; no se escribió nada",
+      "written": "settings.js escrito, Node-RED reiniciado",
+      "writeFailed": "Falló la escritura",
+      "restartFailed": "Falló el reinicio",
+      "recoveryFailed": "Falló la recuperación",
+      "ready": "Readiness OK",
+      "notReady": "Falló el readiness",
+      "unknown": "Resultado sin confirmar; revisa el runtime"
+    },
+    "rollback": {
+      "restored": "Rollback: restaurado desde el respaldo",
+      "failed": "Falló el rollback: no se pudo recuperar el runtime"
+    },
+    "total_one": "{{count}} cambio",
+    "total_other": "{{count}} cambios",
+    "restartCost_one": "{{count}} requiere reinicio",
+    "restartCost_other": "{{count}} requieren reinicio",
+    "review_one": "Revisar {{count}} cambio",
+    "review_other": "Revisar {{count}} cambios",
+    "reviewNone": "No hay cambios que revisar"
   }
 }

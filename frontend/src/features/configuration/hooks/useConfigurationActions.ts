@@ -1,8 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { configService, settingsService } from '../services';
-import type { NodeRedConfigFormData } from '@/shared/types';
-import { formDataToConfigPayload } from '../lib/configTransformers';
 import { errorMessage } from '@/shared/lib/errorMessage';
 import { queryKeys } from '@/shared/lib/queryKeys';
 export function useConfigurationActions() {
@@ -22,8 +20,9 @@ export function useConfigurationActions() {
         input.config as Record<string, unknown>,
         input.expectedRevision,
       ),
+    // No toast: the change circuit's contacts and its polite live region
+    // carry the outcome of the gated apply (T9 THESIS).
     onSuccess: () => {
-      toast.success('Configuration saved successfully');
       queryClient.invalidateQueries({ queryKey: queryKeys.config.root });
       // Issue #878 — the save rewrites settings.js, so the raw-settings
       // document (and with it the revision fingerprint the next save
@@ -31,9 +30,6 @@ export function useConfigurationActions() {
       // the pre-save revision and the next save would be rejected as
       // stale.
       queryClient.invalidateQueries({ queryKey: queryKeys.config.rawSettings });
-    },
-    onError: (error) => {
-      toast.error(`Failed to save: ${errorMessage(error)}`);
     },
   });
 
@@ -61,31 +57,6 @@ export function useConfigurationActions() {
   });
 
   /**
-   * Handle save with validation
-   *
-   * The pre-existing `validateAuthFields` aggregate was removed in
-   * slice F W2 (issue #766). Per-field validation now flows through
-   * `useConfigurationDiff` + `useConfigurationSave` so each
-   * `InputField` shows its own `FieldStatusChip` while the operator
-   * types instead of getting a single toast on Save.
-   *
-   * Issue #878: `expectedRevision` is the settings.js revision the
-   * operator read. It travels with the save so the backend can reject a
-   * stale edit instead of overwriting newer state.
-   */
-  const handleSave = async (
-    formData: NodeRedConfigFormData,
-    expectedRevision?: string,
-  ) => {
-    const payload = formDataToConfigPayload(formData);
-    try {
-      await saveConfigMutation.mutateAsync({ config: payload, expectedRevision });
-    } catch {
-      // Error already handled by mutation
-    }
-  };
-
-  /**
    * Handle raw settings save
    *
    * Issue #878: `expectedRevision` is the revision of the document the
@@ -102,7 +73,6 @@ export function useConfigurationActions() {
     saveRawSettingsMutation,
 
     // Handlers
-    handleSave,
     handleSaveRawSettings,
   };
 }
