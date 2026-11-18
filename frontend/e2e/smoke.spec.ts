@@ -27,9 +27,8 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
     // the metric row; QuickActionsCard was removed in favor of those buttons.
     // Slice D moved the same Restart/Open actions into NodeRedHealthTile.
     await expect(page.getByRole('button', { name: 'Restart' })).toBeVisible()
-    // exact:true disambiguates the NodeRedHealthTile Open button from the
-    // user-menu trigger (whose accessible name contains 'Open user menu').
-    await expect(page.getByRole('button', { name: 'Open', exact: true })).toBeVisible()
+    // T8: the editor action names what it opens.
+    await expect(page.getByRole('button', { name: 'Open Node-RED editor', exact: true })).toBeVisible()
   })
 
   test('restart flow drives the real Restart button and shows the success toast', async ({ page }) => {
@@ -43,9 +42,9 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
 
   test('backup creation uses fixture responses', async ({ page }) => {
     await login(page)
-    // T6: the sidebar label equals the page heading ("Backups"). Slice D
-    // adds an "Open Recovery" CTA on BackupHealthTile too — scope to the
-    // sidebar so Playwright's strict-mode locators resolve to one element.
+    // T6: the sidebar label equals the page heading ("Backups"). Overview
+    // also links to /backups ("Open Backups") — scope to the sidebar so
+    // Playwright's strict-mode locators resolve to one element.
     await page.getByTestId('app-sidebar').getByRole('link', { name: 'Backups', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Backups', exact: true })).toBeVisible()
     await page.getByRole('button', { name: /Create backup now/ }).first().click()

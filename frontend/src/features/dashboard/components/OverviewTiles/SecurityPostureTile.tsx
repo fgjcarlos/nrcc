@@ -1,18 +1,18 @@
 import { Link } from 'react-router-dom';
-import { ShieldCheck, ShieldOff, ChevronRight } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { useT } from '@/i18n';
 import { StatusChip } from '@/shared/components/ui';
+import { cn } from '@/shared/lib';
+import { securityVerdict, type SecurityVerdict } from '../../lib';
 
 /**
- * SecurityPostureTile — issue #766 slice D
+ * Security posture section of the Overview sheet (T8).
  *
- * Operational decision tile for the Overview screen. Renders the four
- * authentication + transport surfaces in one glance so the operator
- * can answer "is Node-RED exposed safely?" without leaving Overview.
- *
- * Each row is a <StatusChip> backed by the slice B CVA variants. The
- * tile carries a single deep-link action (Go to Security) — embedded
- * forms land on the dedicated Configuration / Security screen.
+ * The four surfaces are plain, non-interactive rows: /security has no
+ * addressable place per surface (and requireHttps lives on Configuration),
+ * so one section link carries the navigation. Only the overall "Exposed"
+ * verdict is critical red; a surface that is off reads as neutral text,
+ * or amber for adminAuth, whose absence is what exposes the editor.
  */
 
 export interface SecurityPostureSurface {
@@ -21,130 +21,94 @@ export interface SecurityPostureSurface {
 }
 
 export interface SecurityPostureTileProps {
-  /** Whether each security surface is currently configured. */
-  adminAuth: boolean;
-  httpNodeAuth: boolean;
-  httpStaticAuth: boolean;
-  requireHttps: boolean;
+  /** Whether each surface is configured; undefined while /config has not answered. */
+  adminAuth?: boolean;
+  httpNodeAuth?: boolean;
+  httpStaticAuth?: boolean;
+  requireHttps?: boolean;
 }
 
-type SurfaceKey = 'adminAuth' | 'httpNodeAuth' | 'httpStaticAuth' | 'requireHttps';
+type SurfaceKey = SecurityPostureSurface['id'];
 
-interface SurfaceRow {
-  key: SurfaceKey;
-  labelKey: string;
-  enabledKey: string;
-  disabledKey: string;
-}
+const SURFACES: ReadonlyArray<SurfaceKey> = ['adminAuth', 'httpNodeAuth', 'httpStaticAuth', 'requireHttps'];
 
-const SURFACE_ROWS: ReadonlyArray<SurfaceRow> = [
-  {
-    key: 'adminAuth',
-    labelKey: 'dashboard:overviewTiles.securityPosture.surfaces.adminAuth',
-    enabledKey: 'dashboard:overviewTiles.securityPosture.states.enabled',
-    disabledKey: 'dashboard:overviewTiles.securityPosture.states.disabled',
-  },
-  {
-    key: 'httpNodeAuth',
-    labelKey: 'dashboard:overviewTiles.securityPosture.surfaces.httpNodeAuth',
-    enabledKey: 'dashboard:overviewTiles.securityPosture.states.enabled',
-    disabledKey: 'dashboard:overviewTiles.securityPosture.states.disabled',
-  },
-  {
-    key: 'httpStaticAuth',
-    labelKey: 'dashboard:overviewTiles.securityPosture.surfaces.httpStaticAuth',
-    enabledKey: 'dashboard:overviewTiles.securityPosture.states.enabled',
-    disabledKey: 'dashboard:overviewTiles.securityPosture.states.disabled',
-  },
-  {
-    key: 'requireHttps',
-    labelKey: 'dashboard:overviewTiles.securityPosture.surfaces.requireHttps',
-    enabledKey: 'dashboard:overviewTiles.securityPosture.states.enabled',
-    disabledKey: 'dashboard:overviewTiles.securityPosture.states.disabled',
-  },
-];
+const VERDICT_CHIP: Record<SecurityVerdict, { variant: 'success' | 'warning' | 'danger'; key: string }> = {
+  lockedDown: { variant: 'success', key: 'success' },
+  partial: { variant: 'warning', key: 'warning' },
+  exposed: { variant: 'danger', key: 'danger' },
+};
 
-export function SecurityPostureTile({
-  adminAuth,
-  httpNodeAuth,
-  httpStaticAuth,
-  requireHttps,
-}: SecurityPostureTileProps) {
+export function SecurityPostureTile(props: SecurityPostureTileProps) {
   const { t } = useT();
+  const reported = props.adminAuth !== undefined;
   const values: Record<SurfaceKey, boolean> = {
-    adminAuth,
-    httpNodeAuth,
-    httpStaticAuth,
-    requireHttps,
+    adminAuth: Boolean(props.adminAuth),
+    httpNodeAuth: Boolean(props.httpNodeAuth),
+    httpStaticAuth: Boolean(props.httpStaticAuth),
+    requireHttps: Boolean(props.requireHttps),
   };
-
-  // Overall posture: success only when ALL surfaces are enabled. Two
-  // surfaces off = warning. Three or more = danger.
-  const enabledCount = Object.values(values).filter(Boolean).length;
-  let overallVariant: 'success' | 'warning' | 'danger';
-  if (enabledCount === 4) overallVariant = 'success';
-  else if (enabledCount >= 2) overallVariant = 'warning';
-  else overallVariant = 'danger';
-
-  const overallLabelKey = `dashboard:overviewTiles.securityPosture.overall.${overallVariant}`;
+  const chip = reported ? VERDICT_CHIP[securityVerdict(values)] : undefined;
+  const verdictLabel = t(`dashboard:overviewTiles.securityPosture.overall.${chip?.key ?? 'notReported'}`);
 
   return (
-    <article
+    <section
       data-testid="overview-security-posture-tile"
-      className="card surface-card border border-border p-6"
+      className="grid gap-4 py-4 sm:py-6 lg:grid-cols-[16rem_minmax(0,1fr)] lg:gap-6"
       aria-labelledby="overview-security-posture-title"
     >
-      <header className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
-          {overallVariant === 'success' ? (
-            <ShieldCheck className="h-6 w-6 text-success" aria-hidden="true" />
-          ) : (
-            <ShieldOff className="h-6 w-6 text-warning" aria-hidden="true" />
-          )}
-          <div className="min-w-0">
-            <h2 id="overview-security-posture-title" className="text-base font-semibold text-base-content">
-              {t('dashboard:overviewTiles.securityPosture.title')}
-            </h2>
-            <p className="mt-0.5 text-xs text-base-content/65">
-              {t('dashboard:overviewTiles.securityPosture.subtitle')}
-            </p>
-          </div>
+      <header className="space-y-2">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <h2 id="overview-security-posture-title" className="text-sm font-semibold text-ds-text-primary">
+            {t('dashboard:overviewTiles.securityPosture.title')}
+          </h2>
+          <StatusChip
+            variant={chip?.variant ?? 'neutral'}
+            size="sm"
+            ariaLabel={t('dashboard:overviewTiles.securityPosture.statusAria', { state: verdictLabel })}
+          >
+            {verdictLabel}
+          </StatusChip>
         </div>
-        <StatusChip variant={overallVariant} size="sm" ariaLabel={t(overallLabelKey)}>
-          {t(overallLabelKey)}
-        </StatusChip>
+        <p className="text-xs text-ds-text-secondary">{t('dashboard:overviewTiles.securityPosture.subtitle')}</p>
+        <Link
+          to="/security"
+          className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-ds-on-tint-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ds-accent-primary sm:min-h-0"
+          data-testid="overview-security-posture-link"
+        >
+          {t('dashboard:overviewTiles.securityPosture.cta')}
+          <ChevronRight className="h-4 w-4" aria-hidden="true" />
+        </Link>
       </header>
 
-      <ul className="mt-4 space-y-2">
-        {SURFACE_ROWS.map((row) => {
-          const enabled = values[row.key];
-          const variant = enabled ? 'success' : 'danger';
+      <dl className="grid content-start gap-x-6 sm:grid-cols-2">
+        {SURFACES.map((key) => {
+          const enabled = values[key];
           return (
-            <li
-              key={row.key}
-              className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-base-200/30 px-3 py-2"
-            >
-              <span className="text-sm text-base-content">{t(row.labelKey)}</span>
-              <StatusChip
-                variant={variant}
-                size="sm"
-                data-testid={`overview-security-${row.key}`}
+            <div key={key} className="flex items-baseline justify-between gap-3 border-b border-ds-border-subtle py-2">
+              <dt className="text-sm text-ds-text-primary">
+                {t(`dashboard:overviewTiles.securityPosture.surfaces.${key}`)}
+              </dt>
+              <dd
+                data-testid={`overview-security-${key}`}
+                className={cn(
+                  'text-xs font-semibold',
+                  !reported
+                    ? 'text-ds-text-muted'
+                    : enabled
+                      ? 'text-ds-on-tint-success'
+                      : key === 'adminAuth'
+                        ? 'text-ds-on-tint-warning'
+                        : 'text-ds-text-secondary',
+                )}
               >
-                {t(enabled ? row.enabledKey : row.disabledKey)}
-              </StatusChip>
-            </li>
+                {reported
+                  ? t(`dashboard:overviewTiles.securityPosture.states.${enabled ? 'enabled' : 'disabled'}`)
+                  : t('dashboard:overviewTiles.securityPosture.overall.notReported')}
+              </dd>
+            </div>
           );
         })}
-      </ul>
-
-      <Link
-        to="/security"
-        className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-accent transition-colors hover:text-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-base-100"
-        data-testid="overview-security-posture-link"
-      >
-        {t('dashboard:overviewTiles.securityPosture.cta')}
-        <ChevronRight className="h-4 w-4" aria-hidden="true" />
-      </Link>
-    </article>
+      </dl>
+    </section>
   );
 }
