@@ -115,6 +115,31 @@ func TestBootstrapHandler_GetStatus_AllFieldsAccessible(t *testing.T) {
 	_ = status.NodeRed.Running
 }
 
+func TestBootstrapHandler_GetStatus_RecommendationCodesMatchRecommendations(t *testing.T) {
+	handler := NewBootstrapHandler(service.NewIsolatedHostService(t.TempDir()))
+	w := httptest.NewRecorder()
+	handler.GetStatus(w, httptest.NewRequest(http.MethodGet, "/api/bootstrap/status", nil))
+
+	var resp struct {
+		Data map[string]json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	var messages, codes []string
+	_ = json.Unmarshal(resp.Data["recommendations"], &messages)
+	_ = json.Unmarshal(resp.Data["recommendationCodes"], &codes)
+	// The isolated service always detects Node-RED; whether Portless is on this
+	// host decides how many entries there are, but both lists move together.
+	if len(codes) != len(messages) {
+		t.Fatalf("recommendationCodes %q must align with recommendations %q", codes, messages)
+	}
+	_, hasCodes := resp.Data["recommendationCodes"]
+	if len(messages) > 0 && !hasCodes {
+		t.Fatalf("response %s has recommendations without recommendationCodes", w.Body.String())
+	}
+}
+
 func TestBootstrapHandler_GetStatus_MultipleRequests_Consistent(t *testing.T) {
 	hostSvc := service.NewHostService(t.TempDir())
 	handler := NewBootstrapHandler(hostSvc)

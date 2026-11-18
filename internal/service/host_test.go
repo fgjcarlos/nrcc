@@ -418,7 +418,7 @@ func TestBuildRecommendations_NoBareMetalInstallHints(t *testing.T) {
 
 	// Worst-case input that, pre-ADR-0003, used to light up every
 	// bare-metal-flavored suggestion. Post-#454 none of those fire.
-	recommendations := svc.buildRecommendations(model.HostStatus{
+	recommendations, _ := svc.buildRecommendations(model.HostStatus{
 		NodeJS: model.DependencyStatus{Installed: false},
 		NodeRed: model.NodeRedEnvironment{
 			Detected: false,
@@ -441,12 +441,82 @@ func TestBuildRecommendations_NoBareMetalInstallHints(t *testing.T) {
 
 func TestBuildRecommendations_PortlessOptional(t *testing.T) {
 	svc := NewHostService(t.TempDir())
-	recommendations := svc.buildRecommendations(model.HostStatus{
+	recommendations, _ := svc.buildRecommendations(model.HostStatus{
 		NodeRed: model.NodeRedEnvironment{Detected: true},
 	})
 	joined := strings.Join(recommendations, " ")
 	if !strings.Contains(joined, "Portless") {
 		t.Fatalf("buildRecommendations() = %q, want Portless hint when Node-RED is detected and Portless is missing", recommendations)
+	}
+}
+
+// Legacy human strings: the recommendations field must keep them byte-for-byte
+// because existing consumers (Configuration) render it directly.
+const (
+	legacyPortlessRecommendation = "Opcional: instala Portless para exponer nrcc o Node-RED con URLs HTTPS .localhost, LAN o Tailscale."
+	legacyWritableRecommendation = "Otorga permisos de escritura sobre settings.js para que nrcc pueda guardar cambios."
+)
+
+func TestBuildRecommendations_CodesAlignWithLegacyMessages(t *testing.T) {
+	svc := NewHostService(t.TempDir())
+	cases := []struct {
+		name         string
+		status       model.HostStatus
+		wantCodes    []string
+		wantMessages []string
+	}{
+		{"none", model.HostStatus{}, nil, nil},
+		{
+			"portless only",
+			model.HostStatus{NodeRed: model.NodeRedEnvironment{Detected: true}, Settings: model.SettingsDocument{Path: "/data/settings.js", Writable: true}},
+			[]string{model.RecommendationPortlessOptional},
+			[]string{legacyPortlessRecommendation},
+		},
+		{
+			"both",
+			model.HostStatus{NodeRed: model.NodeRedEnvironment{Detected: true}, Settings: model.SettingsDocument{Path: "/data/settings.js"}},
+			[]string{model.RecommendationPortlessOptional, model.RecommendationSettingsNotWritable},
+			[]string{legacyPortlessRecommendation, legacyWritableRecommendation},
+		},
+		{
+			"portless installed, settings read-only",
+			model.HostStatus{NodeRed: model.NodeRedEnvironment{Detected: true}, Portless: model.DependencyStatus{Installed: true}, Settings: model.SettingsDocument{Path: "/data/settings.js"}},
+			[]string{model.RecommendationSettingsNotWritable},
+			[]string{legacyWritableRecommendation},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			messages, codes := svc.buildRecommendations(tc.status)
+			if strings.Join(codes, ",") != strings.Join(tc.wantCodes, ",") || len(codes) != len(tc.wantCodes) {
+				t.Fatalf("codes = %q, want %q", codes, tc.wantCodes)
+			}
+			if strings.Join(messages, "|") != strings.Join(tc.wantMessages, "|") || len(messages) != len(tc.wantMessages) {
+				t.Fatalf("messages = %q, want %q", messages, tc.wantMessages)
+			}
+		})
+	}
+}
+
+func TestRecommendationCodesAreStable(t *testing.T) {
+	// The frontend catalogs key on these values; renaming one is a breaking change.
+	if model.RecommendationPortlessOptional != "portless_optional" || model.RecommendationSettingsNotWritable != "settings_not_writable" {
+		t.Fatalf("codes changed: %q %q", model.RecommendationPortlessOptional, model.RecommendationSettingsNotWritable)
+	}
+}
+
+func TestHostService_Detect_FillsRecommendationCodes(t *testing.T) {
+	oldLookPath := execLookPath
+	t.Cleanup(func() { execLookPath = oldLookPath })
+	execLookPath = func(name string) (string, error) { return "", exec.ErrNotFound }
+
+	status := NewIsolatedHostService(t.TempDir()).Detect()
+
+	if len(status.RecommendationCodes) != 1 || status.RecommendationCodes[0] != model.RecommendationPortlessOptional {
+		t.Fatalf("RecommendationCodes = %q, want [%q]", status.RecommendationCodes, model.RecommendationPortlessOptional)
+	}
+	if len(status.Recommendations) != 1 || status.Recommendations[0] != legacyPortlessRecommendation {
+		t.Fatalf("Recommendations = %q, want the legacy Portless string unchanged", status.Recommendations)
 	}
 }
 
