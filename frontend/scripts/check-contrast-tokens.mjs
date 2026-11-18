@@ -167,6 +167,13 @@ const TEXT_COLOURS = [
   { fg: 'ds-text-muted', name: 'muted text' },
 ];
 
+/**
+ * Control borders (inputs, selects, secondary buttons) must identify the
+ * control against every surface it sits on (SC 1.4.11). Decorative
+ * hairline dividers (--ds-border-default) are exempt.
+ */
+const CONTROL_BORDERS = [{ fg: 'ds-border-strong', name: 'control border' }];
+
 /** Solid fills carrying a small label (buttons, chips, badges). */
 const SOLID_LABELS = [
   { fg: 'primary-content', bg: 'primary', label: 'primary button label' },
@@ -200,6 +207,9 @@ const PAIRS = THEMES.flatMap((theme) => [
   ),
   ...SEMANTIC_TEXT.flatMap((colour) =>
     SURFACES.map((bg) => ({ theme, fg: `ds-on-tint-${colour}`, bg, use: 'text', label: `${colour} text on ${bg}` })),
+  ),
+  ...CONTROL_BORDERS.flatMap(({ fg, name }) =>
+    SURFACES.map((bg) => ({ theme, fg, bg, use: 'non-text', label: `${name} on ${bg}` })),
   ),
   ...SOLID_LABELS.map(({ fg, bg, label }) => ({ theme, fg, bg, use: 'text', label })),
   ...TINTED_LABELS.flatMap((colour) =>

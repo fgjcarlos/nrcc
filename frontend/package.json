@@ -30,6 +30,8 @@
     "gen:api": "openapi-typescript ../docs/openapi.yaml -o src/shared/api/schema.ts"
   },
   "dependencies": {
+    "@fontsource-variable/overpass": "^5.3.0",
+    "@fontsource/overpass-mono": "^5.3.0",
     "@hookform/resolvers": "^7.0.3",
     "@tanstack/react-query": "^5.104.5",
     "axios": "^1.20.0",
@@ -52,6 +54,7 @@
     "@axe-core/playwright": "^4.14.0",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.64.1",
+    "@tailwindcss/vite": "^4.3.3",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.8",
@@ -72,7 +75,6 @@
     "openapi-typescript": "7.13.0",
     "postcss": "^8.5.23",
     "serve": "^14.2.6",
-    "@tailwindcss/vite": "^4.3.3",
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.72.1",

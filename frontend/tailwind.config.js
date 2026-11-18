@@ -13,12 +13,12 @@ export default {
         // blocks of src/index.css (issue #889). Guarded by
         // scripts/tailwind-ds-vars.test.mjs.
 
-        // Brand (Signal Prime Red)
+        // Brand: neutral-conductor blue, action and selection (Esquema eléctrico)
         'ds-brand-primary': 'var(--ds-brand-primary)',
         'ds-brand-hover': 'var(--ds-brand-hover)',
         'ds-brand-dim': 'var(--ds-brand-dim)',
 
-        // Accent (Signal Prime Cyan)
+        // Accent: same conductor blue (focus and selection)
         'ds-accent-primary': 'var(--ds-accent-primary)',
         'ds-accent-hover': 'var(--ds-accent-hover)',
         'ds-accent-dim': 'var(--ds-accent-dim)',
@@ -56,9 +56,10 @@ export default {
         'ds-on-tint-error': 'var(--ds-on-tint-error)',
       },
       fontFamily: {
-         sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-         mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
-       },
+        // Self-hosted through @fontsource (src/main.tsx); no CDN at runtime.
+        sans: ['Overpass Variable', 'system-ui', 'sans-serif'],
+        mono: ['Overpass Mono', 'ui-monospace', 'monospace'],
+      },
       // ── Typography scale (issue #766 slice B) ─────────────────
       // Named tokens for the typography hierarchy. Use Tailwind
       // utilities like `text-ds-h1`, `text-ds-body` etc. so every page
@@ -83,13 +84,15 @@ export default {
         'ds-density-spacious':     '0.75rem',
       },
       boxShadow: {
-         'glow': '0 24px 60px rgba(0, 0, 0, 0.42), 0 0 0 1px rgba(148, 163, 184, 0.08)',
-         'glow-light': '0 24px 48px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(15, 23, 42, 0.04)',
-         'glow-warning': '0 12px 30px rgba(224, 123, 32, 0.28), inset 0 1px rgba(255, 255, 255, 0.18)',
-         // Focus ring used by the ds-focus-ring utility in index.css.
-         // Two-stop ring: outer halo = surface colour, inner = accent.
-         'ds-focus-ring': '0 0 0 2px var(--ds-bg-base, #07090d), 0 0 0 4px var(--ds-accent-primary, #0089b4)',
-       },
+        // The legacy glow names stay because components still use them;
+        // they now resolve to the flat raised elevation (max 0 1px 2px).
+        'glow': 'var(--ds-shadow-raised)',
+        'glow-light': 'var(--ds-shadow-raised)',
+        'glow-warning': 'var(--ds-shadow-raised)',
+        // Focus ring used by the ds-focus-ring utility in index.css.
+        // Two-stop ring: outer halo = surface colour, inner = accent.
+        'ds-focus-ring': '0 0 0 2px var(--ds-bg-base), 0 0 0 4px var(--ds-accent-primary)',
+      },
     },
   },
 }

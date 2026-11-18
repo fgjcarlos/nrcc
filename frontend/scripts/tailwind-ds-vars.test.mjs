@@ -10,8 +10,7 @@
  *      (no hard-coded hex literal);
  *   2. every referenced `--name` is declared in both the
  *      `corporateDark` and `corporateLight` blocks of src/index.css;
- *   3. dark-theme values that must render identically to the previous
- *      hard-coded Tailwind hex still do.
+ *   3. both themes resolve to the Esquema eléctrico palette.
  *
  * Both files are read as text; no JavaScript is evaluated.
  */
@@ -24,30 +23,54 @@ const ROOT = resolve(__dirname, '..');
 const THEMES = ['corporateDark', 'corporateLight'];
 
 /**
- * Tailwind key → previous dark hex. These keys must keep rendering
- * exactly the same colour in the dark theme after the move to var().
+ * Tailwind key → expected hex per theme (Esquema eléctrico, ui-brand-overhaul
+ * T3). Pins the palette so a token edit is a deliberate, reviewed change.
  */
-const DARK_UNCHANGED = {
-  'ds-brand-primary': '#d4472b',
-  'ds-brand-dim': '#8f2f1f',
-  'ds-accent-primary': '#0089b4',
-  'ds-accent-hover': '#22b4df',
-  'ds-accent-dim': '#075a73',
-  'ds-bg-void': '#07090d',
-  'ds-bg-base': '#0f1419',
-  'ds-bg-surface': '#141b23',
-  'ds-bg-elevated': '#1a2332',
-  'ds-bg-overlay': '#223044',
-  'ds-border-subtle': '#263241',
-  'ds-border-default': '#39485c',
-  'ds-border-strong': '#4a5f7c',
-  'ds-text-primary': '#f5f7fa',
-  'ds-text-secondary': '#d8dee8',
-  'ds-text-tertiary': '#9aa7b8',
-  'ds-success': '#16a36a',
-  'ds-warning': '#e8a811',
-  'ds-danger': '#e54233',
-  'ds-info': '#2c9edb',
+const EXPECTED = {
+  corporateDark: {
+    'ds-brand-primary': '#7fa6ea',
+    'ds-brand-dim': '#24375a',
+    'ds-accent-primary': '#7fa6ea',
+    'ds-accent-hover': '#9ab9ef',
+    'ds-accent-dim': '#24375a',
+    'ds-bg-void': '#111317',
+    'ds-bg-base': '#0c0e11',
+    'ds-bg-surface': '#171a1f',
+    'ds-bg-elevated': '#1d2128',
+    'ds-bg-overlay': '#1d2128',
+    'ds-border-subtle': '#2a2f37',
+    'ds-border-default': '#6b717c',
+    'ds-border-strong': '#9a9ea6',
+    'ds-text-primary': '#e9e7df',
+    'ds-text-secondary': '#c3c1b8',
+    'ds-text-tertiary': '#9a9ea6',
+    'ds-success': '#8cc66b',
+    'ds-warning': '#e8b04a',
+    'ds-danger': '#f08a80',
+    'ds-info': '#c99a6e',
+  },
+  corporateLight: {
+    'ds-brand-primary': '#2b5fb4',
+    'ds-brand-dim': '#dbe4f3',
+    'ds-accent-primary': '#2b5fb4',
+    'ds-accent-hover': '#234e94',
+    'ds-accent-dim': '#dbe4f3',
+    'ds-bg-void': '#f6f5f0',
+    'ds-bg-base': '#eeede6',
+    'ds-bg-surface': '#fbfaf7',
+    'ds-bg-elevated': '#ffffff',
+    'ds-bg-overlay': '#ffffff',
+    'ds-border-subtle': '#d6d4cb',
+    'ds-border-default': '#838891',
+    'ds-border-strong': '#5c626c',
+    'ds-text-primary': '#15171c',
+    'ds-text-secondary': '#3d424b',
+    'ds-text-tertiary': '#5c626c',
+    'ds-success': '#2d6a22',
+    'ds-warning': '#8a5a00',
+    'ds-danger': '#b3261e',
+    'ds-info': '#7a4a2a',
+  },
 };
 
 let failures = 0;
@@ -108,12 +131,14 @@ for (const [key, name] of Object.entries(varOf)) {
   }
 }
 
-// ── 3. Dark rendering unchanged for the pinned keys ──────────────
-console.log('\ndark theme keeps the previous Tailwind colours');
-for (const [key, expected] of Object.entries(DARK_UNCHANGED)) {
-  const name = varOf[key];
-  const actual = name ? cssTokens.corporateDark?.[name] : undefined;
-  assert(actual === expected, `${key} dark = ${expected}`, `resolved ${name ?? '(no var)'} = ${actual ?? '(undeclared)'}`);
+// ── 3. Both themes resolve to the pinned palette ─────────────────
+console.log('\nboth themes resolve to the Esquema eléctrico palette');
+for (const theme of THEMES) {
+  for (const [key, expected] of Object.entries(EXPECTED[theme])) {
+    const name = varOf[key];
+    const actual = name ? cssTokens[theme]?.[name] : undefined;
+    assert(actual === expected, `${key} ${theme} = ${expected}`, `resolved ${name ?? '(no var)'} = ${actual ?? '(undeclared)'}`);
+  }
 }
 
 if (failures > 0) {
