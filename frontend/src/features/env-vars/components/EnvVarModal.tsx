@@ -89,7 +89,8 @@ export function EnvVarModal({
       id: valueId,
       value: formData.value,
       onChange: (e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, value: e.target.value }),
-      placeholder: editing ? '(leave empty to keep current)' : '',
+      // Only an encrypted value survives an empty edit (internal/service/env_linux.go set()); other types are overwritten.
+      placeholder: editing && formData.type === 'secret' ? t('env-vars:modalSecretKeepPlaceholder') : '',
       className: fieldControlClass,
       required: isRequired,
       'aria-invalid': validationErrors.value ? true : undefined,
@@ -146,7 +147,7 @@ export function EnvVarModal({
             value={formData.key}
             onChange={(e) => setFormData({ ...formData, key: e.target.value.toUpperCase() })}
             disabled={editing}
-            placeholder="MY_VARIABLE"
+            placeholder={t('env-vars:modalKeyPlaceholder')}
             className="font-mono"
             error={validationErrors.key}
             required
@@ -182,7 +183,7 @@ export function EnvVarModal({
             type="text"
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            placeholder="What this variable is for"
+            placeholder={t('env-vars:modalDescriptionPlaceholder')}
           />
         </DialogBody>
 

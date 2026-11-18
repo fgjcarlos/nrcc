@@ -10,8 +10,8 @@ interface BulkImportModalProps {
   onImported: () => void;
 }
 
-const PLACEHOLDER = `# KEY=VALUE[#type] — one per line
-API_URL=https://example.test
+// Example lines are code; the hint line above them comes from the catalog.
+const EXAMPLE_LINES = `API_URL=https://example.test
 DEBUG=true#boolean
 PORT=8080#number
 TOKEN=hunter2#secret
@@ -19,6 +19,7 @@ TOKEN=hunter2#secret
 
 export function BulkImportModal({ open, onClose, onImported }: BulkImportModalProps) {
   const { t } = useT();
+  const placeholder = `${t('env-vars:bulkPlaceholderHint')}\n${EXAMPLE_LINES}`;
   const [content, setContent] = useState('');
   const [report, setReport] = useState<BulkEnvResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +34,8 @@ export function BulkImportModal({ open, onClose, onImported }: BulkImportModalPr
   }, [report]);
 
   const linesForRender = content.split('\n');
+  const lineIssueCount = report ? report.issues.filter((iss) => iss.line > 0).length : 0;
+  const generalIssues = report ? report.issues.filter((iss) => !(iss.line > 0)) : [];
 
   async function handleValidate() {
     if (inFlightRef.current) return;
@@ -43,7 +46,7 @@ export function BulkImportModal({ open, onClose, onImported }: BulkImportModalPr
       const result = await envService.bulkImport(content, false);
       setReport(result);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Validation failed';
+      const message = err instanceof Error ? err.message : t('env-vars:bulkValidateFailed');
       setError(message);
       setReport(null);
     } finally {
@@ -67,7 +70,7 @@ export function BulkImportModal({ open, onClose, onImported }: BulkImportModalPr
         setContent('');
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Import failed';
+      const message = err instanceof Error ? err.message : t('env-vars:bulkImportFailed');
       setError(message);
     } finally {
       inFlightRef.current = false;
@@ -76,7 +79,7 @@ export function BulkImportModal({ open, onClose, onImported }: BulkImportModalPr
   }
 
   function handlePasteExample() {
-    setContent(PLACEHOLDER);
+    setContent(placeholder);
     setReport(null);
     setError(null);
   }
@@ -95,20 +98,32 @@ export function BulkImportModal({ open, onClose, onImported }: BulkImportModalPr
         <Textarea
           aria-label={t('env-vars:bulkTitle')}
           className="h-48 font-mono text-xs"
-          placeholder={PLACEHOLDER}
+          placeholder={placeholder}
           value={content}
           onChange={(e) => setContent(e.target.value)}
         />
 
-        {(report || error) && (
-          <p role="status" className="flex flex-wrap gap-x-3 text-sm">
-            {report && (
-              <span className={report.valid ? 'text-ds-on-tint-success' : 'text-ds-on-tint-error'}>
-                {report.summary}
-              </span>
-            )}
-            {error && <span className="text-ds-on-tint-error">{error}</span>}
+        {report?.valid && !error && (
+          <p role="status" className="text-sm text-ds-on-tint-success">
+            {t('env-vars:bulkReady', { count: report.lines.length })}
           </p>
+        )}
+
+        {(error || (report && !report.valid)) && (
+          <div
+            role="alert"
+            className="space-y-1 rounded-box border border-ds-danger/35 bg-ds-danger/10 px-3 py-2 text-sm text-ds-on-tint-error"
+          >
+            {error && <p>{error}</p>}
+            {report && !report.valid && lineIssueCount > 0 && (
+              <p className="font-semibold">{t('env-vars:bulkLinesInvalid', { count: lineIssueCount })}</p>
+            )}
+            {/* Issues without a line (limits, server errors) have no table row to sit on. */}
+            {report && !report.valid && generalIssues.map((issue, idx) => <p key={idx}>{issue.reason}</p>)}
+            {report && !report.valid && lineIssueCount === 0 && generalIssues.length === 0 && (
+              <p>{report.summary || t('env-vars:bulkImportFailed')}</p>
+            )}
+          </div>
         )}
 
         {report && (
