@@ -182,7 +182,7 @@ export function CronBuilder({
             />
           </div>
 
-          <label className="flex min-h-6 cursor-pointer items-center gap-2 text-sm text-ds-text-secondary">
+          <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-ds-text-secondary md:min-h-6">
             <input
               type="checkbox"
               data-testid="custom-advanced-toggle"

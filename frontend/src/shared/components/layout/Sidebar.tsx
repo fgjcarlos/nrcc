@@ -101,7 +101,7 @@ export function Sidebar({ mode = 'rail', onClose }: SidebarProps) {
     <aside
       data-testid="app-sidebar"
       className={cn(
-        'app-sidebar-shell flex h-full min-h-full flex-col border-r transition-[width] duration-200',
+        'app-sidebar-shell flex h-full min-h-full flex-col border-r',
         iconOnly ? 'w-16' : 'w-64',
       )}
     >

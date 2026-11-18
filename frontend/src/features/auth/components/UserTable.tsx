@@ -21,7 +21,7 @@ export function UserTable({
 }: UserTableProps) {
   const { t } = useT();
   // 44px touch targets on phones, dense 24px links from sm up.
-  const linkButton = 'min-h-11 text-sm transition-colors hover:underline sm:min-h-6';
+  const linkButton = 'min-h-11 text-sm transition-colors hover:underline md:min-h-6';
   return (
     // One table; below sm each user becomes a labelled card.
     <Table stacked>

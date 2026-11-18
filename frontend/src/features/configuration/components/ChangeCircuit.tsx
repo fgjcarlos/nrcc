@@ -11,7 +11,7 @@ import { SettingKey } from './FormFields';
  * back, draws the rollback branch from Apply back to Backup.
  *
  * Every state is carried by text and symbol shape, never by colour alone.
- * Below `lg` the same list renders as a compact horizontal strip.
+ * Below `xl` the same list renders as a compact horizontal strip.
  */
 export interface ChangeCircuitProps {
   circuit: Circuit;
@@ -57,7 +57,7 @@ function ContactSymbol({ state, index }: { state: ContactState; index: number })
       height="20"
       aria-hidden="true"
       // Rotating 90° about the centre keeps x=10.5 on the strip's y=10.5 conductor.
-      className={cn('relative shrink-0 max-lg:rotate-90', STATE_STROKE[state])}
+      className={cn('relative shrink-0 max-xl:rotate-90', STATE_STROKE[state])}
     >
       <rect x="6.5" y="5" width="8" height="10" className="fill-ds-bg-surface" />
       {/* x=10.5 sits on the 1px conductor drawn at whole pixels (12–13px in the gutter). */}
@@ -91,7 +91,7 @@ function ContactSymbol({ state, index }: { state: ContactState; index: number })
 
 /**
  * Rollback branch glyph for the note under the circuit, so the outcome is
- * drawn at every width (the side branch itself is only drawn from lg up).
+ * drawn at every width (the side branch itself is only drawn from xl up).
  * A dashed return path from Apply back to the Backup contact: restored ends
  * on a closed contact; failed ends on an open one.
  */
@@ -155,18 +155,18 @@ export function ChangeCircuit({
       aria-labelledby={titleId}
       className={cn(
         'sticky top-0 z-10 min-w-0 self-start border-b border-ds-border-subtle bg-ds-bg-surface py-2',
-        'lg:top-4 lg:border-b-0 lg:border-l lg:py-0 lg:pl-5',
+        'xl:top-4 xl:border-b-0 xl:border-l xl:py-0 xl:pl-5',
         className,
       )}
       data-testid="change-circuit"
     >
-      <h2 id={titleId} className="mb-3 text-sm font-semibold text-ds-text-primary max-lg:sr-only">
+      <h2 id={titleId} className="mb-3 text-sm font-semibold text-ds-text-primary max-xl:sr-only">
         {t('configuration:circuit.title')}
       </h2>
 
-      {/* Below lg: a short summary over the six symbols; the list items
+      {/* Below xl: a short summary over the six symbols; the list items
           keep the full state text for assistive tech. */}
-      <p className="mb-1 truncate text-xs text-ds-text-secondary lg:hidden" aria-hidden="true">
+      <p className="mb-1 truncate text-xs text-ds-text-secondary xl:hidden" aria-hidden="true">
         {t('configuration:circuit.summary', {
           index: frontierIndex + 1,
           total: circuit.steps.length,
@@ -179,12 +179,12 @@ export function ChangeCircuit({
       <ol
         aria-labelledby={titleId}
         className={cn(
-          'relative flex min-w-0 justify-between lg:flex-col lg:justify-start',
+          'relative flex min-w-0 justify-between xl:flex-col xl:justify-start',
           // Ink conductor: the control-border token (>=3:1 in both themes),
           // 1px on whole pixels so it is never antialiased to half strength.
           "before:pointer-events-none before:absolute before:bg-[var(--ds-border-strong)] before:content-['']",
-          'max-lg:before:inset-x-0 max-lg:before:top-2.5 max-lg:before:h-px',
-          'lg:before:inset-y-0 lg:before:left-3 lg:before:w-px',
+          'max-xl:before:inset-x-0 max-xl:before:top-2.5 max-xl:before:h-px',
+          'xl:before:inset-y-0 xl:before:left-3 xl:before:w-px',
         )}
         data-testid="change-circuit-steps"
       >
@@ -192,7 +192,7 @@ export function ChangeCircuit({
           const last = index === circuit.steps.length - 1;
           const branch = circuit.rollback && (s.id === 'backup' || s.id === 'apply');
           return (
-            <li key={s.id} className="relative flex min-w-0 justify-center lg:justify-start lg:gap-3" data-state={s.state}>
+            <li key={s.id} className="relative flex min-w-0 justify-center xl:justify-start xl:gap-3" data-state={s.state}>
               <span className="flex w-6 shrink-0 justify-center">
                 <ContactSymbol state={s.state} index={index} />
               </span>
@@ -200,13 +200,13 @@ export function ChangeCircuit({
                 <span
                   aria-hidden="true"
                   className={cn(
-                    'absolute left-0 w-3 border-dashed border-ds-danger max-lg:hidden',
+                    'absolute left-0 w-3 border-dashed border-ds-danger max-xl:hidden',
                     s.id === 'backup' ? 'bottom-0 top-2.5 border-l border-t' : 'top-0 h-2.5 border-b border-l',
                   )}
                 />
               )}
 
-              <div className={cn('min-w-0 max-lg:sr-only lg:flex-1', !last && 'lg:pb-3')}>
+              <div className={cn('min-w-0 max-xl:sr-only xl:flex-1', !last && 'xl:pb-3')}>
                 <div className="flex items-baseline gap-2">
                   <span className="font-mono text-xs text-ds-text-muted">{`K${index + 1}`}</span>
                   <span className="text-sm font-semibold text-ds-text-primary">{stepName(s)}</span>
@@ -245,8 +245,8 @@ export function ChangeCircuit({
         </p>
       )}
 
-      <div className="mt-2 flex flex-col gap-2 border-t border-ds-border-subtle pt-2 lg:mt-3 lg:pt-3">
-        <p className="text-xs tabular-nums text-ds-text-secondary lg:text-right" data-testid="change-circuit-total">
+      <div className="mt-2 flex flex-col gap-2 border-t border-ds-border-subtle pt-2 xl:mt-3 xl:pt-3">
+        <p className="text-xs tabular-nums text-ds-text-secondary xl:text-right" data-testid="change-circuit-total">
           {total}
         </p>
         <button

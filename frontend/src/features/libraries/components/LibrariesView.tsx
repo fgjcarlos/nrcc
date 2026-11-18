@@ -26,7 +26,7 @@ function PackageName({ name }: { name: string }) {
 
 // 24px link targets on desktop, 44px rows on phones (WCAG 2.5.8).
 const linkClass =
-  'inline-flex min-h-11 items-center gap-1 text-xs font-medium text-ds-on-tint-primary underline-offset-4 hover:underline sm:min-h-6';
+  'inline-flex min-h-11 min-w-11 items-center justify-center gap-1 text-xs font-medium text-ds-on-tint-primary underline-offset-4 hover:underline md:min-h-6 md:min-w-6';
 
 function ExternalAnchor({ href, label, children }: { href: string; label: string; children: ReactNode }) {
   return (
@@ -127,7 +127,7 @@ export function LibrariesView() {
                 <tbody>
                   {visibleLibraries.map((lib) => (
                     <tr key={lib.name}>
-                      <td data-label={t('libraries:colPackage')} className="max-sm:min-h-11">
+                      <td data-label={t('libraries:colPackage')} className="max-md:min-h-11">
                         <div className="min-w-0 space-y-0.5">
                           <PackageName name={lib.name} />
                           {lib.description && (
@@ -135,7 +135,7 @@ export function LibrariesView() {
                           )}
                         </div>
                       </td>
-                      <td data-label={t('libraries:colVersion')} className="max-sm:min-h-11">
+                      <td data-label={t('libraries:colVersion')} className="max-md:min-h-11">
                         {lib.version && (
                           <span className="font-mono text-xs font-semibold tabular-nums text-ds-text-secondary">
                             {lib.version}
@@ -168,7 +168,7 @@ export function LibrariesView() {
                           onClick={() => setPendingUninstall(lib.name)}
                           disabled={uninstallMutation.isPending}
                           aria-label={t('libraries:uninstallPackage', { name: lib.name })}
-                          className="min-h-11 sm:min-h-8"
+                          className="min-h-11 md:min-h-8"
                         >
                           <Trash2 className="h-4 w-4" aria-hidden="true" />
                           {t('libraries:uninstall')}
@@ -193,7 +193,7 @@ export function LibrariesView() {
                       type="button"
                       variant="secondary"
                       size="sm"
-                      className="min-h-11 sm:min-h-8"
+                      className="min-h-11 md:min-h-8"
                       disabled={installedPage === 1}
                       onClick={() => setInstalledPage((page) => Math.max(1, page - 1))}
                       aria-label={t('libraries:previousPage')}
@@ -205,7 +205,7 @@ export function LibrariesView() {
                       type="button"
                       variant="secondary"
                       size="sm"
-                      className="min-h-11 sm:min-h-8"
+                      className="min-h-11 md:min-h-8"
                       disabled={installedPage === totalInstalledPages}
                       onClick={() => setInstalledPage((page) => Math.min(totalInstalledPages, page + 1))}
                       aria-label={t('libraries:nextPage')}
@@ -286,7 +286,7 @@ export function LibrariesView() {
                     onClick={() => handleInstall(result.name)}
                     disabled={installMutation.isPending}
                     aria-label={t('libraries:installPackage', { name: result.name })}
-                    className="min-h-11 shrink-0 self-start sm:min-h-9"
+                    className="min-h-11 shrink-0 self-start md:min-h-9"
                   >
                     {installingName === result.name ? t('libraries:installing') : t('libraries:install')}
                   </Button>

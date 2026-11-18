@@ -416,11 +416,12 @@ export function ConfigurationView() {
         ))}
       </ConfigurationHeader>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-6 xl:grid-cols-[minmax(0,1fr)_21rem]">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_20rem] xl:gap-6">
       {/* T9 change circuit: first in reading order so it sits above the
-          form as a strip below lg; a sticky right column from lg up. */}
+          form as a strip below xl; a sticky right column from xl up (from lg
+          the rail already takes 16rem, so a column would squeeze the form). */}
       <ChangeCircuit
-        className="lg:col-start-2 lg:row-start-1"
+        className="xl:col-start-2 xl:row-start-1"
         circuit={circuit}
         pendingCount={diff.pendingCount}
         restartCount={restartCount}
@@ -429,7 +430,7 @@ export function ConfigurationView() {
         onDiscard={diff.pendingCount > 0 && !isSaving ? handleReset : undefined}
       />
 
-      <div className="min-w-0 space-y-4 lg:col-start-1 lg:row-start-1">
+      <div className="min-w-0 space-y-4 xl:col-start-1 xl:row-start-1">
       {/* Sections: a WAI-ARIA tablist with roving tabindex. */}
       <Tabs
         label={t('configuration:sectionsLabel')}

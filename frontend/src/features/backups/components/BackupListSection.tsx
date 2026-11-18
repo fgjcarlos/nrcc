@@ -33,7 +33,7 @@ interface BackupListSectionProps {
 }
 
 // 44px touch target on phones, 36px from sm up.
-const iconButton = 'min-h-11 min-w-11 justify-center px-0 sm:min-h-9 sm:min-w-9';
+const iconButton = 'min-h-11 min-w-11 justify-center px-0 md:min-h-9 md:min-w-9';
 const spinner = <LoaderCircle className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />;
 
 export function BackupListSection(props: BackupListSectionProps) {
@@ -117,7 +117,7 @@ export function BackupListSection(props: BackupListSectionProps) {
                         type="button"
                         onClick={() => onSelect(backup.id)}
                         aria-expanded={selected}
-                        className="min-h-6 break-words text-left font-medium text-ds-on-tint-primary underline-offset-4 hover:underline"
+                        className="min-h-11 break-words text-left md:min-h-6 font-medium text-ds-on-tint-primary underline-offset-4 hover:underline"
                       >
                         {getBackupDisplayName(backup)}
                       </button>

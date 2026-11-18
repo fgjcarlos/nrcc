@@ -190,7 +190,7 @@ export function HttpBasicAuthBoundaryCard({
         <label className="text-sm">
           {t(i18n('username'))}
           <input
-            className="input input-bordered mt-1 min-h-11 w-full sm:min-h-0"
+            className="input input-bordered mt-1 min-h-11 w-full md:min-h-0"
             data-testid={`boundary-${surface}-user`}
             value={value.user}
             onChange={(event) => {
@@ -201,7 +201,7 @@ export function HttpBasicAuthBoundaryCard({
         <label className="text-sm">
           {t(i18n('password'))}
           <input
-            className="input input-bordered mt-1 min-h-11 w-full sm:min-h-0"
+            className="input input-bordered mt-1 min-h-11 w-full md:min-h-0"
             data-testid={`boundary-${surface}-pass`}
             type="password"
             value={value.pass}
@@ -222,7 +222,7 @@ export function HttpBasicAuthBoundaryCard({
         <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
           <button
             type="button"
-            className="action-btn-primary min-h-11 sm:min-h-0"
+            className="action-btn-primary min-h-11 md:min-h-0"
             onClick={save}
             disabled={!editable || saving}
             data-testid={`boundary-${surface}-save`}

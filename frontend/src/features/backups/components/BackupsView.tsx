@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Archive, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Archive, RefreshCw, AlertTriangle, Loader2 } from 'lucide-react';
 import { Button } from '@/shared/components/ui';
 import {
   BackupSummaryCards,
@@ -23,7 +23,6 @@ import {
 } from '@/features/backups/services';
 import { useT } from '@/i18n';
 import { getErrorMessage, getBackupFileLabel } from '@/features/backups/lib/formatters';
-import { cn } from '@/shared/lib';
 
 function isConfigDirty(left: BackupConfig, right: BackupConfig | undefined): boolean {
   if (!right) {
@@ -181,12 +180,13 @@ export function BackupsView() {
           type="button"
           onClick={() => actions.createMutation.mutate()}
           disabled={actions.createMutation.isPending}
-          className="min-h-11 shrink-0 self-start whitespace-nowrap sm:min-h-9 sm:self-auto"
+          className="min-h-11 shrink-0 self-start whitespace-nowrap md:min-h-9 sm:self-auto"
         >
-          <Archive
-            className={cn('h-4 w-4', actions.createMutation.isPending && 'animate-pulse motion-reduce:animate-none')}
-            aria-hidden="true"
-          />
+          {actions.createMutation.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          ) : (
+            <Archive className="h-4 w-4" aria-hidden="true" />
+          )}
           {t('backups:createBackupNow')}
         </Button>
       </header>

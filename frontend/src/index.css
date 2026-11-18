@@ -17,6 +17,21 @@
   --text-color-accent: var(--ds-on-tint-accent);
 }
 
+/* Motion grammar (DESIGN.md Motion): one exponential ease-out curve, a
+   150ms state change and a 180ms overlay entrance. Every Tailwind
+   transition-* utility and the ease-out utility resolve to it. */
+:root {
+  --motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-state: 150ms;
+  --motion-overlay: 180ms;
+}
+
+@theme inline {
+  --default-transition-duration: var(--motion-state);
+  --default-transition-timing-function: var(--motion-ease);
+  --ease-out: var(--motion-ease);
+}
+
 /* ═══════════════════════════════════════════════════════════════
    BASE LAYER
    Visual world: "Esquema eléctrico" (IEC wiring-diagram language).
@@ -675,6 +690,8 @@
   --fontsize: 0.875rem;
   font-weight: 400;
   box-shadow: none;
+  transition-duration: var(--motion-state);
+  transition-timing-function: var(--motion-ease);
 }
 
 /* md is 36px; daisyUI's own size classes keep their 24/32px targets. */
@@ -764,7 +781,7 @@
 }
 
 .btn-success {
-  @apply transition-colors duration-150 ease-out;
+  @apply transition-colors;
 }
 
 .btn-success:active:not(:disabled) {
@@ -962,7 +979,7 @@ aside.bg-base-100 {
   border-width: 1px;
   border-style: solid;
   border-radius: var(--radius-field);
-  transition: border-color 150ms ease-out, box-shadow 150ms ease-out;
+  transition: border-color var(--motion-state) var(--motion-ease), box-shadow var(--motion-state) var(--motion-ease);
 }
 
 [data-theme] :is(input, textarea, select):hover:not(:focus, :disabled, [readonly], [aria-invalid="true"]) {
@@ -1042,7 +1059,7 @@ aside.bg-base-100 {
 
 [data-theme] table:not(.ds-table) tbody tr {
   border-bottom: 1px solid var(--ds-border-default);
-  transition: background-color 150ms ease;
+  transition: background-color var(--motion-state) var(--motion-ease);
 }
 
 [data-theme] table:not(.ds-table) tbody tr:hover {
@@ -1074,7 +1091,7 @@ aside.bg-base-100 {
 .circuit-blade {
   transform-box: view-box;
   transform-origin: 10.5px 15px;
-  transition: transform 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform var(--motion-state) var(--motion-ease);
   transition-delay: calc(var(--contact-i, 0) * 60ms);
 }
 
@@ -1085,6 +1102,44 @@ aside.bg-base-100 {
 @media (prefers-reduced-motion: reduce) {
   .circuit-blade {
     transition: none;
+  }
+}
+
+/* Overlay entrance (dialog, drawer, palette): opacity plus a small
+   translate, from an already-laid-out position. Exit is instant.
+   --overlay-from sets the direction (default: 4px up from below). */
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+    translate: var(--overlay-from, 0 4px);
+  }
+}
+
+@keyframes scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.motion-overlay {
+  animation: overlay-in var(--motion-overlay) var(--motion-ease) both;
+}
+
+.motion-scrim {
+  animation: scrim-in var(--motion-state) var(--motion-ease) both;
+}
+
+/* Touch targets (DESIGN.md Layout): below md every button and text
+   control is at least 44px tall. Unlayered so a call site's min-h-*
+   utility only takes effect from md up. */
+@media (width < 48rem) {
+  :is(.action-btn-primary, .action-btn-solid, .action-btn-secondary, .action-btn-danger, .action-btn-ghost),
+  [data-theme] :is(select, input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="hidden"])):not(.input-bare) {
+    min-height: 2.75rem;
+  }
+
+  [data-theme] .btn {
+    --size: 2.75rem;
   }
 }
 
@@ -1099,6 +1154,8 @@ aside.bg-base-100 {
      * every Tailwind animate-* utility (animation: none)
      * the spin-smooth @keyframes (animation-name: none)
      * every CSS transition shorthand declaration that survives
+     * every transition and animation delay, including the inline
+       --contact-i stagger of the change circuit
 
    Focus rings, text rendering and colour contrast are unaffected —
    the rule only suppresses movement, not visual state.
@@ -1109,8 +1166,10 @@ aside.bg-base-100 {
   *::before,
   *::after {
     animation-duration: 0.001ms !important;
+    animation-delay: 0s !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
+    transition-delay: 0s !important;
     scroll-behavior: auto !important;
   }
 
@@ -1121,8 +1180,7 @@ aside.bg-base-100 {
      accessibility-safe 0.001ms sentinel above. */
   .animate-pulse,
   .animate-spin,
-  .animate-ping,
-  .animate-bounce {
+  .animate-ping {
     animation-name: none !important;
   }
 }

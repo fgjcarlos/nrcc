@@ -69,7 +69,7 @@ export function SecuritySurface({ anchor, testId, title, status, summary, childr
       {children && (
         <details open={open} onToggle={(event) => setOpen(event.currentTarget.open)} className="group">
           <summary
-            className="mt-2 inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-field border border-ds-border-strong bg-ds-bg-surface px-4 text-sm font-medium text-ds-text-primary hover:bg-base-content/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent-primary sm:absolute sm:right-0 sm:top-3 sm:mt-0 sm:min-h-9 [&::-webkit-details-marker]:hidden"
+            className="mt-2 inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-field border border-ds-border-strong bg-ds-bg-surface px-4 text-sm font-medium text-ds-text-primary hover:bg-base-content/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent-primary sm:absolute sm:right-0 sm:top-3 sm:mt-0 md:min-h-9 [&::-webkit-details-marker]:hidden"
           >
             {t('security:surface.edit')}
             <span className="sr-only"> {title}</span>

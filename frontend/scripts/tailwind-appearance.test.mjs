@@ -63,10 +63,10 @@ try {
       const context = await browser.newContext({ viewport, reducedMotion: 'reduce' });
       try {
         const page = await context.newPage();
-        await page.setContent(`<style>${css}</style><main data-theme="${theme}" class="bg-base-100"><section id="panel" class="glass-panel p-5"><button id="primary" class="action-btn-primary">Primary</button><button id="secondary" class="action-btn-secondary">Secondary</button><button id="ghost" class="action-btn-ghost">Ghost</button><button id="danger" class="action-btn-danger">Danger</button><button id="solid" class="action-btn-solid">Solid</button><button id="daisy-primary" class="btn btn-primary">Solid</button><button id="daisy-secondary" class="btn btn-secondary">Secondary</button><button id="daisy-ghost" class="btn btn-ghost">Ghost</button><button id="daisy-error" class="btn btn-error">Danger</button><button id="daisy-xs" class="btn btn-ghost btn-xs">Small</button></section><button id="disabled-primary" class="action-btn-primary" disabled>Disabled</button><button id="disabled-secondary" class="action-btn-secondary" disabled>Disabled</button><button id="disabled-ghost" class="action-btn-ghost" disabled>Disabled</button><button id="disabled-danger" class="action-btn-danger" disabled>Disabled</button><button id="disabled-solid" class="action-btn-solid" disabled>Disabled</button><button id="disabled-daisy" class="btn btn-primary" disabled>Disabled</button><button id="busy" class="action-btn-primary" aria-busy="true">Saving</button><span id="spinner" class="loading loading-spinner"></span><section id="fields" class="bg-ds-bg-surface p-5"><input id="field" class="block w-full px-3 py-2 text-sm" aria-label="Shared input"><input id="glass-field" class="glass-panel h-12 w-full rounded-xl border-0 px-3" aria-label="Glass input"><select id="select-field" aria-label="Select"><option>One</option></select><textarea id="textarea-field" aria-label="Textarea"></textarea><input id="invalid-field" aria-invalid="true" aria-label="Invalid"><input id="disabled-field" disabled aria-label="Disabled"><textarea id="readonly-field" readonly aria-label="Read-only"></textarea><input id="bare-field" class="input-bare border-b border-border" aria-label="Bare"><input id="check-field" type="checkbox" class="checkbox" aria-label="Check"></section></main>`);
+        await page.setContent(`<style>${css}</style><main data-theme="${theme}" class="bg-base-100"><section id="panel" class="glass-panel p-5"><button id="primary" class="action-btn-primary">Primary</button><button id="secondary" class="action-btn-secondary">Secondary</button><button id="ghost" class="action-btn-ghost">Ghost</button><button id="danger" class="action-btn-danger">Danger</button><button id="solid" class="action-btn-solid">Solid</button><button id="daisy-primary" class="btn btn-primary">Solid</button><button id="daisy-secondary" class="btn btn-secondary">Secondary</button><button id="daisy-ghost" class="btn btn-ghost">Ghost</button><button id="daisy-error" class="btn btn-error">Danger</button><button id="daisy-xs" class="btn btn-ghost btn-xs">Small</button></section><button id="disabled-primary" class="action-btn-primary" disabled>Disabled</button><button id="disabled-secondary" class="action-btn-secondary" disabled>Disabled</button><button id="disabled-ghost" class="action-btn-ghost" disabled>Disabled</button><button id="disabled-danger" class="action-btn-danger" disabled>Disabled</button><button id="disabled-solid" class="action-btn-solid" disabled>Disabled</button><button id="disabled-daisy" class="btn btn-primary" disabled>Disabled</button><button id="busy" class="action-btn-primary" aria-busy="true">Saving</button><span id="spinner" class="loading loading-spinner"></span><div id="overlay" class="motion-overlay">Overlay</div><div id="scrim" class="motion-scrim"></div><span id="state-change" class="transition-colors">State</span><svg><line id="blade" class="circuit-blade" data-open="true" style="--contact-i: 3"></line></svg><section id="fields" class="bg-ds-bg-surface p-5"><input id="field" class="block w-full px-3 py-2 text-sm" aria-label="Shared input"><input id="glass-field" class="glass-panel h-12 w-full rounded-xl border-0 px-3" aria-label="Glass input"><select id="select-field" aria-label="Select"><option>One</option></select><textarea id="textarea-field" aria-label="Textarea"></textarea><input id="invalid-field" aria-invalid="true" aria-label="Invalid"><input id="disabled-field" disabled aria-label="Disabled"><textarea id="readonly-field" readonly aria-label="Read-only"></textarea><input id="bare-field" class="input-bare border-b border-border" aria-label="Bare"><input id="check-field" type="checkbox" class="checkbox" aria-label="Check"></section></main>`);
         const style = (id) => page.locator(`#${id}`).evaluate((el) => {
           const computed = getComputedStyle(el);
-          return Object.fromEntries(['backdropFilter', 'backgroundColor', 'backgroundImage', 'boxShadow', 'cursor', 'border', 'borderColor', 'borderTopWidth', 'borderTopStyle', 'borderRadius', 'padding', 'height', 'minHeight', 'display', 'gap', 'fontSize', 'color', 'outlineStyle', 'outlineColor', 'transitionDuration', 'opacity', 'animationDuration'].map((key) => [key, computed[key]]));
+          return Object.fromEntries(['backdropFilter', 'backgroundColor', 'backgroundImage', 'boxShadow', 'cursor', 'border', 'borderColor', 'borderTopWidth', 'borderTopStyle', 'borderRadius', 'padding', 'height', 'minHeight', 'display', 'gap', 'fontSize', 'color', 'outlineStyle', 'outlineColor', 'transitionDuration', 'transitionDelay', 'transitionTimingFunction', 'opacity', 'animationDuration', 'animationDelay', 'animationName'].map((key) => [key, computed[key]]));
         });
         const panel = await style('panel');
         assertFlat(panel, `${theme} ${viewport.width}px panel`);
@@ -76,7 +76,10 @@ try {
         assert.equal(panel.padding, '20px');
 
         // One button spec (DESIGN.md Buttons): 4px field radius, inline-flex,
-        // 8px gap, 14px label, 36px minimum target, 1px edge.
+        // 8px gap, 14px label, 36px minimum target, 1px edge. Below md (768px)
+        // every button and text control is a 44px touch target (DESIGN.md Layout).
+        const touch = viewport.width < 768;
+        const minTarget = touch ? '44px' : '36px';
         const transparent = 'rgba(0, 0, 0, 0)';
         const restGround = { primary: surface[theme], secondary: surface[theme], ghost: transparent, danger: surface[theme] };
         const hoverColors = [];
@@ -90,8 +93,8 @@ try {
           assert.equal(before.display, 'inline-flex', `${theme} ${id} is inline-flex`);
           assert.equal(before.gap, '8px', `${theme} ${id} gap`);
           assert.equal(before.fontSize, '14px', `${theme} ${id} label size`);
-          assert.equal(before.minHeight, '36px', `${theme} ${id} minimum target`);
-          assert.ok(Number.parseFloat(before.height) >= 36, `${theme} ${id} height ≥ 36px, got ${before.height}`);
+          assert.equal(before.minHeight, minTarget, `${theme} ${viewport.width}px ${id} minimum target`);
+          assert.ok(Number.parseFloat(before.height) >= Number.parseFloat(minTarget), `${theme} ${id} height ≥ ${minTarget}, got ${before.height}`);
           assert.match(before.border, /^1px solid /);
           await page.locator(`#${id}`).hover();
           const hovered = await style(id);
@@ -110,11 +113,11 @@ try {
           await page.mouse.move(0, 0);
           const [a, b] = [await style(daisy), await style(action)];
           for (const key of keys) assert.equal(a[key], b[key], `${theme} .${daisy} ${key} matches .action-btn-${action}`);
-          assert.equal(a.height, '36px', `${theme} ${daisy} md height`);
+          assert.equal(a.height, minTarget, `${theme} ${viewport.width}px ${daisy} md height`);
           assert.equal(a.boxShadow, 'none', `${theme} ${daisy} is flat`);
         }
         const xs = await style('daisy-xs');
-        assert.equal(xs.height, '24px', `${theme} btn-xs keeps a 24px target`);
+        assert.equal(xs.height, touch ? '44px' : '24px', `${theme} ${viewport.width}px btn-xs target`);
         assert.equal(xs.fontSize, '12px', `${theme} btn-xs uses the 12px label size`);
 
         for (const id of ['primary', 'secondary', 'ghost', 'danger', 'solid', 'daisy-primary']) {
@@ -142,6 +145,7 @@ try {
           assert.equal(field.borderRadius, '4px', `${theme} ${id} field radius`);
           assert.equal(field.borderColor, controlBorder[theme], `${theme} ${id} uses the control border`);
           assert.equal(field.backgroundColor, raised[theme], `${theme} ${id} raised ground`);
+          if (touch && id !== 'textarea-field') assert.ok(Number.parseFloat(field.height) >= 44, `${theme} ${viewport.width}px ${id} height ${field.height}`);
           for (const bg of grounds) {
             const ratio = contrast(field.borderColor, bg);
             assert.ok(ratio >= 3, `${theme} ${id} border ${field.borderColor} on ${bg} = ${ratio.toFixed(2)}:1 (needs 3:1)`);
@@ -167,12 +171,55 @@ try {
         assert.equal(await page.locator('#busy').getAttribute('aria-busy'), 'true');
         assert.equal(await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches), true);
         assert.ok(Number.parseFloat((await style('spinner')).animationDuration) <= 0.01, 'reduced motion limits spinner animation');
+        // Reduced motion also drops delays, so the staggered contact close
+        // (inline --contact-i) and overlay entrances are instant.
+        const blade = await style('blade');
+        assert.equal(blade.transitionDelay, '0s', `${theme} reduced motion: no contact stagger`);
+        for (const id of ['overlay', 'scrim', 'state-change']) {
+          const m = await style(id);
+          assert.ok(Number.parseFloat(m.animationDuration) <= 0.01 && Number.parseFloat(m.transitionDuration) <= 0.01, `${theme} reduced motion: ${id} is instant`);
+          assert.equal(m.animationDelay, '0s');
+        }
       } finally {
         await context.close();
       }
     }
   }
-  console.log(`Computed appearance passed in Chromium ${await browser.version()} (2 themes × 2 viewports, reduced motion).`);
+  // Motion grammar (DESIGN.md Motion): state changes 150ms on the expo
+  // ease-out, overlays 150–200ms opacity plus a small translate, no bounce.
+  {
+    const easeOut = 'cubic-bezier(0.16, 1, 0.3, 1)';
+    assert.doesNotMatch(css, /bounce|elastic|spring/i, 'no bounce, elastic or spring motion in the stylesheet');
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    try {
+      const page = await context.newPage();
+      await page.setContent(`<style>${css}</style><main data-theme="corporateDark"><button id="btn" class="action-btn-primary">Go</button><span id="state-change" class="transition-colors">State</span><input id="field" aria-label="Field"><div id="overlay" class="motion-overlay">Overlay</div><div id="scrim" class="motion-scrim"></div><svg><line id="blade" class="circuit-blade" style="--contact-i: 2"></line></svg></main>`);
+      const motion = (id) => page.locator(`#${id}`).evaluate((el) => {
+        const c = getComputedStyle(el);
+        return { td: c.transitionDuration, tf: c.transitionTimingFunction, tdl: c.transitionDelay, an: c.animationName, ad: c.animationDuration, af: c.animationTimingFunction };
+      });
+      for (const id of ['btn', 'state-change', 'field', 'blade']) {
+        const m = await motion(id);
+        assert.ok(m.td.split(', ').every((d) => d === '0.15s'), `${id} state change is 150ms, got ${m.td}`);
+        assert.ok(m.tf.split(/,\s*(?![^(]*\))/).every((f) => f === easeOut), `${id} uses the expo ease-out, got ${m.tf}`);
+      }
+      assert.equal((await motion('blade')).tdl, '0.12s', 'contacts close in sequence (index × 60ms)');
+      const overlay = await motion('overlay');
+      assert.equal(overlay.an, 'overlay-in');
+      assert.ok(Number.parseFloat(overlay.ad) >= 0.15 && Number.parseFloat(overlay.ad) <= 0.2, `overlay entrance 150–200ms, got ${overlay.ad}`);
+      assert.equal(overlay.af, easeOut);
+      const scrim = await motion('scrim');
+      assert.equal(scrim.an, 'scrim-in');
+      assert.equal(scrim.ad, '0.15s');
+      // Overlay keyframes move opacity and translate only.
+      const frames = css.match(/@keyframes overlay-in\s*{[^}]*}/)?.[0] ?? '';
+      assert.match(frames, /opacity:\s*0/);
+      assert.doesNotMatch(frames, /scale|rotate|width|height|top|left/, `overlay-in animates opacity and translate only: ${frames}`);
+    } finally {
+      await context.close();
+    }
+  }
+  console.log(`Computed appearance passed in Chromium ${await browser.version()} (2 themes × 2 viewports, reduced motion, motion grammar).`);
 } finally {
   try {
     if (browser) await browser.close();

@@ -157,7 +157,7 @@ export function ProfileView() {
               </p>
             )}
 
-            <Button type="submit" disabled={isSubmitting} className="min-h-11 sm:min-h-9">
+            <Button type="submit" disabled={isSubmitting} className="min-h-11 md:min-h-9">
               {isSubmitting ? t('auth:profile.updating') : t('auth:profile.updatePassword')}
             </Button>
           </form>

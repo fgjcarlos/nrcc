@@ -72,7 +72,7 @@ export function SecurityPostureTile(props: SecurityPostureTileProps) {
         <p className="text-xs text-ds-text-secondary">{t('dashboard:overviewTiles.securityPosture.subtitle')}</p>
         <Link
           to="/security"
-          className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-ds-on-tint-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ds-accent-primary sm:min-h-0"
+          className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-ds-on-tint-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ds-accent-primary md:min-h-6"
           data-testid="overview-security-posture-link"
         >
           {t('dashboard:overviewTiles.securityPosture.cta')}

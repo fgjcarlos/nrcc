@@ -215,19 +215,19 @@ export function CommandPalette() {
         aria-haspopup="dialog"
         aria-expanded={isOpen}
       >
-        <Search className="h-5 w-5 text-ds-text-secondary md:hidden" aria-hidden="true" />
-        <span className="sr-only md:not-sr-only">{t('common:commandPalette')}</span>
-        <kbd className="hidden rounded-selector border border-ds-border-default bg-ds-bg-base px-1.5 py-0.5 font-mono text-xs text-ds-text-muted md:inline">{t('common:commandPaletteShortcut')}</kbd>
+        <Search className="h-5 w-5 text-ds-text-secondary lg:hidden" aria-hidden="true" />
+        <span className="sr-only lg:not-sr-only">{t('common:commandPalette')}</span>
+        <kbd className="hidden rounded-selector border border-ds-border-default bg-ds-bg-base px-1.5 py-0.5 font-mono text-xs text-ds-text-muted lg:inline">{t('common:commandPaletteShortcut')}</kbd>
       </button>
 
       {isOpen && (
-        <div className="fixed inset-0 z-[70] bg-[color-mix(in_srgb,var(--ds-rail-bg)_55%,transparent)] p-4" role="presentation" onMouseDown={closePalette}>
+        <div className="motion-scrim fixed inset-0 z-[70] bg-[color-mix(in_srgb,var(--ds-rail-bg)_55%,transparent)] p-4" role="presentation" onMouseDown={closePalette}>
           <div
             ref={dialogRef}
             role="dialog"
             aria-modal="true"
             aria-label={t('common:commandPalette')}
-            className="mx-auto mt-16 w-full max-w-2xl overflow-hidden rounded-box border border-ds-border-default bg-ds-bg-elevated shadow-[var(--ds-shadow-raised)]"
+            className="motion-overlay mx-auto mt-16 w-full max-w-2xl overflow-hidden rounded-box border border-ds-border-default bg-ds-bg-elevated shadow-[var(--ds-shadow-raised)]"
             onMouseDown={(event) => event.stopPropagation()}
           >
             <form onSubmit={onSubmit}>

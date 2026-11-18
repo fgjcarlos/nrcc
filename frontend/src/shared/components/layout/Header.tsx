@@ -52,7 +52,7 @@ export function Header({ compact = false, navOpen = false, onOpenNav }: HeaderPr
           <RuntimeStatusPill {...chrome} />
         </div>
 
-        <div className="ml-auto flex shrink-0 items-center gap-2">
+        <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
           <CommandPalette />
           <UpdateNotificationChip />
           <LocaleSwitcher />

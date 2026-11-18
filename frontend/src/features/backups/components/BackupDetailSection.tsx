@@ -50,7 +50,7 @@ export function BackupDetailSection(props: BackupDetailSectionProps) {
           variant="ghost"
           onClick={onClose}
           aria-label={t('backups:detail.close')}
-          className="min-h-11 min-w-11 shrink-0 justify-center px-0 sm:min-h-9 sm:min-w-9"
+          className="min-h-11 min-w-11 shrink-0 justify-center px-0 md:min-h-9 md:min-w-9"
         >
           <X className="h-4 w-4" aria-hidden="true" />
         </Button>

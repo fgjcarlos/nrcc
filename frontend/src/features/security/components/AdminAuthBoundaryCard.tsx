@@ -228,7 +228,7 @@ export function AdminAuthBoundaryCard({
           <input
             aria-label={t('security:adminAuthBoundary.sessionExpiryLabel')}
             data-testid="boundary-admin-auth-expiry"
-            className="input input-bordered mt-1 min-h-11 w-full sm:min-h-0"
+            className="input input-bordered mt-1 min-h-11 w-full md:min-h-0"
             min={0}
             type="number"
             value={displayExpiry}
@@ -240,7 +240,7 @@ export function AdminAuthBoundaryCard({
           <h3 className="text-sm font-semibold">{t('security:adminAuthBoundary.usersLabel')}</h3>
           <button
             type="button"
-            className="action-btn-secondary min-h-11 sm:min-h-0"
+            className="action-btn-secondary min-h-11 md:min-h-0"
             onClick={addUser}
             data-testid="boundary-admin-auth-add"
           >
@@ -267,7 +267,7 @@ export function AdminAuthBoundaryCard({
             <label className="text-sm">
               {t('security:adminAuthBoundary.username')}
               <input
-                className="input input-bordered mt-1 min-h-11 w-full sm:min-h-0"
+                className="input input-bordered mt-1 min-h-11 w-full md:min-h-0"
                 data-testid="boundary-admin-auth-username"
                 value={user.username}
                 onChange={(event) => updateUsername(index, event.target.value)}
@@ -281,7 +281,7 @@ export function AdminAuthBoundaryCard({
                     ? t('security:adminAuthBoundary.permissionFor', { username: user.username })
                     : t('security:adminAuthBoundary.permissionForIndex', { index: index + 1 })
                 }
-                className="select select-bordered mt-1 min-h-11 w-full sm:min-h-0"
+                className="select select-bordered mt-1 min-h-11 w-full md:min-h-0"
                 value={user.permissions}
                 onChange={(event) =>
                   updatePermission(index, event.target.value as Permission)
@@ -297,7 +297,7 @@ export function AdminAuthBoundaryCard({
             <label className="text-sm">
               {t('security:adminAuthBoundary.newPassword')}
               <input
-                className="input input-bordered mt-1 min-h-11 w-full sm:min-h-0"
+                className="input input-bordered mt-1 min-h-11 w-full md:min-h-0"
                 type="password"
                 value={user.password}
                 data-testid="boundary-admin-auth-password"
@@ -306,7 +306,7 @@ export function AdminAuthBoundaryCard({
             </label>
             <button
               type="button"
-              className="action-btn-ghost min-h-11 self-end sm:min-h-0"
+              className="action-btn-ghost min-h-11 self-end md:min-h-0"
               aria-label={t('security:adminAuthBoundary.removeUser', {
                 username:
                   user.username ||
@@ -324,7 +324,7 @@ export function AdminAuthBoundaryCard({
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
-            className="action-btn-primary min-h-11 sm:min-h-0"
+            className="action-btn-primary min-h-11 md:min-h-0"
             onClick={save}
             disabled={disabled}
             data-testid="boundary-admin-auth-save"

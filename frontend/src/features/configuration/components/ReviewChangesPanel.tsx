@@ -161,7 +161,7 @@ export function ReviewChangesPanel({
     >
       {/* Backdrop */}
       <div
-        className="absolute inset-0 modal-overlay"
+        className="absolute inset-0 modal-overlay motion-scrim"
         aria-hidden="true"
         onClick={isPending ? undefined : onCancel}
       />
@@ -173,7 +173,7 @@ export function ReviewChangesPanel({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="relative z-[60] surface-panel flex h-full w-full max-w-xl flex-col border-l border-border shadow-glow sm:rounded-none rounded-t-box sm:mt-0 mt-auto max-h-[85vh] sm:max-h-full"
+        className="motion-overlay relative z-[60] surface-panel flex h-full [--overlay-from:0_8px] sm:[--overlay-from:8px_0] w-full max-w-xl flex-col border-l border-border shadow-glow sm:rounded-none rounded-t-box sm:mt-0 mt-auto max-h-[85vh] sm:max-h-full"
         data-testid="review-changes-panel"
       >
         {/* Header */}
@@ -191,9 +191,9 @@ export function ReviewChangesPanel({
             onClick={onCancel}
             disabled={isPending}
             aria-label={t('configuration:reviewPanel.cancel')}
-            className="text-body-secondary transition-colors hover:text-base-content disabled:opacity-50"
+            className="-mr-2 -mt-2 grid min-h-11 min-w-11 shrink-0 place-items-center rounded-field text-body-secondary transition-colors hover:text-base-content disabled:opacity-50 md:min-h-8 md:min-w-8"
           >
-            <X className="h-5 w-5" />
+            <X className="h-5 w-5" aria-hidden="true" />
           </button>
         </header>
 

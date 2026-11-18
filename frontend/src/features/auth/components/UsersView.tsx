@@ -169,7 +169,7 @@ export function UsersView() {
           type="button"
           onClick={openCreateModal}
           disabled={isAnyMutationPending}
-          className="min-h-11 shrink-0 self-start sm:min-h-9 sm:self-auto"
+          className="min-h-11 shrink-0 self-start md:min-h-9 sm:self-auto"
         >
           <Plus className="h-4 w-4" aria-hidden="true" />
           {t('auth:addUser')}

@@ -86,7 +86,7 @@ export function BackupHealthTile({ backups }: BackupHealthTileProps) {
         )}
         <Link
           to="/backups"
-          className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-ds-on-tint-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ds-accent-primary sm:min-h-0"
+          className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-ds-on-tint-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ds-accent-primary md:min-h-6"
           data-testid="overview-backup-health-link"
         >
           {k('cta')}

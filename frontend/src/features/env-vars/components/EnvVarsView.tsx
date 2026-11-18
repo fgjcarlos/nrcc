@@ -145,7 +145,7 @@ export function EnvVarsView() {
               disabled={nodeRedSyncState === 'loading'}
               data-testid="import-from-node-red-button"
               title={t('env-vars:resyncTitle')}
-              className="min-h-11 sm:min-h-9"
+              className="min-h-11 md:min-h-9"
             >
               <Download className="h-4 w-4" aria-hidden="true" />
               {nodeRedSyncState === 'loading' ? t('env-vars:resyncing') : t('env-vars:resyncNodeRed')}
@@ -155,12 +155,12 @@ export function EnvVarsView() {
               variant="secondary"
               onClick={() => setIsBulkOpen(true)}
               data-testid="bulk-import-button"
-              className="min-h-11 sm:min-h-9"
+              className="min-h-11 md:min-h-9"
             >
               <FileStack className="h-4 w-4" aria-hidden="true" />
               {t('env-vars:bulkImport')}
             </Button>
-            <Button type="button" onClick={() => openModal()} className="min-h-11 sm:min-h-9">
+            <Button type="button" onClick={() => openModal()} className="min-h-11 md:min-h-9">
               <Plus className="h-4 w-4" aria-hidden="true" />
               {t('env-vars:add')}
             </Button>

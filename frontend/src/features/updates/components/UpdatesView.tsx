@@ -94,7 +94,7 @@ export function UpdatesView() {
           variant="secondary"
           onClick={handleCheckNow}
           disabled={isChecking || statusLoading || isUpdateActive}
-          className="min-h-11 shrink-0 self-start whitespace-nowrap sm:min-h-9 sm:self-auto"
+          className="min-h-11 shrink-0 self-start whitespace-nowrap md:min-h-9 sm:self-auto"
         >
           {isChecking && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />}
           {t('updates:checkNow')}
@@ -140,7 +140,7 @@ export function UpdatesView() {
               variant="solid"
               onClick={() => setConfirmOpen(true)}
               disabled={applyMutation.isPending || isChecking}
-              className="min-h-11 sm:min-h-9"
+              className="min-h-11 md:min-h-9"
             >
               {applyMutation.isPending ? t('updates:updating') : t('updates:updateTo', { version: latestVersion })}
             </Button>
