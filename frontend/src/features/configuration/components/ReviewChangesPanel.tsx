@@ -27,6 +27,9 @@ import { SettingKey } from './FormFields';
  *  - Initial focus lands on Cancel so destructive apply is not the
  *    default action.
  *
+ * The drawer is the single confirmation of an apply: the footer states
+ * its cost (every apply backs up settings.js, then restarts Node-RED).
+ *
  * No data fetching lives here. The caller owns the save dispatch and
  * provides `isPending` to disable the apply button while the mutation
  * is in flight.
@@ -86,6 +89,7 @@ export function ReviewChangesPanel({
 }: ReviewChangesPanelProps) {
   const { t } = useT();
   const titleId = useId();
+  const consequenceId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
@@ -273,27 +277,39 @@ export function ReviewChangesPanel({
         </div>
 
         {/* Footer */}
-        <footer className="flex justify-end gap-3 border-t ghost-divider modal-inner px-6 py-4">
-          <button
-            ref={cancelButtonRef}
-            type="button"
-            onClick={onCancel}
-            disabled={isPending}
-            className="action-btn-secondary"
-          >
-            {t('configuration:reviewPanel.cancel')}
-          </button>
-          <button
-            type="button"
-            onClick={onApply}
-            disabled={isPending || noChanges}
-            className="action-btn-primary"
-            data-testid="review-changes-panel-apply"
-          >
-            {isPending
-              ? t('configuration:reviewPanel.applying')
-              : t('configuration:reviewPanel.apply')}
-          </button>
+        <footer className="space-y-3 border-t ghost-divider modal-inner px-6 py-4">
+          {!noChanges && (
+            <p
+              id={consequenceId}
+              className="text-right text-xs tabular-nums text-ds-text-secondary"
+              data-testid="review-changes-panel-consequence"
+            >
+              {t('configuration:reviewPanel.consequence', { count: pendingCount })}
+            </p>
+          )}
+          <div className="flex flex-wrap justify-end gap-3">
+            <button
+              ref={cancelButtonRef}
+              type="button"
+              onClick={onCancel}
+              disabled={isPending}
+              className="action-btn-secondary"
+            >
+              {t('configuration:reviewPanel.cancel')}
+            </button>
+            <button
+              type="button"
+              onClick={onApply}
+              disabled={isPending || noChanges}
+              aria-describedby={noChanges ? undefined : consequenceId}
+              className="action-btn-primary"
+              data-testid="review-changes-panel-apply"
+            >
+              {isPending
+                ? t('configuration:reviewPanel.applying')
+                : t('configuration:reviewPanel.apply')}
+            </button>
+          </div>
         </footer>
       </div>
     </div>,

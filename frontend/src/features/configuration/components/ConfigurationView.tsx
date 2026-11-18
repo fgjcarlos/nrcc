@@ -160,8 +160,6 @@ export function ConfigurationView() {
   // Diff contact) and the outcome of the last server transaction.
   const [reviewedFormData, setReviewedFormData] = useState<NodeRedConfigFormData | null>(null);
   const [applyRun, setApplyRun] = useState<ApplyRun>({ status: 'idle' });
-  // Apply in the drawer asks for confirmation before saving.
-  const [applyConfirmOpen, setApplyConfirmOpen] = useState(false);
   // Synchronous guard: the mutation's pending flag lands after a render,
   // so a same-tick double click would otherwise start two saves.
   const savingRef = useRef(false);
@@ -250,21 +248,17 @@ export function ConfigurationView() {
     }
   };
 
-  const handleApplyFromPanel = () => {
+  // The review drawer is the single confirmation: its Apply saves directly.
+  const handleApplyFromPanel = async () => {
     // Issue #762 — rotation confirmation gates the save on a new
-    // credentialSecret; it already confirms, so no second dialog.
+    // credentialSecret with its own acknowledgement.
     if (formData.credentialSecret) {
       setReviewPanelOpen(false);
       setRotationDialogOpen(true);
       return;
     }
-    setApplyConfirmOpen(true);
-  };
-
-  const handleConfirmApply = async () => {
     const outcome = await runSave();
     if (!outcome) return;
-    setApplyConfirmOpen(false);
     // Every settled outcome closes the drawer: the circuit beside it carries
     // the result (closed contacts, a held gate or the rollback branch), and
     // the drawer would otherwise cover it. Review reopens it for a retry.
@@ -590,16 +584,6 @@ export function ConfigurationView() {
         isPending={isSaving}
         onApply={handleApplyFromPanel}
         onCancel={() => setReviewPanelOpen(false)}
-      />
-
-      <ConfirmationDialog
-        isOpen={applyConfirmOpen}
-        title={t('configuration:reviewPanel.confirmTitle')}
-        description={t('configuration:reviewPanel.confirmDescription', { count: diff.pendingCount, target: 'settings.js' })}
-        variant="warning"
-        isPending={isSaving}
-        onCancel={() => setApplyConfirmOpen(false)}
-        onConfirm={handleConfirmApply}
       />
     </div>
     </LoadingBoundary>

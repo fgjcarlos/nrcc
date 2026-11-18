@@ -149,13 +149,13 @@
     "groupNone": "Other ({{count}})",
     "configuredLabel": "Current",
     "newLabel": "New",
-    "apply": "Apply",
+    "apply": "Apply and restart Node-RED",
+    "consequence_one": "{{count}} change · Node-RED restarts · backup taken first",
+    "consequence_other": "{{count}} changes · Node-RED restarts · backup taken first",
     "cancel": "Cancel",
     "applying": "Applying…",
     "applied": "Applied successfully.",
-    "appliedError": "Failed to apply: {{message}}",
-    "confirmTitle": "Apply changes?",
-    "confirmDescription": "{{count}} pending change(s) will be written to {{target}}. Node-RED may restart, which can take a while."
+    "appliedError": "Failed to apply: {{message}}"
   },
   "topology": {
     "subtitle": "NRCC edits settings.js; Node-RED reads it on (re)start.",

@@ -853,14 +853,9 @@ test('unrelated visual edit keeps every admin account, permission and session ex
     expect(await page.getByLabel('Page Title').inputValue()).toBe('NRCC issue 881')
   }).toPass({ timeout: 30_000 })
   await page.getByRole('button', { name: /^Review \d+ changes?$/ }).click()
-  // The change circuit's "Review N changes" action opens the review panel and
-  // the panel's Apply button performs the save.
-  await page.getByTestId('review-changes-panel-apply').click()
-  // Apply asks for confirmation before saving.
-  await page
-    .getByRole('dialog', { name: 'Apply changes?' })
-    .getByRole('button', { name: 'Confirm', exact: true })
-    .click()
+  // The change circuit's "Review N changes" action opens the review panel;
+  // the panel is the single confirmation and its Apply button saves.
+  await page.getByRole('button', { name: 'Apply and restart Node-RED', exact: true }).click()
   // The change circuit carries the outcome (no toast): every contact closes
   // and the polite live region reports the Ready contact's proof.
   await expect(page.getByTestId('change-circuit-live')).toHaveText('Ready: Closed. Readiness OK')
