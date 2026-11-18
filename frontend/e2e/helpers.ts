@@ -1,6 +1,7 @@
 import { expect, type Page } from '@playwright/test'
 import {
   authResponse,
+  authUsersResponse,
   authStatusInitialized,
   authStatusSetupRequired,
   backupConfig,
@@ -44,7 +45,7 @@ export async function installApiMocks(page: Page, scenario: Scenario = 'initiali
     if (method === 'POST' && path === '/auth/refresh') return json(envelope({ token: authResponse.token }))
     if (method === 'POST' && path === '/auth/logout') return json(envelope({ message: 'Logged out' }))
     if (method === 'GET' && path === '/auth/me') return json(envelope(mockUser))
-    if (method === 'GET' && path === '/auth/users') return json(envelope([mockUser]))
+    if (method === 'GET' && path === '/auth/users') return json(envelope(authUsersResponse))
 
     if (method === 'GET' && path === '/bootstrap/status') return json(envelope(hostStatus))
     if (method === 'GET' && path === '/system/info') return json(envelope(systemInfo))

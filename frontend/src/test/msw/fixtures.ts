@@ -131,7 +131,11 @@ export const backupConfig: BackupConfig = {
   includePackageJson: true,
 }
 
-export const backups: BackupSummary[] = [
+// Wire shape of GET /api/backups items: the API sends sizeBytes (internal/model/backup.go Backup.SizeBytes);
+// normalizeBackup maps it to BackupSummary.totalSize.
+type BackupApiFixture = Omit<BackupSummary, 'totalSize'> & { sizeBytes: number }
+
+export const backups: BackupApiFixture[] = [
   {
     id: 'backup-001',
     name: 'Manual smoke backup',
@@ -139,7 +143,7 @@ export const backups: BackupSummary[] = [
     createdAt: '2026-01-01T12:00:00.000Z',
     triggeredBy: 'Playwright smoke fixture',
     fileCount: 4,
-    totalSize: 4096,
+    sizeBytes: 4096,
   },
 ]
 
@@ -156,11 +160,11 @@ export const backupManifest: BackupManifest = {
   ],
 }
 
-export const backupObservability: BackupObservability = {
+export const backupObservability: Omit<BackupObservability, 'latestBackup'> & { latestBackup: BackupApiFixture } = {
   scheduler: backupSchedulerStatus,
   storage: {
     totalBackups: backups.length,
-    totalSize: backups.reduce((total, backup) => total + backup.totalSize, 0),
+    totalSize: backups.reduce((total, backup) => total + backup.sizeBytes, 0),
     manualCount: 1,
     autoCount: 0,
     preRestoreCount: 0,
