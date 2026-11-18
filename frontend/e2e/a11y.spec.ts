@@ -65,6 +65,10 @@ test.describe('Issue #766 slice G W4 — WCAG 2.1 AA gate', () => {
     await page.goto('/security')
     await expect(page.getByRole('heading', { name: 'Node-RED admin auth' })).toBeVisible()
     await expectNoAxeBlockers(page, 'security')
+    // T10: scan an expanded surface form too, not only the collapsed rows.
+    await page.getByTestId('boundary-admin-auth').locator('summary').click()
+    await expect(page.getByTestId('boundary-admin-auth-fieldset')).toBeVisible()
+    await expectNoAxeBlockers(page, 'security')
   })
 
   test('computed muted text colour matches the pinned theme token (#889 S1)', async ({ page }) => {

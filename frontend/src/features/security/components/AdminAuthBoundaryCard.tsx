@@ -1,16 +1,16 @@
 import { useState } from 'react';
-import { Plus, ShieldCheck, ShieldOff, Trash2, UserPlus } from 'lucide-react';
+import { Trash2, UserPlus } from 'lucide-react';
 import { ConfirmationDialog } from '@/shared/components/ConfirmationDialog';
 import { StatusChip } from '@/shared/components/ui';
-import { cn } from '@/shared/lib';
 import { useT } from '@/i18n';
 import {
   applySecurityPatch,
+  applyErrorKey,
   detectLegacyAliases,
-  humanizeApplyError,
   reportApplyError,
   reportApplySuccess,
 } from './securityCenterHelpers';
+import { SecuritySurface } from './SecuritySurface';
 
 type AdminUser = { username: string; permissions: '*' | 'read'; password: string };
 type Permission = AdminUser['permissions'];
@@ -81,11 +81,8 @@ export function AdminAuthBoundaryCard({
   const displayExpiry = edits.expiry ?? config?.sessionExpiryTime ?? 0;
 
   const surfacesConfigured = serverUsers.length > 0;
-  const variant: 'success' | 'warning' | 'neutral' = !editable
-    ? 'neutral'
-    : surfacesConfigured
-      ? 'success'
-      : 'warning';
+  // Off is amber here: without adminAuth anyone reaching the editor can deploy.
+  const variant = surfacesConfigured ? 'success' : 'warning';
 
   const updateUsers = (change: (users: AdminUser[]) => AdminUser[]) => {
     setEdits((current) => ({ ...current, users: change(current.users ?? displayUsers) }));
@@ -143,8 +140,9 @@ export function AdminAuthBoundaryCard({
       reportApplySuccess(t('security:adminAuthBoundary.applied'));
       onApplied();
     } else {
-      setError(humanizeApplyError(result.error?.status));
-      reportApplyError({ status: 'FAILED', detail: result.error?.detail });
+      const message = t(applyErrorKey(result.error?.status));
+      setError(message);
+      reportApplyError(message);
     }
   };
 
@@ -158,48 +156,38 @@ export function AdminAuthBoundaryCard({
 
   const disabled = !editable || saving;
 
+  const canonicalAliases = legacyAliases
+    .map((name) => (name === 'nodeHttpAuth' ? 'httpNodeAuth' : 'httpStaticAuth'))
+    .join(', ');
+  const title = t('security:adminAuthBoundary.title');
+
   return (
-    <article
-      data-testid="boundary-admin-auth"
-      aria-labelledby="boundary-admin-auth-title"
-      className="card surface-card border border-border p-6"
-    >
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
-          {surfacesConfigured ? (
-            <ShieldCheck className="h-6 w-6 text-success" aria-hidden="true" />
-          ) : (
-            <ShieldOff className="h-6 w-6 text-warning" aria-hidden="true" />
-          )}
-          <div className="min-w-0">
-            <h2
-              id="boundary-admin-auth-title"
-              className="text-base font-semibold text-base-content"
-            >
-              {t('security:adminAuthBoundary.title')}
-            </h2>
-            <p className="mt-0.5 text-xs text-base-content/65">
-              {t('security:adminAuthBoundary.subtitle')}
-            </p>
-          </div>
-        </div>
+    <>
+    <SecuritySurface
+      anchor="admin-auth"
+      testId="boundary-admin-auth"
+      title={title}
+      summary={t('security:adminAuthBoundary.subtitle')}
+      status={
         <StatusChip
           variant={variant}
           size="sm"
           ariaLabel={t('security:adminAuthBoundary.statusAria', {
-            state: surfacesConfigured ? 'on' : 'off',
+            state: surfacesConfigured
+              ? t('security:adminAuthBoundary.statusOn')
+              : t('security:adminAuthBoundary.statusOff'),
           })}
         >
           {surfacesConfigured
             ? t('security:adminAuthBoundary.statusOn')
             : t('security:adminAuthBoundary.statusOff')}
         </StatusChip>
-      </header>
-
+      }
+    >
       {!editable && (
         <p
           role="status"
-          className="mt-3 rounded-xl border border-warning/40 bg-warning/10 p-3 text-sm text-warning"
+          className="mb-4 rounded-box border border-ds-warning/40 bg-ds-warning/10 px-3 py-2 text-sm text-ds-on-tint-warning"
           data-testid="boundary-admin-auth-readonly"
         >
           {t('security:adminAuthBoundary.readOnly')}
@@ -210,7 +198,7 @@ export function AdminAuthBoundaryCard({
         <p
           role="status"
           aria-live="polite"
-          className="mt-3 rounded-xl border border-danger/40 bg-danger/10 p-3 text-sm text-danger"
+          className="mb-4 rounded-box border border-ds-danger/40 bg-ds-danger/10 px-3 py-2 text-sm text-ds-on-tint-error"
           data-testid="boundary-admin-auth-error"
         >
           {error}
@@ -220,30 +208,39 @@ export function AdminAuthBoundaryCard({
       {legacyAliases.length > 0 && editable && (
         <div
           role="status"
-          className="mt-3 rounded-xl border border-warning/40 bg-warning/10 p-3 text-sm"
+          className="mb-4 rounded-box border border-ds-warning/40 bg-ds-warning/10 px-3 py-2 text-sm"
           data-testid="boundary-admin-auth-legacy"
         >
-          <h3 className="font-medium">{t('security:adminAuthBoundary.legacyTitle')}</h3>
-          <p className="text-base-content/85">
-            {t('security:adminAuthBoundary.legacyBody', {
-              aliases: legacyAliases
-                .map((name) => (name === 'nodeHttpAuth' ? 'httpNodeAuth' : 'httpStaticAuth'))
-                .join(' and '),
-            })}
+          <h3 className="font-semibold">{t('security:adminAuthBoundary.legacyTitle')}</h3>
+          <p className="text-ds-text-secondary">
+            {t('security:adminAuthBoundary.legacyBody', { aliases: canonicalAliases })}
           </p>
         </div>
       )}
 
       <fieldset
         disabled={disabled}
-        className="mt-5 space-y-4"
+        className="space-y-4"
         data-testid="boundary-admin-auth-fieldset"
       >
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="text-sm font-medium">{t('security:adminAuthBoundary.usersLabel')}</h3>
+        <label className="block max-w-xs text-sm">
+          {t('security:adminAuthBoundary.sessionExpiry')}
+          <input
+            aria-label={t('security:adminAuthBoundary.sessionExpiryLabel')}
+            data-testid="boundary-admin-auth-expiry"
+            className="input input-bordered mt-1 min-h-11 w-full sm:min-h-0"
+            min={0}
+            type="number"
+            value={displayExpiry}
+            onChange={(event) => updateExpiry(Number(event.target.value))}
+          />
+        </label>
+
+        <div className="flex items-center justify-between gap-3 border-b border-ds-border-subtle pb-2">
+          <h3 className="text-sm font-semibold">{t('security:adminAuthBoundary.usersLabel')}</h3>
           <button
             type="button"
-            className="action-btn-secondary"
+            className="action-btn-secondary min-h-11 sm:min-h-0"
             onClick={addUser}
             data-testid="boundary-admin-auth-add"
           >
@@ -252,22 +249,9 @@ export function AdminAuthBoundaryCard({
           </button>
         </div>
 
-        <label className="block text-sm">
-          {t('security:adminAuthBoundary.sessionExpiry')}
-          <input
-            aria-label={t('security:adminAuthBoundary.sessionExpiryLabel')}
-            data-testid="boundary-admin-auth-expiry"
-            className="input input-bordered mt-1 w-full"
-            min={0}
-            type="number"
-            value={displayExpiry}
-            onChange={(event) => updateExpiry(Number(event.target.value))}
-          />
-        </label>
-
         {displayUsers.length === 0 && (
           <p
-            className="rounded-xl border border-border bg-base-200/40 px-4 py-3 text-sm text-base-content/65"
+            className="text-sm text-ds-text-secondary"
             data-testid="boundary-admin-auth-empty"
           >
             {t('security:adminAuthBoundary.noUsers')}
@@ -277,13 +261,13 @@ export function AdminAuthBoundaryCard({
         {displayUsers.map((user, index) => (
           <div
             key={index}
-            className="grid gap-3 rounded-xl border border-border p-3 md:grid-cols-4"
+            className="grid gap-3 border-b border-ds-border-subtle pb-4 md:grid-cols-[1fr_1fr_1fr_auto]"
             data-testid="boundary-admin-auth-user-row"
           >
             <label className="text-sm">
               {t('security:adminAuthBoundary.username')}
               <input
-                className="input input-bordered mt-1 w-full"
+                className="input input-bordered mt-1 min-h-11 w-full sm:min-h-0"
                 data-testid="boundary-admin-auth-username"
                 value={user.username}
                 onChange={(event) => updateUsername(index, event.target.value)}
@@ -297,7 +281,7 @@ export function AdminAuthBoundaryCard({
                     ? t('security:adminAuthBoundary.permissionFor', { username: user.username })
                     : t('security:adminAuthBoundary.permissionForIndex', { index: index + 1 })
                 }
-                className="select select-bordered mt-1 w-full"
+                className="select select-bordered mt-1 min-h-11 w-full sm:min-h-0"
                 value={user.permissions}
                 onChange={(event) =>
                   updatePermission(index, event.target.value as Permission)
@@ -313,7 +297,7 @@ export function AdminAuthBoundaryCard({
             <label className="text-sm">
               {t('security:adminAuthBoundary.newPassword')}
               <input
-                className="input input-bordered mt-1 w-full"
+                className="input input-bordered mt-1 min-h-11 w-full sm:min-h-0"
                 type="password"
                 value={user.password}
                 data-testid="boundary-admin-auth-password"
@@ -322,12 +306,11 @@ export function AdminAuthBoundaryCard({
             </label>
             <button
               type="button"
-              className={cn(
-                'btn btn-ghost self-end',
-                'border border-border/60 bg-base-200/40 text-base-content/80',
-              )}
+              className="action-btn-ghost min-h-11 self-end sm:min-h-0"
               aria-label={t('security:adminAuthBoundary.removeUser', {
-                username: user.username || `user ${index + 1}`,
+                username:
+                  user.username ||
+                  t('security:adminAuthBoundary.userFallback', { index: index + 1 }),
               })}
               data-testid="boundary-admin-auth-remove"
               onClick={() => removeUser(index)}
@@ -338,43 +321,43 @@ export function AdminAuthBoundaryCard({
           </div>
         ))}
 
-        <button
-          type="button"
-          className="action-btn-primary flex items-center gap-2"
-          onClick={save}
-          disabled={disabled}
-          data-testid="boundary-admin-auth-save"
-        >
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          {saving
-            ? t('security:adminAuthBoundary.saving')
-            : t('security:adminAuthBoundary.save')}
-        </button>
-        {appliedAt && !error && (
-          <p
-            role="status"
-            aria-live="polite"
-            className="mt-2 text-sm text-success"
-            data-testid="boundary-admin-auth-applied"
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            className="action-btn-primary min-h-11 sm:min-h-0"
+            onClick={save}
+            disabled={disabled}
+            data-testid="boundary-admin-auth-save"
           >
-            {t('security:adminAuthBoundary.appliedLabel')}
-          </p>
-        )}
+            {saving
+              ? t('security:adminAuthBoundary.saving')
+              : t('security:adminAuthBoundary.save')}
+          </button>
+          {appliedAt && !error && (
+            <p
+              role="status"
+              aria-live="polite"
+              className="text-sm text-ds-on-tint-success"
+              data-testid="boundary-admin-auth-applied"
+            >
+              {t('security:adminAuthBoundary.appliedLabel')}
+            </p>
+          )}
+        </div>
       </fieldset>
+    </SecuritySurface>
 
       <ConfirmationDialog
         isOpen={confirmMigration}
         title={t('security:adminAuthBoundary.migrationTitle')}
         description={t('security:adminAuthBoundary.migrationDescription', {
-          aliases: legacyAliases
-            .map((name) => (name === 'nodeHttpAuth' ? 'httpNodeAuth' : 'httpStaticAuth'))
-            .join(', '),
+          aliases: canonicalAliases,
         })}
         acknowledgement={t('security:adminAuthBoundary.migrationAck')}
         variant="warning"
         onCancel={() => setConfirmMigration(false)}
         onConfirm={apply}
       />
-    </article>
+    </>
   );
 }

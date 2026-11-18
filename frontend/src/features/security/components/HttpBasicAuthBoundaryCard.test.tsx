@@ -44,7 +44,7 @@ describe('HttpBasicAuthBoundaryCard — httpNodeAuth', () => {
     expect(chip?.className).toMatch(/bg-ds-success/);
   });
 
-  it('renders the danger palette when not editable', () => {
+  it('keeps the surface state palette and shows the read-only notice when not editable', () => {
     renderBoundary({
       surface: 'httpNodeAuth',
       config: { user: 'nodes' },
@@ -54,7 +54,8 @@ describe('HttpBasicAuthBoundaryCard — httpNodeAuth', () => {
     });
     const card = screen.getByTestId('boundary-httpNodeAuth');
     const chip = card.querySelector('[role="status"]');
-    expect(chip?.className).toMatch(/bg-base-300/);
+    // T10: the chip reports the surface state; read-only is the notice's job.
+    expect(chip?.className).toMatch(/bg-ds-success/);
     expect(screen.getByTestId('boundary-httpNodeAuth-readonly')).toBeInTheDocument();
   });
 

@@ -1,14 +1,15 @@
-import { Shield } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { useT } from '@/i18n';
-import { NrccTopologyDiagram } from '@/features/configuration/components/NrccTopologyDiagram';
 import { useConfigurationData } from '@/features/configuration/hooks/useConfigurationData';
 import { useUsersData } from '@/features/auth/hooks/useUsersData';
 import { LoadingBoundary } from '@/shared/components/feedback';
+import { StatusChip } from '@/shared/components/ui';
 import type { NodeRedConfigResponse } from '@/features/configuration/lib/configTransformers';
 import type { HttpBasicAuthSurface } from './HttpBasicAuthBoundaryCard';
 import { AdminAuthBoundaryCard } from './AdminAuthBoundaryCard';
 import { HttpBasicAuthBoundaryCard } from './HttpBasicAuthBoundaryCard';
 import { NrccAccessBoundaryCard } from './NrccAccessBoundaryCard';
+import { SecuritySurface } from './SecuritySurface';
 import { DashboardAccess } from '@/features/configuration/components/DashboardAccess';
 
 /**
@@ -29,8 +30,10 @@ import { DashboardAccess } from '@/features/configuration/components/DashboardAc
  *   5. DashboardAccess — Dashboard HTTP/Socket.IO policy
  *      (unchanged from slice A).
  *
- * Composition: 5 cards in order, each independent, each with its
- * own save action. The admin/node/static one combined Save Security
+ * Composition (T10): each surface is a flat row (name, state chip,
+ * what it protects) with its form behind an Edit disclosure and a
+ * stable anchor (/security#admin-auth etc.). Each keeps its own save
+ * action. The admin/node/static one combined Save Security
  * Center button is gone; the dependencies between them (legacy
  * alias migration) are now surfaced inside the affected boundary
  * card as a confirmation dialog.
@@ -75,20 +78,32 @@ export function SecurityView() {
     <LoadingBoundary state={securityViewState}>
     <section
       data-testid="security-view"
-      className="space-y-4 sm:space-y-6"
       aria-labelledby="security-view-title"
     >
-      <header className="flex flex-col gap-4 border-b border-border pb-6">
-        <div className="flex items-center gap-3">
-          <Shield className="h-6 w-6 stroke-[1.6] text-base-content/70" aria-hidden="true" />
-          <div className="min-w-0">
-            <h1 id="security-view-title" className="text-xl font-semibold text-base-content">
-              {t('security:title')}
-            </h1>
-            <p className="text-sm text-base-content/65">{t('security:subtitle')}</p>
-          </div>
-        </div>
-        <NrccTopologyDiagram ariaLabel={t('security:topologyAriaLabel')} />
+      <header className="space-y-2 border-b border-ds-border-subtle pb-3">
+        <h1 id="security-view-title" className="text-xl font-bold text-ds-text-primary">
+          {t('security:title')}
+        </h1>
+        <p className="max-w-[75ch] text-pretty text-sm text-ds-text-secondary">{t('security:subtitle')}</p>
+        <figure className="space-y-1">
+          <ol className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ds-text-secondary">
+            <li className="font-semibold text-ds-text-primary">{t('configuration:topology.nodeNrcc')}</li>
+            <li className="inline-flex items-center gap-1">
+              <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+              {t('configuration:topology.arrowNrccSettings')}
+            </li>
+            <li className="font-mono font-semibold text-ds-text-primary">{t('configuration:topology.nodeSettings')}</li>
+            <li className="inline-flex items-center gap-1">
+              <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+              {t('configuration:topology.arrowSettingsNodeRed')}
+            </li>
+            <li className="font-semibold text-ds-text-primary">{t('configuration:topology.nodeRed')}</li>
+          </ol>
+          <figcaption className="text-xs text-ds-text-secondary">{t('configuration:topology.subtitle')}</figcaption>
+        </figure>
+        <p className="max-w-[75ch] text-xs text-ds-text-secondary" data-testid="security-password-note">
+          {t('security:passwordNote')}
+        </p>
       </header>
 
       <NrccAccessBoundaryCard users={users} />
@@ -119,13 +134,29 @@ export function SecurityView() {
         onApplied={refetch}
       />
 
-      <div className="border-t border-border" />
-
-      <DashboardAccess
-        editable={editable}
-        expectedRevision={expectedRevision}
-        onApplied={refetch}
-      />
+      <SecuritySurface
+        anchor="dashboard-access"
+        testId="boundary-dashboard-access"
+        title={t('security:dashboardAccess.title')}
+        summary={t('security:dashboardAccess.summary')}
+        status={
+          // /config does not report the dashboard policy, so its state is unknown here.
+          <StatusChip variant="neutral" size="sm">
+            {t('security:dashboardAccess.notReported')}
+          </StatusChip>
+        }
+      >
+        {/* shortcut: hides DashboardAccess's own heading (the row carries it) and
+            lifts its controls to 44px on phones; move both into DashboardAccess
+            when it moves into features/security. */}
+        <div className="max-sm:[&_button]:min-h-11 max-sm:[&_input]:min-h-11 max-sm:[&_select]:min-h-11 [&>section>div:first-child]:hidden">
+          <DashboardAccess
+            editable={editable}
+            expectedRevision={expectedRevision}
+            onApplied={refetch}
+          />
+        </div>
+      </SecuritySurface>
     </section>
     </LoadingBoundary>
   );

@@ -14,7 +14,6 @@ import { configService } from '@/features/configuration/services';
 
 export interface ApplyError {
   status: string;
-  detail?: string;
 }
 
 export interface ApplyResult {
@@ -32,13 +31,7 @@ export async function applySecurityPatch(
   expectedRevision: string | undefined,
 ): Promise<ApplyResult> {
   if (!expectedRevision) {
-    return {
-      status: 'failed',
-      error: {
-        status: 'REVISION_MISSING',
-        detail: 'Refresh before retrying the transaction.',
-      },
-    };
+    return { status: 'failed', error: { status: 'REVISION_MISSING' } };
   }
   try {
     await configService.applyConfig(patch, expectedRevision);
@@ -46,31 +39,28 @@ export async function applySecurityPatch(
   } catch (error) {
     const code =
       error instanceof AxiosError ? error.response?.data?.error?.code : undefined;
-    return {
-      status: 'failed',
-      error: {
-        status: code ?? 'UNKNOWN',
-        detail: humanizeApplyError(code),
-      },
-    };
+    return { status: 'failed', error: { status: code ?? 'UNKNOWN' } };
   }
 }
 
-export function humanizeApplyError(code: string | undefined): string {
+/** Catalog key (security namespace) for the operator-facing apply error. */
+export function applyErrorKey(code: string | undefined): string {
   switch (code) {
     case 'SETTINGS_REVISION_CONFLICT':
-      return 'Settings changed elsewhere. Refresh, review the redacted preview, then retry.';
+      return 'security:applyErrors.revisionConflict';
     case 'APPLY_IN_FLIGHT':
-      return 'Another transaction is in progress. Wait for it to finish, then retry.';
+      return 'security:applyErrors.inFlight';
     case 'SETTINGS_VALIDATION_FAILED':
-      return 'The configuration did not validate. Review the fields and retry.';
+      return 'security:applyErrors.validationFailed';
+    case 'REVISION_MISSING':
+      return 'security:applyErrors.revisionMissing';
     default:
-      return 'The transaction did not complete. Any failed readiness check is rolled back; review runtime readiness, then retry.';
+      return 'security:applyErrors.generic';
   }
 }
 
-export function reportApplyError(error: ApplyError) {
-  toast.error(error.detail ?? 'Transaction needs attention');
+export function reportApplyError(message: string) {
+  toast.error(message);
 }
 
 export function reportApplySuccess(label: string) {

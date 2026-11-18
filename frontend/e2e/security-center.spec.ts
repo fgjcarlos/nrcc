@@ -44,6 +44,11 @@ async function openSecurityCenter(
   await expect(page.getByRole('heading', { name: 'Node-RED admin auth' })).toBeVisible()
 }
 
+// T10: each surface form sits behind its Edit disclosure; open it before filling.
+async function expandSurface(page: import('@playwright/test').Page, testId: string) {
+  await page.getByTestId(testId).locator('summary').click()
+}
+
 test.describe('Security Center transactional apply (issue #766 slice E — per-surface boundaries)', () => {
   test('submits each canonical authentication surface independently with a revision', async ({ page }) => {
     const requests: Record<string, unknown>[] = []
@@ -58,6 +63,7 @@ test.describe('Security Center transactional apply (issue #766 slice E — per-s
     // AdminAuthBoundaryCard — edit the operator username and save
     // via the surface-scoped button (was "Save Security Center" in
     // slice A; now "Save admin auth").
+    await expandSurface(page, 'boundary-admin-auth')
     await page.getByTestId('boundary-admin-auth-username').first().fill('operator-updated')
     await page.getByTestId('boundary-admin-auth-save').click()
     await expect.poll(() => requests.length).toBe(1)
@@ -70,6 +76,7 @@ test.describe('Security Center transactional apply (issue #766 slice E — per-s
 
     // HttpBasicAuthBoundaryCard surface=httpNodeAuth — edit the
     // basic-auth user field and save via the per-surface button.
+    await expandSurface(page, 'boundary-httpNodeAuth')
     await page.getByTestId('boundary-httpNodeAuth-user').fill('nodes-updated')
     await page.getByTestId('boundary-httpNodeAuth-save').click()
     await expect.poll(() => requests.length).toBe(2)
@@ -81,6 +88,7 @@ test.describe('Security Center transactional apply (issue #766 slice E — per-s
     expect(requests[1]).not.toHaveProperty('httpStaticAuth')
 
     // HttpBasicAuthBoundaryCard surface=httpStaticAuth — same flow.
+    await expandSurface(page, 'boundary-httpStaticAuth')
     await page.getByTestId('boundary-httpStaticAuth-user').fill('static-updated')
     await page.getByTestId('boundary-httpStaticAuth-save').click()
     await expect.poll(() => requests.length).toBe(3)
@@ -101,6 +109,7 @@ test.describe('Security Center transactional apply (issue #766 slice E — per-s
       },
     }))
     // First click hits the revision-conflict branch (409 → SETTINGS_REVISION_CONFLICT).
+    await expandSurface(page, 'boundary-admin-auth')
     await page.getByTestId('boundary-admin-auth-username').first().fill('operator-updated')
     await page.getByTestId('boundary-admin-auth-save').click()
     // Scope the assertion to the boundary card's error banner via its

@@ -1,10 +1,20 @@
 {
   "title": "Security",
   "subtitle": "Authentication surfaces and dashboard access for this Node-RED instance.",
-  "topologyAriaLabel": "Security topology: NRCC edits settings.js, Node-RED reads it on (re)start.",
+  "passwordNote": "NRCC stores admin auth, Node HTTP auth and Static auth passwords as bcrypt hashes and keeps a value that is already hashed as is. Leave a password blank to keep the stored one.",
+  "surface": {
+    "edit": "Edit"
+  },
+  "applyErrors": {
+    "revisionConflict": "Settings changed elsewhere. Refresh, review the redacted preview, then retry.",
+    "inFlight": "Another transaction is in progress. Wait for it to finish, then retry.",
+    "validationFailed": "The configuration did not validate. Review the fields and retry.",
+    "revisionMissing": "The settings revision is unavailable. Refresh before retrying.",
+    "generic": "The transaction did not complete. Any failed readiness check is rolled back; review runtime readiness, then retry."
+  },
   "adminAuthBoundary": {
     "title": "Node-RED admin auth",
-    "subtitle": "Credentials, session expiry, and the read-only migration flow",
+    "subtitle": "Protects the Node-RED editor and admin API.",
     "statusOn": "On",
     "statusOff": "Off",
     "statusAria": "Node-RED admin auth: {{state}}",
@@ -12,6 +22,7 @@
     "usersLabel": "Users",
     "addUser": "Add user",
     "removeUser": "Remove {{username}}",
+    "userFallback": "user {{index}}",
     "remove": "Remove",
     "sessionExpiry": "Session expiry (seconds)",
     "sessionExpiryLabel": "Session expiry seconds",
@@ -35,14 +46,14 @@
   },
   "httpNodeAuth": {
     "title": "Node HTTP auth",
-    "subtitle": "Basic-auth on the Node-RED HTTP / endpoint (separate from /admin)",
+    "subtitle": "Protects the HTTP endpoints your flows serve (HTTP In nodes).",
     "statusOn": "On",
     "statusOff": "Off",
+    "statusLegacy": "Legacy alias",
     "statusAria": "Node HTTP auth: {{state}}",
     "readOnly": "Editing is disabled. The detected runtime configuration is not editable.",
     "username": "Username",
     "password": "Password",
-    "passwordHint": "NRCC stores the password as a bcrypt hash; a value that is already a bcrypt hash is stored as is. Leave blank to keep the stored hash.",
     "storedHashHint": "Stored hash: {{hash}}",
     "save": "Save Node HTTP auth",
     "saving": "Saving…",
@@ -56,16 +67,16 @@
   },
   "httpStaticAuth": {
     "title": "Static auth",
-    "subtitle": "Basic-auth on the Node-RED /static endpoint",
+    "subtitle": "Protects the static files Node-RED serves from httpStatic.",
     "statusOn": "On",
     "statusOff": "Off",
+    "statusLegacy": "Legacy alias",
     "statusAria": "Static auth: {{state}}",
     "readOnly": "Editing is disabled. The detected runtime configuration is not editable.",
     "username": "Username",
     "password": "Password",
-    "passwordHint": "NRCC stores the password as a bcrypt hash; a value that is already a bcrypt hash is stored as is. Leave blank to keep the stored hash.",
     "storedHashHint": "Stored hash: {{hash}}",
-    "save": "Save Static auth",
+    "save": "Save static auth",
     "saving": "Saving…",
     "applied": "Static auth applied.",
     "appliedLabel": "Apply succeeded.",
@@ -77,16 +88,18 @@
   },
   "nrccAccessBoundary": {
     "title": "NRCC operator access",
-    "subtitle": "Users, roles, and MFA enrolled on the NRCC control plane",
+    "subtitle": "Who can sign in to NRCC, and with which role.",
     "statusOn": "{{count}} configured",
     "statusOff": "No users",
     "statusAria": "NRCC access: {{state}}",
     "total": "Users",
-    "totalHint": "Each user owns one role and may enroll in MFA.",
-    "roleDistribution": "Role distribution",
-    "admins": "admins",
-    "viewers": "viewers",
-    "roleDistributionHint": "Admins own the settings.js apply path.",
-    "cta": "Manage users"
+    "roleDistribution": "Roles",
+    "cta": "Manage users",
+    "roles": "Admins {{admins}} · Viewers {{viewers}}"
+  },
+  "dashboardAccess": {
+    "title": "Dashboard access",
+    "summary": "Protects Node-RED Dashboard pages and their Socket.IO connection.",
+    "notReported": "Not reported"
   }
 }
