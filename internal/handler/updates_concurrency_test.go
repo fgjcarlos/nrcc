@@ -143,10 +143,20 @@ func TestUpdateHandler_PostApply_AcceptedRequestClaimsRunBeforeResponding(t *tes
 	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(1))
 
 	installFakeNPM(t)
-	svc := service.NewUpdateService(t.TempDir())
+	dataDir := t.TempDir()
+	// A known latest version and stale fields from the previous run let the
+	// state assertions below catch any field the claim must not carry. The
+	// cache is up to date: GetFlowState overlays availableVersion only when an
+	// update is available, so this is where a claimed value would be visible.
+	if err := store.NewJSONStore[model.UpdateCacheEntry](filepath.Join(dataDir, "update_cache.json")).Write(model.UpdateCacheEntry{
+		CurrentVersion: "4.0.2", LatestVersion: "4.0.2", UpdateAvailable: false, CheckedAt: time.Now().UTC(),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	svc := service.NewUpdateService(dataDir)
 	creator := &countingFailingBackupCreator{}
 	svc.SetBackupCreator(creator)
-	svc.SetFlowState(model.UpdateFlowState{State: model.StateCompleted, Phase: "completed"})
+	svc.SetFlowState(model.UpdateFlowState{State: model.StateCompleted, Phase: "completed", BackupID: "stale-id", Error: "stale-error"})
 	handler := NewUpdateHandler(svc)
 
 	post := func() *httptest.ResponseRecorder {
@@ -165,6 +175,26 @@ func TestUpdateHandler_PostApply_AcceptedRequestClaimsRunBeforeResponding(t *tes
 	}
 	if got := resp.Data["state"]; got != string(model.StateBackingUp) {
 		t.Errorf("accepted response state = %v, want BackingUp", got)
+	}
+	if v := resp.Data["backupId"]; v != "" {
+		t.Errorf("accepted response backupId = %v, want empty", v)
+	}
+	// GET /state while the run is still claimed: the fresh BackingUp state has
+	// no stale backup ID or error, and no field it did not carry before the
+	// synchronous claim. The single P has not run the launched goroutine yet.
+	stateRec := httptest.NewRecorder()
+	handler.GetState(stateRec, httptest.NewRequest(http.MethodGet, "/api/updates/state", nil))
+	var inFlight model.ApiResponse[map[string]any]
+	if err := json.Unmarshal(stateRec.Body.Bytes(), &inFlight); err != nil {
+		t.Fatal(err)
+	}
+	if got := inFlight.Data["state"]; got != string(model.StateBackingUp) {
+		t.Errorf("in-flight GET /state state = %v, want BackingUp; body: %s", got, stateRec.Body.String())
+	}
+	for _, field := range []string{"backupId", "error", "availableVersion"} {
+		if v, ok := inFlight.Data[field]; ok {
+			t.Errorf("in-flight GET /state %s = %v, want absent", field, v)
+		}
 	}
 	var conflict model.ApiResponse[any]
 	if err := json.Unmarshal(second.Body.Bytes(), &conflict); err != nil {

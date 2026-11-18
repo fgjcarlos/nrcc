@@ -488,9 +488,8 @@ func (s *UpdateService) ClaimUpdate() (*UpdateRun, error) {
 	preApplyStatus := s.GetCachedStatus()
 	// A fresh state also clears the previous run's error reason and backup ID.
 	claimed := model.UpdateFlowState{
-		State:            model.StateBackingUp,
-		Phase:            "backup",
-		AvailableVersion: preApplyStatus.LatestVersion,
+		State: model.StateBackingUp,
+		Phase: "backup",
 	}
 	s.setFlowState(claimed)
 	return &UpdateRun{svc: s, preApplyStatus: preApplyStatus, claimed: claimed}, nil
