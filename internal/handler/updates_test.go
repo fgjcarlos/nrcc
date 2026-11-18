@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -537,4 +538,63 @@ func waitForUpdateFlowToSettle(t *testing.T, svc *service.UpdateService) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Fatalf("update flow did not settle before test cleanup; latest state=%+v", svc.GetFlowState())
+}
+
+// gatedBackupCreator holds the update flow at BackingUp until the test releases it.
+type gatedBackupCreator struct {
+	started chan struct{}
+	release chan struct{}
+}
+
+func (g gatedBackupCreator) CreateTyped(model.BackupType, string) (model.Backup, error) {
+	g.started <- struct{}{}
+	<-g.release
+	return model.Backup{}, errors.New("released by test")
+}
+
+// A finished flow (Completed or Failed) must not block the next update, while
+// an update actually in flight must still be rejected with 409.
+func TestUpdateHandler_PostApply_RestartsAfterTerminalAndRejectsInFlight(t *testing.T) {
+	installFakeNPM(t)
+	svc := service.NewUpdateService(t.TempDir())
+	creator := gatedBackupCreator{started: make(chan struct{}), release: make(chan struct{})}
+	svc.SetBackupCreator(creator)
+	handler := NewUpdateHandler(svc)
+
+	post := func() *httptest.ResponseRecorder {
+		w := httptest.NewRecorder()
+		handler.PostApply(w, httptest.NewRequest(http.MethodPost, "/api/updates/apply", nil))
+		return w
+	}
+
+	for _, terminal := range []model.UpdateState{model.StateCompleted, model.StateFailed} {
+		svc.SetFlowState(model.UpdateFlowState{State: terminal, Phase: "done"})
+
+		if w := post(); w.Code != http.StatusOK {
+			t.Fatalf("POST /apply after %s = %d, want 200; body: %s", terminal, w.Code, w.Body.String())
+		}
+		select {
+		case <-creator.started:
+		case <-time.After(5 * time.Second):
+			t.Fatalf("update started after %s never reached the backup step", terminal)
+		}
+
+		w := post()
+		var resp model.ApiResponse[any]
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatal(err)
+		}
+		if w.Code != http.StatusConflict || resp.Error == nil || resp.Error.Code != "UPDATE_IN_PROGRESS" {
+			t.Fatalf("POST /apply while in flight = %d %s, want 409 UPDATE_IN_PROGRESS", w.Code, w.Body.String())
+		}
+
+		creator.release <- struct{}{}
+		deadline := time.Now().Add(5 * time.Second)
+		for svc.GetFlowState().State != model.StateFailed {
+			if time.Now().After(deadline) {
+				t.Fatalf("released update did not settle; state=%+v", svc.GetFlowState())
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
 }

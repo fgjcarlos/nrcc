@@ -17,9 +17,14 @@ export function useUpdatesActions() {
   // Check for updates mutation
   const checkMutation = useMutation({
     mutationFn: updateService.check,
-    onSuccess: async () => {
+    onSuccess: async (data) => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.updates.status });
-      toast.success(t('updates:checkCompleted'));
+      // The service resolves failed checks (HTTP or npm) with `error` set instead of throwing.
+      if (data.error) {
+        toast.error(t('updates:checkFailed'));
+      } else {
+        toast.success(t('updates:checkCompleted'));
+      }
     },
     onError: () => {
       toast.error(t('updates:checkFailed'));

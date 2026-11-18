@@ -146,16 +146,11 @@ export function SecurityView() {
           </StatusChip>
         }
       >
-        {/* shortcut: hides DashboardAccess's own heading (the row carries it) and
-            lifts its controls to 44px on phones; move both into DashboardAccess
-            when it moves into features/security. */}
-        <div className="max-sm:[&_button]:min-h-11 max-sm:[&_input]:min-h-11 max-sm:[&_select]:min-h-11 [&>section>div:first-child]:hidden">
-          <DashboardAccess
-            editable={editable}
-            expectedRevision={expectedRevision}
-            onApplied={refetch}
-          />
-        </div>
+        <DashboardAccess
+          editable={editable}
+          expectedRevision={expectedRevision}
+          onApplied={refetch}
+        />
       </SecuritySurface>
     </section>
     </LoadingBoundary>

@@ -46,6 +46,8 @@ type PendingAction = { action: BackupAction; backup: BackupSummary } | null;
 
 export function BackupsView() {
   const [configDraft, setConfigDraft] = useState<BackupConfig>(defaultBackupConfig);
+  // Server config the draft was last taken from; undefined until the first fetch.
+  const [configBaseline, setConfigBaseline] = useState<BackupConfig | undefined>(undefined);
   const [selectedBackupId, setSelectedBackupId] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [backupListPage, setBackupListPage] = useState(1);
@@ -65,18 +67,21 @@ export function BackupsView() {
 
   const actions = useBackupsActions();
 
-  // Sync config from query to draft — but only when the operator has no
-  // pending edits. `saveConfig` / `retention` invalidate the config query,
-  // and a refetch mid-edit would silently overwrite the draft. We compute
-  // `configDirty` here (rather than at the JSX site below) so this guard
-  // sees the current value, not a stale reference.
-  const configDirty = isConfigDirty(configDraft, backupsData.config);
+  // Dirty means "edited since the last adopted server config", not "differs
+  // from the latest fetch": comparing against the fetch made the default draft
+  // look dirty on first load, so it never took the server values.
+  const configDirty = isConfigDirty(configDraft, configBaseline);
 
+  // Adopt the fetched config while the operator has no unsaved edits, or once
+  // the server reports exactly the draft (e.g. after a retention save).
+  // A refetch mid-edit must never overwrite the draft.
   useEffect(() => {
-    if (backupsData.config && !configDirty) {
-      setConfigDraft(backupsData.config);
+    const serverConfig = backupsData.config;
+    if (serverConfig && (!configDirty || !isConfigDirty(configDraft, serverConfig))) {
+      setConfigDraft(serverConfig);
+      setConfigBaseline(serverConfig);
     }
-  }, [backupsData.config, configDirty]);
+  }, [backupsData.config, configDirty, configDraft]);
 
   // Clear selected backup if not in list
   useEffect(() => {
@@ -154,7 +159,15 @@ export function BackupsView() {
       toast.error(t('backups:backupCronRequired'));
       return;
     }
-    actions.saveConfigMutation.mutate(configDraft);
+    const submitted = configDraft;
+    actions.saveConfigMutation.mutate(submitted, {
+      // The server normalises what it stores (e.g. clears customSchedule for
+      // presets), so take its answer; keep edits made while the save ran.
+      onSuccess: (savedConfig) => {
+        setConfigBaseline(savedConfig);
+        setConfigDraft((current) => (current === submitted ? savedConfig : current));
+      },
+    });
   };
 
   const confirmPendingAction = () => {

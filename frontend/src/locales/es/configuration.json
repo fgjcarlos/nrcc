@@ -3,8 +3,6 @@
     "installationDetected": "Instalación detectada",
     "nodeRedNotDetected": "(sin Node-RED detectado)",
     "pathNotDetected": "sin ruta detectada",
-    "recommendPortless": "Opcional: instala Portless para exponer nrcc o Node-RED con URLs HTTPS .localhost, LAN o Tailscale.",
-    "recommendWritable": "Otorga permisos de escritura sobre settings.js para que nrcc pueda guardar cambios.",
     "revisionTitle": "Revisión de settings.js {{fingerprint}}"
   },
   "advanced": {
@@ -71,28 +69,6 @@
   "rotateSecretTitle": "Rotar secret de credenciales",
   "rotateSecretDescription": "Guardar un nuevo secret invalida el cifrado de cada credencial almacenada. Los flows con credenciales cifradas tendrán que re-introducirse o restaurarse desde un respaldo previo a la rotación. Continúa solo si entiendes el impacto.",
   "rotateSecretAcknowledgement": "Entiendo que las credenciales cifradas existentes deben re-introducirse tras esta rotación.",
-  "dashboardAccess": {
-    "title": "Acceso al dashboard",
-    "subtitle": "Configura una política de acceso revisada sin exponer credenciales.",
-    "discovery": "Descubrimiento:",
-    "discoverySummary": "paquetes {{packages}}; flows {{flows}}; legacy {{legacy}}; rutas FlowFuse {{paths}}.",
-    "previewLabel": "Previsualización con datos ocultos",
-    "previewTitle": "Previsualización de política con datos ocultos",
-    "previewBody": "Objetivo: {{target}}. Receta: {{recipe}}. Las credenciales, hashes y valores de autorización nunca se muestran.",
-    "readOnly": "El Acceso al dashboard es de solo lectura porque esta configuración no es editable.",
-    "target": "Objetivo del dashboard",
-    "legacyOption": "Dashboard legacy (deprecado)",
-    "unavailable": "(no disponible)",
-    "flowFuseOption": "Dashboard FlowFuse ({{count}} rutas ui-base)",
-    "recipe": "Receta de acceso",
-    "basicAuth": "Autenticación básica",
-    "reverseProxySso": "SSO por proxy inverso",
-    "username": "Usuario",
-    "secret": "Secreto de acceso",
-    "applying": "Aplicando…",
-    "apply": "Aplicar acceso al dashboard",
-    "absent": "ausente"
-  },
   "fieldStatus": {
     "header": {
       "field": "Campo",
