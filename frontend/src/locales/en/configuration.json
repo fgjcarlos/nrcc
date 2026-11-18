@@ -71,29 +71,6 @@
   "rotateSecretTitle": "Rotate credential secret",
   "rotateSecretDescription": "Saving a new credential secret invalidates the encryption of every stored credential. Existing flows with encrypted credentials will need to be re-entered or restored from a backup taken before this rotation. Continue only if you understand the impact.",
   "rotateSecretAcknowledgement": "I understand that existing encrypted credentials must be re-entered after this rotation.",
-  "securityCenter": {
-    "title": "Security Center",
-    "subtitle": "Passwords and bcrypt hashes are never shown. Leave a password blank to preserve its existing value.",
-    "previewLabel": "Redacted transaction preview",
-    "previewTitle": "Redacted transaction preview",
-    "previewBody": "Canonical surfaces: adminAuth, httpNodeAuth, and httpStaticAuth. Credential values, hashes, and passwords are redacted.",
-    "readOnly": "Security Center is read-only because this runtime configuration is not editable.",
-    "legacyTitle": "Legacy authentication detected",
-    "legacyBody": "Saving will migrate {{aliases}} to the canonical surfaces. Secrets remain redacted.",
-    "adminAuth": "Admin authentication",
-    "addUser": "Add user",
-    "sessionExpiry": "Session expiry (seconds)",
-    "username": "Username",
-    "permission": "Permission",
-    "fullAccess": "Full access",
-    "readOnlyPermission": "Read only",
-    "newPassword": "New password",
-    "nodeAuth": "HTTP node authentication",
-    "staticAuth": "Static HTTP authentication",
-    "save": "Save Security Center",
-    "bcryptHash": "Replacement bcrypt hash",
-    "bcryptHint": "Leave blank to preserve the existing hash. New values must be bcrypt hashes and are never displayed."
-  },
   "dashboardAccess": {
     "title": "Dashboard Access",
     "subtitle": "Configure a reviewed access policy without exposing credentials.",
@@ -126,22 +103,12 @@
       "pending": "Pending",
       "restart": "Restart"
     },
-    "source": {
-      "settingsJs": "settings.js",
-      "formDefault": "form default"
-    },
     "validation": {
-      "valid": "Valid",
       "pending": "Pending",
       "invalid": "Invalid"
     },
     "pending": {
       "changed": "Changed"
-    },
-    "restart": {
-      "hard": "Restart required",
-      "soft": "Redeploy flows",
-      "none": "—"
     },
     "invalid": {
       "uiPort": "Port out of range",
@@ -191,12 +158,9 @@
     "confirmDescription": "{{count}} pending change(s) will be written to {{target}}. Node-RED may restart, which can take a while."
   },
   "topology": {
-    "title": "Configuration topology",
     "subtitle": "NRCC edits settings.js; Node-RED reads it on (re)start.",
     "nodeNrcc": "NRCC",
-    "nodeNrccSubtitle": "control plane",
     "nodeSettings": "settings.js",
-    "nodeSettingsSubtitle": "source of truth",
     "nodeRed": "Node-RED + Dashboard",
     "arrowNrccSettings": "edits",
     "arrowSettingsNodeRed": "loads"

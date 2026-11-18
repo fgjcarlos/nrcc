@@ -10,28 +10,6 @@ vi.mock('@/shared/lib', () => ({
 
 const mockGet = vi.mocked(api.get);
 
-describe('historyService.getSystemHistory', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('calls /system/history with default n=120', () => {
-    mockGet.mockResolvedValueOnce({ data: { success: true, data: [], timestamp: '' } });
-
-    historyService.getSystemHistory();
-
-    expect(mockGet).toHaveBeenCalledWith('/system/history', { params: { n: 120 } });
-  });
-
-  it('calls /system/history with custom n when specified', () => {
-    mockGet.mockResolvedValueOnce({ data: { success: true, data: [], timestamp: '' } });
-
-    historyService.getSystemHistory(50);
-
-    expect(mockGet).toHaveBeenCalledWith('/system/history', { params: { n: 50 } });
-  });
-});
-
 describe('historyService.getRuntimeHistory', () => {
   beforeEach(() => {
     vi.clearAllMocks();

@@ -329,8 +329,7 @@
     outline-offset: 2px;
   }
 
-  .topbar-signal-icon,
-  .sidebar-brand-mark {
+  .topbar-signal-icon {
     border-color: var(--ds-border-strong);
     background: color-mix(in srgb, var(--color-primary) 10%, var(--ds-bg-surface));
   }
@@ -620,13 +619,6 @@
     background-color: var(--color-base-200);
   }
 
-  /* ── Code Block Background ─────────────────────────────────── */
-  .code-block-bg {
-    @apply p-4;
-    border-radius: var(--radius-box);
-    background-color: var(--ds-bg-base);
-  }
-
   /* ── Image Overlay (ImageUpload hover) ─────────────────────── */
   .image-overlay {
     @apply absolute inset-0 flex items-center justify-center gap-2 opacity-0 transition-opacity group-hover:opacity-100;
@@ -805,14 +797,6 @@
 /* ═══════════════════════════════════════════════════════════════
    UTILITY CLASSES — Theme-aware
    ═══════════════════════════════════════════════════════════════ */
-
-.bg-background {
-  background-color: var(--color-base-100) !important;
-}
-
-.bg-muted {
-  background-color: var(--color-base-200) !important;
-}
 
 .bg-card {
   background-color: var(--ds-bg-surface) !important;

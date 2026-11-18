@@ -7,11 +7,6 @@ import * as dashboardHooks from '../hooks'
 vi.mock('../hooks', () => ({
   useDashboardData: vi.fn(),
   useDashboardActions: vi.fn(),
-  useSystemHistory: vi.fn().mockReturnValue({ data: [], isLoading: false, isError: false }),
-}))
-
-vi.mock('../hooks/useSystemHistory', () => ({
-  useSystemHistory: vi.fn().mockReturnValue({ data: [], isLoading: false, isError: false }),
 }))
 
 const renderDashboard = () =>

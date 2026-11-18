@@ -228,7 +228,7 @@ Motion explains a state change or an arriving overlay; it never decorates. One c
 - **State changes, 150ms:** a contact closing, chips, disclosure chevrons, toggles, and colour or border changes on buttons, fields, rows and tabs. Animate colour, opacity and transform only; never width, height or position (the rail collapses instantly).
 - **Overlays, 150–200ms:** dialogs, the navigation drawer, the review drawer and the command palette enter with opacity plus a 4–8px translate toward their resting place (`.motion-overlay`, 180ms; direction from `--overlay-from`). Their scrim fades in over 150ms (`.motion-scrim`). Exit is instant.
 - **The authored moment:** the change circuit closes its contacts in sequence, 60ms per contact index. It is the only staggered motion in the product.
-- **Loops:** only loading spinners (1s linear) and skeleton shimmer run indefinitely. A pending action shows a spinner, not a pulsing icon. Charts do not animate (`isAnimationActive={false}`).
+- **Loops:** only loading spinners (1s linear) and skeleton shimmer run indefinitely. A pending action shows a spinner, not a pulsing icon.
 - **Reduced motion:** under `prefers-reduced-motion: reduce` one global rule at the end of `src/index.css` collapses every transition and animation to 0.001ms and every delay to 0s, inline styles included, so the contact stagger and the overlay entrances are instant. State still changes; only the movement goes. `pnpm run test:appearance` pins the grammar and the reduced-motion path.
 
 ## Shapes
