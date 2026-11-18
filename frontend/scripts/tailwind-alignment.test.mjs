@@ -50,10 +50,14 @@ try {
     ['body set in Overpass', /font-family:Overpass Variable,system-ui,sans-serif/],
     ['DaisyUI field size token', /--size-field:\.25rem/],
     // #965: semantic text reads the readable on-tint token; fills keep --color-*.
-    ...['primary', 'error', 'success', 'warning', 'info', 'accent'].map((colour) => [
-      `text-${colour} on --ds-on-tint-${colour}`,
-      new RegExp(`\\.text-${colour}\\{color:var\\(--ds-on-tint-${colour}\\)\\}`),
-    ]),
+    // Tailwind only emits used utilities, so check every semantic text class the
+    // build actually contains (text-primary is always used by the shell).
+    ...['primary', 'error', 'success', 'warning', 'info', 'accent']
+      .filter((colour) => colour === 'primary' || css.includes(`.text-${colour}{`))
+      .map((colour) => [
+        `text-${colour} on --ds-on-tint-${colour}`,
+        new RegExp(`\\.text-${colour}\\{color:var\\(--ds-on-tint-${colour}\\)\\}`),
+      ]),
     ['bg-primary keeps the solid fill', /\.bg-primary[,{][^}]*background-color:var\(--color-primary\)/],
   ]) {
     assert.match(css, pattern, `Built CSS is missing ${label}`);
