@@ -1,21 +1,33 @@
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, Fragment, useState } from 'react';
 import { toast } from 'sonner';
 import { useAuth } from '../hooks/useAuth';
 import { authService } from '../services/authService';
 import { useT } from '@/i18n';
+import { Button, Input, StatusChip } from '@/shared/components/ui';
 
 const MIN_PASSWORD_LENGTH = 8;
 
-function formatDate(value?: string) {
-  if (!value) return 'Not available';
+function formatDate(value: string | undefined, fallback: string) {
+  if (!value) return fallback;
 
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Not available';
+  if (Number.isNaN(date.getTime())) return fallback;
 
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(date);
+}
+
+/** Designator text that may wrap only after a hyphen (DESIGN.md: never mid-word). */
+function BreakAtHyphens({ value }: { value: string }) {
+  const parts = value.split('-');
+  return parts.map((part, index) => (
+    <Fragment key={index}>
+      {part}
+      {index < parts.length - 1 && <>{'-'}<wbr /></>}
+    </Fragment>
+  ));
 }
 
 export function ProfileView() {
@@ -26,13 +38,11 @@ export function ProfileView() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const initials = useMemo(() => user?.username.slice(0, 2).toUpperCase() ?? 'NR', [user?.username]);
-
   if (!user) {
     return (
-      <div className="p-6">
-        <h1 className="text-2xl font-bold text-base-content">{t('auth:profile.title')}</h1>
-        <p className="mt-2 text-ds-text-muted">{t('auth:profile.signInRequired')}</p>
+      <div className="space-y-1">
+        <h1 className="text-xl font-bold text-ds-text-primary">{t('auth:profile.title')}</h1>
+        <p className="text-sm text-ds-text-secondary">{t('auth:profile.signInRequired')}</p>
       </div>
     );
   }
@@ -42,12 +52,12 @@ export function ProfileView() {
     setError(null);
 
     if (password.length < MIN_PASSWORD_LENGTH) {
-      setError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters long.`);
+      setError(t('auth:setup.errors.passwordLength'));
       return;
     }
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match.');
+      setError(t('auth:setup.errors.passwordMismatch'));
       return;
     }
 
@@ -56,11 +66,11 @@ export function ProfileView() {
       await authService.changePassword(user.id, password);
       setPassword('');
       setConfirmPassword('');
-      toast.success('Password updated successfully');
+      toast.success(t('auth:profile.passwordUpdated'));
     } catch (err) {
       const message =
         (err as { response?: { data?: { error?: { message?: string } } } }).response?.data?.error?.message ||
-        'Failed to update password';
+        t('auth:profile.updateFailed');
       setError(message);
       toast.error(message);
     } finally {
@@ -68,95 +78,91 @@ export function ProfileView() {
     }
   };
 
+  const notAvailable = t('auth:profile.notAvailable');
+
   return (
-    <div className="p-6 space-y-6">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-ds-text-muted">{t('auth:profile.account')}</p>
-        <h1 className="mt-2 text-2xl font-bold text-base-content">{t('auth:profile.title')}</h1>
-        <p className="mt-2 text-sm text-ds-text-muted">
-          {t('auth:profile.reviewPrompt')}
-        </p>
-      </div>
+    <div className="space-y-4">
+      <header className="space-y-1 border-b border-ds-border-subtle pb-3">
+        <h1 className="text-xl font-bold text-ds-text-primary">{t('auth:profile.title')}</h1>
+        <p className="max-w-[75ch] text-pretty text-sm text-ds-text-secondary">{t('auth:profile.reviewPrompt')}</p>
+      </header>
 
-      <section className="surface-card p-6">
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-          <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl border border-border bg-primary/15 text-xl font-bold text-primary">
-            {initials}
-          </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="truncate text-xl font-semibold text-base-content">{user.username}</h2>
-            <p className="mt-1 text-sm capitalize text-ds-text-secondary">{user.role}</p>
-          </div>
-        </div>
-
-        <dl className="mt-6 grid gap-4 md:grid-cols-3">
-          <div className="rounded-xl border border-border bg-base-200/45 p-4">
-            <dt className="text-xs font-semibold uppercase tracking-wide text-ds-text-muted">{t('auth:profile.userId')}</dt>
-            <dd className="mt-2 break-all text-sm text-base-content">{user.id}</dd>
-          </div>
-          <div className="rounded-xl border border-border bg-base-200/45 p-4">
-            <dt className="text-xs font-semibold uppercase tracking-wide text-ds-text-muted">Created</dt>
-            <dd className="mt-2 text-sm text-base-content">{formatDate(user.createdAt)}</dd>
-          </div>
-          <div className="rounded-xl border border-border bg-base-200/45 p-4">
-            <dt className="text-xs font-semibold uppercase tracking-wide text-ds-text-muted">{t('auth:profile.lastUpdated')}</dt>
-            <dd className="mt-2 text-sm text-base-content">{formatDate(user.updatedAt)}</dd>
-          </div>
-        </dl>
-      </section>
-
-      <section className="surface-card p-6">
-        <div className="mb-5">
-          <h2 className="text-lg font-semibold text-base-content">Password</h2>
-          <p className="mt-1 text-sm text-ds-text-secondary">
-            Choose a new password with at least {MIN_PASSWORD_LENGTH} characters.
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="max-w-lg space-y-4">
-          <div>
-            <label htmlFor="new-password" className="mb-1 block text-sm font-medium text-base-content">
-              {t('auth:profile.newPasswordLabel')}
-            </label>
-            <input
-              id="new-password"
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className="glass-panel w-full rounded-xl border border-border px-3 py-2 text-base-content focus:outline-none focus:ring-2 focus:ring-primary/50"
-              minLength={MIN_PASSWORD_LENGTH}
-              autoComplete="new-password"
-              required
-            />
+      <div className="divide-y divide-ds-border-subtle">
+        <section aria-labelledby="profile-account-heading" className="space-y-4 pb-4">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <h2 id="profile-account-heading" className="min-w-0 text-sm font-semibold text-ds-text-primary [overflow-wrap:anywhere]">
+              {user.username}
+            </h2>
+            <StatusChip variant="neutral" size="sm">
+              {user.role === 'admin' ? t('auth:roles.admin') : t('auth:roles.viewer')}
+            </StatusChip>
           </div>
 
-          <div>
-            <label htmlFor="confirm-new-password" className="mb-1 block text-sm font-medium text-base-content">
-              {t('auth:profile.confirmNewPasswordLabel')}
-            </label>
-            <input
+          <dl className="grid gap-4 md:grid-cols-3">
+            <div className="min-w-0 space-y-1">
+              <dt className="text-xs text-ds-text-secondary">{t('auth:profile.userId')}</dt>
+              <dd className="font-mono text-xs font-semibold tabular-nums text-ds-text-primary break-normal">
+                <BreakAtHyphens value={user.id} />
+              </dd>
+            </div>
+            <div className="min-w-0 space-y-1">
+              <dt className="text-xs text-ds-text-secondary">{t('auth:createdLabel')}</dt>
+              <dd className="text-sm text-ds-text-primary">{formatDate(user.createdAt, notAvailable)}</dd>
+            </div>
+            <div className="min-w-0 space-y-1">
+              <dt className="text-xs text-ds-text-secondary">{t('auth:profile.lastUpdated')}</dt>
+              <dd className="text-sm text-ds-text-primary">{formatDate(user.updatedAt, notAvailable)}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section aria-labelledby="profile-password-heading" className="space-y-3 pt-4">
+          <h2 id="profile-password-heading" className="text-sm font-semibold text-ds-text-primary">
+            {t('auth:profile.passwordHeading')}
+          </h2>
+
+          {/* noValidate: the same length and match checks run in handleSubmit and answer inline. */}
+          <form onSubmit={handleSubmit} noValidate className="max-w-lg space-y-4">
+            <div className="space-y-1">
+              <Input
+                id="new-password"
+                type="password"
+                label={t('auth:profile.newPasswordLabel')}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                minLength={MIN_PASSWORD_LENGTH}
+                autoComplete="new-password"
+                aria-describedby="profile-password-hint"
+                required
+              />
+              <p id="profile-password-hint" className="text-xs text-ds-text-secondary">
+                {t('auth:setup.passwordHint')}
+              </p>
+            </div>
+
+            <Input
               id="confirm-new-password"
               type="password"
+              label={t('auth:profile.confirmNewPasswordLabel')}
               value={confirmPassword}
               onChange={(event) => setConfirmPassword(event.target.value)}
-              className="glass-panel w-full rounded-xl border border-border px-3 py-2 text-base-content focus:outline-none focus:ring-2 focus:ring-primary/50"
               minLength={MIN_PASSWORD_LENGTH}
               autoComplete="new-password"
               required
             />
-          </div>
 
-          {error && (
-            <p role="alert" className="rounded-xl border border-error/30 bg-error/10 px-3 py-2 text-sm text-error">
-              {error}
-            </p>
-          )}
+            {error && (
+              <p role="alert" className="text-xs text-error">
+                {error}
+              </p>
+            )}
 
-          <button type="submit" className="action-btn-primary disabled:opacity-50" disabled={isSubmitting}>
-            {isSubmitting ? t('auth:profile.updating') : t('auth:profile.updatePassword')}
-          </button>
-        </form>
-      </section>
+            <Button type="submit" disabled={isSubmitting} className="min-h-11 sm:min-h-9">
+              {isSubmitting ? t('auth:profile.updating') : t('auth:profile.updatePassword')}
+            </Button>
+          </form>
+        </section>
+      </div>
     </div>
   );
 }

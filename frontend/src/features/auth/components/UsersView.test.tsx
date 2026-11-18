@@ -1,6 +1,6 @@
 import { i18n } from '@/i18n';
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
@@ -139,7 +139,7 @@ describe('UsersView', () => {
       const user = userEvent.setup()
       renderWithProviders(<UsersView />)
 
-      const addButton = screen.getByRole('button', { name: new RegExp(`${i18n.t('common:add')}.*${i18n.t('auth:createUser')}`) })
+      const addButton = screen.getByRole('button', { name: i18n.t('auth:addUser') })
       await user.click(addButton)
 
       // Look for the modal heading, not the submit button
@@ -150,7 +150,7 @@ describe('UsersView', () => {
       const user = userEvent.setup()
       renderWithProviders(<UsersView />)
 
-      const addButton = screen.getByRole('button', { name: new RegExp(`${i18n.t('common:add')}.*${i18n.t('auth:createUser')}`) })
+      const addButton = screen.getByRole('button', { name: i18n.t('auth:addUser') })
       await user.click(addButton)
 
       // Username input exists and is enabled
@@ -170,7 +170,7 @@ describe('UsersView', () => {
       const user = userEvent.setup()
       renderWithProviders(<UsersView />)
 
-      const addButton = screen.getByRole('button', { name: new RegExp(`${i18n.t('common:add')}.*${i18n.t('auth:createUser')}`) })
+      const addButton = screen.getByRole('button', { name: i18n.t('auth:addUser') })
       await user.click(addButton)
 
       const submitButton = screen.getByRole('button', { name: i18n.t('auth:createUser') }) as HTMLButtonElement
@@ -182,7 +182,7 @@ describe('UsersView', () => {
       const user = userEvent.setup()
       renderWithProviders(<UsersView />)
 
-      const addButton = screen.getByRole('button', { name: new RegExp(`${i18n.t('common:add')}.*${i18n.t('auth:createUser')}`) })
+      const addButton = screen.getByRole('button', { name: i18n.t('auth:addUser') })
       await user.click(addButton)
 
       const usernameInputs = screen.getAllByDisplayValue('')
@@ -383,7 +383,7 @@ describe('UsersView', () => {
       const deleteButtons = screen.getAllByRole('button', { name: i18n.t('common:delete') })
       await user.click(deleteButtons[1])
 
-      expect(screen.getByRole('heading', { name: i18n.t('common:deleteUser') })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: i18n.t('auth:deleteUserTitle', { username: mockViewerUser.username }) })).toBeInTheDocument()
     })
 
     it('disables delete button for sole admin user', () => {
@@ -596,10 +596,10 @@ describe('UsersView', () => {
     it('renders role badges correctly', () => {
       renderWithProviders(<UsersView />)
 
-      const roleBadges = screen.getAllByText('admin')
+      const roleBadges = screen.getAllByText(i18n.t('auth:roles.admin'))
       expect(roleBadges.length).toBeGreaterThan(0)
 
-      const viewerBadges = screen.getAllByText('viewer')
+      const viewerBadges = screen.getAllByText(i18n.t('auth:roles.viewer'))
       expect(viewerBadges.length).toBeGreaterThan(0)
     })
 
@@ -632,7 +632,7 @@ describe('UsersView', () => {
 
       renderWithProviders(<UsersView />)
 
-      const addButton = screen.getByRole('button', { name: new RegExp(`${i18n.t('common:add')}.*${i18n.t('auth:createUser')}`) })
+      const addButton = screen.getByRole('button', { name: i18n.t('auth:addUser') })
       expect(addButton).toBeInTheDocument()
     })
   })
@@ -656,7 +656,7 @@ describe('UsersView', () => {
       const user = userEvent.setup()
       renderWithProviders(<UsersView />)
 
-      await user.click(screen.getByRole('button', { name: new RegExp(`${i18n.t('common:add')}.*${i18n.t('auth:createUser')}`) }))
+      await user.click(screen.getByRole('button', { name: i18n.t('auth:addUser') }))
       await user.type(screen.getByRole('textbox'), 'newuser')
 
       const passwordInputs = screen.getAllByDisplayValue('')
@@ -691,7 +691,7 @@ describe('UsersView', () => {
       const user = userEvent.setup()
       renderWithProviders(<UsersView />)
 
-      await user.click(screen.getByRole('button', { name: new RegExp(`${i18n.t('common:add')}.*${i18n.t('auth:createUser')}`) }))
+      await user.click(screen.getByRole('button', { name: i18n.t('auth:addUser') }))
       await user.type(screen.getByRole('textbox'), 'existinguser')
 
       const passwordInputs = screen.getAllByDisplayValue('')
@@ -821,7 +821,7 @@ describe('UsersView', () => {
       const user = userEvent.setup()
       renderWithProviders(<UsersView />)
 
-      const addButton = screen.getByRole('button', { name: new RegExp(`${i18n.t('common:add')}.*${i18n.t('auth:createUser')}`) })
+      const addButton = screen.getByRole('button', { name: i18n.t('auth:addUser') })
       await user.click(addButton)
 
       expect(screen.getByRole('heading', { name: i18n.t('auth:createUser') })).toBeInTheDocument()
@@ -831,5 +831,74 @@ describe('UsersView', () => {
 
       expect(screen.queryByRole('heading', { name: i18n.t('auth:createUser') })).not.toBeInTheDocument()
     })
+  })
+})
+
+describe('UsersView presentation (T11)', () => {
+  const mockUsers = (users: User[]) =>
+    vi.mocked(useUsersDataModule.useUsersData).mockReturnValue({
+      users,
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    })
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(useAuthModule.useAuth).mockReturnValue(
+      buildAuthMock({
+        isAuthenticated: true,
+        isInitialized: true,
+        user: buildUserMock({ id: 'admin-1', username: 'admin', role: 'admin' }),
+      })
+    )
+  })
+
+  it('labels the add button "Add user", once', () => {
+    mockUsers([mockAdminUser])
+    renderWithProviders(<UsersView />)
+
+    expect(screen.getByRole('button', { name: 'Add user' })).toHaveTextContent(/^Add user$/)
+  })
+
+  it('shows each role as a catalog-labelled chip, not the raw role value', () => {
+    mockUsers([mockAdminUser, mockViewerUser])
+    renderWithProviders(<UsersView />)
+
+    const [, adminRow, viewerRow] = screen.getAllByRole('row')
+    expect(within(adminRow).getByRole('status')).toHaveTextContent(/^Admin$/)
+    expect(within(viewerRow).getByRole('status')).toHaveTextContent(/^Viewer$/)
+    expect(i18n.t('auth:roles.admin')).toBe('Admin')
+    expect(i18n.t('auth:roles.viewer')).toBe('Viewer')
+  })
+
+  it('keeps Delete disabled on your own account and says why', () => {
+    mockUsers([mockAdminUser, mockAnotherAdminUser])
+    renderWithProviders(<UsersView />)
+
+    const [, ownRow, otherRow] = screen.getAllByRole('row')
+    const ownDelete = within(ownRow).getByRole('button', { name: 'Delete' })
+    expect(ownDelete).toBeDisabled()
+    expect(ownDelete).toHaveAccessibleDescription("You can't delete your own account.")
+    expect(within(ownRow).getByText("You can't delete your own account.")).toBeVisible()
+
+    const otherDelete = within(otherRow).getByRole('button', { name: 'Delete' })
+    expect(otherDelete).toBeEnabled()
+    expect(otherDelete).not.toHaveAccessibleDescription()
+  })
+
+  it('names the user in the danger delete confirmation', async () => {
+    mockUsers([mockAdminUser, mockViewerUser])
+    const user = userEvent.setup()
+    renderWithProviders(<UsersView />)
+
+    const [, , viewerRow] = screen.getAllByRole('row')
+    await user.click(within(viewerRow).getByRole('button', { name: 'Delete' }))
+
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByRole('heading', { name: 'Delete user viewer?' })).toBeInTheDocument()
+    expect(dialog).toHaveTextContent('viewer is removed and can no longer sign in to NRCC. This cannot be undone.')
+    expect(authService.deleteUser).not.toHaveBeenCalled()
   })
 })

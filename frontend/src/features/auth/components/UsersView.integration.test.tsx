@@ -80,7 +80,7 @@ describe('UsersView access administration integration', () => {
     renderAccessManagement()
     await screen.findAllByText('viewer')
 
-    await user.click(screen.getByRole('button', { name: new RegExp(`${i18n.t('common:add')}.*${i18n.t('auth:createUser')}`) }))
+    await user.click(screen.getByRole('button', { name: i18n.t('auth:addUser') }))
     await user.type(screen.getByRole('textbox'), 'new-user')
     const passwordInput = screen.getAllByDisplayValue('').find(
       (element) => element instanceof HTMLInputElement && element.type === 'password',
