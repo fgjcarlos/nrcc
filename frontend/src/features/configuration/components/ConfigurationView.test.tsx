@@ -328,6 +328,25 @@ describe('ConfigurationView (issue #762 — Security tab for credentialSecret / 
     expect(secretInput.value).toBe('final-rotation-passphrase');
   });
 
+  // PRODUCT.md: secrets are masked before any diff is shown.
+  it('prints typed secrets in the review drawer as the redaction marker', async () => {
+    const user = userEvent.setup();
+    renderConfiguration();
+
+    await user.click(await screen.findByRole('tab', { name: /^TLS & Secrets$/ }));
+    await user.type(screen.getByLabelText('Credential Secret (credentialSecret)'), 'typed-credential-secret');
+    await user.type(screen.getByLabelText('Private Key Passphrase (https.passphrase)'), 'typed-key-passphrase');
+    await user.click(reviewAction());
+    const panel = await screen.findByTestId('review-changes-panel');
+
+    for (const id of ['credentialSecret', 'httpsPassphrase']) {
+      const values = within(within(panel).getByTestId(`review-changes-panel-row-${id}`)).getAllByText(/^(—|\[redacted\])$/);
+      expect(values.map((v) => v.textContent)).toEqual(['—', '[redacted]']);
+    }
+    expect(document.body.textContent).not.toContain('typed-credential-secret');
+    expect(document.body.textContent).not.toContain('typed-key-passphrase');
+  });
+
   // Rotation is opt-in: blank credentialSecret must NOT be sent.
   it('omits credentialSecret from the save payload when the rotation field is blank', async () => {
     const user = userEvent.setup();

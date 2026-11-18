@@ -1,5 +1,6 @@
 import type { TFunction } from 'i18next';
 import type { ReviewEntry } from '@/features/configuration/components/ReviewChangesPanel';
+import { REDACTED_SECRET } from '@/shared/lib/redaction';
 
 /**
  * Review rows for the Security surfaces (P1 #1): what an apply would change
@@ -12,7 +13,6 @@ import type { ReviewEntry } from '@/features/configuration/components/ReviewChan
  *
  * Every row restarts Node-RED: it reads its auth settings only at start.
  */
-export const REDACTED_SECRET = '[redacted]';
 
 type T = TFunction;
 type Permission = '*' | 'read';

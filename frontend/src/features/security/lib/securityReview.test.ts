@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { TFunction } from 'i18next';
-import { adminAuthReview, basicAuthReview, enablesAdminAuth, migrationRows, REDACTED_SECRET } from './securityReview';
+import { REDACTED_SECRET } from '@/shared/lib/redaction';
+import { adminAuthReview, basicAuthReview, enablesAdminAuth, migrationRows } from './securityReview';
 
 const t = ((key: string) => key) as unknown as TFunction;
 const HASH = '$2b$10$storedhash';

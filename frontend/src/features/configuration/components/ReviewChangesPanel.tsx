@@ -8,6 +8,7 @@ import type {
   RestartSeverity,
 } from '../hooks/useConfigurationDiff';
 import type { NodeRedConfigFormData } from '@/shared/types';
+import { redactSecret } from '@/shared/lib/redaction';
 import { FIELD_LABELS, SETTINGS_KEYS } from '../lib/fieldLabels';
 import { SettingKey } from './FormFields';
 
@@ -69,7 +70,14 @@ export interface ReviewChangesPanelProps {
   onCancel: () => void;
 }
 
-/** The pending fields of a settings form diff as drawer rows. */
+/**
+ * Form fields that carry a secret; mirrors the write-only fields of
+ * `NodeRedConfig.RedactedSecrets` in internal/model/config_secrets.go.
+ * The https key/cert/ca fields are file paths, not secret material.
+ */
+const SECRET_FIELDS = new Set<keyof NodeRedConfigFormData>(['credentialSecret', 'httpsPassphrase']);
+
+/** The pending fields of a settings form diff as drawer rows, secrets redacted. */
 function pendingEntries(fields: ConfigurationDiff | undefined): ReviewEntry[] {
   if (!fields) return [];
   return (Object.keys(fields) as Array<keyof NodeRedConfigFormData>)
@@ -79,8 +87,8 @@ function pendingEntries(fields: ConfigurationDiff | undefined): ReviewEntry[] {
       settingsKey: SETTINGS_KEYS[key] ?? key,
       label: FIELD_LABELS[key] ?? key,
       restart: fields[key].restart,
-      configuredValue: fields[key].configuredValue,
-      formValue: fields[key].formValue,
+      configuredValue: SECRET_FIELDS.has(key) ? redactSecret(fields[key].configuredValue) : fields[key].configuredValue,
+      formValue: SECRET_FIELDS.has(key) ? redactSecret(fields[key].formValue) : fields[key].formValue,
       invalid: fields[key].validation.state === 'invalid',
     }));
 }
