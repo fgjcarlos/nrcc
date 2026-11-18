@@ -100,6 +100,8 @@ var routeAuthz = map[string]authzLevel{
 	"POST /api/dashboards/access":                authzAdmin,
 	"GET /api/settings/raw":                      authzAdmin,
 	"POST /api/settings/raw":                     authzAdmin,
+	"GET /api/presets/":                          authzAdmin,
+	"POST /api/presets/{id}/preview":             authzAdmin,
 	"POST /api/backups/":                         authzAdmin,
 	"POST /api/backups/config":                   authzAdmin,
 	"GET /api/backups/provider/snapshots":        authzAdmin,
