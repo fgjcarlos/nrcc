@@ -76,7 +76,7 @@ export function SetupView() {
     <div className="auth-shell min-h-screen flex items-center justify-center px-4">
       <div className="surface-card w-full max-w-md space-y-6 border border-border p-8">
         <div className="text-center">
-          <p className="mb-2 text-xs uppercase tracking-[0.24em] text-base-content/50">{t('auth:setup.bootstrap')}</p>
+          <p className="mb-2 text-xs uppercase tracking-[0.24em] text-ds-text-muted">{t('auth:setup.bootstrap')}</p>
           <h1 className="text-2xl font-bold text-base-content">{t('common:productFullName')}</h1>
           <p className="mt-2 text-base-content/70">{t('auth:setup.initialSetup')}</p>
         </div>

@@ -233,7 +233,7 @@ export function HttpBasicAuthBoundaryCard({
           />
           {value.storedPass && (
             <p
-              className="mt-1 text-xs text-base-content/55"
+              className="mt-1 text-xs text-ds-text-muted"
               data-testid={`boundary-${surface}-stored-hash`}
             >
               {t(i18n('storedHashHint'), { hash: value.storedPass })}

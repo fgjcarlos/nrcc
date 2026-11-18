@@ -9,7 +9,7 @@ export function AnalysisResultView({ result }: AnalysisResultViewProps) {
     <div className="space-y-4">
       <div>
         <h3 className="mb-2 font-medium text-base-content">Summary</h3>
-        <p className="text-base-content/60">{result.summary}</p>
+        <p className="text-ds-text-secondary">{result.summary}</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -17,7 +17,7 @@ export function AnalysisResultView({ result }: AnalysisResultViewProps) {
            <h4 className="mb-2 font-medium text-success">Pros</h4>
            <ul className="space-y-1">
              {result.pros.map((pro, i) => (
-               <li key={i} className="flex items-start gap-2 text-sm text-base-content/60">
+               <li key={i} className="flex items-start gap-2 text-sm text-ds-text-secondary">
                  <span className="text-success">+</span> {pro}
                </li>
              ))}
@@ -28,7 +28,7 @@ export function AnalysisResultView({ result }: AnalysisResultViewProps) {
            <h4 className="mb-2 font-medium text-error">Cons</h4>
            <ul className="space-y-1">
              {result.cons.map((con, i) => (
-               <li key={i} className="flex items-start gap-2 text-sm text-base-content/60">
+               <li key={i} className="flex items-start gap-2 text-sm text-ds-text-secondary">
                  <span className="text-error">-</span> {con}
                </li>
              ))}
@@ -39,7 +39,7 @@ export function AnalysisResultView({ result }: AnalysisResultViewProps) {
            <h4 className="mb-2 font-medium text-info">Suggestions</h4>
            <ul className="space-y-1">
              {result.suggestions.map((sug, i) => (
-               <li key={i} className="flex items-start gap-2 text-sm text-base-content/60">
+               <li key={i} className="flex items-start gap-2 text-sm text-ds-text-secondary">
                  <span className="text-info">→</span> {sug}
                </li>
              ))}

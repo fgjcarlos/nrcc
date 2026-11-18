@@ -66,7 +66,7 @@ export function DotenvEditor() {
       <div className="flex justify-between items-start">
         <div>
           <h2 className="text-lg font-semibold text-base-content">{t('env-vars:dotenvTitle')}</h2>
-          <p className="text-sm text-base-content/60 mt-1">
+          <p className="text-sm text-ds-text-muted mt-1">
             {t('env-vars:editorHelpText')}
           </p>
         </div>

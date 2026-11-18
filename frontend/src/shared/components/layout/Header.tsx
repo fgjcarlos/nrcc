@@ -56,7 +56,7 @@ export function Header() {
           <div className="flex min-w-0 items-center gap-3">
             <NrccMark tone="accent" size="md" />
             <div className="min-w-0 leading-tight">
-              <span className="block text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-base-content/55">{t('common:productShortName')}</span>
+              <span className="block text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-ds-text-muted">{t('common:productShortName')}</span>
               <span className="block truncate text-sm font-semibold text-base-content sm:text-base">{t('common:productFullName')}</span>
             </div>
           </div>

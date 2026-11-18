@@ -89,13 +89,13 @@ export function UserMenu({ user, onLogout, logoutBusy = false }: UserMenuProps) 
         <span className="min-w-0 flex-1 text-left">
           <span className="block truncate text-sm font-semibold text-base-content">{user.username}</span>
           {' '}
-          <span className="block text-xs text-base-content/50 capitalize">{user.role}</span>
+          <span className="block text-xs text-ds-text-muted capitalize">{user.role}</span>
         </span>
         {' '}
         <span className="sr-only">{t('common:openUserMenu')}</span>
         <ChevronDown
           aria-hidden="true"
-          className={`h-4 w-4 shrink-0 text-base-content/40 transition-transform duration-150 ${open ? 'rotate-180' : ''}`}
+          className={`h-4 w-4 shrink-0 text-ds-text-muted transition-transform duration-150 ${open ? 'rotate-180' : ''}`}
         />
       </button>
 
@@ -106,7 +106,7 @@ export function UserMenu({ user, onLogout, logoutBusy = false }: UserMenuProps) 
            className="absolute bottom-full left-0 mb-2 w-full rounded-xl border border-base-300/60 bg-base-200 shadow-lg transition-all duration-150 origin-bottom animate-slide-up"
          >
            <div className="border-b border-base-300/50 px-4 py-3">
-             <p className="text-xs text-base-content/50 uppercase tracking-widest">{t('common:signedInAs')}</p>
+             <p className="text-xs text-ds-text-muted uppercase tracking-widest">{t('common:signedInAs')}</p>
              <p className="mt-0.5 font-semibold text-base-content">{user.username}</p>
            </div>
            <div className="p-2 space-y-1">

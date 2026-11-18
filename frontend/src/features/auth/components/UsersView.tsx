@@ -144,7 +144,7 @@ export function UsersView() {
     return (
       <div className="p-6">
         <h1 className="text-2xl font-bold text-base-content">{t('auth:accessDenied')}</h1>
-        <p className="mt-2 text-base-content/60">{t('auth:accessDeniedDescription')}</p>
+        <p className="mt-2 text-ds-text-secondary">{t('auth:accessDeniedDescription')}</p>
       </div>
     );
   }
@@ -168,7 +168,7 @@ export function UsersView() {
           {t('common:add')} {t('auth:createUser')}
         </button>
       </div>
-      <p className="text-sm text-base-content/60">{t('auth:userManagementSafetyNotice')}</p>
+      <p className="text-sm text-ds-text-secondary">{t('auth:userManagementSafetyNotice')}</p>
 
       {/* State container: loading, error, empty, or content */}
       <StateContainer
@@ -178,7 +178,7 @@ export function UsersView() {
         emptySlot={
           <div className="flex flex-col items-center justify-center gap-3 py-12">
             <p className="text-lg text-base-content">{t('auth:noUsersYet')}</p>
-            <p className="text-base-content/60">{t('auth:addFirstUser')}</p>
+            <p className="text-ds-text-muted">{t('auth:addFirstUser')}</p>
           </div>
         }
       >

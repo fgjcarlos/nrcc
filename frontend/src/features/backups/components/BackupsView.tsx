@@ -204,7 +204,7 @@ export function BackupsView() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">{t('backups:localBackupsLabel')}</p>
+          <p className="text-xs uppercase tracking-[0.24em] text-ds-text-muted">{t('backups:localBackupsLabel')}</p>
           <h1 className="text-2xl font-bold text-base-content">{t('backups:backupsTitle')}</h1>
           <p className="text-sm text-base-content/65">{t('backups:localBackupsSubtitle')}</p>
         </div>

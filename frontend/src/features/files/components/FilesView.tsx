@@ -50,7 +50,7 @@ export function FilesView() {
   const errorSlot = (
     <div className="rounded-2xl border border-error/30 bg-error/10 px-4 py-8 text-center">
       <p className="font-medium text-error">{t('files:loadFailed')}</p>
-      <p className="mt-1 text-sm text-base-content/60">{t('files:loadHint')}</p>
+      <p className="mt-1 text-sm text-ds-text-muted">{t('files:loadHint')}</p>
       <Button type="button" onClick={() => refetch()} variant="secondary" size="sm" className="mt-4">
         {t('common:retry')}
       </Button>
@@ -59,9 +59,9 @@ export function FilesView() {
 
   const emptySlot = (
     <div className="rounded-2xl border border-dashed border-border px-4 py-10 text-center">
-      <FileIcon className="mx-auto h-10 w-10 text-base-content/35" aria-hidden="true" />
+      <FileIcon className="mx-auto h-10 w-10 text-base-content/35" aria-hidden="true" />{/* contrast-ok: decorative icon, aria-hidden */}
       <p className="mt-3 font-medium text-base-content">{t('files:empty')}</p>
-      <p className="mt-1 text-sm text-base-content/60">{t('files:emptyHint')}</p>
+      <p className="mt-1 text-sm text-ds-text-muted">{t('files:emptyHint')}</p>
     </div>
   );
 
@@ -69,7 +69,7 @@ export function FilesView() {
     <div className="space-y-6 p-4 sm:p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs uppercase tracking-[0.28em] text-base-content/50">{t('files:storage')}</p>
+          <p className="text-xs uppercase tracking-[0.28em] text-ds-text-muted">{t('files:storage')}</p>
           <h1 className="text-3xl font-bold tracking-tight text-base-content">{t('files:title')}</h1>
           <p className="mt-2 max-w-2xl text-sm text-base-content/65">{t('files:description')}</p>
         </div>
@@ -121,7 +121,7 @@ export function FilesView() {
           >
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
-                <thead className="border-b border-border text-xs uppercase tracking-wide text-base-content/55">
+                <thead className="border-b border-border text-xs uppercase tracking-wide text-ds-text-muted">
                   <tr>
                     <th className="px-3 py-3 font-semibold">{t('files:name')}</th>
                     <th className="px-3 py-3 font-semibold">{t('files:size')}</th>
@@ -134,7 +134,7 @@ export function FilesView() {
                     <tr key={file.name}>
                       <td className="max-w-[18rem] px-3 py-4">
                         <div className="flex items-center gap-2">
-                          <FileIcon className="h-4 w-4 flex-shrink-0 text-base-content/45" aria-hidden="true" />
+                          <FileIcon className="h-4 w-4 flex-shrink-0 text-base-content/45" aria-hidden="true" />{/* contrast-ok: decorative icon beside the file name, aria-hidden */}
                           <span className="truncate font-mono text-sm text-base-content" title={file.name}>{file.name}</span>
                         </div>
                       </td>

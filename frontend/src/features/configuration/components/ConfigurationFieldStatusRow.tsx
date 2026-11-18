@@ -36,17 +36,17 @@ export function ConfigurationFieldStatusRow({
         {formatValue(diff.configuredValue)}
       </td>
       <td className="text-sm text-base-content/75" data-testid="configuration-field-status-effective">
-        <span className="block text-xs text-base-content/50">{diff.effectiveLabel}</span>
+        <span className="block text-xs text-ds-text-muted">{diff.effectiveLabel}</span>
         {formatValue(diff.effectiveValue)}
       </td>
-      <td className="text-xs uppercase tracking-wide text-base-content/55">
+      <td className="text-xs uppercase tracking-wide text-ds-text-muted">
         {t(`configuration:fieldStatus.source.${diff.source === 'settings.js' ? 'settingsJs' : 'formDefault'}`)}
       </td>
       <td data-testid="configuration-field-status-validation" data-state={diff.validation.state}>
         {diff.validation.state === 'invalid' && diff.validation.message ? (
           <span className="text-warning">{diff.validation.message}</span>
         ) : diff.validation.state === 'pending' ? (
-          <span className="text-base-content/55">{t('configuration:fieldStatus.validation.pending')}</span>
+          <span className="text-ds-text-muted">{t('configuration:fieldStatus.validation.pending')}</span>
         ) : (
           <span className="text-success">{t('configuration:fieldStatus.validation.valid')}</span>
         )}
@@ -57,7 +57,7 @@ export function ConfigurationFieldStatusRow({
             {t('configuration:fieldStatus.pending.changed')}
           </span>
         ) : (
-          <span className="text-base-content/40">—</span>
+          <span className="text-ds-text-muted">—</span>
         )}
       </td>
       <td data-testid="configuration-field-status-restart" data-severity={diff.restart}>
@@ -70,7 +70,7 @@ export function ConfigurationFieldStatusRow({
             {t('configuration:fieldStatus.restart.soft')}
           </span>
         ) : (
-          <span className="text-base-content/40">—</span>
+          <span className="text-ds-text-muted">—</span>
         )}
       </td>
     </tr>

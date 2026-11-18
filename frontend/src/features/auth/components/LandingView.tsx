@@ -109,7 +109,7 @@ function CapabilityCard({ capability }: { capability: Capability }) {
 function SignalMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl border border-border bg-base-100/60 p-4">
-      <dt className="text-xs uppercase tracking-[0.2em] text-base-content/50">{label}</dt>
+      <dt className="text-xs uppercase tracking-[0.2em] text-ds-text-muted">{label}</dt>
       <dd className="mt-2 text-2xl font-semibold text-base-content">{value}</dd>
     </div>
   );
@@ -213,7 +213,7 @@ export function LandingView() {
             </div>
             <div>
               <p className="text-sm font-semibold text-base-content">NRCC</p>
-              <p className="text-xs uppercase tracking-[0.2em] text-base-content/50">{t('common:productShortName')}</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-ds-text-muted">{t('common:productShortName')}</p>
             </div>
           </div>
 
@@ -272,7 +272,7 @@ export function LandingView() {
                   {t('auth:landing.viewCapabilities')}
                 </a>
               </div>
-              <p id="landing-primary-action-help" className="mt-3 text-sm text-base-content/60">
+              <p id="landing-primary-action-help" className="mt-3 text-sm text-ds-text-muted">
                 {authState === 'setup-required'
                   ? t('auth:landing.setupHelp')
                   : primaryActionHelp}
@@ -293,7 +293,7 @@ export function LandingView() {
               <div className="relative">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">{t('auth:landing.platformStatus')}</p>
+                    <p className="text-xs uppercase tracking-[0.24em] text-ds-text-muted">{t('auth:landing.platformStatus')}</p>
                     <h2 className="mt-2 text-2xl font-bold text-base-content">{t('auth:landing.readyToOperate')}</h2>
                   </div>
                   <div className="rounded-2xl border border-success/30 bg-success/10 p-3 text-success">

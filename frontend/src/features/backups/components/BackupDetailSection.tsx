@@ -40,7 +40,7 @@ export function BackupDetailSection(props: BackupDetailSectionProps) {
           <h3 className="text-lg font-semibold text-base-content">{t('backups:backupDetailTitle')}</h3>
           <p className="text-sm text-base-content/65">{getBackupSummary(backup, typeLabels)}</p>
         </div>
-        <button onClick={onClose} className="icon-button text-base-content/60 hover:text-base-content">
+        <button onClick={onClose} className="icon-button text-ds-text-muted hover:text-base-content">
           <X className="h-5 w-5" />
         </button>
       </div>
@@ -49,7 +49,7 @@ export function BackupDetailSection(props: BackupDetailSectionProps) {
       {isLoading && !detail ? (
         <div className="flex items-center justify-center py-8">
           <div className="text-center">
-            <LoaderCircle className="mx-auto mb-3 h-10 w-10 animate-spin text-base-content/40" />
+            <LoaderCircle className="mx-auto mb-3 h-10 w-10 animate-spin text-ds-text-muted" />
             <p className="text-sm text-base-content/65">{t('backups:loadingDetail')}</p>
           </div>
         </div>
@@ -57,7 +57,7 @@ export function BackupDetailSection(props: BackupDetailSectionProps) {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border text-left text-xs text-base-content/60">
+              <tr className="border-b border-border text-left text-xs text-ds-text-muted">
                 <th className="py-3 pr-4">{t('backups:filePath')}</th>
                 <th className="py-3 pr-4 text-right">{t('backups:fileSize')}</th>
                 <th className="py-3 pr-4">{t('backups:fileChecksum')}</th>
@@ -68,7 +68,7 @@ export function BackupDetailSection(props: BackupDetailSectionProps) {
                 <tr key={idx} className="border-b border-border/50 hover:bg-base-200/15">
                   <td className="py-2 pr-4 font-mono text-base-content">{file.path}</td>
                   <td className="py-2 pr-4 text-right text-base-content/70">{formatBackupSize(file.size)}</td>
-                  <td className="py-2 pr-4 font-mono text-xs text-base-content/50">{file.checksum.slice(0, 16)}…</td>
+                  <td className="py-2 pr-4 font-mono text-xs text-ds-text-secondary">{file.checksum.slice(0, 16)}…</td>
                 </tr>
               ))}
             </tbody>

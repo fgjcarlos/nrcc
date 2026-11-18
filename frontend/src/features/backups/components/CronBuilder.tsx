@@ -214,7 +214,7 @@ export function CronBuilder({
                   validationError ? 'border-error focus:ring-error/50' : 'border-border focus:ring-primary/50'
                 }`}
               />
-              <p className="text-xs text-base-content/55">
+              <p className="text-xs text-ds-text-muted">
                 {t('backups:cronFormatHint')}
               </p>
             </label>
@@ -231,7 +231,7 @@ export function CronBuilder({
         <div className="flex items-center justify-between gap-3 pt-2">
           <div className="flex items-center gap-2">
             {saveState === 'saving' && (
-              <div className="flex items-center gap-2 text-sm text-base-content/60">
+              <div className="flex items-center gap-2 text-sm text-ds-text-muted">
                 <div className="h-3 w-3 rounded-full bg-primary/60 animate-pulse" />
                 {t('common:saving')}
               </div>

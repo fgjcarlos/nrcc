@@ -97,13 +97,13 @@ export function BackupHealthTile({ backups }: BackupHealthTileProps) {
           )}
           data-testid="overview-backup-last-name"
         >
-          <div className="text-base-content/45 uppercase tracking-[0.18em]">
+          <div className="text-ds-text-muted uppercase tracking-[0.18em]">
             {t('dashboard:overviewTiles.backupHealth.lastBackup')}
           </div>
           <div className="mt-1.5 truncate text-base font-semibold text-base-content">
             {latestBackup?.name ?? t('dashboard:overviewTiles.backupHealth.never')}
           </div>
-          <p className="mt-0.5 text-base-content/55">
+          <p className="mt-0.5 text-ds-text-muted">
             {latestBackup ? formatDate(latestBackup.createdAt, t) : t('dashboard:overviewTiles.backupHealth.noSnapshotsYet')}
           </p>
         </div>
@@ -111,13 +111,13 @@ export function BackupHealthTile({ backups }: BackupHealthTileProps) {
           className="rounded-xl border border-border/60 bg-base-200/30 px-3 py-3 text-xs"
           data-testid="overview-backup-last-automatic"
         >
-          <div className="text-base-content/45 uppercase tracking-[0.18em]">
+          <div className="text-ds-text-muted uppercase tracking-[0.18em]">
             {t('dashboard:overviewTiles.backupHealth.lastAutomatic')}
           </div>
           <div className="mt-1.5 text-base font-semibold text-base-content">
             {formatDate(scheduler?.lastSuccessAt, t)}
           </div>
-          <p className="mt-0.5 text-base-content/55">
+          <p className="mt-0.5 text-ds-text-muted">
             {scheduler?.lastBackupId
               ? `${t('dashboard:overviewTiles.backupHealth.backupIdPrefix')} ${scheduler.lastBackupId}`
               : t('dashboard:overviewTiles.backupHealth.noAutomaticRuns')}
@@ -127,13 +127,13 @@ export function BackupHealthTile({ backups }: BackupHealthTileProps) {
           className="rounded-xl border border-border/60 bg-base-200/30 px-3 py-3 text-xs"
           data-testid="overview-backup-storage"
         >
-          <div className="text-base-content/45 uppercase tracking-[0.18em]">
+          <div className="text-ds-text-muted uppercase tracking-[0.18em]">
             {t('dashboard:overviewTiles.backupHealth.storageUsed')}
           </div>
           <div className="mt-1.5 text-base font-semibold text-base-content">
             {storage ? formatBytes(storage.totalSize) : t('dashboard:overviewTiles.backupHealth.unknownDate')}
           </div>
-          <p className="mt-0.5 text-base-content/55">
+          <p className="mt-0.5 text-ds-text-muted">
             {storage
               ? `${storage.totalBackups} ${t('dashboard:overviewTiles.backupHealth.countSuffix')}`
               : t('dashboard:overviewTiles.backupHealth.unknownDate')}

@@ -76,7 +76,7 @@ function RouteLoadingFallback({ label }: { label: string }) {
       <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden="true" />
       <div>
         <p className="font-medium text-base-content">{t('common:loadingWithLabel', { label })}</p>
-        <p className="text-sm text-base-content/60">{t('common:preparingSection')}</p>
+        <p className="text-sm text-ds-text-muted">{t('common:preparingSection')}</p>
       </div>
     </div>
   );

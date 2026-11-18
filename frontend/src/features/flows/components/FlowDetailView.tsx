@@ -63,7 +63,7 @@ export function FlowDetailView() {
   if (flowError) {
     return (
       <div className="p-6 space-y-4">
-        <p className="text-base-content/60">{t('flows:loadFailed')}</p>
+        <p className="text-ds-text-muted">{t('flows:loadFailed')}</p>
         <div className="flex items-center gap-3">
           <button onClick={() => refetchFlow()} className="action-btn-primary">
             {t('common:tryAgain')}
@@ -80,7 +80,7 @@ export function FlowDetailView() {
   if (!flow) {
     return (
       <div className="p-6">
-        <p className="text-base-content/60">{t('flows:flowNotFound')}</p>
+        <p className="text-ds-text-muted">{t('flows:flowNotFound')}</p>
       </div>
     );
   }
@@ -148,7 +148,7 @@ export function FlowDetailView() {
         </div>
 
         {!aiCapability.isReady && (
-          <p className="text-sm text-base-content/60" aria-live="polite">
+          <p className="text-sm text-ds-text-muted" aria-live="polite">
             {aiCapability.message}
             {canConfigureAI && (
               <Link to="/configuration" className="ml-2 text-primary underline underline-offset-2">
@@ -160,14 +160,14 @@ export function FlowDetailView() {
 
         {/* Analyze Flow Result */}
         {analyzeFlowMutation.isPending ? (
-          <div className="flex items-center gap-2 text-base-content/60">
+          <div className="flex items-center gap-2 text-ds-text-muted">
             <Loader2 className="w-5 h-5 animate-spin" />
             {t('flows:analyzing')}
           </div>
         ) : analyzeFlowMutation.data ? (
           <AnalysisResultView result={analyzeFlowMutation.data} />
         ) : (
-          <p className="text-base-content/60">
+          <p className="text-ds-text-muted">
             {t('flows:analyzePrompt')}
           </p>
         )}
@@ -185,7 +185,7 @@ export function FlowDetailView() {
             <Bot className="h-5 w-5" />
             {t('flows:aiCopilotTitle')}
           </h2>
-          <p className="mt-1 text-sm text-base-content/60">
+          <p className="mt-1 text-sm text-ds-text-secondary">
             Review-first actions are available only when AI is explicitly configured. Secrets are redacted before requests leave this host; generated JSON is never auto-applied.
           </p>
         </div>
@@ -267,7 +267,7 @@ export function FlowDetailView() {
       <div className="surface-card p-6">
         <button
           onClick={() => setShowRawJson(!showRawJson)}
-          className="text-sm text-base-content/60 transition-colors hover:text-base-content"
+          className="text-sm text-ds-text-muted transition-colors hover:text-base-content"
         >
           {showRawJson ? t('common:hide') : t('common:show')} {t('flows:rawJson')}
         </button>

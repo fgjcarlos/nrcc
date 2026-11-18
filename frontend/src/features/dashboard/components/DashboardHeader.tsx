@@ -19,7 +19,7 @@ export function DashboardHeader(_props: DashboardHeaderProps) {
   return (
     <div className="flex items-end justify-between gap-4">
       <div>
-        <p className="text-xs uppercase tracking-[0.28em] text-base-content/50">{t('dashboard:systemOverview')}</p>
+        <p className="text-xs uppercase tracking-[0.28em] text-ds-text-muted">{t('dashboard:systemOverview')}</p>
         <h1 className="text-3xl font-bold tracking-tight text-base-content">{t('dashboard:overview')}</h1>
       </div>
       <div className="flex items-center gap-2">

@@ -37,12 +37,12 @@ const NodeRedEnvironmentCard = ({ env }: { env: NodeRedEnvironment }) => {
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <p className="text-xs uppercase tracking-wider text-base-content/50 mb-1">{t('bootstrap:mode')}</p>
+          <p className="text-xs uppercase tracking-wider text-ds-text-muted mb-1">{t('bootstrap:mode')}</p>
           <p className={cn('text-lg font-semibold', modeColor)}>{modeLabel}</p>
         </div>
         
         <div>
-          <p className="text-xs uppercase tracking-wider text-base-content/50 mb-1">{t('bootstrap:status')}</p>
+          <p className="text-xs uppercase tracking-wider text-ds-text-muted mb-1">{t('bootstrap:status')}</p>
           <div className="flex items-center gap-2">
             {env.running ? (
               <>
@@ -60,14 +60,14 @@ const NodeRedEnvironmentCard = ({ env }: { env: NodeRedEnvironment }) => {
 
         {env.version && (
           <div>
-            <p className="text-xs uppercase tracking-wider text-base-content/50 mb-1">{t('bootstrap:version')}</p>
+            <p className="text-xs uppercase tracking-wider text-ds-text-muted mb-1">{t('bootstrap:version')}</p>
             <p className="text-sm text-base-content">{env.version}</p>
           </div>
         )}
 
         {env.settingsPath && (
           <div>
-            <p className="text-xs uppercase tracking-wider text-base-content/50 mb-1">{t('bootstrap:settingsPath')}</p>
+            <p className="text-xs uppercase tracking-wider text-ds-text-muted mb-1">{t('bootstrap:settingsPath')}</p>
             <p className="text-xs text-base-content/70 truncate font-mono" title={env.settingsPath}>
               {env.settingsPath}
             </p>
@@ -76,7 +76,7 @@ const NodeRedEnvironmentCard = ({ env }: { env: NodeRedEnvironment }) => {
 
         {env.userDir && (
           <div>
-            <p className="text-xs uppercase tracking-wider text-base-content/50 mb-1">{t('bootstrap:userDirectory')}</p>
+            <p className="text-xs uppercase tracking-wider text-ds-text-muted mb-1">{t('bootstrap:userDirectory')}</p>
             <p className="text-xs text-base-content/70 truncate font-mono" title={env.userDir}>
               {env.userDir}
             </p>
@@ -85,7 +85,7 @@ const NodeRedEnvironmentCard = ({ env }: { env: NodeRedEnvironment }) => {
 
         {env.containerName && (
           <div>
-            <p className="text-xs uppercase tracking-wider text-base-content/50 mb-1">{t('bootstrap:containerName')}</p>
+            <p className="text-xs uppercase tracking-wider text-ds-text-muted mb-1">{t('bootstrap:containerName')}</p>
             <p className="text-sm text-base-content font-mono">{env.containerName}</p>
           </div>
         )}
@@ -105,19 +105,19 @@ const SettingsCard = ({ settings }: { settings: SettingsDocument }) => {
 
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div>
-        <p className="text-xs uppercase tracking-wider text-base-content/50 mb-1">{t('bootstrap:path')}</p>
+        <p className="text-xs uppercase tracking-wider text-ds-text-muted mb-1">{t('bootstrap:path')}</p>
         <p className="text-xs text-base-content/70 truncate font-mono" title={settings.path}>
           {settings.path}
         </p>
       </div>
 
       <div>
-        <p className="text-xs uppercase tracking-wider text-base-content/50 mb-1">{t('bootstrap:source')}</p>
+        <p className="text-xs uppercase tracking-wider text-ds-text-muted mb-1">{t('bootstrap:source')}</p>
         <p className="text-sm text-base-content">{settings.source}</p>
       </div>
 
       <div>
-        <p className="text-xs uppercase tracking-wider text-base-content/50 mb-1">{t('bootstrap:writable')}</p>
+        <p className="text-xs uppercase tracking-wider text-ds-text-muted mb-1">{t('bootstrap:writable')}</p>
         <div className="flex items-center gap-2">
           {settings.writable ? (
             <>
@@ -135,7 +135,7 @@ const SettingsCard = ({ settings }: { settings: SettingsDocument }) => {
 
       {settings.backupPath && (
         <div>
-          <p className="text-xs uppercase tracking-wider text-base-content/50 mb-1">{t('bootstrap:backupPath')}</p>
+          <p className="text-xs uppercase tracking-wider text-ds-text-muted mb-1">{t('bootstrap:backupPath')}</p>
           <p className="text-xs text-base-content/70 truncate font-mono" title={settings.backupPath}>
             {settings.backupPath}
           </p>
@@ -178,7 +178,7 @@ export function BootstrapView() {
       {/* Header */}
       <div className="flex items-end justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-[0.28em] text-base-content/50">{t('bootstrap:systemLabel')}</p>
+          <p className="text-xs uppercase tracking-[0.28em] text-ds-text-muted">{t('bootstrap:systemLabel')}</p>
           <h1 className="text-3xl font-bold tracking-tight text-base-content">{t('bootstrap:bootstrapTitle')}</h1>
         </div>
       </div>
@@ -210,12 +210,12 @@ export function BootstrapView() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <p className="text-xs uppercase tracking-wider text-base-content/50 mb-1">{t('bootstrap:platform')}</p>
+                <p className="text-xs uppercase tracking-wider text-ds-text-muted mb-1">{t('bootstrap:platform')}</p>
                 <p className="text-lg font-semibold text-base-content">{hostStatus.platform}</p>
               </div>
 
               <div>
-                <p className="text-xs uppercase tracking-wider text-base-content/50 mb-1">{t('bootstrap:overallStatus')}</p>
+                <p className="text-xs uppercase tracking-wider text-ds-text-muted mb-1">{t('bootstrap:overallStatus')}</p>
                 <div className="flex items-center gap-2">
                   {hostStatus.ready ? (
                     <>

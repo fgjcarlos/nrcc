@@ -132,7 +132,7 @@ export function EnvVarsView() {
     <div className="space-y-6 p-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">{t('env-vars:secretsLabel')}</p>
+          <p className="text-xs uppercase tracking-[0.24em] text-ds-text-muted">{t('env-vars:secretsLabel')}</p>
           <h1 className="text-2xl font-bold text-base-content">{t('env-vars:pageTitle')}</h1>
         </div>
         {activeTab === 'table' && (
