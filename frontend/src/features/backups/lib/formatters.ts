@@ -9,15 +9,15 @@ export function isValidDate(value: string | null | undefined): boolean {
 }
 
 /**
- * Formats a backup creation date to locale string
- * Returns 'Fecha no disponible' if the date is invalid
+ * Formats a backup date for the active UI locale (medium date, short time).
+ * Returns null for an invalid date so the caller can show catalog copy.
  */
-export function formatBackupDate(value: string | null | undefined): string {
+export function formatBackupDate(value: string | null | undefined, locale?: string): string | null {
   if (!isValidDate(value)) {
-    return 'Fecha no disponible';
+    return null;
   }
 
-  return new Date(value as string).toLocaleString();
+  return new Date(value as string).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
 /**
@@ -64,14 +64,6 @@ export function getBackupFileLabel(backup: BackupSummary): string {
     ? new Date(backup.createdAt).toISOString().slice(0, 19).replace(/[:T]/g, '-')
     : 'backup';
   return `backup-${date}-${backup.id.slice(0, 8)}.zip`;
-}
-
-/**
- * Generates a backup summary string with type, date, and size
- * Format: '{type} · {date} · {size}'
- */
-export function getBackupSummary(backup: BackupSummary, typeLabels: Record<BackupSummary['type'], string>): string {
-  return [typeLabels[backup.type], formatBackupDate(backup.createdAt), formatBackupSize(backup.totalSize)].join(' · ');
 }
 
 /**

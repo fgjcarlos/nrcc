@@ -94,9 +94,9 @@ test.describe('Issue #889 — modal keyboard behaviour', () => {
     await trigger.focus()
     await page.keyboard.press('Enter')
 
-    const dialog = page.getByRole('dialog', { name: 'Restaurar backup' })
+    const dialog = page.getByRole('dialog', { name: 'Restore backup' })
     await expect(dialog).toBeVisible()
-    await expect(dialog.locator('input[placeholder="backup-001"]')).toBeFocused()
+    await expect(dialog.getByLabel('Type "restore" to confirm')).toBeFocused()
 
     for (let i = 0; i < 6; i += 1) {
       await page.keyboard.press(i % 2 === 0 ? 'Tab' : 'Shift+Tab')

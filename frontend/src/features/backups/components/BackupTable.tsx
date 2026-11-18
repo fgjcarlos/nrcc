@@ -3,6 +3,8 @@ import { cn, formatBytes } from '@/shared/lib';
 import type { BackupSummary } from '../services/backupService';
 import type { SortOrder } from '../types';
 import { useT } from '@/i18n';
+import { formatBackupDate } from '../lib/formatters';
+import { BackupTypeChip } from './BackupTypeChip';
 
 export interface BackupTableProps {
   items: BackupSummary[];
@@ -16,25 +18,6 @@ export interface BackupTableProps {
   onSort: (sort: 'date' | 'size' | 'status', order: SortOrder) => void;
 }
 
-const typeLabels: Record<BackupSummary['type'], string> = {
-  manual: 'Manual',
-  auto: 'Auto',
-  'pre-restore': 'Pre-restore',
-};
-
-const typeStyles: Record<BackupSummary['type'], string> = {
-  manual: 'bg-success/15 text-ds-on-tint-success',
-  auto: 'bg-info/15 text-ds-on-tint-info',
-  'pre-restore': 'bg-warning/15 text-ds-on-tint-warning',
-};
-
-function formatBackupDate(createdAt: string): string {
-  try {
-    return new Date(createdAt).toLocaleString();
-  } catch {
-    return 'Invalid date';
-  }
-}
 
 export function BackupTable({
   items,
@@ -47,7 +30,7 @@ export function BackupTable({
   onPageChange,
   onSort,
 }: BackupTableProps) {
-  const { t } = useT();
+  const { t, i18n } = useT();
   const totalPages = Math.ceil(total / limit);
   const hasPrevious = page > 1;
   const hasNext = page < totalPages;
@@ -113,13 +96,11 @@ export function BackupTable({
             {items.map((backup) => (
               <tr key={backup.id} className="hover:bg-muted/30 transition-colors">
                 <td className="px-4 py-3 text-sm text-foreground">
-                  {formatBackupDate(backup.createdAt)}
+                  {formatBackupDate(backup.createdAt, i18n.language) ?? t('backups:dateUnavailable')}
                 </td>
                 <td className="px-4 py-3 text-sm text-foreground">{backup.name}</td>
                 <td className="px-4 py-3 text-sm">
-                  <span className={cn('inline-block px-2 py-1 rounded text-xs font-medium', typeStyles[backup.type])}>
-                    {typeLabels[backup.type]}
-                  </span>
+                  <BackupTypeChip type={backup.type} />
                 </td>
                 <td className="px-4 py-3 text-sm text-foreground">
                   {formatBytes(backup.totalSize)}
@@ -135,14 +116,14 @@ export function BackupTable({
       {totalPages > 1 && (
         <div className="flex items-center justify-between px-4 py-2 border border-border rounded-lg">
           <span className="text-sm text-muted-foreground">
-            Page {page} of {totalPages}
+            {t('common:pageOf', { current: page, total: totalPages })}
           </span>
           <div className="flex gap-2">
             <button
               onClick={() => onPageChange(page - 1)}
               disabled={!hasPrevious}
               className="inline-flex items-center gap-1 px-3 py-1 rounded text-sm font-medium hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              aria-label="Previous page"
+              aria-label={t('common:previousPage')}
             >
               <ChevronLeft size={16} />
               {t('common:previousPage')}
@@ -151,7 +132,7 @@ export function BackupTable({
               onClick={() => onPageChange(page + 1)}
               disabled={!hasNext}
               className="inline-flex items-center gap-1 px-3 py-1 rounded text-sm font-medium hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              aria-label="Next page"
+              aria-label={t('common:nextPage')}
             >
               {t('common:nextPage')}
               <ChevronRight size={16} />

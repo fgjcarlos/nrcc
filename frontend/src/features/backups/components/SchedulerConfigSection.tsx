@@ -17,12 +17,12 @@ export function SchedulerConfigSection(props: SchedulerConfigSectionProps) {
   const schedule = (configDraft.schedule ?? 'disabled') as PresetType;
 
   return (
-    <div className="surface-card p-6">
-      <div className="mb-4">
-        <h2 className="text-lg font-semibold text-base-content">{t('backups:scheduler.schedulerTitle')}</h2>
-        <p className="text-sm text-base-content/65">
-          {t('backups:scheduler.schedulerDesc')}
-        </p>
+    <section aria-labelledby="backups-schedule-title" className="space-y-3 py-4">
+      <div className="space-y-1">
+        <h2 id="backups-schedule-title" className="text-sm font-semibold text-ds-text-primary">
+          {t('backups:scheduler.title')}
+        </h2>
+        <p className="text-xs text-ds-text-secondary">{t('backups:scheduler.desc')}</p>
       </div>
 
       <CronBuilder
@@ -34,6 +34,6 @@ export function SchedulerConfigSection(props: SchedulerConfigSectionProps) {
         saveState={saveState}
         saveError={saveError}
       />
-    </div>
+    </section>
   );
 }
