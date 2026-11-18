@@ -164,8 +164,5 @@
       "reviewSecurity": "Revisar seguridad",
       "createBackup": "Crear un backup"
     }
-  },
-  "chart": {
-    "summary": "{{label}}: {{count}} muestras, última {{latest}} %, rango {{min}}–{{max}} %"
   }
 }

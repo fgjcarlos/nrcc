@@ -126,14 +126,6 @@
     "preRestore": "Instantáneas previas a restauración",
     "save": "Guardar retención"
   },
-  "history": {
-    "empty": "Aún no hay historial del programador",
-    "event": "Evento",
-    "failed": "Fallido",
-    "pruned_one": "Se eliminó {{count}} respaldo",
-    "pruned_other": "Se eliminaron {{count}} respaldos",
-    "pageOfTotal": "Página {{page}} de {{pages}} ({{total}} en total)"
-  },
   "configurationSaved": "Programación de respaldos guardada",
   "backupCreated": "Respaldo creado",
   "backupRestored": "Respaldo restaurado",
@@ -148,8 +140,5 @@
   "couldNotRestoreBackup": "No se pudo restaurar el respaldo",
   "couldNotDeleteBackup": "No se pudo eliminar el respaldo",
   "couldNotSaveRetentionPolicy": "No se pudo guardar la retención",
-  "couldNotSaveBackupConfiguration": "No se pudo guardar la programación de respaldos",
-  "noBackupsConfigured": "Aún no hay respaldos. Configura el programador para empezar a crear respaldos automáticamente.",
-  "dateCreated": "Fecha de creación",
-  "triggeredBy": "Disparado por"
+  "couldNotSaveBackupConfiguration": "No se pudo guardar la programación de respaldos"
 }

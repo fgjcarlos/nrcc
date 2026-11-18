@@ -374,9 +374,9 @@ test('unknown API routes fail as JSON instead of returning the SPA', async () =>
 // Removed obsolete Flows-UI e2e test (issue #829). The public Flows UI
 // was retired by issue #763 (`/flows` and `/flows/:id` now redirect to
 // `/overview`). The functionality it covered (flows derived from the
-// live Node-RED flows document) is exercised at the API layer by
-// `frontend/src/features/flows/services/flowService.test.ts` and at the
-// component layer by `DashboardView.test.tsx`. If a future change
+// live Node-RED flows document) was removed with the unrouted flows
+// feature; the overview is covered at the component layer by
+// `DashboardView.test.tsx`. If a future change
 // re-introduces a public Flows surface, port this test back.
 
 test('invalid raw settings are rejected without restarting healthy Node-RED', async () => {

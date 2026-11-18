@@ -523,32 +523,6 @@ export const backupService = {
     return unwrapData(response.data);
   },
 
-  getSchedulerHistory: async (params: PaginationParams) => {
-    const queryString = new URLSearchParams({
-      page: String(params.page),
-      limit: String(params.limit),
-      ...(params.sort && { sort: params.sort }),
-      ...(params.order && { order: params.order }),
-    }).toString();
-
-    const response = await api.get<
-      ApiEnvelope<{
-        entries: { timestamp: string; status: string; error?: string }[];
-        total: number;
-        page: number;
-        limit: number;
-      }>
-    >(`/scheduler/history?${queryString}`);
-    const data = unwrapData(response.data);
-
-    return {
-      entries: Array.isArray(data?.entries) ? data.entries : [],
-      total: typeof data?.total === 'number' ? data.total : 0,
-      page: typeof data?.page === 'number' ? data.page : params.page,
-      limit: typeof data?.limit === 'number' ? data.limit : params.limit,
-    };
-  },
-
   patchStorageRetention: async (retentionDays: number) => {
     const response = await api.patch<
       ApiEnvelope<{ retentionDays: number }> | { retentionDays: number }

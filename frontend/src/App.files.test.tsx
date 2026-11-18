@@ -46,7 +46,7 @@ describe('navigation redirects', () => {
     // transiently through vi.importActual and ThemeToggle's body executes
     // once before the mock applies. Stub matchMedia so the effect
     // completes without throwing. Mirrors the setup in
-    // App.sidebar.test.tsx, LayoutShell.test.tsx, and LandingView.test.tsx.
+    // App.sidebar.test.tsx and LayoutShell.test.tsx.
     window.matchMedia = vi.fn().mockImplementation((query) => ({
       matches: false,
       media: query,

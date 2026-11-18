@@ -126,14 +126,6 @@
     "preRestore": "Pre-restore snapshots",
     "save": "Save retention"
   },
-  "history": {
-    "empty": "No scheduler history yet",
-    "event": "Event",
-    "failed": "Failed",
-    "pruned_one": "Pruned {{count}} backup",
-    "pruned_other": "Pruned {{count}} backups",
-    "pageOfTotal": "Page {{page}} of {{pages}} ({{total}} total)"
-  },
   "configurationSaved": "Backup schedule saved",
   "backupCreated": "Backup created",
   "backupRestored": "Backup restored",
@@ -148,8 +140,5 @@
   "couldNotRestoreBackup": "Could not restore the backup",
   "couldNotDeleteBackup": "Could not delete the backup",
   "couldNotSaveRetentionPolicy": "Could not save the retention",
-  "couldNotSaveBackupConfiguration": "Could not save the backup schedule",
-  "noBackupsConfigured": "No backups yet. Configure the scheduler to start creating backups automatically.",
-  "dateCreated": "Date created",
-  "triggeredBy": "Triggered by"
+  "couldNotSaveBackupConfiguration": "Could not save the backup schedule"
 }

@@ -8,8 +8,7 @@ import { cn } from '@/shared/lib/utils';
  * Reusable status surface used by Configuration, Security, Environment,
  * Recovery and Overview to communicate the state of an item at a glance.
  * Replaces the inline chip pattern (pill, padding-3, small text,
- * 15-percent accent background) currently duplicated across pages
- * (e.g. EdgeModeBadge).
+ * 15-percent accent background) that was duplicated across pages.
  *
  * Variants map to the existing ds-* semantic palette in
  * tailwind.config.js — no new colours are introduced. Labels sit on a

@@ -12,8 +12,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
 // Mock @/i18n before importing the SUT — pre-existing react-i18next
-// resolution gap (issue #767 follow-up; see ConfigurationFieldStatusRow
-// for the same workaround).
+// resolution gap (issue #767 follow-up).
 vi.mock('@/i18n', () => ({
   useT: () => ({ t: (key: string) => key }),
 }));

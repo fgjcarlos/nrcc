@@ -183,16 +183,3 @@ export const backupObservability: BackupObservability = {
 export const libraries = [
   { name: 'node-red-dashboard', version: '3.6.5', installed: true, type: 'node' },
 ]
-
-export const flows = {
-  available: true,
-  flows: [
-    {
-      id: 'flow-001',
-      label: 'Smoke Flow',
-      type: 'tab',
-      disabled: false,
-      nodeCount: 2,
-    },
-  ],
-}

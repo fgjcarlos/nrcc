@@ -164,8 +164,5 @@
       "reviewSecurity": "Review security",
       "createBackup": "Create a backup"
     }
-  },
-  "chart": {
-    "summary": "{{label}}: {{count}} samples, latest {{latest}}%, range {{min}}–{{max}}%"
   }
 }
