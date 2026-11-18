@@ -770,6 +770,83 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+  /api/presets:
+    get:
+      tags: [Config]
+      operationId: getPresets
+      summary: List curated settings.js presets
+      description: "**Admin only.** Returns the embedded curated-preset catalogue in stable ID-sorted order. No network access is involved."
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Curated preset catalogue
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_PresetList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/presets/{id}/preview:
+    post:
+      tags: [Config]
+      operationId: postPresetPreview
+      summary: Preview a curated preset against settings.js source
+      description: |
+        **Admin only.** Applies the preset to the supplied settings.js source
+        in memory and returns the patched source plus a redacted diff. Nothing
+        is written to disk; the operator confirms by sending `after` to
+        `POST /api/settings/raw`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Preset id from `GET /api/presets`
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PresetPreviewRequest"
+      responses:
+        "200":
+          description: Preview of the preset apply
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope_PresetPreview"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: Preset id is not registered (`PRESET_NOT_REGISTERED`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "422":
+          description: Source has no patchable `module.exports` object (`SOURCE_NOT_EXPORTS`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
+          description: Preview failed unexpectedly (`PRESET_PREVIEW_FAILED`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
   # ─── System ────────────────────────────────────────────────────────────────────
 
   /api/bootstrap/status:
@@ -2478,6 +2555,9 @@ components:
             - SETUP_REQUIRED
             - ALREADY_INITIALIZED
             - SETTINGS_REVISION_CONFLICT
+            - PRESET_NOT_REGISTERED
+            - SOURCE_NOT_EXPORTS
+            - PRESET_PREVIEW_FAILED
           example: INVALID_REQUEST
         message:
           type: string
@@ -3030,6 +3110,57 @@ components:
           type: string
           minLength: 1
           description: Full text content to write to settings.js
+
+    PresetView:
+      type: object
+      required: [id, name, description, surfaces, trust, channelBoundary, managedKeys]
+      properties:
+        id:
+          type: string
+          example: https-tls-preset
+        name:
+          type: string
+        description:
+          type: string
+        surfaces:
+          type: array
+          items:
+            type: string
+        trust:
+          type: string
+        channelBoundary:
+          type: string
+        managedKeys:
+          type: array
+          items:
+            type: string
+
+    PresetPreviewRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          description: Live settings.js source to preview the preset against
+
+    PresetPreview:
+      type: object
+      required: [after, preview, replaced, inserted]
+      properties:
+        after:
+          type: string
+          description: Patched settings.js source; confirm by writing it through POST /api/settings/raw
+        preview:
+          type: string
+          description: Redacted unified diff for display and audit
+        replaced:
+          type: [array, "null"]
+          items:
+            type: string
+        inserted:
+          type: [array, "null"]
+          items:
+            type: string
 
     ValidResult:
       type: object
@@ -4186,6 +4317,40 @@ components:
           properties:
             data:
               $ref: "#/components/schemas/ValidResult"
+
+    SuccessEnvelope_PresetList:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/PresetView"
+
+    SuccessEnvelope_PresetPreview:
+      allOf:
+        - type: object
+          required: [success, data, timestamp]
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            timestamp:
+              type: string
+              format: date-time
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/PresetPreview"
 
     SuccessEnvelope_SettingsDocument:
       allOf:

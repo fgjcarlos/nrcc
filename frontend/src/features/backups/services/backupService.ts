@@ -522,11 +522,4 @@ export const backupService = {
     );
     return unwrapData(response.data);
   },
-
-  patchStorageRetention: async (retentionDays: number) => {
-    const response = await api.patch<
-      ApiEnvelope<{ retentionDays: number }> | { retentionDays: number }
-    >('/storage/retention', { retentionDays });
-    return unwrapData(response.data);
-  },
 };
