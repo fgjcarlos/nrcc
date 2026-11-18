@@ -12,6 +12,12 @@
     "revisionMissing": "The settings revision is unavailable. Refresh before retrying.",
     "generic": "The transaction did not complete. Any failed readiness check is rolled back; review runtime readiness, then retry."
   },
+  "review": {
+    "adminAuthEnable": "The Node-RED editor will require this login. After this apply, the editor and its admin API ask for a username and password; only these users can sign in: {{users}}.",
+    "migrated": "Legacy alias migrated to its canonical surface",
+    "userAdded": "User added",
+    "userRemoved": "User removed"
+  },
   "adminAuthBoundary": {
     "title": "Node-RED admin auth",
     "subtitle": "Protects the Node-RED editor and admin API.",
@@ -36,8 +42,6 @@
     "noUsers": "No users configured yet.",
     "save": "Save admin auth",
     "saving": "Saving…",
-    "applied": "Admin auth applied.",
-    "appliedLabel": "Apply succeeded.",
     "legacyTitle": "Legacy authentication detected",
     "legacyBody": "These aliases live outside the canonical surfaces: {{aliases}}. Migration confirmation is required before applying.",
     "migrationTitle": "Apply authentication migration",
@@ -57,8 +61,6 @@
     "storedHashHint": "Stored hash: {{hash}}",
     "save": "Save Node HTTP auth",
     "saving": "Saving…",
-    "applied": "Node HTTP auth applied.",
-    "appliedLabel": "Apply succeeded.",
     "legacyTitle": "Legacy alias detected",
     "legacyBody": "settings.js declares the legacy `{{alias}}` alias. Migration will canonicalize the surface and redacted credentials will be applied.",
     "migrationTitle": "Apply authentication migration",
@@ -78,8 +80,6 @@
     "storedHashHint": "Stored hash: {{hash}}",
     "save": "Save static auth",
     "saving": "Saving…",
-    "applied": "Static auth applied.",
-    "appliedLabel": "Apply succeeded.",
     "legacyTitle": "Legacy alias detected",
     "legacyBody": "settings.js declares the legacy `{{alias}}` alias. Migration will canonicalize the surface and redacted credentials will be applied.",
     "migrationTitle": "Apply authentication migration",

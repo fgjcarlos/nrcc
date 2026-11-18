@@ -169,3 +169,32 @@ describe('ReviewChangesPanel', () => {
     expect(onCancel).not.toHaveBeenCalled();
   });
 });
+
+describe('ReviewChangesPanel with entries (Security, P1 #1)', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('lists the given rows as printed and reads the notice with Apply', () => {
+    render(
+      <ReviewChangesPanel
+        isOpen
+        entries={[
+          { id: 'httpNodeAuth.pass', settingsKey: 'httpNodeAuth.pass', label: 'Password', restart: 'hard', configuredValue: '[redacted]', formValue: '[redacted]' },
+        ]}
+        notice="Editor login turns on"
+        pendingCount={1}
+        target="settings.js"
+        onApply={vi.fn()}
+        onCancel={vi.fn()}
+      />
+    );
+    const row = screen.getByTestId('review-changes-panel-row-httpNodeAuth.pass');
+    expect(row.textContent).toContain('Password');
+    expect(row.textContent).toContain('[redacted]');
+    expect(screen.getByTestId('review-changes-panel-group-hard')).toBeTruthy();
+    expect(screen.getByTestId('review-changes-panel-notice').textContent).toBe('Editor login turns on');
+    const describedBy = screen.getByTestId('review-changes-panel-apply').getAttribute('aria-describedby') ?? '';
+    expect(describedBy.split(' ')).toContain(screen.getByTestId('review-changes-panel-notice').id);
+  });
+});

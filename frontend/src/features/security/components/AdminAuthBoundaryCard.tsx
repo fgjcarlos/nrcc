@@ -1,16 +1,17 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Trash2, UserPlus } from 'lucide-react';
 import { ConfirmationDialog } from '@/shared/components/ConfirmationDialog';
 import { StatusChip } from '@/shared/components/ui';
 import { useT } from '@/i18n';
+import { ReviewChangesPanel } from '@/features/configuration/components/ReviewChangesPanel';
 import {
   applySecurityPatch,
   applyErrorKey,
   detectLegacyAliases,
-  reportApplyError,
-  reportApplySuccess,
 } from './securityCenterHelpers';
 import { SecuritySurface } from './SecuritySurface';
+import { adminAuthReview, enablesAdminAuth, migrationRows } from '../lib/securityReview';
+import { useSurfaceApply } from '../lib/useSurfaceApply';
 
 type AdminUser = { username: string; permissions: '*' | 'read'; password: string };
 type Permission = AdminUser['permissions'];
@@ -62,8 +63,9 @@ export function AdminAuthBoundaryCard({
   const { t } = useT();
   const [edits, setEdits] = useState<UserEdits>({});
   const [saving, setSaving] = useState(false);
+  // Synchronous guard: a same-tick double click must not start two applies.
+  const savingRef = useRef(false);
   const [confirmMigration, setConfirmMigration] = useState(false);
-  const [appliedAt, setAppliedAt] = useState<number | null>(null);
   const [error, setError] = useState<string>();
   const legacyAliases = detectLegacyAliases(rawSettingsContent);
 
@@ -80,6 +82,13 @@ export function AdminAuthBoundaryCard({
     }));
   const displayExpiry = edits.expiry ?? config?.sessionExpiryTime ?? 0;
 
+  const reviewEntries = [
+    ...migrationRows(legacyAliases, t),
+    ...adminAuthReview(config, displayUsers, displayExpiry, t),
+  ];
+  const review = useSurfaceApply(reviewEntries.length, edits, editable);
+  const enabling = enablesAdminAuth(serverUsers.length, displayUsers.length);
+
   const surfacesConfigured = serverUsers.length > 0;
   // Off is amber here: without adminAuth anyone reaching the editor can deploy.
   const variant = surfacesConfigured ? 'success' : 'warning';
@@ -87,6 +96,7 @@ export function AdminAuthBoundaryCard({
   const updateUsers = (change: (users: AdminUser[]) => AdminUser[]) => {
     setEdits((current) => ({ ...current, users: change(current.users ?? displayUsers) }));
     setError(undefined);
+    review.edited();
   };
 
   const updateUser = (index: number, patch: Partial<AdminUser>) =>
@@ -106,6 +116,7 @@ export function AdminAuthBoundaryCard({
   const updateExpiry = (value: number) => {
     setEdits((current) => ({ ...current, expiry: value }));
     setError(undefined);
+    review.edited();
   };
 
   const addUser = () =>
@@ -115,9 +126,13 @@ export function AdminAuthBoundaryCard({
     updateUsers((users) => users.filter((_, i) => i !== index));
 
   const apply = async () => {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    const count = reviewEntries.length;
     setConfirmMigration(false);
     setSaving(true);
     setError(undefined);
+    review.started(count);
 
     const adminAuth =
       displayUsers.length === 0
@@ -133,21 +148,25 @@ export function AdminAuthBoundaryCard({
           };
 
     const result = await applySecurityPatch({ adminAuth }, expectedRevision);
+    savingRef.current = false;
     setSaving(false);
+    // The circuit and its live region carry the outcome; no toast.
+    review.settled(count, result);
     if (result.status === 'applied') {
       setEdits({});
-      setAppliedAt(Date.now());
-      reportApplySuccess(t('security:adminAuthBoundary.applied'));
       onApplied();
     } else {
-      const message = t(applyErrorKey(result.error?.status));
-      setError(message);
-      reportApplyError(message);
+      setError(t(applyErrorKey(result.error?.status)));
     }
   };
 
-  const save = async () => {
+  // Save opens the review drawer; its Apply is the confirmation.
+  const save = () => review.openReview();
+
+  const applyFromReview = async () => {
+    // The legacy migration keeps its own acknowledgement, after the review.
     if (legacyAliases.length > 0) {
+      review.closeReview();
       setConfirmMigration(true);
       return;
     }
@@ -168,6 +187,7 @@ export function AdminAuthBoundaryCard({
       testId="boundary-admin-auth"
       title={title}
       summary={t('security:adminAuthBoundary.subtitle')}
+      circuit={{ circuit: review.circuit, pendingCount: reviewEntries.length }}
       status={
         <StatusChip
           variant={variant}
@@ -333,19 +353,26 @@ export function AdminAuthBoundaryCard({
               ? t('security:adminAuthBoundary.saving')
               : t('security:adminAuthBoundary.save')}
           </button>
-          {appliedAt && !error && (
-            <p
-              role="status"
-              aria-live="polite"
-              className="text-sm text-ds-on-tint-success"
-              data-testid="boundary-admin-auth-applied"
-            >
-              {t('security:adminAuthBoundary.appliedLabel')}
-            </p>
-          )}
         </div>
       </fieldset>
     </SecuritySurface>
+
+      <ReviewChangesPanel
+        isOpen={review.reviewOpen}
+        entries={reviewEntries}
+        pendingCount={reviewEntries.length}
+        target="settings.js"
+        notice={
+          enabling
+            ? t('security:review.adminAuthEnable', {
+                users: displayUsers.map((user) => user.username).filter(Boolean).join(', ') || '—',
+              })
+            : undefined
+        }
+        isPending={saving}
+        onApply={applyFromReview}
+        onCancel={review.closeReview}
+      />
 
       <ConfirmationDialog
         isOpen={confirmMigration}

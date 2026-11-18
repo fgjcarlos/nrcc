@@ -1,11 +1,10 @@
-import { useEffect, useId, useMemo, useRef } from 'react';
+import { useEffect, useId, useMemo, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowRight, FileWarning, RotateCw, X } from 'lucide-react';
 import { useT } from '@/i18n';
 import { StatusChip } from '@/shared/components/ui/StatusChip';
 import type {
   ConfigurationDiff,
-  FieldDiff,
   RestartSeverity,
 } from '../hooks/useConfigurationDiff';
 import type { NodeRedConfigFormData } from '@/shared/types';
@@ -35,10 +34,30 @@ import { SettingKey } from './FormFields';
  * is in flight.
  */
 
+/**
+ * One drawer row, for callers outside the settings form (Security).
+ * Values must already be redacted: the panel prints them as given.
+ */
+export interface ReviewEntry {
+  /** Unique row id (test id suffix and React key). */
+  id: string;
+  /** settings.js path shown as the terminal label. */
+  settingsKey: string;
+  label: string;
+  restart: RestartSeverity;
+  configuredValue: unknown;
+  formValue: unknown;
+  invalid?: boolean;
+}
+
 export interface ReviewChangesPanelProps {
   isOpen: boolean;
-  /** The diff summary; we read `fields` + `pendingCount`. */
-  fields: ConfigurationDiff;
+  /** The settings form diff; only its pending fields are listed. */
+  fields?: ConfigurationDiff;
+  /** Rows for callers without a settings form diff; used instead of `fields`. */
+  entries?: ReviewEntry[];
+  /** Consequence stated above the rows and read with the Apply button. */
+  notice?: ReactNode;
   pendingCount: number;
   /** Target description for the subtitle, e.g. "settings.js". */
   target: string;
@@ -50,21 +69,32 @@ export interface ReviewChangesPanelProps {
   onCancel: () => void;
 }
 
-/** Group fields by restart severity in the canonical order. */
-function groupFieldsByRestart(
-  fields: ConfigurationDiff,
-  pendingOnly: boolean
-): Array<{ severity: RestartSeverity; entries: Array<{ key: keyof NodeRedConfigFormData; diff: FieldDiff }> }> {
-  const buckets: Record<RestartSeverity, Array<{ key: keyof NodeRedConfigFormData; diff: FieldDiff }>> = {
+/** The pending fields of a settings form diff as drawer rows. */
+function pendingEntries(fields: ConfigurationDiff | undefined): ReviewEntry[] {
+  if (!fields) return [];
+  return (Object.keys(fields) as Array<keyof NodeRedConfigFormData>)
+    .filter((key) => fields[key].pending)
+    .map((key) => ({
+      id: key,
+      settingsKey: SETTINGS_KEYS[key] ?? key,
+      label: FIELD_LABELS[key] ?? key,
+      restart: fields[key].restart,
+      configuredValue: fields[key].configuredValue,
+      formValue: fields[key].formValue,
+      invalid: fields[key].validation.state === 'invalid',
+    }));
+}
+
+/** Group rows by restart severity in the canonical order. */
+function groupByRestart(
+  rows: ReviewEntry[]
+): Array<{ severity: RestartSeverity; entries: ReviewEntry[] }> {
+  const buckets: Record<RestartSeverity, ReviewEntry[]> = {
     hard: [],
     soft: [],
     none: [],
   };
-  for (const key of Object.keys(fields) as Array<keyof NodeRedConfigFormData>) {
-    const f = fields[key];
-    if (pendingOnly && !f.pending) continue;
-    buckets[f.restart].push({ key, diff: f });
-  }
+  for (const row of rows) buckets[row.restart].push(row);
   return (['hard', 'soft', 'none'] as const)
     .map((severity) => ({ severity, entries: buckets[severity] }))
     .filter((b) => b.entries.length > 0);
@@ -81,6 +111,8 @@ function formatValue(value: unknown): string {
 export function ReviewChangesPanel({
   isOpen,
   fields,
+  entries,
+  notice,
   pendingCount,
   target,
   isPending = false,
@@ -90,13 +122,14 @@ export function ReviewChangesPanel({
   const { t } = useT();
   const titleId = useId();
   const consequenceId = useId();
+  const noticeId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
 
   const groups = useMemo(
-    () => groupFieldsByRestart(fields, true),
-    [fields]
+    () => groupByRestart(entries ?? pendingEntries(fields)),
+    [entries, fields]
   );
 
   // Move focus into the drawer when it opens; restore on close.
@@ -203,6 +236,15 @@ export function ReviewChangesPanel({
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-5">
+          {notice && (
+            <div
+              id={noticeId}
+              className="mb-5 rounded-box border border-ds-warning/40 bg-ds-warning/10 px-3 py-2 text-sm text-ds-on-tint-warning"
+              data-testid="review-changes-panel-notice"
+            >
+              {notice}
+            </div>
+          )}
           {noChanges ? (
             <p
               className="text-sm text-ds-text-secondary"
@@ -232,23 +274,23 @@ export function ReviewChangesPanel({
                       : t('configuration:reviewPanel.groupNone', { count: group.entries.length })}
                   </h3>
                   <ul className="space-y-2">
-                    {group.entries.map(({ key, diff }) => (
+                    {group.entries.map((entry) => (
                       <li
-                        key={key}
+                        key={entry.id}
                         className="rounded-box border border-ds-border-subtle p-3"
-                        data-testid={`review-changes-panel-row-${key}`}
+                        data-testid={`review-changes-panel-row-${entry.id}`}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <span className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 text-sm text-ds-text-secondary">
-                            <SettingKey path={SETTINGS_KEYS[key] ?? key} />
+                            <SettingKey path={entry.settingsKey} />
                             <span aria-hidden="true">·</span>
-                            <span>{FIELD_LABELS[key] ?? key}</span>
+                            <span>{entry.label}</span>
                           </span>
                           <StatusChip
-                            variant={diff.validation.state === 'invalid' ? 'warning' : 'neutral'}
+                            variant={entry.invalid ? 'warning' : 'neutral'}
                             size="sm"
                           >
-                            {diff.validation.state === 'invalid'
+                            {entry.invalid
                               ? t('configuration:fieldStatus.validation.invalid')
                               : t('configuration:fieldStatus.validation.pending')}
                           </StatusChip>
@@ -258,13 +300,13 @@ export function ReviewChangesPanel({
                             {t('configuration:reviewPanel.configuredLabel')}
                           </span>
                           <span className="font-mono text-ds-text-secondary break-all">
-                            {formatValue(diff.configuredValue)}
+                            {formatValue(entry.configuredValue)}
                           </span>
                           <span className="text-ds-text-muted">
                             {t('configuration:reviewPanel.newLabel')}
                           </span>
                           <span className="font-mono text-base-content break-all">
-                            {formatValue(diff.formValue)}
+                            {formatValue(entry.formValue)}
                           </span>
                         </div>
                       </li>
@@ -301,7 +343,9 @@ export function ReviewChangesPanel({
               type="button"
               onClick={onApply}
               disabled={isPending || noChanges}
-              aria-describedby={noChanges ? undefined : consequenceId}
+              aria-describedby={
+                noChanges ? undefined : notice ? `${noticeId} ${consequenceId}` : consequenceId
+              }
               className="action-btn-primary"
               data-testid="review-changes-panel-apply"
             >

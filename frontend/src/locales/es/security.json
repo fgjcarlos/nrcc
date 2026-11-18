@@ -12,6 +12,12 @@
     "revisionMissing": "La revisión de la configuración no está disponible. Actualiza antes de volver a intentarlo.",
     "generic": "La transacción no se completó. Cualquier comprobación de disponibilidad fallida se revierte; revisa la disponibilidad del runtime y vuelve a intentarlo."
   },
+  "review": {
+    "adminAuthEnable": "El editor de Node-RED pedirá este inicio de sesión. Tras aplicar, el editor y su API de administración piden usuario y contraseña; solo podrán entrar estos usuarios: {{users}}.",
+    "migrated": "Alias heredado migrado a su superficie canónica",
+    "userAdded": "Usuario añadido",
+    "userRemoved": "Usuario eliminado"
+  },
   "adminAuthBoundary": {
     "title": "Auth admin de Node-RED",
     "subtitle": "Protege el editor y la API de administración de Node-RED.",
@@ -36,8 +42,6 @@
     "noUsers": "Aún no hay usuarios configurados.",
     "save": "Guardar auth admin",
     "saving": "Guardando…",
-    "applied": "Auth admin aplicada.",
-    "appliedLabel": "Aplicación exitosa.",
     "legacyTitle": "Autenticación heredada detectada",
     "legacyBody": "Estos aliases viven fuera de las superficies canónicas: {{aliases}}. Se requiere confirmación de la migración antes de aplicar.",
     "migrationTitle": "Aplicar migración de autenticación",
@@ -57,8 +61,6 @@
     "storedHashHint": "Hash almacenado: {{hash}}",
     "save": "Guardar auth HTTP de nodos",
     "saving": "Guardando…",
-    "applied": "Auth HTTP de nodos aplicada.",
-    "appliedLabel": "Aplicación exitosa.",
     "legacyTitle": "Alias heredado detectado",
     "legacyBody": "settings.js declara el alias heredado `{{alias}}`. La migración canonicalizará la superficie y se aplicarán credenciales redactadas.",
     "migrationTitle": "Aplicar migración de autenticación",
@@ -78,8 +80,6 @@
     "storedHashHint": "Hash almacenado: {{hash}}",
     "save": "Guardar auth estática",
     "saving": "Guardando…",
-    "applied": "Auth estática aplicada.",
-    "appliedLabel": "Aplicación exitosa.",
     "legacyTitle": "Alias heredado detectado",
     "legacyBody": "settings.js declara el alias heredado `{{alias}}`. La migración canonicalizará la superficie y se aplicarán credenciales redactadas.",
     "migrationTitle": "Aplicar migración de autenticación",
