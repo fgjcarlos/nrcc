@@ -3,15 +3,19 @@ package handler
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/fgjcarlos/nrcc/internal/audit"
 	"github.com/fgjcarlos/nrcc/internal/model"
 	"github.com/fgjcarlos/nrcc/internal/service"
 	"github.com/fgjcarlos/nrcc/internal/store"
@@ -20,9 +24,9 @@ import (
 const concurrentApplyRequests = 32
 
 // A burst of POST /apply requests from any startable state must run the update
-// flow exactly once. Requests that pass the handler's state check before the
-// flow reaches BackingUp still return 200, but their goroutines must lose
-// applyMu.TryLock in the service and leave state and files untouched.
+// flow exactly once. The run is claimed before the response, so exactly one
+// request gets 200 (and one audit entry); every other request gets 409 and
+// leaves state and files untouched.
 func TestUpdateHandler_PostApply_ConcurrentRequestsRunOneFlow(t *testing.T) {
 	for _, start := range []model.UpdateState{model.StateIdle, model.StateCompleted, model.StateFailed} {
 		t.Run(string(start), func(t *testing.T) {
@@ -51,6 +55,13 @@ func TestUpdateHandler_PostApply_ConcurrentRequestsRunOneFlow(t *testing.T) {
 			svc.SetBackupCreator(creator)
 			svc.SetFlowState(model.UpdateFlowState{State: start, Phase: "done"})
 			handler := NewUpdateHandler(svc)
+			auditDir := t.TempDir()
+			auditSvc, err := audit.NewService(auditDir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = auditSvc.Close() })
+			handler.SetAuditService(auditSvc)
 
 			cacheBefore, historyBefore := fileSHA256(t, cachePath), fileSHA256(t, historyPath)
 
@@ -106,8 +117,11 @@ func TestUpdateHandler_PostApply_ConcurrentRequestsRunOneFlow(t *testing.T) {
 					t.Errorf("request %d returned %d, want 200 or 409", i, code)
 				}
 			}
-			if accepted == 0 {
-				t.Errorf("no request was accepted; codes=%v", codes)
+			if accepted != 1 {
+				t.Errorf("%d requests were accepted, want exactly 1; codes=%v", accepted, codes)
+			}
+			if n := countAuditActions(t, auditDir, "UPDATE_APPLY"); n != 1 {
+				t.Errorf("UPDATE_APPLY audit entries = %d, want exactly 1", n)
 			}
 			if got := fileSHA256(t, cachePath); got != cacheBefore {
 				t.Errorf("update_cache.json changed: %x -> %x", cacheBefore, got)
@@ -117,6 +131,77 @@ func TestUpdateHandler_PostApply_ConcurrentRequestsRunOneFlow(t *testing.T) {
 			}
 		})
 	}
+}
+
+// An accepted request must already own the run when it responds. Two back-to-back
+// requests from a terminal state used to both get 200; the second goroutine then
+// ran "late", after the first run had finished (Failed is startable again), and
+// started a second update. Now the second request is rejected with 409.
+func TestUpdateHandler_PostApply_AcceptedRequestClaimsRunBeforeResponding(t *testing.T) {
+	// One P keeps launched goroutines from running until the test blocks, which
+	// reproduces the late-scheduled goroutine deterministically.
+	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(1))
+
+	installFakeNPM(t)
+	svc := service.NewUpdateService(t.TempDir())
+	creator := &countingFailingBackupCreator{}
+	svc.SetBackupCreator(creator)
+	svc.SetFlowState(model.UpdateFlowState{State: model.StateCompleted, Phase: "completed"})
+	handler := NewUpdateHandler(svc)
+
+	post := func() *httptest.ResponseRecorder {
+		w := httptest.NewRecorder()
+		handler.PostApply(w, httptest.NewRequest(http.MethodPost, "/api/updates/apply", nil))
+		return w
+	}
+	first, second := post(), post()
+
+	if first.Code != http.StatusOK {
+		t.Fatalf("first POST /apply = %d, want 200; body: %s", first.Code, first.Body.String())
+	}
+	var resp model.ApiResponse[map[string]any]
+	if err := json.Unmarshal(first.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
+	if got := resp.Data["state"]; got != string(model.StateBackingUp) {
+		t.Errorf("accepted response state = %v, want BackingUp", got)
+	}
+	var conflict model.ApiResponse[any]
+	if err := json.Unmarshal(second.Body.Bytes(), &conflict); err != nil {
+		t.Fatal(err)
+	}
+	if second.Code != http.StatusConflict || conflict.Error == nil || conflict.Error.Code != "UPDATE_IN_PROGRESS" {
+		t.Errorf("second POST /apply = %d %s, want 409 UPDATE_IN_PROGRESS", second.Code, second.Body.String())
+	}
+
+	deadline := time.Now().Add(5 * time.Second)
+	for svc.GetFlowState().State != model.StateFailed || runningApplyFlows() > 0 {
+		if time.Now().After(deadline) {
+			t.Fatalf("update flows did not settle; state=%+v", svc.GetFlowState())
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if n := creator.calls.Load(); n != 1 {
+		t.Errorf("backup step ran %d times, want exactly 1", n)
+	}
+}
+
+// countingFailingBackupCreator records each backup attempt and fails it, so a
+// run reaches Failed (a startable state) without touching the network.
+type countingFailingBackupCreator struct{ calls atomic.Int32 }
+
+func (c *countingFailingBackupCreator) CreateTyped(model.BackupType, string) (model.Backup, error) {
+	c.calls.Add(1)
+	return model.Backup{}, errors.New("backup refused by test")
+}
+
+func countAuditActions(t *testing.T, auditDataDir, action string) int {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(auditDataDir, "audit", "audit.jsonl")) // #nosec G304 -- path is inside t.TempDir().
+	if err != nil {
+		t.Fatal(err)
+	}
+	return bytes.Count(data, []byte(`"action":"`+action+`"`))
 }
 
 func fileSHA256(t *testing.T, path string) [sha256.Size]byte {

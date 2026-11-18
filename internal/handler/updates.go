@@ -92,22 +92,23 @@ func (h *UpdateHandler) GetCheck(w http.ResponseWriter, r *http.Request) {
 // POST /api/updates/apply
 //
 // Flow:
-// 1. If a flow is in progress (BackingUp/Applying), return 409 Conflict;
-//    Idle, Completed and Failed can all start a new update
-// 2. Launch asynchronous update flow: BackingUp → Applying → Completed/Failed
-// 3. Return 200 OK immediately with current state + backupId (if available)
+//  1. Claim the run synchronously (service.ClaimUpdate): if a flow is in
+//     progress (BackingUp/Applying) or another request holds the claim, return
+//     409 Conflict; Idle, Completed and Failed can all start a new update
+//  2. Launch the claimed flow asynchronously: BackingUp → Applying → Completed/Failed
+//  3. Return 200 OK immediately with the claimed state (BackingUp)
 //
+// Because acceptance and claim happen together, a 200 always means this
+// request owns the run; no accepted request can start a second update later.
 // Frontend polls GET /api/updates/state every 500ms to track progress.
 // Once state reaches Completed/Failed, polling stops.
 //
-// Response on success: {success: true, state: "BackingUp", backupId: "..."}
+// Response on success: {success: true, state: "BackingUp", backupId: ""}
 // Response on conflict: HTTP 409 {success: false, error: {code: "UPDATE_IN_PROGRESS", ...}}
 func (h *UpdateHandler) PostApply(w http.ResponseWriter, r *http.Request) {
-	// Check if an update is already in progress
-	flowState := h.svc.GetFlowState()
-	if flowState.State.InProgress() {
-		// Another update is already in progress
-		model.RespondError(w, http.StatusConflict, "UPDATE_IN_PROGRESS", 
+	run, err := h.svc.ClaimUpdate()
+	if err != nil {
+		model.RespondError(w, http.StatusConflict, "UPDATE_IN_PROGRESS",
 			"An update is already in progress. Please wait for it to complete.")
 		return
 	}
@@ -115,30 +116,25 @@ func (h *UpdateHandler) PostApply(w http.ResponseWriter, r *http.Request) {
 	// Capture pre-apply status to report version transition (for logging/auditing)
 	preApplyStatus := h.svc.GetCachedStatus()
 	fromVersion := preApplyStatus.CurrentVersion
+	flowState := run.State()
 
 	// Capture fields needed in the goroutine to avoid capturing the handler receiver.
 	svc := h.svc
 	updateMetrics := h.updateMetrics
 
-	// Launch the update flow asynchronously.
+	// Run the claimed flow asynchronously; Run releases the claim when it returns.
 	// This does NOT block the HTTP response; frontend polls for progress.
 	go func() {
 		ctx := context.Background() // Background context; not tied to HTTP request lifetime
-		err := svc.ApplyUpdateWithBackup(ctx)
+		err := run.Run(ctx)
 		if updateMetrics != nil {
-			// Determine success from the final flow state set by ApplyUpdateWithBackup.
+			// Determine success from the final flow state set by Run.
 			finalState := svc.GetFlowState()
 			updateMetrics.RecordUpdateAttempt(err == nil && finalState.State == model.StateCompleted)
 		}
-		if err != nil {
-			// Update failed; state is already set to Failed by ApplyUpdateWithBackup
-			// Log for debugging
-			_ = err // Error already captured in flowState; frontend can see it via GET /state
-		}
+		// On error the state is already Failed; the frontend sees it via GET /state.
 	}()
 
-	// Get current state (should be BackingUp or Applying since we just launched the flow)
-	flowState = h.svc.GetFlowState()
 	toVersion := preApplyStatus.LatestVersion
 	if toVersion == "" {
 		toVersion = "latest"
@@ -146,14 +142,13 @@ func (h *UpdateHandler) PostApply(w http.ResponseWriter, r *http.Request) {
 
 	h.audit.Log(r, "", "UPDATE_APPLY", "", "ok", map[string]string{"from": fromVersion, "to": toVersion})
 
-	// Return 200 OK with current state
 	model.RespondJSON(w, http.StatusOK, map[string]interface{}{
-		"success":      true,
-		"message":      "Update flow started",
-		"state":        flowState.State,
-		"backupId":     flowState.BackupID,
-		"fromVersion":  fromVersion,
-		"toVersion":    toVersion,
+		"success":     true,
+		"message":     "Update flow started",
+		"state":       flowState.State,
+		"backupId":    flowState.BackupID,
+		"fromVersion": fromVersion,
+		"toVersion":   toVersion,
 	})
 }
 

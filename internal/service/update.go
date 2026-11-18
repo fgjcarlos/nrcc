@@ -54,11 +54,11 @@ type backupCreator interface {
 // are sanitized to avoid exposing raw npm exit codes to the UI, and cache persists across restarts.
 //
 // Multi-stage Update Flow:
-// - State machine tracks: Idle → BackingUp → Applying → Completed/Failed;
-//   Completed/Failed are startable again (see model.UpdateState.InProgress)
-// - applyMu guards concurrent updates; only one update flow at a time
-// - flowState stores current operation state (thread-safe via flowStateMu)
-// - backupStore persists backup metadata to ./data/update_backups.json (max 5 entries)
+//   - State machine tracks: Idle → BackingUp → Applying → Completed/Failed;
+//     Completed/Failed are startable again (see model.UpdateState.InProgress)
+//   - applyMu guards concurrent updates; only one update flow at a time
+//   - flowState stores current operation state (thread-safe via flowStateMu)
+//   - backupStore persists backup metadata to ./data/update_backups.json (max 5 entries)
 type UpdateService struct {
 	dataDir               string
 	cache                 model.UpdateCacheEntry
@@ -338,7 +338,7 @@ func (s *UpdateService) GetFlowState() model.UpdateFlowState {
 }
 
 // setFlowState updates flowState with write lock.
-// Internal method; should only be called from ApplyUpdateWithBackup.
+// Internal method; should only be called from the update flow (ClaimUpdate / UpdateRun.Run).
 func (s *UpdateService) setFlowState(state model.UpdateFlowState) {
 	s.flowStateMu.Lock()
 	defer s.flowStateMu.Unlock()
@@ -449,47 +449,68 @@ func (s *UpdateService) applyContext() context.Context {
 
 // ApplyUpdateWithBackup orchestrates the full update flow: BackingUp → Applying → Completed/Failed.
 // Only one update can proceed at a time; returns error if a flow is in progress.
-// Flow:
-//  1. Acquire applyMu lock
-//  2. Check the state is Idle, Completed or Failed; return error if not
-//  3. Set state = BackingUp
-//  4. Call CreateBackup; persist to catalog
-//  5. Set state = Applying
-//  6. Call ApplyUpdate (npm install)
-//  7. Set state = Completed or Failed based on npm result
-//  8. Release applyMu lock
-//
-// Backend operation is asynchronous (logs output but does not block caller).
-// Frontend polls /api/updates/state to track progress.
+// It is ClaimUpdate followed by Run on the caller's goroutine; callers that
+// must answer before the run finishes (POST /apply) call the two steps apart.
 func (s *UpdateService) ApplyUpdateWithBackup(ctx context.Context) error {
-	// Acquire lock for exclusive update flow
-	acquired := s.applyMu.TryLock()
-	if !acquired {
-		// Another update is in progress
-		return fmt.Errorf("update already in progress")
+	run, err := s.ClaimUpdate()
+	if err != nil {
+		return err
 	}
-	defer s.applyMu.Unlock()
+	return run.Run(ctx)
+}
 
-	// Check if we can start: no flow may be in progress
+// UpdateRun is an update flow claimed by ClaimUpdate. It holds applyMu until
+// Run returns, so Run must be called exactly once.
+type UpdateRun struct {
+	svc            *UpdateService
+	preApplyStatus model.UpdateCacheEntry
+	claimed        model.UpdateFlowState
+}
+
+// ClaimUpdate synchronously reserves the single update slot: it acquires
+// applyMu, rejects the claim while a flow is in progress (BackingUp/Applying;
+// Idle, Completed and Failed are startable), and sets state = BackingUp before
+// returning. The caller must then call Run, which releases applyMu.
+func (s *UpdateService) ClaimUpdate() (*UpdateRun, error) {
+	if !s.applyMu.TryLock() {
+		return nil, fmt.Errorf("update already in progress")
+	}
+
 	s.flowStateMu.RLock()
 	if s.flowState.State.InProgress() {
+		state := s.flowState.State
 		s.flowStateMu.RUnlock()
-		return fmt.Errorf("update cannot start: state is %s", s.flowState.State)
+		s.applyMu.Unlock()
+		return nil, fmt.Errorf("update cannot start: state is %s", state)
 	}
 	s.flowStateMu.RUnlock()
 
-	// Get current version for backup record
 	preApplyStatus := s.GetCachedStatus()
+	// A fresh state also clears the previous run's error reason and backup ID.
+	claimed := model.UpdateFlowState{
+		State:            model.StateBackingUp,
+		Phase:            "backup",
+		AvailableVersion: preApplyStatus.LatestVersion,
+	}
+	s.setFlowState(claimed)
+	return &UpdateRun{svc: s, preApplyStatus: preApplyStatus, claimed: claimed}, nil
+}
+
+// State returns the flow state set when the run was claimed (BackingUp).
+func (r *UpdateRun) State() model.UpdateFlowState { return r.claimed }
+
+// Run executes the claimed flow: backup, persist to catalog, Applying, npm
+// install, then Completed or Failed. applyMu is released when Run returns,
+// including on panic.
+func (r *UpdateRun) Run(ctx context.Context) error {
+	s := r.svc
+	defer s.applyMu.Unlock()
+
+	preApplyStatus := r.preApplyStatus
 	fromVersion := preApplyStatus.CurrentVersion
 	if fromVersion == "" {
 		fromVersion = "unknown"
 	}
-
-	// Step 1: BackingUp
-	s.setFlowState(model.UpdateFlowState{
-		State: model.StateBackingUp,
-		Phase: "backup",
-	})
 
 	// Create backup
 	backupEntry, err := s.CreateBackup(ctx, fromVersion)
