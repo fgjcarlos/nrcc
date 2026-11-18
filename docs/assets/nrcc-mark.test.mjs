@@ -44,7 +44,15 @@ assert(favicon.length > 0, 'favicon.svg exists and is non-empty');
 assert(/role="img"/.test(mark) && /aria-label="NRCC mark"/.test(mark), 'nrcc-mark.svg declares role=img + aria-label');
 assert(/role="img"/.test(favicon) && /aria-label="NRCC"/.test(favicon), 'favicon.svg declares role=img + aria-label');
 // Colour checks ignore comments so prose cannot satisfy them.
-const stripComments = (svg) => svg.replace(/<!--[\s\S]*?-->/g, '');
+// Repeat until stable so a nested '<!-<!---->-' cannot leave a comment behind.
+const stripComments = (svg) => {
+  let previous;
+  do {
+    previous = svg;
+    svg = svg.replace(/<!--[\s\S]*?-->/g, '');
+  } while (svg !== previous);
+  return svg;
+};
 const markBody = stripComments(mark);
 const faviconBody = stripComments(favicon);
 const TOKENS = [
