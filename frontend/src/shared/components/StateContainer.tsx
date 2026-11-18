@@ -1,6 +1,8 @@
 import { ReactNode } from 'react';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useT } from '@/i18n';
+import { EmptyState } from './feedback/EmptyState';
+import { ErrorState } from './feedback/ErrorState';
 
 /**
  * Presentational component for standardized loading/error/empty state branching
@@ -10,6 +12,8 @@ export interface StateContainerProps {
   isLoading: boolean;
   isError: boolean;
   isEmpty: boolean;
+  /** Visible text of the default loading status (defaults to common:loading). */
+  loadingLabel?: string;
   loadingSlot?: ReactNode;
   errorSlot?: ReactNode;
   emptySlot?: ReactNode;
@@ -20,6 +24,7 @@ export function StateContainer({
   isLoading,
   isError,
   isEmpty,
+  loadingLabel,
   loadingSlot,
   errorSlot,
   emptySlot,
@@ -31,38 +36,24 @@ export function StateContainer({
   if (isLoading) {
     return (
       loadingSlot || (
-        <div className="flex flex-col items-center justify-center gap-3 py-12">
-          <Loader2 className="w-8 h-8 text-primary animate-spin" />
-          <p className="text-base-content/60">{loadingSlot || t('common:loading')}</p>
+        <div
+          role="status"
+          aria-busy="true"
+          className="flex items-center justify-center gap-2 py-10 text-sm text-ds-text-secondary"
+        >
+          <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+          {loadingLabel ?? t('common:loading')}
         </div>
       )
     );
   }
 
   if (isError) {
-    return (
-      errorSlot || (
-        <div className="p-6 rounded-lg border border-error/20 bg-error/8">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-error flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-base-content font-medium">{t('common:errorOccurred')}</p>
-              <p className="text-base-content/60 text-sm mt-1">{t('common:tryAgainLater')}</p>
-            </div>
-          </div>
-        </div>
-      )
-    );
+    return errorSlot || <ErrorState title={t('common:errorOccurred')} description={t('common:tryAgainLater')} />;
   }
 
   if (isEmpty) {
-    return (
-      emptySlot || (
-        <div className="flex flex-col items-center justify-center gap-2 py-12">
-          <p className="text-base-content/60">{t('common:noItemsYet')}</p>
-        </div>
-      )
-    );
+    return emptySlot || <EmptyState title={t('common:noItemsYet')} />;
   }
 
   return <>{children}</>;

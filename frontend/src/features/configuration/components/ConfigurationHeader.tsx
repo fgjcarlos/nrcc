@@ -1,45 +1,36 @@
-import { Settings } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { useT } from '@/i18n';
-import { NrccTopologyDiagram } from './NrccTopologyDiagram';
 
 /**
- * ConfigurationHeader — issue #766 slice F (W3)
+ * ConfigurationHeader — issue #766 slice F (W3), T9 layout.
  *
- * Replaces the inline header inside `ConfigurationView`. Renders the
- * page title with the settings icon and embeds the
- * `NrccTopologyDiagram` so the operator sees the
- * `NRCC → settings.js → Node-RED` data flow above the form.
- *
- * The topology diagram is a sibling element of the title block so the
- * header stays readable at narrow viewports — the diagram collapses to
- * its icon-only representation below 480 px.
+ * Page title with its designator (the settings.js revision) and one
+ * runtime status beside it, host details underneath. The topology
+ * diagram lives on the Security page only; at header size its labels
+ * were illegible and competed with the runtime status.
  */
 export interface ConfigurationHeaderProps {
-  /** Optional flag: when true, the topology diagram is hidden (e.g.
-   *  on narrow viewports where it doesn't fit cleanly). */
-  hideTopology?: boolean;
+  /** Mono designator for the configuration source, e.g. "REV a1b2c3d4". */
+  designator?: ReactNode;
+  /** One runtime status shown next to the title. */
+  status?: ReactNode;
+  /** Host details rendered under the title. */
+  children?: ReactNode;
 }
 
-export function ConfigurationHeader({ hideTopology }: ConfigurationHeaderProps) {
+export function ConfigurationHeader({ designator, status, children }: ConfigurationHeaderProps) {
   const { t } = useT();
 
   return (
-    <header className="flex flex-col gap-6 border-b border-border pb-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">
-            {t('configuration:settings')}
-          </p>
-          <h1
-            id="configuration-view-title"
-            className="flex items-center gap-3 text-2xl font-bold text-base-content"
-          >
-            <Settings className="h-6 w-6" aria-hidden="true" />
-            {t('configuration:pageTitle')}
-          </h1>
-        </div>
+    <header className="min-w-0 space-y-1 border-b border-ds-border-subtle pb-3">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <h1 id="configuration-view-title" className="text-xl font-bold text-ds-text-primary">
+          {t('configuration:pageTitle')}
+        </h1>
+        {designator}
+        {status}
       </div>
-      {!hideTopology && <NrccTopologyDiagram />}
+      {children}
     </header>
   );
 }

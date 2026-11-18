@@ -7,9 +7,8 @@ import { cn } from '@/shared/lib/utils';
  *
  * Reusable status surface used by Configuration, Security, Environment,
  * Recovery and Overview to communicate the state of an item at a glance.
- * Replaces the inline chip pattern (rounded-full, padding-3, small text,
- * 15-percent accent background) currently duplicated across pages
- * (e.g. EdgeModeBadge).
+ * Replaces the inline chip pattern (pill, padding-3, small text,
+ * 15-percent accent background) that was duplicated across pages.
  *
  * Variants map to the existing ds-* semantic palette in
  * tailwind.config.js — no new colours are introduced. Labels sit on a
@@ -18,7 +17,8 @@ import { cn } from '@/shared/lib/utils';
  */
 
 const statusChipVariants = cva(
-  'inline-flex items-center gap-1.5 rounded-full font-medium transition-colors ' +
+  // 2px selector radius, the same as daisyUI badges (L19).
+  'inline-flex items-center gap-1.5 rounded-selector font-medium transition-colors ' +
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 ' +
     'focus-visible:ring-offset-base-100 focus-visible:ring-ds-accent-primary',
   {

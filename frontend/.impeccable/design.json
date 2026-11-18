@@ -1,0 +1,920 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-16T06:47:38.298Z",
+  "title": "Design System: NRCC",
+  "extensions": {
+    "colorMeta": {
+      "conductor-blue": {
+        "role": "primary",
+        "displayName": "Neutral Conductor Blue",
+        "theme": "corporateLight",
+        "canonical": "#2b5fb4",
+        "oklch": "oklch(49.7% 0.146 259.8)",
+        "tonalRamp": [
+          "oklch(15.0% 0.055 259.8)",
+          "oklch(26.4% 0.081 259.8)",
+          "oklch(37.9% 0.107 259.8)",
+          "oklch(49.3% 0.133 259.8)",
+          "oklch(60.7% 0.133 259.8)",
+          "oklch(72.1% 0.107 259.8)",
+          "oklch(83.6% 0.081 259.8)",
+          "oklch(95.0% 0.055 259.8)"
+        ]
+      },
+      "conductor-blue-hover": {
+        "role": "primary",
+        "displayName": "Conductor Blue, Hover",
+        "theme": "corporateLight",
+        "canonical": "#234e94",
+        "oklch": "oklch(43.3% 0.125 259.7)",
+        "tonalRamp": [
+          "oklch(15.0% 0.047 259.7)",
+          "oklch(26.4% 0.069 259.7)",
+          "oklch(37.9% 0.092 259.7)",
+          "oklch(49.3% 0.114 259.7)",
+          "oklch(60.7% 0.114 259.7)",
+          "oklch(72.1% 0.092 259.7)",
+          "oklch(83.6% 0.069 259.7)",
+          "oklch(95.0% 0.047 259.7)"
+        ]
+      },
+      "conductor-blue-dim": {
+        "role": "primary",
+        "displayName": "Conductor Blue, Dim",
+        "theme": "corporateLight",
+        "canonical": "#dbe4f3",
+        "oklch": "oklch(91.7% 0.023 260.7)",
+        "tonalRamp": [
+          "oklch(15.0% 0.009 260.7)",
+          "oklch(26.4% 0.013 260.7)",
+          "oklch(37.9% 0.017 260.7)",
+          "oklch(49.3% 0.021 260.7)",
+          "oklch(60.7% 0.021 260.7)",
+          "oklch(72.1% 0.017 260.7)",
+          "oklch(83.6% 0.013 260.7)",
+          "oklch(95.0% 0.009 260.7)"
+        ]
+      },
+      "conductor-blue-text": {
+        "role": "primary",
+        "displayName": "Conductor Blue Text",
+        "theme": "corporateLight",
+        "canonical": "#2959a8",
+        "oklch": "oklch(47.5% 0.137 259.9)",
+        "tonalRamp": [
+          "oklch(15.0% 0.052 259.9)",
+          "oklch(26.4% 0.076 259.9)",
+          "oklch(37.9% 0.101 259.9)",
+          "oklch(49.3% 0.125 259.9)",
+          "oklch(60.7% 0.125 259.9)",
+          "oklch(72.1% 0.101 259.9)",
+          "oklch(83.6% 0.076 259.9)",
+          "oklch(95.0% 0.052 259.9)"
+        ]
+      },
+      "pending-brown": {
+        "role": "secondary",
+        "displayName": "Pending Brown",
+        "theme": "corporateLight",
+        "canonical": "#7a4a2a",
+        "oklch": "oklch(45.8% 0.080 53.1)",
+        "tonalRamp": [
+          "oklch(15.0% 0.030 53.1)",
+          "oklch(26.4% 0.044 53.1)",
+          "oklch(37.9% 0.059 53.1)",
+          "oklch(49.3% 0.073 53.1)",
+          "oklch(60.7% 0.073 53.1)",
+          "oklch(72.1% 0.059 53.1)",
+          "oklch(83.6% 0.044 53.1)",
+          "oklch(95.0% 0.030 53.1)"
+        ]
+      },
+      "verified-green": {
+        "role": "secondary",
+        "displayName": "Verified Green",
+        "theme": "corporateLight",
+        "canonical": "#2d6a22",
+        "oklch": "oklch(46.7% 0.123 140.8)",
+        "tonalRamp": [
+          "oklch(15.0% 0.046 140.8)",
+          "oklch(26.4% 0.068 140.8)",
+          "oklch(37.9% 0.090 140.8)",
+          "oklch(49.3% 0.112 140.8)",
+          "oklch(60.7% 0.112 140.8)",
+          "oklch(72.1% 0.090 140.8)",
+          "oklch(83.6% 0.068 140.8)",
+          "oklch(95.0% 0.046 140.8)"
+        ]
+      },
+      "verified-green-text": {
+        "role": "secondary",
+        "displayName": "Verified Green Text",
+        "theme": "corporateLight",
+        "canonical": "#2c6722",
+        "oklch": "oklch(45.8% 0.119 140.9)",
+        "tonalRamp": [
+          "oklch(15.0% 0.045 140.9)",
+          "oklch(26.4% 0.066 140.9)",
+          "oklch(37.9% 0.087 140.9)",
+          "oklch(49.3% 0.108 140.9)",
+          "oklch(60.7% 0.108 140.9)",
+          "oklch(72.1% 0.087 140.9)",
+          "oklch(83.6% 0.066 140.9)",
+          "oklch(95.0% 0.045 140.9)"
+        ]
+      },
+      "verified-fill": {
+        "role": "secondary",
+        "displayName": "Green-Yellow Verified Fill",
+        "theme": "both",
+        "canonical": "#c9b81a",
+        "oklch": "oklch(77.3% 0.157 102.5)",
+        "tonalRamp": [
+          "oklch(15.0% 0.059 102.5)",
+          "oklch(26.4% 0.087 102.5)",
+          "oklch(37.9% 0.115 102.5)",
+          "oklch(49.3% 0.143 102.5)",
+          "oklch(60.7% 0.143 102.5)",
+          "oklch(72.1% 0.115 102.5)",
+          "oklch(83.6% 0.087 102.5)",
+          "oklch(95.0% 0.059 102.5)"
+        ]
+      },
+      "critical-red": {
+        "role": "tertiary",
+        "displayName": "Critical Red",
+        "theme": "corporateLight",
+        "canonical": "#b3261e",
+        "oklch": "oklch(50.1% 0.178 28.7)",
+        "tonalRamp": [
+          "oklch(15.0% 0.067 28.7)",
+          "oklch(26.4% 0.099 28.7)",
+          "oklch(37.9% 0.131 28.7)",
+          "oklch(49.3% 0.162 28.7)",
+          "oklch(60.7% 0.162 28.7)",
+          "oklch(72.1% 0.131 28.7)",
+          "oklch(83.6% 0.099 28.7)",
+          "oklch(95.0% 0.067 28.7)"
+        ]
+      },
+      "critical-red-text": {
+        "role": "tertiary",
+        "displayName": "Critical Red Text",
+        "theme": "corporateLight",
+        "canonical": "#a8251e",
+        "oklch": "oklch(48.0% 0.168 28.4)",
+        "tonalRamp": [
+          "oklch(15.0% 0.064 28.4)",
+          "oklch(26.4% 0.094 28.4)",
+          "oklch(37.9% 0.123 28.4)",
+          "oklch(49.3% 0.153 28.4)",
+          "oklch(60.7% 0.153 28.4)",
+          "oklch(72.1% 0.123 28.4)",
+          "oklch(83.6% 0.094 28.4)",
+          "oklch(95.0% 0.064 28.4)"
+        ]
+      },
+      "warning-amber": {
+        "role": "tertiary",
+        "displayName": "Warning Amber",
+        "theme": "corporateLight",
+        "canonical": "#e8a317",
+        "oklch": "oklch(76.3% 0.155 77.3)",
+        "tonalRamp": [
+          "oklch(15.0% 0.059 77.3)",
+          "oklch(26.4% 0.086 77.3)",
+          "oklch(37.9% 0.114 77.3)",
+          "oklch(49.3% 0.141 77.3)",
+          "oklch(60.7% 0.141 77.3)",
+          "oklch(72.1% 0.114 77.3)",
+          "oklch(83.6% 0.086 77.3)",
+          "oklch(95.0% 0.059 77.3)"
+        ]
+      },
+      "warning-amber-text": {
+        "role": "tertiary",
+        "displayName": "Warning Amber Text",
+        "theme": "corporateLight",
+        "canonical": "#8a5a00",
+        "oklch": "oklch(50.8% 0.108 73.3)",
+        "tonalRamp": [
+          "oklch(15.0% 0.041 73.3)",
+          "oklch(26.4% 0.060 73.3)",
+          "oklch(37.9% 0.079 73.3)",
+          "oklch(49.3% 0.098 73.3)",
+          "oklch(60.7% 0.098 73.3)",
+          "oklch(72.1% 0.079 73.3)",
+          "oklch(83.6% 0.060 73.3)",
+          "oklch(95.0% 0.041 73.3)"
+        ]
+      },
+      "drawing-white": {
+        "role": "neutral",
+        "displayName": "Drawing White",
+        "theme": "corporateLight",
+        "canonical": "#f6f5f0",
+        "oklch": "oklch(97.0% 0.007 97.4)",
+        "tonalRamp": [
+          "oklch(15.0% 0.003 97.4)",
+          "oklch(26.4% 0.004 97.4)",
+          "oklch(37.9% 0.005 97.4)",
+          "oklch(49.3% 0.006 97.4)",
+          "oklch(60.7% 0.006 97.4)",
+          "oklch(72.1% 0.005 97.4)",
+          "oklch(83.6% 0.004 97.4)",
+          "oklch(95.0% 0.003 97.4)"
+        ]
+      },
+      "drawing-sunken": {
+        "role": "neutral",
+        "displayName": "Sunken Sheet",
+        "theme": "corporateLight",
+        "canonical": "#eeede6",
+        "oklch": "oklch(94.5% 0.009 100.0)",
+        "tonalRamp": [
+          "oklch(15.0% 0.004 100.0)",
+          "oklch(26.4% 0.005 100.0)",
+          "oklch(37.9% 0.007 100.0)",
+          "oklch(49.3% 0.009 100.0)",
+          "oklch(60.7% 0.009 100.0)",
+          "oklch(72.1% 0.007 100.0)",
+          "oklch(83.6% 0.005 100.0)",
+          "oklch(95.0% 0.004 100.0)"
+        ]
+      },
+      "sheet": {
+        "role": "neutral",
+        "displayName": "Sheet",
+        "theme": "corporateLight",
+        "canonical": "#fbfaf7",
+        "oklch": "oklch(98.5% 0.004 91.4)",
+        "tonalRamp": [
+          "oklch(15.0% 0.002 91.4)",
+          "oklch(26.4% 0.002 91.4)",
+          "oklch(37.9% 0.003 91.4)",
+          "oklch(49.3% 0.004 91.4)",
+          "oklch(60.7% 0.004 91.4)",
+          "oklch(72.1% 0.003 91.4)",
+          "oklch(83.6% 0.002 91.4)",
+          "oklch(95.0% 0.002 91.4)"
+        ]
+      },
+      "sheet-raised": {
+        "role": "neutral",
+        "displayName": "Raised Sheet",
+        "theme": "corporateLight",
+        "canonical": "#ffffff",
+        "oklch": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "oklch(15.0% 0.000 89.9)",
+          "oklch(26.4% 0.000 89.9)",
+          "oklch(37.9% 0.000 89.9)",
+          "oklch(49.3% 0.000 89.9)",
+          "oklch(60.7% 0.000 89.9)",
+          "oklch(72.1% 0.000 89.9)",
+          "oklch(83.6% 0.000 89.9)",
+          "oklch(95.0% 0.000 89.9)"
+        ]
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "theme": "corporateLight",
+        "canonical": "#d6d4cb",
+        "oklch": "oklch(86.9% 0.012 96.4)",
+        "tonalRamp": [
+          "oklch(15.0% 0.005 96.4)",
+          "oklch(26.4% 0.007 96.4)",
+          "oklch(37.9% 0.009 96.4)",
+          "oklch(49.3% 0.011 96.4)",
+          "oklch(60.7% 0.011 96.4)",
+          "oklch(72.1% 0.009 96.4)",
+          "oklch(83.6% 0.007 96.4)",
+          "oklch(95.0% 0.005 96.4)"
+        ]
+      },
+      "control-border": {
+        "role": "neutral",
+        "displayName": "Control Border",
+        "theme": "corporateLight",
+        "canonical": "#838891",
+        "oklch": "oklch(62.6% 0.015 262.4)",
+        "tonalRamp": [
+          "oklch(15.0% 0.006 262.4)",
+          "oklch(26.4% 0.008 262.4)",
+          "oklch(37.9% 0.011 262.4)",
+          "oklch(49.3% 0.013 262.4)",
+          "oklch(60.7% 0.013 262.4)",
+          "oklch(72.1% 0.011 262.4)",
+          "oklch(83.6% 0.008 262.4)",
+          "oklch(95.0% 0.006 262.4)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "theme": "corporateLight",
+        "canonical": "#15171c",
+        "oklch": "oklch(20.5% 0.010 268.2)",
+        "tonalRamp": [
+          "oklch(15.0% 0.004 268.2)",
+          "oklch(26.4% 0.006 268.2)",
+          "oklch(37.9% 0.008 268.2)",
+          "oklch(49.3% 0.010 268.2)",
+          "oklch(60.7% 0.010 268.2)",
+          "oklch(72.1% 0.008 268.2)",
+          "oklch(83.6% 0.006 268.2)",
+          "oklch(95.0% 0.004 268.2)"
+        ]
+      },
+      "ink-secondary": {
+        "role": "neutral",
+        "displayName": "Ink Secondary",
+        "theme": "corporateLight",
+        "canonical": "#3d424b",
+        "oklch": "oklch(37.8% 0.017 262.3)",
+        "tonalRamp": [
+          "oklch(15.0% 0.006 262.3)",
+          "oklch(26.4% 0.009 262.3)",
+          "oklch(37.9% 0.012 262.3)",
+          "oklch(49.3% 0.015 262.3)",
+          "oklch(60.7% 0.015 262.3)",
+          "oklch(72.1% 0.012 262.3)",
+          "oklch(83.6% 0.009 262.3)",
+          "oklch(95.0% 0.006 262.3)"
+        ]
+      },
+      "ink-muted": {
+        "role": "neutral",
+        "displayName": "Ink Muted",
+        "theme": "corporateLight",
+        "canonical": "#5c626c",
+        "oklch": "oklch(49.4% 0.018 260.7)",
+        "tonalRamp": [
+          "oklch(15.0% 0.007 260.7)",
+          "oklch(26.4% 0.010 260.7)",
+          "oklch(37.9% 0.013 260.7)",
+          "oklch(49.3% 0.016 260.7)",
+          "oklch(60.7% 0.016 260.7)",
+          "oklch(72.1% 0.013 260.7)",
+          "oklch(83.6% 0.010 260.7)",
+          "oklch(95.0% 0.007 260.7)"
+        ]
+      },
+      "rail-text": {
+        "role": "neutral",
+        "displayName": "Rail Text",
+        "theme": "both",
+        "canonical": "#e9e7df",
+        "oklch": "oklch(92.7% 0.011 95.2)",
+        "tonalRamp": [
+          "oklch(15.0% 0.004 95.2)",
+          "oklch(26.4% 0.006 95.2)",
+          "oklch(37.9% 0.008 95.2)",
+          "oklch(49.3% 0.010 95.2)",
+          "oklch(60.7% 0.010 95.2)",
+          "oklch(72.1% 0.008 95.2)",
+          "oklch(83.6% 0.006 95.2)",
+          "oklch(95.0% 0.004 95.2)"
+        ]
+      },
+      "conductor-blue-dark": {
+        "role": "primary",
+        "displayName": "Neutral Conductor Blue (dark)",
+        "theme": "corporateDark",
+        "canonical": "#7fa6ea",
+        "oklch": "oklch(72.4% 0.109 261.1)",
+        "tonalRamp": [
+          "oklch(15.0% 0.041 261.1)",
+          "oklch(26.4% 0.060 261.1)",
+          "oklch(37.9% 0.080 261.1)",
+          "oklch(49.3% 0.099 261.1)",
+          "oklch(60.7% 0.099 261.1)",
+          "oklch(72.1% 0.080 261.1)",
+          "oklch(83.6% 0.060 261.1)",
+          "oklch(95.0% 0.041 261.1)"
+        ]
+      },
+      "conductor-blue-hover-dark": {
+        "role": "primary",
+        "displayName": "Conductor Blue, Hover (dark)",
+        "theme": "corporateDark",
+        "canonical": "#9ab9ef",
+        "oklch": "oklch(78.2% 0.085 261.3)",
+        "tonalRamp": [
+          "oklch(15.0% 0.032 261.3)",
+          "oklch(26.4% 0.047 261.3)",
+          "oklch(37.9% 0.062 261.3)",
+          "oklch(49.3% 0.077 261.3)",
+          "oklch(60.7% 0.077 261.3)",
+          "oklch(72.1% 0.062 261.3)",
+          "oklch(83.6% 0.047 261.3)",
+          "oklch(95.0% 0.032 261.3)"
+        ]
+      },
+      "conductor-blue-dim-dark": {
+        "role": "primary",
+        "displayName": "Conductor Blue, Dim (dark)",
+        "theme": "corporateDark",
+        "canonical": "#24375a",
+        "oklch": "oklch(33.9% 0.067 261.8)",
+        "tonalRamp": [
+          "oklch(15.0% 0.025 261.8)",
+          "oklch(26.4% 0.037 261.8)",
+          "oklch(37.9% 0.049 261.8)",
+          "oklch(49.3% 0.061 261.8)",
+          "oklch(60.7% 0.061 261.8)",
+          "oklch(72.1% 0.049 261.8)",
+          "oklch(83.6% 0.037 261.8)",
+          "oklch(95.0% 0.025 261.8)"
+        ]
+      },
+      "pending-brown-dark": {
+        "role": "secondary",
+        "displayName": "Pending Brown (dark)",
+        "theme": "corporateDark",
+        "canonical": "#c99a6e",
+        "oklch": "oklch(72.0% 0.082 64.1)",
+        "tonalRamp": [
+          "oklch(15.0% 0.031 64.1)",
+          "oklch(26.4% 0.045 64.1)",
+          "oklch(37.9% 0.060 64.1)",
+          "oklch(49.3% 0.074 64.1)",
+          "oklch(60.7% 0.074 64.1)",
+          "oklch(72.1% 0.060 64.1)",
+          "oklch(83.6% 0.045 64.1)",
+          "oklch(95.0% 0.031 64.1)"
+        ]
+      },
+      "verified-green-dark": {
+        "role": "secondary",
+        "displayName": "Verified Green (dark)",
+        "theme": "corporateDark",
+        "canonical": "#8cc66b",
+        "oklch": "oklch(76.6% 0.136 135.1)",
+        "tonalRamp": [
+          "oklch(15.0% 0.051 135.1)",
+          "oklch(26.4% 0.076 135.1)",
+          "oklch(37.9% 0.100 135.1)",
+          "oklch(49.3% 0.124 135.1)",
+          "oklch(60.7% 0.124 135.1)",
+          "oklch(72.1% 0.100 135.1)",
+          "oklch(83.6% 0.076 135.1)",
+          "oklch(95.0% 0.051 135.1)"
+        ]
+      },
+      "critical-red-dark": {
+        "role": "tertiary",
+        "displayName": "Critical Red (dark)",
+        "theme": "corporateDark",
+        "canonical": "#f08a80",
+        "oklch": "oklch(74.0% 0.126 26.5)",
+        "tonalRamp": [
+          "oklch(15.0% 0.048 26.5)",
+          "oklch(26.4% 0.070 26.5)",
+          "oklch(37.9% 0.092 26.5)",
+          "oklch(49.3% 0.115 26.5)",
+          "oklch(60.7% 0.115 26.5)",
+          "oklch(72.1% 0.092 26.5)",
+          "oklch(83.6% 0.070 26.5)",
+          "oklch(95.0% 0.048 26.5)"
+        ]
+      },
+      "warning-amber-dark": {
+        "role": "tertiary",
+        "displayName": "Warning Amber (dark)",
+        "theme": "corporateDark",
+        "canonical": "#e8b04a",
+        "oklch": "oklch(79.1% 0.134 79.5)",
+        "tonalRamp": [
+          "oklch(15.0% 0.051 79.5)",
+          "oklch(26.4% 0.074 79.5)",
+          "oklch(37.9% 0.098 79.5)",
+          "oklch(49.3% 0.122 79.5)",
+          "oklch(60.7% 0.122 79.5)",
+          "oklch(72.1% 0.098 79.5)",
+          "oklch(83.6% 0.074 79.5)",
+          "oklch(95.0% 0.051 79.5)"
+        ]
+      },
+      "drawing-negative": {
+        "role": "neutral",
+        "displayName": "Drawing Negative",
+        "theme": "corporateDark",
+        "canonical": "#111317",
+        "oklch": "oklch(18.6% 0.009 264.3)",
+        "tonalRamp": [
+          "oklch(15.0% 0.003 264.3)",
+          "oklch(26.4% 0.005 264.3)",
+          "oklch(37.9% 0.006 264.3)",
+          "oklch(49.3% 0.008 264.3)",
+          "oklch(60.7% 0.008 264.3)",
+          "oklch(72.1% 0.006 264.3)",
+          "oklch(83.6% 0.005 264.3)",
+          "oklch(95.0% 0.003 264.3)"
+        ]
+      },
+      "drawing-sunken-dark": {
+        "role": "neutral",
+        "displayName": "Sunken Sheet (dark)",
+        "theme": "corporateDark",
+        "canonical": "#0c0e11",
+        "oklch": "oklch(16.3% 0.007 258.4)",
+        "tonalRamp": [
+          "oklch(15.0% 0.003 258.4)",
+          "oklch(26.4% 0.004 258.4)",
+          "oklch(37.9% 0.005 258.4)",
+          "oklch(49.3% 0.007 258.4)",
+          "oklch(60.7% 0.007 258.4)",
+          "oklch(72.1% 0.005 258.4)",
+          "oklch(83.6% 0.004 258.4)",
+          "oklch(95.0% 0.003 258.4)"
+        ]
+      },
+      "sheet-dark": {
+        "role": "neutral",
+        "displayName": "Sheet (dark)",
+        "theme": "corporateDark",
+        "canonical": "#171a1f",
+        "oklch": "oklch(21.7% 0.011 260.7)",
+        "tonalRamp": [
+          "oklch(15.0% 0.004 260.7)",
+          "oklch(26.4% 0.006 260.7)",
+          "oklch(37.9% 0.008 260.7)",
+          "oklch(49.3% 0.010 260.7)",
+          "oklch(60.7% 0.010 260.7)",
+          "oklch(72.1% 0.008 260.7)",
+          "oklch(83.6% 0.006 260.7)",
+          "oklch(95.0% 0.004 260.7)"
+        ]
+      },
+      "sheet-raised-dark": {
+        "role": "neutral",
+        "displayName": "Raised Sheet (dark)",
+        "theme": "corporateDark",
+        "canonical": "#1d2128",
+        "oklch": "oklch(24.7% 0.015 261.7)",
+        "tonalRamp": [
+          "oklch(15.0% 0.006 261.7)",
+          "oklch(26.4% 0.008 261.7)",
+          "oklch(37.9% 0.011 261.7)",
+          "oklch(49.3% 0.013 261.7)",
+          "oklch(60.7% 0.013 261.7)",
+          "oklch(72.1% 0.011 261.7)",
+          "oklch(83.6% 0.008 261.7)",
+          "oklch(95.0% 0.006 261.7)"
+        ]
+      },
+      "hairline-dark": {
+        "role": "neutral",
+        "displayName": "Hairline (dark)",
+        "theme": "corporateDark",
+        "canonical": "#2a2f37",
+        "oklch": "oklch(30.4% 0.016 259.8)",
+        "tonalRamp": [
+          "oklch(15.0% 0.006 259.8)",
+          "oklch(26.4% 0.009 259.8)",
+          "oklch(37.9% 0.012 259.8)",
+          "oklch(49.3% 0.015 259.8)",
+          "oklch(60.7% 0.015 259.8)",
+          "oklch(72.1% 0.012 259.8)",
+          "oklch(83.6% 0.009 259.8)",
+          "oklch(95.0% 0.006 259.8)"
+        ]
+      },
+      "control-border-dark": {
+        "role": "neutral",
+        "displayName": "Control Border (dark)",
+        "theme": "corporateDark",
+        "canonical": "#6b717c",
+        "oklch": "oklch(54.7% 0.019 262.7)",
+        "tonalRamp": [
+          "oklch(15.0% 0.007 262.7)",
+          "oklch(26.4% 0.010 262.7)",
+          "oklch(37.9% 0.014 262.7)",
+          "oklch(49.3% 0.017 262.7)",
+          "oklch(60.7% 0.017 262.7)",
+          "oklch(72.1% 0.014 262.7)",
+          "oklch(83.6% 0.010 262.7)",
+          "oklch(95.0% 0.007 262.7)"
+        ]
+      },
+      "ink-dark": {
+        "role": "neutral",
+        "displayName": "Ink (dark)",
+        "theme": "corporateDark",
+        "canonical": "#e9e7df",
+        "oklch": "oklch(92.7% 0.011 95.2)",
+        "tonalRamp": [
+          "oklch(15.0% 0.004 95.2)",
+          "oklch(26.4% 0.006 95.2)",
+          "oklch(37.9% 0.008 95.2)",
+          "oklch(49.3% 0.010 95.2)",
+          "oklch(60.7% 0.010 95.2)",
+          "oklch(72.1% 0.008 95.2)",
+          "oklch(83.6% 0.006 95.2)",
+          "oklch(95.0% 0.004 95.2)"
+        ]
+      },
+      "ink-secondary-dark": {
+        "role": "neutral",
+        "displayName": "Ink Secondary (dark)",
+        "theme": "corporateDark",
+        "canonical": "#c3c1b8",
+        "oklch": "oklch(81.0% 0.013 96.5)",
+        "tonalRamp": [
+          "oklch(15.0% 0.005 96.5)",
+          "oklch(26.4% 0.007 96.5)",
+          "oklch(37.9% 0.009 96.5)",
+          "oklch(49.3% 0.012 96.5)",
+          "oklch(60.7% 0.012 96.5)",
+          "oklch(72.1% 0.009 96.5)",
+          "oklch(83.6% 0.007 96.5)",
+          "oklch(95.0% 0.005 96.5)"
+        ]
+      },
+      "ink-muted-dark": {
+        "role": "neutral",
+        "displayName": "Ink Muted (dark)",
+        "theme": "corporateDark",
+        "canonical": "#9a9ea6",
+        "oklch": "oklch(69.9% 0.013 264.5)",
+        "tonalRamp": [
+          "oklch(15.0% 0.005 264.5)",
+          "oklch(26.4% 0.007 264.5)",
+          "oklch(37.9% 0.009 264.5)",
+          "oklch(49.3% 0.011 264.5)",
+          "oklch(60.7% 0.011 264.5)",
+          "oklch(72.1% 0.009 264.5)",
+          "oklch(83.6% 0.007 264.5)",
+          "oklch(95.0% 0.005 264.5)"
+        ]
+      },
+      "rail-dark": {
+        "role": "neutral",
+        "displayName": "Ink Rail (dark)",
+        "theme": "corporateDark",
+        "canonical": "#0a0b0d",
+        "oklch": "oklch(14.9% 0.005 264.5)",
+        "tonalRamp": [
+          "oklch(15.0% 0.002 264.5)",
+          "oklch(26.4% 0.003 264.5)",
+          "oklch(37.9% 0.003 264.5)",
+          "oklch(49.3% 0.004 264.5)",
+          "oklch(60.7% 0.004 264.5)",
+          "oklch(72.1% 0.003 264.5)",
+          "oklch(83.6% 0.003 264.5)",
+          "oklch(95.0% 0.002 264.5)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "title": {
+        "displayName": "Title",
+        "purpose": "The page title only, one per view."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Form controls, tabs, descriptions, runtime status."
+      },
+      "body-strong": {
+        "displayName": "Body Strong",
+        "purpose": "Section headings and contact names."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Field labels, help text, contact state words, proof lines, totals (400 to 600)."
+      },
+      "designator": {
+        "displayName": "Designator",
+        "purpose": "REV, K1–K6, RB, settings keys, server error codes, version numbers."
+      }
+    },
+    "shadows": [
+      {
+        "name": "raised-light",
+        "value": "0 1px 2px rgb(21 23 28 / 0.08)",
+        "purpose": "The one elevation (corporateLight, --ds-shadow-raised): panels and cards."
+      },
+      {
+        "name": "raised-dark",
+        "value": "0 1px 2px rgb(0 0 0 / 0.4)",
+        "purpose": "The one elevation (corporateDark, --ds-shadow-raised)."
+      },
+      {
+        "name": "focus-ring",
+        "value": "0 0 0 2px var(--ds-bg-base), 0 0 0 4px var(--ds-accent-primary)",
+        "purpose": "Keyboard focus: sheet-coloured halo plus a conductor-blue ring."
+      },
+      {
+        "name": "input-focus-glow",
+        "value": "0 0 0 3px color-mix(in srgb, var(--color-primary) 24%, transparent)",
+        "purpose": "Soft tint around a focused field."
+      },
+      {
+        "name": "input-error-glow",
+        "value": "0 0 0 3px color-mix(in srgb, var(--color-error) 24%, transparent)",
+        "purpose": "Soft tint around a field in error."
+      }
+    ],
+    "motion": [
+      {
+        "name": "motion-ease",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "The one curve (exponential ease-out, --motion-ease). Every transition-* and ease-out utility resolves to it; no bounce, elastic or spring."
+      },
+      {
+        "name": "state-change",
+        "value": "150ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "State changes (--motion-state): contact close, chips, disclosure chevrons, toggles, colour and border changes on buttons, fields, rows and tabs."
+      },
+      {
+        "name": "contact-stagger",
+        "value": "60ms",
+        "purpose": "Per-contact delay (index × 60ms) so change-circuit contacts close in sequence."
+      },
+      {
+        "name": "overlay-entrance",
+        "value": "180ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Dialog, drawer and palette entrance (--motion-overlay, .motion-overlay): opacity from 0 plus a 4–8px translate (--overlay-from). Exit is instant."
+      },
+      {
+        "name": "scrim-entrance",
+        "value": "150ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Overlay backdrop fade (.motion-scrim), opacity only."
+      },
+      {
+        "name": "loops",
+        "value": "spinner 1s linear; skeleton pulse",
+        "purpose": "The only infinite animations: loading spinners and skeleton shimmer. No decorative loops."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "prefers-reduced-motion: reduce → 0.001ms, delays 0s",
+        "purpose": "Global rule: every transition and animation collapses and every delay (including the inline contact stagger) is dropped; state still shows."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "md",
+        "value": "768px",
+        "purpose": "Touch-target switch: below it every standalone target is at least 44×44px; from it at least 24×24px."
+      },
+      {
+        "name": "lg",
+        "value": "1024px",
+        "purpose": "The ink rail sits beside the content; below it the rail is a drawer behind the header menu button and the header controls are icon-only."
+      },
+      {
+        "name": "xl",
+        "value": "1280px",
+        "purpose": "Change circuit becomes a sticky 20rem right column; below it is a horizontal strip above the form. Header theme and update labels show."
+      }
+    ],
+    "themes": {
+      "light": "corporateLight (drawing white)",
+      "dark": "corporateDark (drawing negative)",
+      "attribute": "data-theme on <html>",
+      "source": "src/index.css"
+    },
+    "knownLimits": [
+      "No backup designator: the apply API returns no backup id, so the Backup contact shows \"Taken before write\" without a BK- number.",
+      "No live per-step progress: POST /api/config answers once, so Validate, Backup, Apply and Ready are Pending together while it runs."
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The action button: sheet ground, conductor-blue edge and label. \"Review N changes\" under the circuit.",
+      "html": "<button class=\"ds-btn-primary\" type=\"button\">Review 3 changes</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 36px; padding: 8px 16px; font: 500 0.875rem/1.43 'Overpass Variable', system-ui, sans-serif; color: var(--ds-on-tint-primary); background: var(--ds-bg-surface); border: 1px solid var(--color-primary); border-radius: 4px; cursor: pointer; transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-primary:hover { background: color-mix(in srgb, var(--color-primary) 10%, var(--ds-bg-surface)); } .ds-btn-primary:focus-visible { outline: 2px solid var(--ds-accent-primary); outline-offset: 2px; } .ds-btn-primary:disabled { opacity: 0.5; cursor: default; }"
+    },
+    {
+      "name": "Solid Primary Button",
+      "kind": "button",
+      "refersTo": "button-solid",
+      "description": "Conductor-blue fill for the single committing action of a dialog.",
+      "html": "<button class=\"ds-btn-solid\" type=\"button\">Apply</button>",
+      "css": ".ds-btn-solid { min-height: 36px; padding: 8px 16px; font: 600 0.875rem/1.43 'Overpass Variable', system-ui, sans-serif; color: var(--color-primary-content); background: var(--color-primary); border: 0; border-radius: 4px; cursor: pointer; transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-solid:hover { background: var(--ds-brand-hover); } .ds-btn-solid:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--ds-bg-base), 0 0 0 4px var(--ds-accent-primary); }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Control-border edge, ink label. \"Unlock to edit settings.js\".",
+      "html": "<button class=\"ds-btn-secondary\" type=\"button\">Unlock to edit settings.js</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 36px; padding: 8px 16px; font: 400 0.875rem/1.43 'Overpass Variable', system-ui, sans-serif; color: var(--color-base-content); background: var(--ds-bg-surface); border: 1px solid var(--ds-border-strong); border-radius: 4px; cursor: pointer; transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-secondary:hover { background: color-mix(in srgb, var(--ds-text-primary) 6%, var(--ds-bg-surface)); } .ds-btn-secondary:focus-visible { outline: 2px solid var(--ds-accent-primary); outline-offset: 2px; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Borderless secondary path, e.g. \"Discard changes\" under the circuit.",
+      "html": "<button class=\"ds-btn-ghost\" type=\"button\">Discard changes</button>",
+      "css": ".ds-btn-ghost { min-height: 36px; padding: 8px 12px; font: 400 0.875rem/1.43 'Overpass Variable', system-ui, sans-serif; color: var(--ds-text-secondary); background: transparent; border: 1px solid transparent; border-radius: 4px; cursor: pointer; transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1), color 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-ghost:hover { color: var(--ds-text-primary); background: color-mix(in srgb, var(--ds-text-muted) 10%, var(--ds-bg-surface)); } .ds-btn-ghost:focus-visible { outline: 2px solid var(--ds-accent-primary); outline-offset: 2px; }"
+    },
+    {
+      "name": "Field with Terminal Label",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Every settings field is labelled by its settings.js key in mono, a middle dot, then the human label.",
+      "html": "<div class=\"ds-field\"><label class=\"ds-field-label\" for=\"ds-uiport\"><span class=\"ds-key\">uiPort</span><span aria-hidden=\"true\">·</span><span>UI Port</span></label><input class=\"ds-input\" id=\"ds-uiport\" aria-label=\"UI Port (uiPort)\" value=\"1880\"></div>",
+      "css": ".ds-field { display: grid; gap: 4px; } .ds-field-label { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 6px; font: 400 0.75rem/1.33 'Overpass Variable', system-ui, sans-serif; color: var(--ds-text-secondary); } .ds-key { font: 600 0.75rem/1.33 'Overpass Mono', ui-monospace, monospace; color: var(--ds-text-primary); } .ds-input { width: 100%; padding: 8px 12px; font: 400 0.875rem/1.43 'Overpass Variable', system-ui, sans-serif; color: var(--ds-text-primary); background: var(--ds-bg-elevated); border: 1px solid var(--ds-border-strong); border-radius: 4px; outline: none; transition: border-color 150ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 24%, transparent); } .ds-input:focus-visible { outline: 2px solid var(--ds-accent-primary); outline-offset: 2px; }"
+    },
+    {
+      "name": "Section Tabs",
+      "kind": "nav",
+      "refersTo": "tab",
+      "description": "WAI-ARIA tablist on a hairline baseline; the selected tab carries a 2px conductor-blue underline.",
+      "html": "<div class=\"ds-tabs\" role=\"tablist\" aria-label=\"Sections\"><button class=\"ds-tab\" role=\"tab\" aria-selected=\"true\">Basic</button><button class=\"ds-tab\" role=\"tab\" aria-selected=\"false\" tabindex=\"-1\">Editor</button><button class=\"ds-tab\" role=\"tab\" aria-selected=\"false\" tabindex=\"-1\">Logging</button></div>",
+      "css": ".ds-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--ds-border-subtle); } .ds-tab { margin-bottom: -1px; min-height: 36px; padding: 8px 12px; font: 500 0.875rem/1.43 'Overpass Variable', system-ui, sans-serif; color: var(--ds-text-muted); background: none; border: 0; border-bottom: 2px solid transparent; cursor: pointer; transition: color 150ms cubic-bezier(0.16, 1, 0.3, 1), border-color 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-tab:hover { color: var(--ds-text-primary); border-bottom-color: var(--ds-border-strong); } .ds-tab[aria-selected=\"true\"] { color: var(--ds-on-tint-primary); border-bottom-color: var(--color-primary); } .ds-tab:focus-visible { outline: 2px solid var(--ds-accent-primary); outline-offset: 2px; }"
+    },
+    {
+      "name": "Page Header with REV Designator",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Title, the REV designator and exactly one runtime status on one baseline, closed by a hairline.",
+      "html": "<header class=\"ds-header\"><h1 class=\"ds-title\">Configuration</h1><span class=\"ds-designator\" title=\"Revision a1b2c3d4e5f6\">REV a1b2c3d4</span><p class=\"ds-status\"><span class=\"ds-mono\">Node-RED 5.0.2</span> · <strong class=\"ds-ok\">Editable</strong></p></header>",
+      "css": ".ds-header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding-bottom: 12px; border-bottom: 1px solid var(--ds-border-subtle); } .ds-title { margin: 0; font: 700 1.25rem/1.4 'Overpass Variable', system-ui, sans-serif; color: var(--ds-text-primary); } .ds-designator, .ds-mono { font: 600 0.75rem/1.33 'Overpass Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; color: var(--ds-text-primary); } .ds-mono { font-weight: 400; font-size: 0.875rem; color: inherit; } .ds-status { margin: 0; font: 400 0.875rem/1.43 'Overpass Variable', system-ui, sans-serif; color: var(--ds-text-secondary); } .ds-ok { font-weight: 600; color: var(--ds-on-tint-success); }"
+    },
+    {
+      "name": "Lock Banner",
+      "kind": "custom",
+      "refersTo": "lock-banner",
+      "description": "The raw settings.js editor is locked by default; the banner explains the lock and offers the unlock.",
+      "html": "<div class=\"ds-lock\"><span class=\"ds-lock-text\">Locked. Select \"Unlock to edit settings.js\" to edit the file directly; a backup is taken before any write.</span><button class=\"ds-lock-btn\" type=\"button\">Unlock to edit settings.js</button></div>",
+      "css": ".ds-lock { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 12px; font: 400 0.875rem/1.43 'Overpass Variable', system-ui, sans-serif; color: var(--ds-text-secondary); border: 1px solid var(--ds-border-strong); border-radius: 4px; } .ds-lock-text { flex: 1 1 14rem; min-width: 0; } .ds-lock-btn { min-height: 36px; padding: 8px 16px; font: inherit; color: var(--color-base-content); background: var(--ds-bg-surface); border: 1px solid var(--ds-border-strong); border-radius: 4px; cursor: pointer; } .ds-lock-btn:hover { background: color-mix(in srgb, var(--ds-text-primary) 6%, var(--ds-bg-surface)); } .ds-lock-btn:focus-visible { outline: 2px solid var(--ds-accent-primary); outline-offset: 2px; }"
+    },
+    {
+      "name": "Change Circuit",
+      "kind": "custom",
+      "refersTo": "change-circuit",
+      "description": "Signature: the gated change sequence as six IEC normally-open contacts on one conductor, showing the full state vocabulary.",
+      "html": "<aside class=\"ds-circuit\"><h2 class=\"ds-circuit-title\">Change circuit</h2><ol class=\"ds-circuit-steps\"><li class=\"ds-contact ds-passed\"><svg viewBox=\"0 0 20 20\" width=\"20\" height=\"20\" aria-hidden=\"true\"><rect x=\"6.5\" y=\"5\" width=\"8\" height=\"10\" class=\"ds-cut\"/><g stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"square\"><line x1=\"10.5\" y1=\"0\" x2=\"10.5\" y2=\"5\"/><line x1=\"10.5\" y1=\"15\" x2=\"10.5\" y2=\"20\"/><line x1=\"10.5\" y1=\"15\" x2=\"10.5\" y2=\"5\" class=\"ds-blade\"/></g><rect x=\"14\" y=\"8\" width=\"4\" height=\"4\" class=\"ds-fill\" stroke-width=\"1\"/></svg><div class=\"ds-contact-body\"><div class=\"ds-contact-row\"><span class=\"ds-k\">K1</span><span class=\"ds-step\">Edit</span><span class=\"ds-state\">Closed</span></div><p class=\"ds-proof\">3 changes</p></div></li><li class=\"ds-contact ds-active\"><svg viewBox=\"0 0 20 20\" width=\"20\" height=\"20\" aria-hidden=\"true\"><rect x=\"6.5\" y=\"5\" width=\"8\" height=\"10\" class=\"ds-cut\"/><g stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"square\"><line x1=\"10.5\" y1=\"0\" x2=\"10.5\" y2=\"5\"/><line x1=\"10.5\" y1=\"15\" x2=\"10.5\" y2=\"20\"/><line x1=\"10.5\" y1=\"15\" x2=\"10.5\" y2=\"5\" class=\"ds-blade\" data-open=\"true\"/></g></svg><div class=\"ds-contact-body\"><div class=\"ds-contact-row\"><span class=\"ds-k\">K2</span><span class=\"ds-step\">Diff</span><span class=\"ds-state\">Pending</span></div><p class=\"ds-proof\">Not reviewed</p></div></li><li class=\"ds-contact ds-blocked\"><svg viewBox=\"0 0 20 20\" width=\"20\" height=\"20\" aria-hidden=\"true\"><rect x=\"6.5\" y=\"5\" width=\"8\" height=\"10\" class=\"ds-cut\"/><g stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"square\"><line x1=\"10.5\" y1=\"0\" x2=\"10.5\" y2=\"5\"/><line x1=\"10.5\" y1=\"15\" x2=\"10.5\" y2=\"20\"/><line x1=\"10.5\" y1=\"15\" x2=\"10.5\" y2=\"5\" class=\"ds-blade\" data-open=\"true\"/></g></svg><div class=\"ds-contact-body\"><div class=\"ds-contact-row\"><span class=\"ds-k\">K3</span><span class=\"ds-step\">Validate</span><span class=\"ds-state\">Open</span></div><p class=\"ds-proof\">1 field invalid</p></div></li><li class=\"ds-contact ds-failed\"><svg viewBox=\"0 0 20 20\" width=\"20\" height=\"20\" aria-hidden=\"true\"><rect x=\"6.5\" y=\"5\" width=\"8\" height=\"10\" class=\"ds-cut\"/><g stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"square\"><line x1=\"10.5\" y1=\"0\" x2=\"10.5\" y2=\"5\"/><line x1=\"10.5\" y1=\"15\" x2=\"10.5\" y2=\"20\"/><line x1=\"10.5\" y1=\"15\" x2=\"10.5\" y2=\"5\" class=\"ds-blade\" data-open=\"true\"/></g></svg><div class=\"ds-contact-body\"><div class=\"ds-contact-row\"><span class=\"ds-k\">K4</span><span class=\"ds-step\">Backup</span><span class=\"ds-state\">Failed</span></div><p class=\"ds-proof\">Backup failed; nothing written</p></div></li><li class=\"ds-contact ds-unknown\"><svg viewBox=\"0 0 20 20\" width=\"20\" height=\"20\" aria-hidden=\"true\"><rect x=\"6.5\" y=\"5\" width=\"8\" height=\"10\" class=\"ds-cut\"/><g stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"square\"><line x1=\"10.5\" y1=\"0\" x2=\"10.5\" y2=\"5\"/><line x1=\"10.5\" y1=\"15\" x2=\"10.5\" y2=\"20\"/><line x1=\"10.5\" y1=\"15\" x2=\"10.5\" y2=\"5\" class=\"ds-blade\" data-open=\"true\" stroke-dasharray=\"2 1.5\"/></g></svg><div class=\"ds-contact-body\"><div class=\"ds-contact-row\"><span class=\"ds-k\">K5</span><span class=\"ds-step\">Apply</span><span class=\"ds-state\">Not confirmed</span></div><p class=\"ds-proof\">Outcome not confirmed; check the runtime</p></div></li><li class=\"ds-contact ds-idle\"><svg viewBox=\"0 0 20 20\" width=\"20\" height=\"20\" aria-hidden=\"true\"><rect x=\"6.5\" y=\"5\" width=\"8\" height=\"10\" class=\"ds-cut\"/><g stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"square\"><line x1=\"10.5\" y1=\"0\" x2=\"10.5\" y2=\"5\"/><line x1=\"10.5\" y1=\"15\" x2=\"10.5\" y2=\"20\"/><line x1=\"10.5\" y1=\"15\" x2=\"10.5\" y2=\"5\" class=\"ds-blade\" data-open=\"true\"/></g></svg><div class=\"ds-contact-body\"><div class=\"ds-contact-row\"><span class=\"ds-k\">K6</span><span class=\"ds-step\">Ready</span><span class=\"ds-state\">Waiting</span></div><p class=\"ds-proof\">Not reached</p></div></li></ol><div class=\"ds-circuit-foot\"><p class=\"ds-total\">3 changes · 1 needs restart</p><button class=\"ds-circuit-review\" type=\"button\">Review 3 changes</button></div></aside>",
+      "css": ".ds-circuit { width: 20rem; padding-left: 20px; border-left: 1px solid var(--ds-border-subtle); background: var(--ds-bg-surface); font-family: 'Overpass Variable', system-ui, sans-serif; } .ds-circuit-title { margin: 0 0 12px; font-size: 0.875rem; font-weight: 600; color: var(--ds-text-primary); } .ds-circuit-steps { position: relative; margin: 0; padding: 0; list-style: none; } .ds-circuit-steps::before { content: ''; position: absolute; top: 0; bottom: 0; left: 12px; width: 1px; background: var(--ds-border-strong); } .ds-contact { position: relative; display: flex; gap: 12px; padding-bottom: 12px; } .ds-contact:last-child { padding-bottom: 0; } .ds-contact svg { flex: none; margin: 0 2px; } .ds-cut { fill: var(--ds-bg-surface); } .ds-fill { fill: var(--ds-verified-fill); stroke: var(--ds-text-primary); } .ds-blade { transform-box: view-box; transform-origin: 10.5px 15px; transition: transform 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-blade[data-open=\"true\"] { transform: rotate(-30deg); } .ds-contact-body { flex: 1; min-width: 0; } .ds-contact-row { display: flex; align-items: baseline; gap: 8px; } .ds-k { font: 400 0.75rem/1.33 'Overpass Mono', ui-monospace, monospace; color: var(--ds-text-muted); } .ds-step { font-size: 0.875rem; font-weight: 600; color: var(--ds-text-primary); } .ds-state { margin-left: auto; font-size: 0.75rem; font-weight: 600; } .ds-proof { margin: 0; font-size: 0.75rem; line-height: 1.33; color: var(--ds-text-secondary); } .ds-idle svg, .ds-idle .ds-state, .ds-unknown svg, .ds-unknown .ds-state { color: var(--ds-text-muted); } .ds-blocked svg, .ds-blocked .ds-state { color: var(--ds-on-tint-warning); } .ds-active svg, .ds-active .ds-state { color: var(--ds-on-tint-info); } .ds-passed svg { color: var(--ds-text-primary); } .ds-passed .ds-state { color: var(--ds-on-tint-success); } .ds-failed svg, .ds-failed .ds-state { color: var(--ds-on-tint-error); } .ds-circuit-foot { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--ds-border-subtle); } .ds-total { margin: 0; text-align: right; font-size: 0.75rem; font-variant-numeric: tabular-nums; color: var(--ds-text-secondary); } .ds-circuit-review { min-height: 36px; padding: 8px 16px; font: 500 0.875rem/1.43 'Overpass Variable', system-ui, sans-serif; color: var(--ds-on-tint-primary); background: var(--ds-bg-surface); border: 1px solid var(--color-primary); border-radius: 4px; cursor: pointer; } .ds-circuit-review:hover { background: color-mix(in srgb, var(--color-primary) 10%, var(--ds-bg-surface)); } .ds-circuit-review:focus-visible { outline: 2px solid var(--ds-accent-primary); outline-offset: 2px; } @media (prefers-reduced-motion: reduce) { .ds-blade { transition: none; } }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Wiring Diagram",
+    "overview": "NRCC is drawn the way a panel builder draws a control cabinet: IEC schematic language on a drawing-white sheet (the dark theme is the drawing negative), hairline ink conductors, and conductor colours that each do one job. The stylesheet names the world \"Esquema eléctrico\". The operator configures one Node-RED instance and must see what will happen before it happens, so the interface reads as a technical drawing they can trust, not as a dashboard of cards.\n\nThe signature is the change circuit: the gated sequence Edit → Diff → Validate → Backup → Apply → Ready drawn as six normally-open contacts on one conductor. A contact closes when its gate passes; a failure leaves it open and, when the server rolled back, draws the rollback branch. Every state is said in words and shape, never by colour alone. Density is a feature: three type sizes, ranked by weight, case and rule rather than by size.\n\nIdentity lives in designators, not decoration. The settings revision is `REV a1b2c3d4`, contacts are `K1`–`K6`, the rollback branch is `RB`, and every settings field carries its `settings.js` key as a terminal label. Light and dark are equal citizens; WCAG 2.2 AA holds in both.",
+    "keyCharacteristics": [
+      "Flat drawing sheet, 1px hairlines, at most a 1px-offset shadow.",
+      "Conductor colours with fixed jobs: blue acts and selects, brown is pending, green-yellow fills a verified contact, red is critical and rollback only.",
+      "Three type sizes (20, 14, 12px) in Overpass; designators in Overpass Mono.",
+      "Stable mono designators (REV, K1–K6, RB, settings keys) instead of icons and badges.",
+      "Self-hosted fonts and assets; nothing loads from the network."
+    ],
+    "rules": [
+      {
+        "name": "The One Job Rule",
+        "body": "A conductor colour means one thing everywhere: blue acts or selects, brown is pending, green and green-yellow are verified, red is critical or rollback, amber is a held gate. Never use a conductor colour as decoration.",
+        "section": "colors"
+      },
+      {
+        "name": "The Red Is Rare Rule",
+        "body": "Red appears only for a failure, a rollback, a destructive action or an error. A screen with no fault shows no red.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tint Text Rule",
+        "body": "Text on a semantic tint or a plain surface uses the `*-text` value (`--ds-on-tint-*`), never the solid fill colour; the solid colour is for borders, fills and button grounds.",
+        "section": "colors"
+      },
+      {
+        "name": "The Three Sizes Rule",
+        "body": "Use only 20, 14 and 12px. Rank by weight, case and a rule line, never by adding a fourth size.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tabular Data Rule",
+        "body": "Tables, code, counts and totals use tabular numerals so columns and digits never shift.",
+        "section": "typography"
+      },
+      {
+        "name": "The Hairline Rule",
+        "body": "Elevation is a 1px border plus at most `--ds-shadow-raised`. If a surface needs more separation, use a ground change or a rule line, not a bigger shadow.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** give every colour one job from the One Job Rule, and say every state in text as well as colour and shape.",
+      "**Do** report the outcome of a gated configuration change on the change circuit and its polite live region. **No toasts on the gated flow**: applying, holding, failing and rolling back a change never raise a toast.",
+      "**Do** label settings with their `settings.js` key in mono, and identify things with stable designators (`REV`, `K1`–`K6`, `RB`).",
+      "**Do** use the control-border colour (`--ds-border-strong`) for every control edge and conductor, and the hairline only for decorative dividers.",
+      "**Do** keep to the three sizes (20, 14, 12px) and rank with weight, case and rule lines.",
+      "**Do** derive every circuit state from a signal the product really observes. The transaction is one request: while it runs, Validate, Backup, Apply and Ready are all Pending together, and an answer without a known error code leaves them Not confirmed.",
+      "**Do** keep fonts and assets self-hosted, and both themes at WCAG 2.2 AA."
+    ],
+    "donts": [
+      "**Don't** invent a backup designator. The apply API returns no backup id, so the Backup contact's proof is \"Taken before write\" with no `BK-` number until the API exposes one.",
+      "**Don't** animate per-step progress inside the server transaction. The frontend sees only its start and its end, so no live per-step progress exists to draw.",
+      "**Don't** use red for anything but failure, rollback, destructive actions and errors.",
+      "**Don't** add gradients, glows, glass blur or shadows deeper than `--ds-shadow-raised`.",
+      "**Don't** wrap a settings key mid-word; break only after a dot.",
+      "**Don't** introduce a fourth type size.",
+      "**Don't** fade text with opacity (`text-base-content/50`) to rank it; use the three text tokens (ink, ink-secondary, ink-muted). Opacity mixes escape the token contrast check, and `pnpm run check:faded-text` rejects them below `/65`."
+    ]
+  }
+}

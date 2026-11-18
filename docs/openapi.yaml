@@ -1920,14 +1920,16 @@ paths:
       operationId: postUpdatesApply
       summary: Apply pending update
       description: |
-        Starts an asynchronous update flow: BackingUp → Applying → Completed/Failed.
-        Returns immediately with the current flow state. Poll `GET /api/updates/state`
-        every 500 ms to track progress.
+        Claims the single update run synchronously, then runs it asynchronously:
+        BackingUp → Applying → Completed/Failed. A 200 means this request claimed
+        the run (state is already `BackingUp`); no other request can start one
+        until it finishes. Poll `GET /api/updates/state` every 500 ms to track
+        progress. A new update can start from `Idle`, `Completed` or `Failed`.
       security:
         - bearerAuth: []
       responses:
         "200":
-          description: Update flow started
+          description: Run claimed and started; `state` is `BackingUp`
           content:
             application/json:
               schema:
@@ -1935,7 +1937,13 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "409":
-          $ref: "#/components/responses/Conflict"
+          description: >-
+            `UPDATE_IN_PROGRESS`: another request holds the update run (`BackingUp`
+            or `Applying`). Completed or failed flows do not block a new update.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
 
   /api/updates/state:
     get:
@@ -3236,8 +3244,25 @@ components:
           $ref: "#/components/schemas/ConfigurationCapabilities"
         recommendations:
           type: array
+          description: |
+            Human-readable recommendations, kept for existing consumers. The text
+            is not localized; clients should prefer `recommendationCodes`.
           items:
             type: string
+        recommendationCodes:
+          type: array
+          description: |
+            Stable machine code for each entry in `recommendations`, in the same
+            order and with the same length. Clients localize the code and fall
+            back to the matching `recommendations` string for codes they do not
+            know. Omitted when there are no recommendations.
+          items:
+            type: string
+            description: |
+              Known codes: `portless_optional` (Node-RED is detected and Portless
+              is not installed), `settings_not_writable` (NRCC cannot write the
+              settings.js it edits). New codes may be added.
+          example: [portless_optional]
 
     CpuInfo:
       type: object

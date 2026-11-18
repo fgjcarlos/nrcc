@@ -1,9 +1,12 @@
 import { type InputHTMLAttributes, type Ref } from 'react';
 import { cn } from '@/shared/lib/utils';
+import { FieldShell } from './FieldShell';
+import { fieldControlClass, useField } from './useField';
 
 export interface InputProps
   extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> {
-  error?: boolean;
+  /** `true` marks the field invalid; a string is also rendered as its message. */
+  error?: boolean | string;
   label?: string;
   ref?: Ref<HTMLInputElement>;
 }
@@ -15,23 +18,16 @@ export const Input = ({
   id,
   ref,
   type,
+  'aria-describedby': describedBy,
+  'aria-invalid': ariaInvalid,
   ...props
 }: InputProps) => {
-  const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
+  const field = useField({ id, label, error, 'aria-describedby': describedBy, 'aria-invalid': ariaInvalid });
 
   return (
-    <div className="space-y-1.5">
-      {label && (
-        <label
-          htmlFor={inputId}
-          className="text-label text-base-content"
-        >
-          {label}
-        </label>
-      )}
+    <FieldShell field={field} label={label}>
       <input
         ref={ref}
-        id={inputId}
         // Disable password-manager autofill on password inputs by default:
         // sites that legitimately *change* a password should opt in to
         // autocomplete="current-password" or "new-password" explicitly. Without
@@ -41,21 +37,10 @@ export const Input = ({
         // this via the explicit `autoComplete` prop.
         autoComplete={type === 'password' ? 'off' : undefined}
         type={type}
-        className={cn(
-          'flex w-full rounded-md px-3 py-2 text-sm',
-          'bg-base-300 text-base-content placeholder:text-base-content/50',
-          'border-none outline-none',
-          // Solid keyboard-focus indicator; the glow below is only a soft tint.
-          'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent-primary',
-          'transition-all duration-200',
-          'file:border-0 file:bg-transparent file:text-sm file:font-medium',
-          'focus:ring-1 focus:ring-primary input-focus-glow',
-          error && 'ring-1 ring-error input-error-glow',
-          'disabled:cursor-not-allowed disabled:opacity-50',
-          className
-        )}
+        className={cn(fieldControlClass, 'file:border-0 file:bg-transparent file:text-sm file:font-medium', className)}
         {...props}
+        {...field.controlProps}
       />
-    </div>
+    </FieldShell>
   );
 };

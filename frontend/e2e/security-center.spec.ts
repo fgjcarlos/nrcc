@@ -44,6 +44,24 @@ async function openSecurityCenter(
   await expect(page.getByRole('heading', { name: 'Node-RED admin auth' })).toBeVisible()
 }
 
+// T10: each surface form sits behind its Edit disclosure; open it before filling.
+async function expandSurface(page: import('@playwright/test').Page, testId: string) {
+  await page.getByTestId(testId).locator('summary').click()
+}
+
+// P1 #1: Save opens the shared review drawer; its Apply sends the request.
+async function saveAndApply(page: import('@playwright/test').Page, testId: string) {
+  await page.getByTestId(`${testId}-save`).click()
+  const drawer = page.getByRole('dialog', { name: 'Review changes' })
+  await expect(drawer).toBeVisible()
+  await drawer.getByRole('button', { name: 'Apply and restart Node-RED' }).click()
+  await expect(drawer).toBeHidden()
+}
+
+// The surface's change circuit live region carries the outcome (no toast).
+const circuitLive = (page: import('@playwright/test').Page, testId: string) =>
+  page.getByTestId(testId).getByTestId('change-circuit-live')
+
 test.describe('Security Center transactional apply (issue #766 slice E — per-surface boundaries)', () => {
   test('submits each canonical authentication surface independently with a revision', async ({ page }) => {
     const requests: Record<string, unknown>[] = []
@@ -58,8 +76,9 @@ test.describe('Security Center transactional apply (issue #766 slice E — per-s
     // AdminAuthBoundaryCard — edit the operator username and save
     // via the surface-scoped button (was "Save Security Center" in
     // slice A; now "Save admin auth").
+    await expandSurface(page, 'boundary-admin-auth')
     await page.getByTestId('boundary-admin-auth-username').first().fill('operator-updated')
-    await page.getByTestId('boundary-admin-auth-save').click()
+    await saveAndApply(page, 'boundary-admin-auth')
     await expect.poll(() => requests.length).toBe(1)
     expect(requests[0]).toMatchObject({
       expectedRevision: 'current-revision',
@@ -67,11 +86,13 @@ test.describe('Security Center transactional apply (issue #766 slice E — per-s
     })
     expect(requests[0]).not.toHaveProperty('httpNodeAuth')
     expect(requests[0]).not.toHaveProperty('httpStaticAuth')
+    await expect(circuitLive(page, 'boundary-admin-auth')).toHaveText('Ready: Closed. Readiness OK')
 
     // HttpBasicAuthBoundaryCard surface=httpNodeAuth — edit the
     // basic-auth user field and save via the per-surface button.
+    await expandSurface(page, 'boundary-httpNodeAuth')
     await page.getByTestId('boundary-httpNodeAuth-user').fill('nodes-updated')
-    await page.getByTestId('boundary-httpNodeAuth-save').click()
+    await saveAndApply(page, 'boundary-httpNodeAuth')
     await expect.poll(() => requests.length).toBe(2)
     expect(requests[1]).toMatchObject({
       expectedRevision: 'current-revision',
@@ -81,8 +102,9 @@ test.describe('Security Center transactional apply (issue #766 slice E — per-s
     expect(requests[1]).not.toHaveProperty('httpStaticAuth')
 
     // HttpBasicAuthBoundaryCard surface=httpStaticAuth — same flow.
+    await expandSurface(page, 'boundary-httpStaticAuth')
     await page.getByTestId('boundary-httpStaticAuth-user').fill('static-updated')
-    await page.getByTestId('boundary-httpStaticAuth-save').click()
+    await saveAndApply(page, 'boundary-httpStaticAuth')
     await expect.poll(() => requests.length).toBe(3)
     expect(requests[2]).toMatchObject({
       expectedRevision: 'current-revision',
@@ -101,18 +123,23 @@ test.describe('Security Center transactional apply (issue #766 slice E — per-s
       },
     }))
     // First click hits the revision-conflict branch (409 → SETTINGS_REVISION_CONFLICT).
+    await expandSurface(page, 'boundary-admin-auth')
     await page.getByTestId('boundary-admin-auth-username').first().fill('operator-updated')
-    await page.getByTestId('boundary-admin-auth-save').click()
-    // Scope the assertion to the boundary card's error banner via its
-    // testid; the same text is rendered inside the sonner toast which
-    // would otherwise trigger Playwright's strict-mode locator violation.
+    await saveAndApply(page, 'boundary-admin-auth')
+    // The inline error stays; the circuit opens at Validate. No toast.
     await expect(page.getByTestId('boundary-admin-auth-error')).toContainText(
       'Settings changed elsewhere. Refresh, review the redacted preview, then retry.',
     )
-    // Second click hits the readiness-failure branch (500 → APPLY_ERROR).
-    await page.getByTestId('boundary-admin-auth-save').click()
+    await expect(circuitLive(page, 'boundary-admin-auth')).toHaveText('Validate: Failed. Rejected; nothing written')
+    // Second apply hits the readiness-failure branch (500 → APPLY_ERROR, a code
+    // without a known stage: the circuit says the outcome is not confirmed).
+    await saveAndApply(page, 'boundary-admin-auth')
     await expect(page.getByTestId('boundary-admin-auth-error')).toContainText(
       'The transaction did not complete. Any failed readiness check is rolled back; review runtime readiness, then retry.',
     )
+    await expect(circuitLive(page, 'boundary-admin-auth')).toHaveText(
+      'Validate: Not confirmed. Outcome not confirmed; check the runtime',
+    )
+    await expect(page.locator('[data-sonner-toast]')).toHaveCount(0)
   })
 })

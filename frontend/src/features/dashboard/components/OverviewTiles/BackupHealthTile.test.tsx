@@ -49,7 +49,9 @@ describe('BackupHealthTile', () => {
     expect(chip?.className).toMatch(/bg-ds-success/);
   });
 
-  it('renders the warning palette when the scheduler has a last error', () => {
+  // T8: a failed automatic run is a failure (red); an unscheduled
+  // scheduler is a held gate the operator may choose (amber).
+  it('renders the danger palette when the scheduler has a last error', () => {
     renderTile({
       backups: buildBackups({
         scheduler: {
@@ -60,10 +62,10 @@ describe('BackupHealthTile', () => {
     });
     const tile = screen.getByTestId('overview-backup-health-tile');
     const chip = tile.querySelector('[role="status"]');
-    expect(chip?.className).toMatch(/bg-ds-warning/);
+    expect(chip?.className).toMatch(/bg-ds-danger/);
   });
 
-  it('renders the danger palette when the scheduler is not scheduled', () => {
+  it('renders the warning palette when the scheduler is not scheduled', () => {
     renderTile({
       backups: buildBackups({
         scheduler: { ...buildBackups().scheduler, scheduled: false },
@@ -71,7 +73,7 @@ describe('BackupHealthTile', () => {
     });
     const tile = screen.getByTestId('overview-backup-health-tile');
     const chip = tile.querySelector('[role="status"]');
-    expect(chip?.className).toMatch(/bg-ds-danger/);
+    expect(chip?.className).toMatch(/bg-ds-warning/);
   });
 
   it('exposes the last error message when the scheduler reports one', () => {

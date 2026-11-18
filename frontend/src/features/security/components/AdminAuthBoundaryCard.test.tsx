@@ -145,6 +145,8 @@ describe('AdminAuthBoundaryCard', () => {
     expect(permission).toHaveValue('read');
 
     await user.click(screen.getByTestId('boundary-admin-auth-save'));
+    // Save opens the review drawer (P1 #1); its Apply sends the request.
+    await user.click(screen.getByTestId('review-changes-panel-apply'));
     await waitFor(() => expect(onApplied).toHaveBeenCalled());
     expect((posted as { adminAuth: { users: unknown[] } }).adminAuth.users).toEqual([
       { username: 'admin', permissions: '*', password: '' },
@@ -185,6 +187,8 @@ describe('AdminAuthBoundaryCard', () => {
     ]);
 
     await user.click(screen.getByTestId('boundary-admin-auth-save'));
+    // Save opens the review drawer (P1 #1); its Apply sends the request.
+    await user.click(screen.getByTestId('review-changes-panel-apply'));
     await waitFor(() => expect(onApplied).toHaveBeenCalled());
     expect((posted as { adminAuth: { users: unknown[] } }).adminAuth.users).toEqual([
       { username: 'bob2', permissions: '*', password: '' },
@@ -214,6 +218,8 @@ describe('AdminAuthBoundaryCard', () => {
     await user.clear(screen.getByTestId('boundary-admin-auth-expiry'));
     await user.type(screen.getByTestId('boundary-admin-auth-expiry'), '7200');
     await user.click(screen.getByTestId('boundary-admin-auth-save'));
+    // Save opens the review drawer (P1 #1); its Apply sends the request.
+    await user.click(screen.getByTestId('review-changes-panel-apply'));
     await waitFor(() => expect(onApplied).toHaveBeenCalled());
     const payload = (posted as { adminAuth?: { type: string; users?: Array<{ username: string; password?: string }> } }).adminAuth;
     expect(payload?.type).toBe('credentials');
@@ -250,6 +256,8 @@ describe('AdminAuthBoundaryCard', () => {
     await user.clear(screen.getByTestId('boundary-admin-auth-expiry'));
     await user.type(screen.getByTestId('boundary-admin-auth-expiry'), '1800');
     await user.click(screen.getByTestId('boundary-admin-auth-save'));
+    // Save opens the review drawer (P1 #1); its Apply sends the request.
+    await user.click(screen.getByTestId('review-changes-panel-apply'));
     await waitFor(() =>
       expect(screen.getByTestId('boundary-admin-auth-error')).toBeInTheDocument(),
     );
@@ -267,11 +275,10 @@ describe('AdminAuthBoundaryCard', () => {
     });
     expect(screen.getByTestId('boundary-admin-auth-legacy')).toBeInTheDocument();
     await user.click(screen.getByTestId('boundary-admin-auth-save'));
-    await waitFor(() =>
-      expect(
-        screen.getByRole('dialog'),
-      ).toBeInTheDocument(),
-    );
+    await user.click(screen.getByTestId('review-changes-panel-apply'));
+    expect(
+      await screen.findByRole('dialog', { name: 'Apply authentication migration' }),
+    ).toBeInTheDocument();
   });
 
   it('refuses to apply when the revision is missing', async () => {
@@ -287,6 +294,8 @@ describe('AdminAuthBoundaryCard', () => {
     await user.clear(screen.getByTestId('boundary-admin-auth-expiry'));
     await user.type(screen.getByTestId('boundary-admin-auth-expiry'), '1800');
     await user.click(screen.getByTestId('boundary-admin-auth-save'));
+    // Save opens the review drawer (P1 #1); its Apply sends the request.
+    await user.click(screen.getByTestId('review-changes-panel-apply'));
     await waitFor(() =>
       expect(screen.getByTestId('boundary-admin-auth-error')).toBeInTheDocument(),
     );

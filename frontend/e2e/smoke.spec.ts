@@ -27,9 +27,8 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
     // the metric row; QuickActionsCard was removed in favor of those buttons.
     // Slice D moved the same Restart/Open actions into NodeRedHealthTile.
     await expect(page.getByRole('button', { name: 'Restart' })).toBeVisible()
-    // exact:true disambiguates the NodeRedHealthTile Open button from the
-    // user-menu trigger (whose accessible name contains 'Open user menu').
-    await expect(page.getByRole('button', { name: 'Open', exact: true })).toBeVisible()
+    // T8: the editor action names what it opens.
+    await expect(page.getByRole('button', { name: 'Open Node-RED editor', exact: true })).toBeVisible()
   })
 
   test('restart flow drives the real Restart button and shows the success toast', async ({ page }) => {
@@ -43,11 +42,10 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
 
   test('backup creation uses fixture responses', async ({ page }) => {
     await login(page)
-    // Issue #763 renamed the sidebar label to "Recovery" (/backups keeps
-    // the "Backups" page heading). Slice D adds an "Open Recovery" CTA
-    // on BackupHealthTile too — scope to the sidebar so Playwright's
-    // strict-mode locators resolve to a single element.
-    await page.getByTestId('app-sidebar').getByRole('link', { name: /Recovery/ }).click()
+    // T6: the sidebar label equals the page heading ("Backups"). Overview
+    // also links to /backups ("Open Backups") — scope to the sidebar so
+    // Playwright's strict-mode locators resolve to one element.
+    await page.getByTestId('app-sidebar').getByRole('link', { name: 'Backups', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Backups', exact: true })).toBeVisible()
     await page.getByRole('button', { name: /Create backup now/ }).first().click()
     await expect(page.getByRole('button', { name: 'Manual smoke backup' })).toBeVisible()
@@ -58,14 +56,12 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
     await page.goto('/backups')
     await expect(page.getByRole('button', { name: 'Manual smoke backup' })).toBeVisible()
     await page.locator('button[title="Restore"]').first().click()
-    await expect(page.getByText('Restaurar backup')).toBeVisible()
-    // The ConfirmationDialog listens for Enter when canConfirm() is true.
-    // We use the keyboard shortcut here because the dialog's overlay sits
-    // above the Confirm button in the stacking context — a click on the
-    // button itself is intercepted by the overlay. The keyboard path is
-    // the same code branch the user would hit by pressing Enter.
-    await page.locator('input[placeholder="backup-001"]').fill('backup-001')
-    await page.locator('input[placeholder="backup-001"]').press('Enter')
+    const dialog = page.getByRole('dialog', { name: 'Restore backup' })
+    await expect(dialog).toBeVisible()
+    // Enter in the token field submits the dialog form once the word matches.
+    const confirmation = dialog.getByLabel('Type "restore" to confirm')
+    await confirmation.fill('restore')
+    await confirmation.press('Enter')
     await expect(page.getByText('Restore dry path completed in test mode')).toBeVisible()
   })
 
@@ -79,12 +75,12 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
     // /libraries moved under /maintenance/*. Exercise the canonical routes.
     const pages: Array<{ url: string; heading: string }> = [
       { url: '/overview', heading: 'Overview' },
-      { url: '/bootstrap', heading: 'Bootstrap & Environment' },
-      { url: '/configuration', heading: 'Node-RED Configuration' },
+      { url: '/bootstrap', heading: 'Host & environment' },
+      { url: '/configuration', heading: 'Configuration' },
       { url: '/backups', heading: 'Backups' },
-      { url: '/environment', heading: 'Environment Variables' },
-      { url: '/maintenance/updates', heading: 'Node-RED Updates' },
-      { url: '/maintenance/libraries', heading: 'npm Libraries' },
+      { url: '/environment', heading: 'Environment variables' },
+      { url: '/maintenance/updates', heading: 'Updates' },
+      { url: '/maintenance/libraries', heading: 'Libraries' },
     ]
 
     for (const { url, heading } of pages) {
@@ -129,7 +125,7 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
 
     // Issue #766 slice A — 'Security' tab was renamed to 'TLS & Secrets'
     // because 'Security' now refers to the dedicated top-level section.
-    await page.getByRole('button', { name: 'TLS & Secrets' }).click()
+    await page.getByRole('tab', { name: 'TLS & Secrets' }).click()
     await expect(page.getByText('Credential Encryption')).toBeVisible()
     await expect(page.getByLabel('Credential Secret')).toBeVisible()
     await expect(page.getByText('HTTPS Redirect')).toBeVisible()
@@ -152,8 +148,10 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
     // heading.
     await page.goto('/security')
     await expect(page.getByRole('heading', { name: 'Node-RED admin auth' })).toBeVisible()
-    // Read-only mode keeps the Save button mounted but disabled so
-    // the operator still sees the action affordance.
+    // Surfaces render collapsed; open admin auth first. Read-only mode
+    // keeps the Save button mounted but disabled so the operator still
+    // sees the action affordance.
+    await page.getByTestId('boundary-admin-auth').locator('summary').click()
     await expect(page.getByRole('button', { name: 'Save admin auth' })).toBeDisabled()
   })
 })

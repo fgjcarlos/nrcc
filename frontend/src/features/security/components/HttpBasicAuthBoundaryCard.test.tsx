@@ -44,7 +44,7 @@ describe('HttpBasicAuthBoundaryCard — httpNodeAuth', () => {
     expect(chip?.className).toMatch(/bg-ds-success/);
   });
 
-  it('renders the danger palette when not editable', () => {
+  it('keeps the surface state palette and shows the read-only notice when not editable', () => {
     renderBoundary({
       surface: 'httpNodeAuth',
       config: { user: 'nodes' },
@@ -54,7 +54,8 @@ describe('HttpBasicAuthBoundaryCard — httpNodeAuth', () => {
     });
     const card = screen.getByTestId('boundary-httpNodeAuth');
     const chip = card.querySelector('[role="status"]');
-    expect(chip?.className).toMatch(/bg-base-300/);
+    // T10: the chip reports the surface state; read-only is the notice's job.
+    expect(chip?.className).toMatch(/bg-ds-success/);
     expect(screen.getByTestId('boundary-httpNodeAuth-readonly')).toBeInTheDocument();
   });
 
@@ -82,6 +83,8 @@ describe('HttpBasicAuthBoundaryCard — httpNodeAuth', () => {
     fireEvent.change(passInput, { target: { value: 'plain-text' } });
     expect(screen.queryByTestId('boundary-httpNodeAuth-bcrypt-warning')).not.toBeInTheDocument();
     await user.click(screen.getByTestId('boundary-httpNodeAuth-save'));
+    // Save opens the review drawer (P1 #1); its Apply sends the request.
+    await user.click(screen.getByTestId('review-changes-panel-apply'));
     await waitFor(() => expect(posted).toBeDefined());
     expect((posted as { httpNodeAuth?: { pass: string } }).httpNodeAuth?.pass).toBe(
       'plain-text',
@@ -111,6 +114,8 @@ describe('HttpBasicAuthBoundaryCard — httpNodeAuth', () => {
     const passInput = screen.getByTestId('boundary-httpNodeAuth-pass');
     await user.type(passInput, '$2a$hash');
     await user.click(screen.getByTestId('boundary-httpNodeAuth-save'));
+    // Save opens the review drawer (P1 #1); its Apply sends the request.
+    await user.click(screen.getByTestId('review-changes-panel-apply'));
     await waitFor(() => expect(onApplied).toHaveBeenCalled());
     expect((posted as { httpNodeAuth?: { user: string } }).httpNodeAuth?.user).toBe(
       'nodes',
@@ -163,11 +168,13 @@ describe('HttpBasicAuthBoundaryCard — httpStaticAuth', () => {
     const card = screen.getByTestId('boundary-httpStaticAuth');
     const chip = card.querySelector('[role="status"]');
     expect(chip?.className).toMatch(/bg-ds-success/);
-    // Save stays disabled until the operator has touched a field.
+    // The drawer lists real changes only, so change the user.
     const userInput = screen.getByTestId('boundary-httpStaticAuth-user');
     await user.clear(userInput);
-    await user.type(userInput, 'static');
+    await user.type(userInput, 'static-ops');
     await user.click(screen.getByTestId('boundary-httpStaticAuth-save'));
+    // Save opens the review drawer (P1 #1); its Apply sends the request.
+    await user.click(screen.getByTestId('review-changes-panel-apply'));
     await waitFor(() => expect(onApplied).toHaveBeenCalled());
   });
 });

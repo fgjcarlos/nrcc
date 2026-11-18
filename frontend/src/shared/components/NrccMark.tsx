@@ -1,26 +1,32 @@
 import { type ReactNode } from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
-import { RadioTower } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 
 /**
- * NrccMark — issue #766 slice B
- *
- * Single source of truth for the NRCC brand mark. Replaces the
- * duplicated mark containers that lived in:
- *   - Header.tsx      (topbar-signal-icon, h-11 w-11, accent colour)
- *   - Sidebar.tsx     (sidebar-brand-mark, h-11 w-11 / h-10 w-10,
- *                      primary colour)
- *   - LandingView     (decorative logo on the public landing page)
- *
- * The visual treatment mirrors the existing palette: rounded-square
- * container, 1px border, brand-red primary or accent-cyan variant,
- * lucide RadioTower icon (the signal-tower glyph already chosen in
- * Header.tsx).
+ * NrccMark: single source of truth for the NRCC brand mark (Header,
+ * Sidebar). The glyph is the IEC normally-open contact, closed: the
+ * conductor runs in from each edge and ends in an open terminal ring,
+ * and the blade lies flat on the line between the rings, drawn heavier
+ * than the conductor so it reads as a part, not as wire. Every piece
+ * ends under a ring's stroke, so the rings stay open on any ground.
+ * Drawn on a 16-unit grid; the glyph sizes below are 1x, 1.5x and 2x.
  */
+function ClosedContact() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">
+      <g stroke="currentColor">
+        <line x1="0" y1="8" x2="2.25" y2="8" strokeWidth="1.5" />
+        <line x1="13.75" y1="8" x2="16" y2="8" strokeWidth="1.5" />
+        <line x1="5.75" y1="8" x2="10.25" y2="8" strokeWidth="2.5" />
+        <circle cx="4" cy="8" r="1.75" strokeWidth="1.5" />
+        <circle cx="12" cy="8" r="1.75" strokeWidth="1.5" />
+      </g>
+    </svg>
+  );
+}
 
 const nrccMarkVariants = cva(
-  'inline-flex shrink-0 items-center justify-center rounded-xl border ' +
+  'inline-flex shrink-0 items-center justify-center rounded-box border ' +
     'transition-colors focus-visible:outline-none focus-visible:ring-2 ' +
     'focus-visible:ring-offset-2 focus-visible:ring-offset-base-100 ' +
     'focus-visible:ring-ds-accent-primary',
@@ -28,16 +34,17 @@ const nrccMarkVariants = cva(
     variants: {
       tone: {
         // Used by the Header topbar mark.
-        accent: 'border-ds-border-default text-ds-accent-primary bg-ds-bg-elevated/60',
-        // Used by the Sidebar brand mark.
-        primary: 'border-ds-border-default text-ds-brand-primary bg-ds-bg-elevated/60',
+        accent: 'border-ds-border-default text-ds-accent-primary bg-ds-bg-elevated',
+        primary: 'border-ds-border-default text-ds-brand-primary bg-ds-bg-elevated',
         // Subdued mark used inside dense rows.
-        muted: 'border-ds-border-default text-base-content/70 bg-base-300/60',
+        muted: 'border-ds-border-default text-base-content/70 bg-base-300',
+        // Used by the ink navigation rail (Sidebar).
+        rail: 'border-[var(--ds-rail-hairline)] text-[var(--ds-rail-text)] bg-transparent',
       },
       size: {
         sm: 'h-9 w-9 [&_svg]:h-4 [&_svg]:w-4',
-        md: 'h-11 w-11 [&_svg]:h-5 [&_svg]:w-5',
-        lg: 'h-14 w-14 [&_svg]:h-7 [&_svg]:w-7',
+        md: 'h-11 w-11 [&_svg]:h-6 [&_svg]:w-6',
+        lg: 'h-14 w-14 [&_svg]:h-8 [&_svg]:w-8',
       },
     },
     defaultVariants: {
@@ -59,7 +66,7 @@ export interface NrccMarkProps
   onClick?: () => void;
   /** Extra className for layout positioning (margins, etc.). */
   className?: string;
-  /** Optional override of the inner icon (defaults to RadioTower). */
+  /** Optional override of the inner glyph (defaults to the closed contact). */
   icon?: ReactNode;
 }
 
@@ -76,9 +83,7 @@ export function NrccMark({
   className,
   icon,
 }: NrccMarkProps) {
-  const inner = icon ?? (
-    <RadioTower className="stroke-[1.8]" aria-hidden="true" />
-  );
+  const inner = icon ?? <ClosedContact />;
 
   const classes = cn(nrccMarkVariants({ tone, size }), className);
 

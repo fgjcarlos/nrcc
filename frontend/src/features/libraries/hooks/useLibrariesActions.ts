@@ -5,11 +5,13 @@ import { libraryService } from '@/features/libraries/services';
 import type { NpmSearchResult } from '@/features/libraries/types';
 
 import { queryKeys } from '@/shared/lib/queryKeys';
+import { useT } from '@/i18n';
 
 const SEARCH_DEBOUNCE_MS = 300;
 
 export function useLibrariesActions() {
   const queryClient = useQueryClient();
+  const { t } = useT();
   const [searchResults, setSearchResults] = useState<NpmSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -19,13 +21,13 @@ export function useLibrariesActions() {
       libraryService.installLibrary(name, alias),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.libraries.root });
-      toast.success('Library installed successfully');
+      toast.success(t('libraries:installSucceeded'));
       setSearchResults([]);
     },
     onError: (error: unknown) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.libraries.root });
       const err = error as { response?: { data?: { error?: { message?: string } } } };
-      toast.error(err.response?.data?.error?.message || 'Failed to install library');
+      toast.error(err.response?.data?.error?.message || t('libraries:installFailed'));
     },
   });
 
@@ -33,12 +35,12 @@ export function useLibrariesActions() {
     mutationFn: libraryService.uninstallLibrary,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.libraries.root });
-      toast.success('Library uninstalled successfully');
+      toast.success(t('libraries:uninstallSucceeded'));
     },
     onError: (error: unknown) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.libraries.root });
       const err = error as { response?: { data?: { error?: { message?: string } } } };
-      toast.error(err.response?.data?.error?.message || 'Failed to uninstall library');
+      toast.error(err.response?.data?.error?.message || t('libraries:uninstallFailed'));
     },
   });
 
@@ -63,7 +65,7 @@ export function useLibrariesActions() {
         // Limit to first 10 results (backend already does this via size=10)
         setSearchResults(results.slice(0, 10));
       } catch {
-        toast.error('Failed to search libraries');
+        toast.error(t('libraries:searchFailed'));
         setSearchResults([]);
       } finally {
         setSearching(false);

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent, within } from '@testing-library/react';
 import { ReviewChangesPanel } from './ReviewChangesPanel';
 import type {
   ConfigurationDiff,
@@ -167,5 +167,59 @@ describe('ReviewChangesPanel', () => {
     );
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(onCancel).not.toHaveBeenCalled();
+  });
+});
+
+describe('ReviewChangesPanel secret fields', () => {
+  afterEach(() => cleanup());
+
+  it('prints stored and typed secrets as the redaction marker and an empty one as —', () => {
+    const fields = makeDiff();
+    const secret = (configuredValue: string, formValue: string) =>
+      ({ ...fields.uiPort, configuredValue, effectiveValue: configuredValue, formValue, pending: true, restart: 'hard' }) as FieldDiff;
+    fields.credentialSecret = secret('stored-credential-secret', 'typed-credential-secret');
+    fields.httpsPassphrase = secret('', 'typed-key-passphrase');
+    render(
+      <ReviewChangesPanel isOpen fields={fields} pendingCount={2} target="settings.js" onApply={vi.fn()} onCancel={vi.fn()} />
+    );
+
+    const text = (id: string) =>
+      within(screen.getByTestId(`review-changes-panel-row-${id}`))
+        .getAllByText(/^(—|\[redacted\])$/)
+        .map((el) => el.textContent);
+    expect(text('credentialSecret')).toEqual(['[redacted]', '[redacted]']);
+    expect(text('httpsPassphrase')).toEqual(['—', '[redacted]']);
+    for (const plain of ['stored-credential-secret', 'typed-credential-secret', 'typed-key-passphrase']) {
+      expect(document.body.textContent).not.toContain(plain);
+    }
+  });
+});
+
+describe('ReviewChangesPanel with entries (Security, P1 #1)', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('lists the given rows as printed and reads the notice with Apply', () => {
+    render(
+      <ReviewChangesPanel
+        isOpen
+        entries={[
+          { id: 'httpNodeAuth.pass', settingsKey: 'httpNodeAuth.pass', label: 'Password', restart: 'hard', configuredValue: '[redacted]', formValue: '[redacted]' },
+        ]}
+        notice="Editor login turns on"
+        pendingCount={1}
+        target="settings.js"
+        onApply={vi.fn()}
+        onCancel={vi.fn()}
+      />
+    );
+    const row = screen.getByTestId('review-changes-panel-row-httpNodeAuth.pass');
+    expect(row.textContent).toContain('Password');
+    expect(row.textContent).toContain('[redacted]');
+    expect(screen.getByTestId('review-changes-panel-group-hard')).toBeTruthy();
+    expect(screen.getByTestId('review-changes-panel-notice').textContent).toBe('Editor login turns on');
+    const describedBy = screen.getByTestId('review-changes-panel-apply').getAttribute('aria-describedby') ?? '';
+    expect(describedBy.split(' ')).toContain(screen.getByTestId('review-changes-panel-notice').id);
   });
 });

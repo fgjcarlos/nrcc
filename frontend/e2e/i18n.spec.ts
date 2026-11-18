@@ -15,7 +15,8 @@ test.describe('locale selection', () => {
 
     await page.reload()
     await expect(page.locator('html')).toHaveAttribute('lang', 'es')
-    await expect(switcher.getByRole('button', { name: 'Active: ES' })).toBeVisible()
+    // The switcher's own labels follow the active locale (T6).
+    await expect(switcher.getByRole('button', { name: 'Activo: ES' })).toBeVisible()
 
     const routes = [
       '/login',
@@ -32,7 +33,7 @@ test.describe('locale selection', () => {
     }
 
     await page.goto('/overview')
-    await switcher.getByRole('button', { name: 'Switch to EN' }).click()
+    await switcher.getByRole('button', { name: 'Cambiar a EN' }).click()
     await expect(page.locator('html')).toHaveAttribute('lang', 'en')
   })
 })

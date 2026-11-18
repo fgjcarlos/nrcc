@@ -1,15 +1,16 @@
-import { useEffect, useId, useMemo, useRef } from 'react';
+import { useEffect, useId, useMemo, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowRight, FileWarning, RotateCw, X } from 'lucide-react';
 import { useT } from '@/i18n';
 import { StatusChip } from '@/shared/components/ui/StatusChip';
 import type {
   ConfigurationDiff,
-  FieldDiff,
   RestartSeverity,
 } from '../hooks/useConfigurationDiff';
 import type { NodeRedConfigFormData } from '@/shared/types';
-import { FIELD_LABELS } from '../lib/fieldLabels';
+import { redactSecret } from '@/shared/lib/redaction';
+import { FIELD_LABELS, SETTINGS_KEYS } from '../lib/fieldLabels';
+import { SettingKey } from './FormFields';
 
 /**
  * Issue #766 slice F (W4) — reviewable safe-apply panel.
@@ -26,15 +27,38 @@ import { FIELD_LABELS } from '../lib/fieldLabels';
  *  - Initial focus lands on Cancel so destructive apply is not the
  *    default action.
  *
+ * The drawer is the single confirmation of an apply: the footer states
+ * its cost (every apply backs up settings.js, then restarts Node-RED).
+ *
  * No data fetching lives here. The caller owns the save dispatch and
  * provides `isPending` to disable the apply button while the mutation
  * is in flight.
  */
 
+/**
+ * One drawer row, for callers outside the settings form (Security).
+ * Values must already be redacted: the panel prints them as given.
+ */
+export interface ReviewEntry {
+  /** Unique row id (test id suffix and React key). */
+  id: string;
+  /** settings.js path shown as the terminal label. */
+  settingsKey: string;
+  label: string;
+  restart: RestartSeverity;
+  configuredValue: unknown;
+  formValue: unknown;
+  invalid?: boolean;
+}
+
 export interface ReviewChangesPanelProps {
   isOpen: boolean;
-  /** The diff summary; we read `fields` + `pendingCount`. */
-  fields: ConfigurationDiff;
+  /** The settings form diff; only its pending fields are listed. */
+  fields?: ConfigurationDiff;
+  /** Rows for callers without a settings form diff; used instead of `fields`. */
+  entries?: ReviewEntry[];
+  /** Consequence stated above the rows and read with the Apply button. */
+  notice?: ReactNode;
   pendingCount: number;
   /** Target description for the subtitle, e.g. "settings.js". */
   target: string;
@@ -46,21 +70,39 @@ export interface ReviewChangesPanelProps {
   onCancel: () => void;
 }
 
-/** Group fields by restart severity in the canonical order. */
-function groupFieldsByRestart(
-  fields: ConfigurationDiff,
-  pendingOnly: boolean
-): Array<{ severity: RestartSeverity; entries: Array<{ key: keyof NodeRedConfigFormData; diff: FieldDiff }> }> {
-  const buckets: Record<RestartSeverity, Array<{ key: keyof NodeRedConfigFormData; diff: FieldDiff }>> = {
+/**
+ * Form fields that carry a secret; mirrors the write-only fields of
+ * `NodeRedConfig.RedactedSecrets` in internal/model/config_secrets.go.
+ * The https key/cert/ca fields are file paths, not secret material.
+ */
+const SECRET_FIELDS = new Set<keyof NodeRedConfigFormData>(['credentialSecret', 'httpsPassphrase']);
+
+/** The pending fields of a settings form diff as drawer rows, secrets redacted. */
+function pendingEntries(fields: ConfigurationDiff | undefined): ReviewEntry[] {
+  if (!fields) return [];
+  return (Object.keys(fields) as Array<keyof NodeRedConfigFormData>)
+    .filter((key) => fields[key].pending)
+    .map((key) => ({
+      id: key,
+      settingsKey: SETTINGS_KEYS[key] ?? key,
+      label: FIELD_LABELS[key] ?? key,
+      restart: fields[key].restart,
+      configuredValue: SECRET_FIELDS.has(key) ? redactSecret(fields[key].configuredValue) : fields[key].configuredValue,
+      formValue: SECRET_FIELDS.has(key) ? redactSecret(fields[key].formValue) : fields[key].formValue,
+      invalid: fields[key].validation.state === 'invalid',
+    }));
+}
+
+/** Group rows by restart severity in the canonical order. */
+function groupByRestart(
+  rows: ReviewEntry[]
+): Array<{ severity: RestartSeverity; entries: ReviewEntry[] }> {
+  const buckets: Record<RestartSeverity, ReviewEntry[]> = {
     hard: [],
     soft: [],
     none: [],
   };
-  for (const key of Object.keys(fields) as Array<keyof NodeRedConfigFormData>) {
-    const f = fields[key];
-    if (pendingOnly && !f.pending) continue;
-    buckets[f.restart].push({ key, diff: f });
-  }
+  for (const row of rows) buckets[row.restart].push(row);
   return (['hard', 'soft', 'none'] as const)
     .map((severity) => ({ severity, entries: buckets[severity] }))
     .filter((b) => b.entries.length > 0);
@@ -77,6 +119,8 @@ function formatValue(value: unknown): string {
 export function ReviewChangesPanel({
   isOpen,
   fields,
+  entries,
+  notice,
   pendingCount,
   target,
   isPending = false,
@@ -85,13 +129,15 @@ export function ReviewChangesPanel({
 }: ReviewChangesPanelProps) {
   const { t } = useT();
   const titleId = useId();
+  const consequenceId = useId();
+  const noticeId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
 
   const groups = useMemo(
-    () => groupFieldsByRestart(fields, true),
-    [fields]
+    () => groupByRestart(entries ?? pendingEntries(fields)),
+    [entries, fields]
   );
 
   // Move focus into the drawer when it opens; restore on close.
@@ -160,7 +206,7 @@ export function ReviewChangesPanel({
     >
       {/* Backdrop */}
       <div
-        className="absolute inset-0 modal-overlay"
+        className="absolute inset-0 modal-overlay motion-scrim"
         aria-hidden="true"
         onClick={isPending ? undefined : onCancel}
       />
@@ -172,35 +218,44 @@ export function ReviewChangesPanel({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="relative z-[60] surface-panel flex h-full w-full max-w-xl flex-col border-l border-border shadow-glow sm:rounded-none rounded-t-2xl sm:mt-0 mt-auto max-h-[85vh] sm:max-h-full"
+        className="motion-overlay relative z-[60] surface-panel flex h-full [--overlay-from:0_8px] sm:[--overlay-from:8px_0] w-full max-w-xl flex-col border-l border-border shadow-glow sm:rounded-none rounded-t-box sm:mt-0 mt-auto max-h-[85vh] sm:max-h-full"
         data-testid="review-changes-panel"
       >
         {/* Header */}
         <header className="flex items-start justify-between border-b ghost-divider modal-inner p-6">
           <div className="min-w-0">
-            <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">
+            <h2 id={titleId} className="text-xl font-semibold text-ds-text-primary">
               {t('configuration:reviewPanel.title')}
-            </p>
-            <h2 id={titleId} className="mt-1 text-lg font-semibold text-base-content">
-              {t('configuration:reviewPanel.subtitle', { target })}
             </h2>
+            <p className="mt-1 text-sm text-ds-text-secondary">
+              {t('configuration:reviewPanel.subtitle', { target })}
+            </p>
           </div>
           <button
             type="button"
             onClick={onCancel}
             disabled={isPending}
             aria-label={t('configuration:reviewPanel.cancel')}
-            className="text-body-secondary transition-colors hover:text-base-content disabled:opacity-50"
+            className="-mr-2 -mt-2 grid min-h-11 min-w-11 shrink-0 place-items-center rounded-field text-body-secondary transition-colors hover:text-base-content disabled:opacity-50 md:min-h-8 md:min-w-8"
           >
-            <X className="h-5 w-5" />
+            <X className="h-5 w-5" aria-hidden="true" />
           </button>
         </header>
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-5">
+          {notice && (
+            <div
+              id={noticeId}
+              className="mb-5 rounded-box border border-ds-warning/40 bg-ds-warning/10 px-3 py-2 text-sm text-ds-on-tint-warning"
+              data-testid="review-changes-panel-notice"
+            >
+              {notice}
+            </div>
+          )}
           {noChanges ? (
             <p
-              className="text-sm text-base-content/70"
+              className="text-sm text-ds-text-secondary"
               data-testid="review-changes-panel-empty"
             >
               {t('configuration:reviewPanel.noChanges')}
@@ -212,7 +267,7 @@ export function ReviewChangesPanel({
                   key={group.severity}
                   data-testid={`review-changes-panel-group-${group.severity}`}
                 >
-                  <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-base-content/65">
+                  <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-ds-text-secondary">
                     {group.severity === 'hard' ? (
                       <RotateCw className="h-3.5 w-3.5" aria-hidden="true" />
                     ) : group.severity === 'soft' ? (
@@ -227,37 +282,39 @@ export function ReviewChangesPanel({
                       : t('configuration:reviewPanel.groupNone', { count: group.entries.length })}
                   </h3>
                   <ul className="space-y-2">
-                    {group.entries.map(({ key, diff }) => (
+                    {group.entries.map((entry) => (
                       <li
-                        key={key}
-                        className="rounded-xl border border-border bg-base-100/60 p-3"
-                        data-testid={`review-changes-panel-row-${key}`}
+                        key={entry.id}
+                        className="rounded-box border border-ds-border-subtle p-3"
+                        data-testid={`review-changes-panel-row-${entry.id}`}
                       >
                         <div className="flex items-start justify-between gap-2">
-                          <span className="text-sm font-medium text-base-content">
-                            {FIELD_LABELS[key] ?? key}
+                          <span className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 text-sm text-ds-text-secondary">
+                            <SettingKey path={entry.settingsKey} />
+                            <span aria-hidden="true">·</span>
+                            <span>{entry.label}</span>
                           </span>
                           <StatusChip
-                            variant={diff.validation.state === 'invalid' ? 'warning' : 'neutral'}
+                            variant={entry.invalid ? 'warning' : 'neutral'}
                             size="sm"
                           >
-                            {diff.validation.state === 'invalid'
+                            {entry.invalid
                               ? t('configuration:fieldStatus.validation.invalid')
                               : t('configuration:fieldStatus.validation.pending')}
                           </StatusChip>
                         </div>
                         <div className="mt-2 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-xs">
-                          <span className="text-base-content/50">
+                          <span className="text-ds-text-muted">
                             {t('configuration:reviewPanel.configuredLabel')}
                           </span>
-                          <span className="font-mono text-base-content/80 break-all">
-                            {formatValue(diff.configuredValue)}
+                          <span className="font-mono text-ds-text-secondary break-all">
+                            {formatValue(entry.configuredValue)}
                           </span>
-                          <span className="text-base-content/50">
+                          <span className="text-ds-text-muted">
                             {t('configuration:reviewPanel.newLabel')}
                           </span>
                           <span className="font-mono text-base-content break-all">
-                            {formatValue(diff.formValue)}
+                            {formatValue(entry.formValue)}
                           </span>
                         </div>
                       </li>
@@ -270,27 +327,41 @@ export function ReviewChangesPanel({
         </div>
 
         {/* Footer */}
-        <footer className="flex justify-end gap-3 border-t ghost-divider modal-inner px-6 py-4">
-          <button
-            ref={cancelButtonRef}
-            type="button"
-            onClick={onCancel}
-            disabled={isPending}
-            className="action-btn-secondary"
-          >
-            {t('configuration:reviewPanel.cancel')}
-          </button>
-          <button
-            type="button"
-            onClick={onApply}
-            disabled={isPending || noChanges}
-            className="action-btn-primary"
-            data-testid="review-changes-panel-apply"
-          >
-            {isPending
-              ? t('configuration:reviewPanel.applying')
-              : t('configuration:reviewPanel.apply')}
-          </button>
+        <footer className="space-y-3 border-t ghost-divider modal-inner px-6 py-4">
+          {!noChanges && (
+            <p
+              id={consequenceId}
+              className="text-right text-xs tabular-nums text-ds-text-secondary"
+              data-testid="review-changes-panel-consequence"
+            >
+              {t('configuration:reviewPanel.consequence', { count: pendingCount })}
+            </p>
+          )}
+          <div className="flex flex-wrap justify-end gap-3">
+            <button
+              ref={cancelButtonRef}
+              type="button"
+              onClick={onCancel}
+              disabled={isPending}
+              className="action-btn-secondary"
+            >
+              {t('configuration:reviewPanel.cancel')}
+            </button>
+            <button
+              type="button"
+              onClick={onApply}
+              disabled={isPending || noChanges}
+              aria-describedby={
+                noChanges ? undefined : notice ? `${noticeId} ${consequenceId}` : consequenceId
+              }
+              className="action-btn-primary"
+              data-testid="review-changes-panel-apply"
+            >
+              {isPending
+                ? t('configuration:reviewPanel.applying')
+                : t('configuration:reviewPanel.apply')}
+            </button>
+          </div>
         </footer>
       </div>
     </div>,

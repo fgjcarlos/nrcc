@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Plus } from 'lucide-react';
 import { type User } from '@/features/auth/services/authService';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useUsersData } from '@/features/auth/hooks/useUsersData';
@@ -8,6 +9,7 @@ import { UserModal } from '@/features/auth/components/UserModal';
 import { StateContainer } from '@/shared/components/StateContainer';
 import { ConfirmationDialog } from '@/shared/components/ConfirmationDialog';
 import { useConfirmationDialog } from '@/shared/hooks/useConfirmationDialog';
+import { Button } from '@/shared/components/ui';
 import { useT } from '@/i18n';
 
 type ModalMode = 'create' | 'edit_full' | 'edit_password';
@@ -142,9 +144,9 @@ export function UsersView() {
   // Access control
   if (currentUser?.role !== 'admin') {
     return (
-      <div className="p-6">
-        <h1 className="text-2xl font-bold text-base-content">{t('auth:accessDenied')}</h1>
-        <p className="mt-2 text-base-content/60">{t('auth:accessDeniedDescription')}</p>
+      <div className="space-y-1">
+        <h1 className="text-xl font-bold text-ds-text-primary">{t('auth:accessDenied')}</h1>
+        <p className="text-sm text-ds-text-secondary">{t('auth:accessDeniedDescription')}</p>
       </div>
     );
   }
@@ -157,18 +159,22 @@ export function UsersView() {
     updateRoleMutation.isPending;
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-base-content">{t('auth:userManagement')}</h1>
-        <button
+    <div className="space-y-4">
+      <header className="flex flex-col gap-3 border-b border-ds-border-subtle pb-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0 space-y-1">
+          <h1 className="text-xl font-bold text-ds-text-primary">{t('auth:userManagement')}</h1>
+          <p className="max-w-[75ch] text-pretty text-sm text-ds-text-secondary">{t('auth:userManagementSafetyNotice')}</p>
+        </div>
+        <Button
+          type="button"
           onClick={openCreateModal}
           disabled={isAnyMutationPending}
-          className="action-btn-primary disabled:opacity-60 disabled:cursor-not-allowed"
+          className="min-h-11 shrink-0 self-start md:min-h-9 sm:self-auto"
         >
-          {t('common:add')} {t('auth:createUser')}
-        </button>
-      </div>
-      <p className="text-sm text-base-content/60">{t('auth:userManagementSafetyNotice')}</p>
+          <Plus className="h-4 w-4" aria-hidden="true" />
+          {t('auth:addUser')}
+        </Button>
+      </header>
 
       {/* State container: loading, error, empty, or content */}
       <StateContainer
@@ -176,9 +182,9 @@ export function UsersView() {
         isError={isError}
         isEmpty={users.length === 0}
         emptySlot={
-          <div className="flex flex-col items-center justify-center gap-3 py-12">
-            <p className="text-lg text-base-content">{t('auth:noUsersYet')}</p>
-            <p className="text-base-content/60">{t('auth:addFirstUser')}</p>
+          <div className="flex flex-col items-center justify-center gap-1 py-12 text-sm">
+            <p className="font-semibold text-ds-text-primary">{t('auth:noUsersYet')}</p>
+            <p className="text-ds-text-secondary">{t('auth:addFirstUser')}</p>
           </div>
         }
       >
@@ -195,10 +201,10 @@ export function UsersView() {
       {/* Delete Confirmation Dialog */}
       <ConfirmationDialog
         isOpen={deleteDialog.isOpen}
-        title={t('common:deleteUser')}
+        title={deleteDialog.pendingItem ? t('auth:deleteUserTitle', { username: deleteDialog.pendingItem.username }) : ''}
         description={
           deleteDialog.pendingItem
-            ? t('common:deleteUserDescription', { username: deleteDialog.pendingItem.username })
+            ? t('auth:deleteUserDescription', { username: deleteDialog.pendingItem.username })
             : ''
         }
         variant="danger"

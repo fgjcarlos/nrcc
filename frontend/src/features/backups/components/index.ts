@@ -1,14 +1,12 @@
-export { BackupTable } from './BackupTable';
-export type { BackupTableProps } from './BackupTable';
 export { CronBuilder } from './CronBuilder';
 export { validateCron } from '@/features/backups/lib/cronUtils';
 export type { CronBuilderProps, SaveState, PresetType } from './CronBuilder';
 export { RetentionEditor } from './RetentionEditor';
 export type { RetentionEditorProps } from './RetentionEditor';
-export { SchedulerHistory } from './SchedulerHistory';
-export type { SchedulerHistoryProps } from './SchedulerHistory';
 export { BackupSummaryCards } from './BackupSummaryCards';
 export { BackupListSection } from './BackupListSection';
 export { BackupDetailSection } from './BackupDetailSection';
 export { SchedulerConfigSection } from './SchedulerConfigSection';
 export { RetentionPolicySection } from './RetentionPolicySection';
+export { BackupActionDialog, type BackupAction } from './BackupActionDialog';
+export type { SchedulerState } from './BackupSummaryCards';

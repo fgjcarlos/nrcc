@@ -1,3 +1,8 @@
+// Self-hosted fonts: NRCC must run without network access (PRODUCT.md).
+import '@fontsource-variable/overpass';
+import '@fontsource/overpass-mono/400.css';
+import '@fontsource/overpass-mono/500.css';
+import '@fontsource/overpass-mono/600.css';
 import './index.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';

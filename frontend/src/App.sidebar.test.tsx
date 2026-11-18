@@ -54,18 +54,6 @@ vi.mock('@/features/libraries/components/LibrariesView', () => ({
   LibrariesView: () => <div>Libraries page</div>,
 }));
 
-vi.mock('@/features/flows/components/FlowsView', () => ({
-  FlowsView: () => <div>Flows page</div>,
-}));
-
-vi.mock('@/features/flows/components/FlowVersionsView', () => ({
-  FlowVersionsView: () => <div>Flow versions page</div>,
-}));
-
-vi.mock('@/features/flows/components/FlowDetailView', () => ({
-  FlowDetailView: () => <div>Flow detail page</div>,
-}));
-
 vi.mock('@/features/bootstrap/components/BootstrapView', () => ({
   BootstrapView: () => <div>Bootstrap page</div>,
 }));
@@ -80,10 +68,6 @@ vi.mock('@/features/backups/components/BackupsView', () => ({
 
 vi.mock('@/features/security/components/SecurityView', () => ({
   SecurityView: () => <div>Security page</div>,
-}));
-
-vi.mock('@/features/files/components/FilesView', () => ({
-  FilesView: () => <div>Files page</div>,
 }));
 
 vi.mock('@/features/updates/components/UpdateNotificationChip', () => ({
@@ -219,10 +203,10 @@ describe('sidebar navigation (#365)', () => {
     });
     expect(screen.queryByText('Overview page')).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('link', { name: /Update Maintenance/ }));
+    await userEvent.click(screen.getByRole('link', { name: 'Updates' }));
     await waitFor(() => expect(screen.getByText('Updates page')).toBeInTheDocument());
 
-    await userEvent.click(screen.getByRole('link', { name: /Library Maintenance/ }));
+    await userEvent.click(screen.getByRole('link', { name: 'Libraries' }));
     await waitFor(() => expect(screen.getByText('Libraries page')).toBeInTheDocument());
   });
 });

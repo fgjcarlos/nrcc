@@ -1,8 +1,9 @@
 import { Link } from 'react-router-dom';
-import { ChevronRight, ShieldCheck, ShieldOff, Users } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { StatusChip } from '@/shared/components/ui';
 import { useT } from '@/i18n';
 import type { User } from '@/features/auth/services/authService';
+import { SecuritySurface } from './SecuritySurface';
 
 /**
  * NrccAccessBoundaryCard — issue #766 slice E
@@ -48,89 +49,55 @@ export function NrccAccessBoundaryCard({ users }: NrccAccessBoundaryCardProps) {
       ? 'warning'
       : 'success';
 
+  const title = t('security:nrccAccessBoundary.title');
+  const statusLabel = total > 0
+    ? t('security:nrccAccessBoundary.statusOn', { count: total })
+    : t('security:nrccAccessBoundary.statusOff');
+
   return (
-    <article
-      data-testid="boundary-nrcc-access"
-      aria-labelledby="boundary-nrcc-access-title"
-      className="card surface-card border border-border p-6"
-    >
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
-          {variant === 'success' ? (
-            <ShieldCheck className="h-6 w-6 text-success" aria-hidden="true" />
-          ) : (
-            <ShieldOff className="h-6 w-6 text-warning" aria-hidden="true" />
-          )}
-          <div className="min-w-0">
-            <h2
-              id="boundary-nrcc-access-title"
-              className="text-base font-semibold text-base-content"
-            >
-              {t('security:nrccAccessBoundary.title')}
-            </h2>
-            <p className="mt-0.5 text-xs text-base-content/65">
-              {t('security:nrccAccessBoundary.subtitle')}
-            </p>
-          </div>
-        </div>
+    <SecuritySurface
+      anchor="nrcc-access"
+      testId="boundary-nrcc-access"
+      title={title}
+      summary={t('security:nrccAccessBoundary.subtitle')}
+      status={
         <StatusChip
           variant={variant}
           size="sm"
-          ariaLabel={t('security:nrccAccessBoundary.statusAria', {
-            state: total > 0 ? 'configured' : 'empty',
-          })}
+          ariaLabel={t('security:nrccAccessBoundary.statusAria', { state: statusLabel })}
         >
-          {total > 0
-            ? t('security:nrccAccessBoundary.statusOn', { count: total })
-            : t('security:nrccAccessBoundary.statusOff')}
+          {statusLabel}
         </StatusChip>
-      </header>
-
-      <div
-        className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2"
-        data-testid="boundary-nrcc-access-summary"
-      >
-        <div className="rounded-xl border border-border/60 bg-base-200/30 px-3 py-3">
-          <div className="flex items-center gap-1.5 text-base-content/45 uppercase tracking-[0.18em] text-xs">
-            <Users className="h-3 w-3" aria-hidden="true" />
-            {t('security:nrccAccessBoundary.total')}
+      }
+      details={
+        <dl
+          className="flex flex-wrap gap-x-4 text-xs text-ds-text-secondary"
+          data-testid="boundary-nrcc-access-summary"
+        >
+          <div className="flex gap-1">
+            <dt>{t('security:nrccAccessBoundary.total')}</dt>
+            <dd className="font-semibold tabular-nums text-ds-text-primary" data-testid="boundary-nrcc-access-total">
+              {total}
+            </dd>
           </div>
-          <div
-            className="mt-1.5 text-base font-semibold text-base-content"
-            data-testid="boundary-nrcc-access-total"
-          >
-            {total}
+          <div className="flex gap-1">
+            <dt>{t('security:nrccAccessBoundary.roleDistribution')}</dt>
+            <dd className="tabular-nums text-ds-text-primary" data-testid="boundary-nrcc-access-roles">
+              {t('security:nrccAccessBoundary.roles', { admins, viewers })}
+            </dd>
           </div>
-          <p className="mt-0.5 text-base-content/55">
-            {t('security:nrccAccessBoundary.totalHint')}
-          </p>
-        </div>
-        <div className="rounded-xl border border-border/60 bg-base-200/30 px-3 py-3">
-          <div className="text-base-content/45 uppercase tracking-[0.18em] text-xs">
-            {t('security:nrccAccessBoundary.roleDistribution')}
-          </div>
-          <div
-            className="mt-1.5 text-base font-semibold text-base-content"
-            data-testid="boundary-nrcc-access-roles"
-          >
-            {admins} <span className="text-base-content/55">{t('security:nrccAccessBoundary.admins')}</span>
-            {' · '}
-            {viewers} <span className="text-base-content/55">{t('security:nrccAccessBoundary.viewers')}</span>
-          </div>
-          <p className="mt-0.5 text-base-content/55">
-            {t('security:nrccAccessBoundary.roleDistributionHint')}
-          </p>
-        </div>
-      </div>
-
-      <Link
-        to="/settings/users"
-        className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-accent transition-colors hover:text-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-base-100"
-        data-testid="boundary-nrcc-access-link"
-      >
-        {t('security:nrccAccessBoundary.cta')}
-        <ChevronRight className="h-4 w-4" aria-hidden="true" />
-      </Link>
-    </article>
+        </dl>
+      }
+      action={
+        <Link
+          to="/settings/users"
+          className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-ds-on-tint-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ds-accent-primary md:min-h-9"
+          data-testid="boundary-nrcc-access-link"
+        >
+          {t('security:nrccAccessBoundary.cta')}
+          <ChevronRight className="h-4 w-4" aria-hidden="true" />
+        </Link>
+      }
+    />
   );
 }

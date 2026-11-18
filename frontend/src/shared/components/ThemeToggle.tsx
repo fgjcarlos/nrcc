@@ -4,31 +4,23 @@ import { useTheme } from '@/shared/hooks';
 
 export function ThemeToggle() {
   const { theme, toggleTheme } = useTheme();
-
-  const getIcon = () => {
-    if (theme === 'light') return <Sun className="w-5 h-5" />;
-    if (theme === 'dark') return <Moon className="w-5 h-5" />;
-    return <Monitor className="w-5 h-5" />;
-  };
-
   const { t } = useT();
-  const getLabel = () => {
-    if (theme === 'light') return t('common:themeLight');
-    if (theme === 'dark') return t('common:themeDark');
-    return t('common:themeSystem');
-  };
+
+  const Icon = theme === 'light' ? Sun : theme === 'dark' ? Moon : Monitor;
+  const label =
+    theme === 'light' ? t('common:themeLight') : theme === 'dark' ? t('common:themeDark') : t('common:themeSystem');
+  const name = t('common:themeToggleLabel', { theme: label });
 
   return (
     <button
+      type="button"
       onClick={toggleTheme}
-      className="theme-toggle-shell inline-flex h-11 items-center gap-2 rounded-xl border px-3 text-sm font-medium text-base-content/80 transition-colors hover:text-base-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
-      title={`Tema: ${getLabel()}`}
-      aria-label={`Tema: ${getLabel()}`}
+      className="theme-toggle-shell inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-field border px-3 text-sm font-medium text-ds-text-primary transition-colors"
+      title={name}
+      aria-label={name}
     >
-      <span className="grid h-7 w-7 place-items-center rounded-lg bg-accent/10 text-accent">
-        {getIcon()}
-      </span>
-      <span className="hidden sm:inline">{getLabel()}</span>
+      <Icon className="h-5 w-5 text-ds-text-secondary" aria-hidden="true" />
+      <span className="hidden xl:inline">{label}</span>
     </button>
   );
 }

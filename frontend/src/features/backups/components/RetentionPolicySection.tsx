@@ -15,10 +15,12 @@ export function RetentionPolicySection(props: RetentionPolicySectionProps) {
   const { t } = useT();
 
   return (
-    <div className="surface-card p-6">
-      <div className="mb-4">
-        <h2 className="text-lg font-semibold text-base-content">{t('backups:retentionTitle')}</h2>
-        <p className="text-sm text-base-content/65">{t('backups:retentionDesc')}</p>
+    <section aria-labelledby="backups-retention-title" className="space-y-3 py-4">
+      <div className="space-y-1">
+        <h2 id="backups-retention-title" className="text-sm font-semibold text-ds-text-primary">
+          {t('backups:retention.title')}
+        </h2>
+        <p className="text-xs text-ds-text-secondary">{t('backups:retention.desc')}</p>
       </div>
 
       <RetentionEditor
@@ -28,6 +30,6 @@ export function RetentionPolicySection(props: RetentionPolicySectionProps) {
         isSaving={isSaving}
         onSave={onSave}
       />
-    </div>
+    </section>
   );
 }

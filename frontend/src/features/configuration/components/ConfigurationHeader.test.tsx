@@ -10,20 +10,17 @@ vi.mock('@/i18n', () => ({
 import { ConfigurationHeader } from './ConfigurationHeader';
 
 describe('ConfigurationHeader', () => {
-  it('renders the page title and a Settings icon', () => {
-    render(<ConfigurationHeader />);
+  it('renders the page title with its designator and status', () => {
+    render(<ConfigurationHeader designator={<span>REV 9f2c1b0d</span>} status={<p>Node-RED 5.0.6</p>} />);
     expect(
       screen.getByRole('heading', { name: 'configuration:pageTitle' })
     ).toBeInTheDocument();
+    expect(screen.getByText('REV 9f2c1b0d')).toBeInTheDocument();
+    expect(screen.getByText('Node-RED 5.0.6')).toBeInTheDocument();
   });
 
-  it('renders the topology diagram by default', () => {
+  it('no longer embeds the topology diagram', () => {
     render(<ConfigurationHeader />);
-    expect(screen.getByTestId('nrcc-topology-diagram')).toBeInTheDocument();
-  });
-
-  it('hides the topology diagram when hideTopology is true', () => {
-    render(<ConfigurationHeader hideTopology />);
     expect(screen.queryByTestId('nrcc-topology-diagram')).toBeNull();
   });
 });

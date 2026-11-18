@@ -33,16 +33,6 @@ export const queryKeys = {
     root: ['envVars'] as const,
     dotenv: ['envVars-dotenv'] as const,
   },
-  flows: {
-    root: ['flows'] as const,
-    detail: (flowId?: string) => ['flow', flowId] as const,
-    metrics: (flowId?: string) => ['flow-metrics', flowId] as const,
-    versions: ['flow-versions'] as const,
-    diff: (selectedVersions: readonly string[] | null) => ['flow-diff', selectedVersions] as const,
-  },
-  files: {
-    root: ['files'] as const,
-  },
   libraries: {
     root: ['libraries'] as const,
   },
@@ -54,7 +44,6 @@ export const queryKeys = {
   },
   system: {
     info: ['system', 'info'] as const,
-    history: ['system', 'history'] as const,
   },
   updates: {
     status: ['updateStatus'] as const,

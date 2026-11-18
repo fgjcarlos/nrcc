@@ -1,6 +1,7 @@
 import { type EnvVar } from '@/features/env-vars/services/envService';
 import { Eye, EyeOff, Trash2, Pencil } from 'lucide-react';
 import { useT } from '@/i18n';
+import { StatusChip } from '@/shared/components/ui';
 
 export function EnvVarRow({ envVar, onDelete, onToggleSecret, onEdit, showSecret }: {
   envVar: EnvVar;
@@ -11,15 +12,21 @@ export function EnvVarRow({ envVar, onDelete, onToggleSecret, onEdit, showSecret
 }) {
   const { t } = useT();
   return (
-    <tr className="table-row-hover">
-      <td className="px-4 py-3 font-mono text-sm text-base-content">{envVar.key}</td>
-      <td className="px-4 py-3 font-mono text-sm text-base-content">
+    <tr>
+      <td data-label={t('env-vars:colKey')} className="font-mono">{envVar.key}</td>
+      <td data-label={t('env-vars:colValue')} className="font-mono [overflow-wrap:anywhere]">
         <div className="flex items-center gap-2">
           {envVar.type === 'secret' ? (
             <>
               <span>{showSecret ? envVar.value : '••••••••'}</span>
-              <button onClick={() => onToggleSecret(envVar.key)} className="text-base-content/60 hover:text-base-content">
-                {showSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              <button
+                type="button"
+                onClick={() => onToggleSecret(envVar.key)}
+                aria-label={t(showSecret ? 'env-vars:hideValue' : 'env-vars:showValue', { key: envVar.key })}
+                aria-pressed={showSecret}
+                className="rounded p-1 text-ds-text-muted hover:text-base-content"
+              >
+                {showSecret ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
               </button>
             </>
           ) : (
@@ -27,30 +34,34 @@ export function EnvVarRow({ envVar, onDelete, onToggleSecret, onEdit, showSecret
           )}
         </div>
       </td>
-      <td className="px-4 py-3">
-        <span className={`rounded-full px-2 py-1 text-xs ${
-          envVar.type === 'secret' ? 'bg-error/15 text-ds-on-tint-error' :
-          envVar.type === 'boolean' ? 'bg-info/15 text-ds-on-tint-info' :
-          envVar.type === 'number' ? 'bg-success/15 text-ds-on-tint-success' :
-          'bg-base-300/70 text-base-content'
-        }`}>{envVar.type}</span>
+      <td data-label={t('env-vars:colType')}>
+        {/* Type and source are data, not state: neutral chips (colour is reserved for state). */}
+        <StatusChip size="sm" className="whitespace-nowrap">{envVar.type}</StatusChip>
         {envVar.type === 'secret' && (
-          <span className="ml-2 text-xs text-base-content/50">{t('env-vars:runtimeOnly')}</span>
+          <span className="ml-2 text-xs text-ds-text-muted">{t('env-vars:runtimeOnly')}</span>
         )}
       </td>
-      <td className="px-4 py-3 text-sm text-base-content/60">
-        <span className="rounded-full bg-base-300/70 px-2 py-1 text-xs text-base-content">
+      <td data-label={t('env-vars:colSource')}>
+        <StatusChip size="sm" className="whitespace-nowrap">
           {envVar.source === 'node-red' ? 'Node-RED' : 'NRCC'}
-        </span>
+        </StatusChip>
       </td>
-      <td className="px-4 py-3 text-sm text-base-content/60">{envVar.description || '-'}</td>
-      <td className="px-4 py-3 text-right">
+      <td data-label={t('env-vars:colDescription')} className="text-ds-text-secondary">{envVar.description || '-'}</td>
+      <td data-label={t('env-vars:colActions')} className="text-right">
         <div className="flex items-center justify-end gap-2">
-          <button onClick={() => onEdit(envVar)} className="rounded p-2 text-primary transition-colors hover:bg-primary/10">
-            <Pencil className="w-4 h-4" />
+          <button
+            onClick={() => onEdit(envVar)}
+            aria-label={`${t('common:edit')} ${envVar.key}`}
+            className="rounded p-2 text-primary transition-colors hover:bg-primary/10"
+          >
+            <Pencil className="w-4 h-4" aria-hidden="true" />
           </button>
-          <button onClick={() => onDelete(envVar.key)} className="rounded p-2 text-error transition-colors hover:bg-error/10">
-            <Trash2 className="w-4 h-4" />
+          <button
+            onClick={() => onDelete(envVar.key)}
+            aria-label={`${t('common:delete')} ${envVar.key}`}
+            className="rounded p-2 text-error transition-colors hover:bg-error/10"
+          >
+            <Trash2 className="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
       </td>

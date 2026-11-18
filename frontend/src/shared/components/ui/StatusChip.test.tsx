@@ -81,6 +81,8 @@ describe('StatusChip', () => {
     render(<StatusChip className="ml-2">Custom</StatusChip>);
     const chip = screen.getByRole('status');
     expect(chip.className).toMatch(/ml-2/);
-    expect(chip.className).toMatch(/rounded-full/);
+    // Same 2px selector radius as daisyUI badges (L19).
+    expect(chip).toHaveClass('rounded-selector');
+    expect(chip.className).not.toMatch(/rounded-full/);
   });
 });

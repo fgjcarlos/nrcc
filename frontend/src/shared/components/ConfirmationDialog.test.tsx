@@ -37,6 +37,21 @@ describe('ConfirmationDialog', () => {
     expect(dialog).toHaveAccessibleName('Delete User');
   });
 
+  it('describes the dialog with its description and labels the close button from i18n', () => {
+    render(
+      <ConfirmationDialog
+        isOpen={true}
+        title="Delete User"
+        description="Are you sure?"
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole('dialog')).toHaveAccessibleDescription('Are you sure?');
+    expect(screen.getByRole('button', { name: i18n.t('common:closeDialog') })).toBeInTheDocument();
+  });
+
   it('renders the shared dialog in the document top layer (#721)', () => {
     render(
       <div data-testid="page-shell">
@@ -229,6 +244,8 @@ describe('ConfirmationDialog', () => {
     );
 
     expect(screen.getByText(i18n.t('common:typeToConfirmDelete', { identifier: 'username' }))).toBeInTheDocument();
+    // The catalog entry exists: the gate is labelled in words, not by its raw key.
+    expect(screen.getByLabelText('Type "username" to confirm')).toHaveAttribute('placeholder', 'username');
   });
 
   it('disables confirm button when confirmText does not match input', async () => {
@@ -320,7 +337,7 @@ describe('ConfirmationDialog', () => {
     );
 
     const confirmBtn = screen.getByText(i18n.t('common:confirm'));
-    expect(confirmBtn).toHaveClass('bg-error');
+    expect(confirmBtn).toHaveClass('action-btn-danger');
   });
 
   it('auto-focuses input when confirmText is provided', async () => {

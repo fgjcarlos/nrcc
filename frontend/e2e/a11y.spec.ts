@@ -54,7 +54,7 @@ test.describe('Issue #766 slice G W4 — WCAG 2.1 AA gate', () => {
   test('configuration page has no critical or serious axe violations', async ({ page }) => {
     await login(page)
     await page.goto('/configuration')
-    await expect(page.getByRole('heading', { name: 'Node-RED Configuration', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Configuration', exact: true })).toBeVisible()
     // The raw settings.js editor renders after its fixture loads.
     await expect(page.getByRole('textbox', { name: 'Advanced settings.js' })).toHaveValue(/fixture settings\.js/)
     await expectNoAxeBlockers(page, 'configuration')
@@ -65,6 +65,10 @@ test.describe('Issue #766 slice G W4 — WCAG 2.1 AA gate', () => {
     await page.goto('/security')
     await expect(page.getByRole('heading', { name: 'Node-RED admin auth' })).toBeVisible()
     await expectNoAxeBlockers(page, 'security')
+    // T10: scan an expanded surface form too, not only the collapsed rows.
+    await page.getByTestId('boundary-admin-auth').locator('summary').click()
+    await expect(page.getByTestId('boundary-admin-auth-fieldset')).toBeVisible()
+    await expectNoAxeBlockers(page, 'security')
   })
 
   test('computed muted text colour matches the pinned theme token (#889 S1)', async ({ page }) => {
@@ -72,8 +76,8 @@ test.describe('Issue #766 slice G W4 — WCAG 2.1 AA gate', () => {
     await page.goto('/login')
     await expectPinnedTheme(page)
 
-    // L5 token values: dark --ds-text-muted #8e99a8, light #5a6577.
-    const expected = expectedTheme() === 'corporateDark' ? 'rgb(142, 153, 168)' : 'rgb(90, 101, 119)'
+    // --ds-text-muted per DESIGN.md: dark ink-muted-dark #9a9ea6, light ink-muted #5c626c.
+    const expected = expectedTheme() === 'corporateDark' ? 'rgb(154, 158, 166)' : 'rgb(92, 98, 108)'
     const computed = await page.evaluate(() => {
       const probe = document.createElement('p')
       probe.className = 'text-body-secondary'
@@ -126,11 +130,14 @@ test.describe('Issue #766 slice G W4 — WCAG 2.1 AA gate', () => {
     await login(page)
     await page.goto('/backups')
     await page.locator('button[title="Restore"]').first().click()
-    await expect(page.getByText('Restaurar backup')).toBeVisible()
-    const confirmation = page.locator('input[placeholder="backup-001"]')
-    await confirmation.fill('backup-001', { timeout: 3_000 })
-    await expect(confirmation).toHaveValue('backup-001')
-    const confirmButton = page.getByRole('button', { name: 'Confirm', exact: true })
+    const dialog = page.getByRole('dialog', { name: 'Restore backup' })
+    await expect(dialog).toBeVisible()
+    // T10: a short word replaces the 36-character id; the button names the backup.
+    const confirmation = dialog.getByLabel('Type "restore" to confirm')
+    const confirmButton = dialog.getByRole('button', { name: /^Restore / })
+    await expect(confirmButton).toBeDisabled()
+    await confirmation.fill('restore', { timeout: 3_000 })
+    await expect(confirmation).toHaveValue('restore')
     await expect(confirmButton).toBeEnabled()
     await confirmButton.click({ timeout: 3_000 })
     await expect(page.getByText('Restore dry path completed in test mode')).toBeVisible()
@@ -140,9 +147,10 @@ test.describe('Issue #766 slice G W4 — WCAG 2.1 AA gate', () => {
     await login(page)
     await page.goto('/backups')
     await page.locator('button[title="Restore"]').first().click()
-    await expect(page.getByText('Restaurar backup')).toBeVisible()
-    const confirmation = page.locator('input[placeholder="backup-001"]')
-    await confirmation.fill('backup-001')
+    const dialog = page.getByRole('dialog', { name: 'Restore backup' })
+    await expect(dialog).toBeVisible()
+    const confirmation = dialog.getByLabel('Type "restore" to confirm')
+    await confirmation.fill('restore')
     await confirmation.press('Enter')
     await expect(page.getByText('Restore dry path completed in test mode')).toBeVisible()
   })

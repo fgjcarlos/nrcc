@@ -1,21 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { MetricsSnapshot, RestartEvent } from './history';
-
-describe('MetricsSnapshot', () => {
-  it('has the required shape with all numeric metric fields', () => {
-    const snapshot: MetricsSnapshot = {
-      timestamp: '2024-01-01T00:00:00Z',
-      cpuPercent: 45.2,
-      memoryPercent: 62.1,
-      diskPercent: 78.5,
-    };
-
-    expect(snapshot.cpuPercent).toBe(45.2);
-    expect(snapshot.memoryPercent).toBe(62.1);
-    expect(snapshot.diskPercent).toBe(78.5);
-    expect(snapshot.timestamp).toBe('2024-01-01T00:00:00Z');
-  });
-});
+import type { RestartEvent } from './history';
 
 describe('RestartEvent', () => {
   it('has the required shape with exit code and attempt tracking', () => {

@@ -1,15 +1,18 @@
-import { useEffect, useState } from 'react';
-import { Check, Lock, Unlock } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { ConfirmationDialog } from '@/shared/components/ConfirmationDialog';
 import { StatusChip } from '@/shared/components/ui';
 import { useT } from '@/i18n';
+import { ReviewChangesPanel } from '@/features/configuration/components/ReviewChangesPanel';
 import {
   applySecurityPatch,
+  applyErrorKey,
   detectLegacyAliases,
-  humanizeApplyError,
-  reportApplyError,
-  reportApplySuccess,
 } from './securityCenterHelpers';
+import { SecuritySurface } from './SecuritySurface';
+import { basicAuthReview, migrationRows } from '../lib/securityReview';
+import { useSurfaceApply } from '../lib/useSurfaceApply';
+
+const ANCHORS = { httpNodeAuth: 'http-node-auth', httpStaticAuth: 'http-static-auth' } as const;
 
 type BasicAuthForm = { user: string; pass: string; storedPass?: string };
 
@@ -56,9 +59,10 @@ export function HttpBasicAuthBoundaryCard({
   const { t } = useT();
   const [value, setValue] = useState<BasicAuthForm>({ user: '', pass: '' });
   const [saving, setSaving] = useState(false);
+  // Synchronous guard: a same-tick double click must not start two applies.
+  const savingRef = useRef(false);
   const [confirmMigration, setConfirmMigration] = useState(false);
   const [error, setError] = useState<string>();
-  const [appliedAt, setAppliedAt] = useState<number | null>(null);
 
   const surfaceConfigured = Boolean(config?.user);
   const legacyAliases = detectLegacyAliases(rawSettingsContent);
@@ -71,13 +75,9 @@ export function HttpBasicAuthBoundaryCard({
     (surface === 'httpStaticAuth' &&
       legacyAliases.includes('staticAuth') &&
       !config?.user);
-  const variant: 'success' | 'warning' | 'neutral' = !editable
-    ? 'neutral'
-    : surfaceConfigured
-      ? 'success'
-      : isLegacySurface
-        ? 'warning'
-        : 'neutral';
+  // Off is neutral (often off on purpose); a pending legacy alias is amber.
+  const state = surfaceConfigured ? 'statusOn' : isLegacySurface ? 'statusLegacy' : 'statusOff';
+  const variant = surfaceConfigured ? 'success' : isLegacySurface ? 'warning' : 'neutral';
 
   useEffect(() => {
     setValue({
@@ -89,11 +89,26 @@ export function HttpBasicAuthBoundaryCard({
   }, [config]);
 
   const i18n = (suffix: string) => `security:${surface}.${suffix}`;
+  const legacyAlias = surface === 'httpNodeAuth' ? 'nodeHttpAuth' : 'staticAuth';
+  const reviewEntries = [
+    ...migrationRows(isLegacySurface ? [legacyAlias] : [], t),
+    ...basicAuthReview(surface, config, value, t),
+  ];
+  const review = useSurfaceApply(reviewEntries.length, value, editable);
+
+  const edit = (patch: Partial<BasicAuthForm>) => {
+    setValue((current) => ({ ...current, ...patch }));
+    review.edited();
+  };
 
   const apply = async () => {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    const count = reviewEntries.length;
     setConfirmMigration(false);
     setSaving(true);
     setError(undefined);
+    review.started(count);
 
     const patch =
       value.user.trim().length === 0
@@ -106,24 +121,24 @@ export function HttpBasicAuthBoundaryCard({
           };
 
     const result = await applySecurityPatch(patch, expectedRevision);
+    savingRef.current = false;
     setSaving(false);
+    // The circuit and its live region carry the outcome; no toast.
+    review.settled(count, result);
     if (result.status === 'applied') {
-      // The lint rule flags Date.now() as impure; this call runs from
-      // the Save button click handler (an event), not from render, so
-      // purity is preserved. Capture once to keep the call out of
-      // the setState callback.
-      const ts = Date.now();
-      setAppliedAt(ts);
-      reportApplySuccess(t(i18n('applied')));
       onApplied();
     } else {
-      setError(humanizeApplyError(result.error?.status));
-      reportApplyError({ status: 'FAILED', detail: result.error?.detail });
+      setError(t(applyErrorKey(result.error?.status)));
     }
   };
 
-  const save = async () => {
+  // Save opens the review drawer; its Apply is the confirmation.
+  const save = () => review.openReview();
+
+  const applyFromReview = async () => {
+    // The legacy migration keeps its own acknowledgement, after the review.
     if (isLegacySurface) {
+      review.closeReview();
       setConfirmMigration(true);
       return;
     }
@@ -131,47 +146,27 @@ export function HttpBasicAuthBoundaryCard({
   };
 
   return (
-    <article
-      data-testid={`boundary-${surface}`}
-      aria-labelledby={`boundary-${surface}-title`}
-      className="card surface-card border border-border p-6"
-    >
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
-          {surfaceConfigured ? (
-            <Lock className="h-6 w-6 text-success" aria-hidden="true" />
-          ) : (
-            <Unlock className="h-6 w-6 text-warning" aria-hidden="true" />
-          )}
-          <div className="min-w-0">
-            <h2
-              id={`boundary-${surface}-title`}
-              className="text-base font-semibold text-base-content"
-            >
-              {t(i18n('title'))}
-            </h2>
-            <p className="mt-0.5 text-xs text-base-content/65">
-              {t(i18n('subtitle'))}
-            </p>
-          </div>
-        </div>
+    <>
+    <SecuritySurface
+      anchor={ANCHORS[surface]}
+      testId={`boundary-${surface}`}
+      title={t(i18n('title'))}
+      summary={t(i18n('subtitle'))}
+      circuit={{ circuit: review.circuit, pendingCount: reviewEntries.length }}
+      status={
         <StatusChip
           variant={variant}
           size="sm"
-          ariaLabel={t(i18n('statusAria'), {
-            state: surfaceConfigured ? 'on' : 'off',
-          })}
+          ariaLabel={t(i18n('statusAria'), { state: t(i18n(state)) })}
         >
-          {surfaceConfigured
-            ? t(i18n('statusOn'))
-            : t(i18n('statusOff'))}
+          {t(i18n(state))}
         </StatusChip>
-      </header>
-
+      }
+    >
       {!editable && (
         <p
           role="status"
-          className="mt-3 rounded-xl border border-warning/40 bg-warning/10 p-3 text-sm text-warning"
+          className="mb-4 rounded-box border border-ds-warning/40 bg-ds-warning/10 px-3 py-2 text-sm text-ds-on-tint-warning"
           data-testid={`boundary-${surface}-readonly`}
         >
           {t(i18n('readOnly'))}
@@ -182,7 +177,7 @@ export function HttpBasicAuthBoundaryCard({
         <p
           role="status"
           aria-live="polite"
-          className="mt-3 rounded-xl border border-danger/40 bg-danger/10 p-3 text-sm text-danger"
+          className="mb-4 rounded-box border border-ds-danger/40 bg-ds-danger/10 px-3 py-2 text-sm text-ds-on-tint-error"
           data-testid={`boundary-${surface}-error`}
         >
           {error}
@@ -192,11 +187,11 @@ export function HttpBasicAuthBoundaryCard({
       {isLegacySurface && editable && (
         <div
           role="status"
-          className="mt-3 rounded-xl border border-warning/40 bg-warning/10 p-3 text-sm"
+          className="mb-4 rounded-box border border-ds-warning/40 bg-ds-warning/10 px-3 py-2 text-sm"
           data-testid={`boundary-${surface}-legacy`}
         >
-          <h3 className="font-medium">{t(i18n('legacyTitle'))}</h3>
-          <p className="text-base-content/85">
+          <h3 className="font-semibold">{t(i18n('legacyTitle'))}</h3>
+          <p className="text-ds-text-secondary">
             {t(i18n('legacyBody'), {
               alias: surface === 'httpNodeAuth' ? 'nodeHttpAuth' : 'staticAuth',
             })}
@@ -206,66 +201,60 @@ export function HttpBasicAuthBoundaryCard({
 
       <fieldset
         disabled={!editable || saving}
-        className="mt-5 space-y-4"
+        className="grid max-w-2xl gap-4 sm:grid-cols-2"
         data-testid={`boundary-${surface}-fieldset`}
       >
         <label className="text-sm">
           {t(i18n('username'))}
           <input
-            className="input input-bordered mt-1 w-full"
+            className="input input-bordered mt-1 min-h-11 w-full md:min-h-0"
             data-testid={`boundary-${surface}-user`}
             value={value.user}
-            onChange={(event) => {
-              setValue((current) => ({ ...current, user: event.target.value }));
-            }}
+            onChange={(event) => edit({ user: event.target.value })}
           />
         </label>
         <label className="text-sm">
           {t(i18n('password'))}
           <input
-            className="input input-bordered mt-1 w-full"
+            className="input input-bordered mt-1 min-h-11 w-full md:min-h-0"
             data-testid={`boundary-${surface}-pass`}
             type="password"
             value={value.pass}
-            onChange={(event) => {
-              setValue((current) => ({ ...current, pass: event.target.value }));
-            }}
+            onChange={(event) => edit({ pass: event.target.value })}
           />
           {value.storedPass && (
             <p
-              className="mt-1 text-xs text-base-content/55"
+              className="mt-1 break-all font-mono text-xs text-ds-text-muted"
               data-testid={`boundary-${surface}-stored-hash`}
             >
               {t(i18n('storedHashHint'), { hash: value.storedPass })}
             </p>
           )}
-          <p className="mt-1 text-sm text-base-content/65">
-            {t(i18n('passwordHint'))}
-          </p>
         </label>
 
-        <button
-          type="button"
-          className="action-btn-primary flex items-center gap-2"
-          onClick={save}
-          disabled={!editable || saving}
-          data-testid={`boundary-${surface}-save`}
-        >
-          <Check className="h-4 w-4" aria-hidden="true" />
-          {saving ? t(i18n('saving')) : t(i18n('save'))}
-        </button>
+        <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
+          <button
+            type="button"
+            className="action-btn-primary min-h-11 md:min-h-0"
+            onClick={save}
+            disabled={!editable || saving}
+            data-testid={`boundary-${surface}-save`}
+          >
+            {saving ? t(i18n('saving')) : t(i18n('save'))}
+          </button>
+        </div>
       </fieldset>
+    </SecuritySurface>
 
-      {appliedAt && !error && (
-        <p
-          role="status"
-          aria-live="polite"
-          className="mt-2 text-sm text-success"
-          data-testid={`boundary-${surface}-applied`}
-        >
-          {t(i18n('appliedLabel'))}
-        </p>
-      )}
+      <ReviewChangesPanel
+        isOpen={review.reviewOpen}
+        entries={reviewEntries}
+        pendingCount={reviewEntries.length}
+        target="settings.js"
+        isPending={saving}
+        onApply={applyFromReview}
+        onCancel={review.closeReview}
+      />
 
       <ConfirmationDialog
         isOpen={confirmMigration}
@@ -278,6 +267,6 @@ export function HttpBasicAuthBoundaryCard({
         onCancel={() => setConfirmMigration(false)}
         onConfirm={apply}
       />
-    </article>
+    </>
   );
 }

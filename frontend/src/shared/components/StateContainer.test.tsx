@@ -126,4 +126,34 @@ describe('StateContainer', () => {
     expect(screen.getByText('No items yet')).toBeInTheDocument();
     expect(screen.queryByText('Children')).not.toBeInTheDocument();
   });
+
+  it('announces a custom loading label as a status in muted ink', () => {
+    render(
+      <StateContainer isLoading={true} isError={false} isEmpty={false} loadingLabel="Loading files...">
+        <div>Children</div>
+      </StateContainer>
+    );
+
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent('Loading files...');
+    expect(status).toHaveAttribute('aria-busy', 'true');
+    expect(status.querySelector('.text-primary')).toBeNull();
+  });
+
+  it('renders the shared empty and error states by default', () => {
+    const { unmount } = render(
+      <StateContainer isLoading={false} isError={true} isEmpty={false}>
+        <div>Children</div>
+      </StateContainer>
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('An error occurred');
+    unmount();
+
+    render(
+      <StateContainer isLoading={false} isError={false} isEmpty={true}>
+        <div>Children</div>
+      </StateContainer>
+    );
+    expect(screen.getByRole('heading', { level: 3, name: 'No items yet' })).toBeInTheDocument();
+  });
 });

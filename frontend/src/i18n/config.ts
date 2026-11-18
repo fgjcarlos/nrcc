@@ -13,8 +13,6 @@ import enBootstrap from '@/locales/en/bootstrap.json';
 import enConfig from '@/locales/en/configuration.json';
 import enDashboard from '@/locales/en/dashboard.json';
 import enEnvVars from '@/locales/en/env-vars.json';
-import enFiles from '@/locales/en/files.json';
-import enFlows from '@/locales/en/flows.json';
 import enLibraries from '@/locales/en/libraries.json';
 import enSecurity from '@/locales/en/security.json';
 import enUpdates from '@/locales/en/updates.json';
@@ -26,8 +24,6 @@ import esBootstrap from '@/locales/es/bootstrap.json';
 import esConfig from '@/locales/es/configuration.json';
 import esDashboard from '@/locales/es/dashboard.json';
 import esEnvVars from '@/locales/es/env-vars.json';
-import esFiles from '@/locales/es/files.json';
-import esFlows from '@/locales/es/flows.json';
 import esLibraries from '@/locales/es/libraries.json';
 import esSecurity from '@/locales/es/security.json';
 import esUpdates from '@/locales/es/updates.json';
@@ -41,8 +37,6 @@ const resources = {
     configuration: enConfig,
     dashboard: enDashboard,
     'env-vars': enEnvVars,
-    files: enFiles,
-    flows: enFlows,
     libraries: enLibraries,
     security: enSecurity,
     updates: enUpdates,
@@ -55,8 +49,6 @@ const resources = {
     configuration: esConfig,
     dashboard: esDashboard,
     'env-vars': esEnvVars,
-    files: esFiles,
-    flows: esFlows,
     libraries: esLibraries,
     security: esSecurity,
     updates: esUpdates,
@@ -77,8 +69,7 @@ if (!w.__nrccI18nInitOnce) {
       defaultNS: 'common',
       ns: [
         'common', 'auth', 'backups', 'bootstrap', 'configuration',
-        'dashboard', 'env-vars', 'files', 'flows', 'libraries',
-        'security', 'updates',
+        'dashboard', 'env-vars', 'libraries', 'security', 'updates',
       ],
       resources,
       detection: {

@@ -43,24 +43,25 @@ export function UpdateNotificationChip() {
 
     return (
       <div
-        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-success/10 text-success"
+        className="flex h-11 items-stretch text-ds-on-tint-primary"
         role="alert"
         aria-label={t('updates:updateAvailable')}
       >
         <button
           onClick={handleClick}
-          className="flex items-center gap-2 flex-1 hover:opacity-80 transition-opacity"
+          className="flex min-w-11 flex-1 items-center justify-center gap-2 rounded-l-field border border-primary bg-ds-bg-surface px-3 transition-colors hover:bg-ds-accent-dim"
           aria-label={t('updates:availableAria')}
         >
-          <ArrowUpCircle className="w-4 h-4 flex-shrink-0" />
-          <span className="text-sm font-medium">{t('updates:updateAvailable')}</span>
+          <ArrowUpCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+          {/* Icon-only below xl so the header controls never push past the viewport. */}
+          <span className="sr-only text-sm font-medium xl:not-sr-only">{t('updates:updateAvailable')}</span>
         </button>
         <button
           onClick={handleDismiss}
-          className="ml-2 p-0.5 rounded hover:bg-success/20 opacity-60 hover:opacity-100 transition-all flex-shrink-0"
+          className="grid w-11 shrink-0 place-items-center rounded-r-field border border-l-0 border-primary bg-ds-bg-surface text-ds-text-secondary transition-colors hover:bg-base-200 hover:text-ds-text-primary"
           aria-label={t('updates:dismiss')}
         >
-          <X className="w-3 h-3" />
+          <X className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
     );
@@ -70,13 +71,13 @@ export function UpdateNotificationChip() {
   if (isUpdateActive) {
     return (
       <div
-        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-accent/10 text-accent"
+        className="flex h-11 items-center gap-2 rounded-field border border-ds-border-strong bg-ds-bg-surface px-3 text-ds-on-tint-info"
         role="status"
         aria-live="polite"
         aria-label={t('updates:inProgress')}
       >
-        <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
-        <span className="text-sm font-medium">
+        <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden="true" />
+        <span className="sr-only text-sm font-medium xl:not-sr-only">
           {flowState?.state === 'BackingUp' ? t('updates:backingUp') : t('updates:updating')}
         </span>
       </div>
@@ -87,12 +88,12 @@ export function UpdateNotificationChip() {
   if (isUpdateCompleted) {
     return (
       <div
-        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-success/10 text-success"
+        className="flex h-11 items-center gap-2 rounded-field border border-ds-border-strong bg-ds-bg-surface px-3 text-ds-on-tint-success"
         role="status"
         aria-label={t('updates:completed')}
       >
-        <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-        <span className="text-sm font-medium">{t('updates:upToDate')}</span>
+        <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+        <span className="sr-only text-sm font-medium xl:not-sr-only">{t('updates:upToDate')}</span>
       </div>
     );
   }

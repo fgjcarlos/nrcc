@@ -9,7 +9,6 @@ import {
   backupObservability,
   backupSchedulerStatus,
   backups,
-  flows,
   hostStatus,
   libraries,
   mockUser,
@@ -76,9 +75,6 @@ export function createNrccApiHandlers(scenario: NrccMswScenario = 'initialized')
     http.post('/api/libraries/install', () => ok({ message: 'Install skipped in test mode', installed: true })),
     http.get('/api/libraries/:name/check', ({ params }) => ok({ name: String(params.name), installed: true })),
     http.delete('/api/libraries/:name', () => ok({ message: 'Uninstall skipped in test mode' })),
-
-    http.get('/api/flows', () => ok(flows)),
-    http.get('/api/files', () => ok([{ path: 'flows.json', type: 'file', size: 1024 }])),
   ]
 }
 

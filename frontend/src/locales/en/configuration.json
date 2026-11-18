@@ -2,7 +2,8 @@
   "host": {
     "installationDetected": "Installation detected",
     "nodeRedNotDetected": "(no Node-RED detected)",
-    "pathNotDetected": "no path detected"
+    "pathNotDetected": "no path detected",
+    "revisionTitle": "settings.js revision {{fingerprint}}"
   },
   "advanced": {
     "title": "Advanced settings.js",
@@ -14,14 +15,17 @@
     "unlockAcknowledgement": "I understand that a bad save can break Node-RED startup.",
     "saveRaw": "Save raw settings.js",
     "savingRaw": "Saving settings.js...",
-    "lockedBadge": "Locked - click \"Unlock to edit\" to make changes",
-    "cancelEdit": "Cancel"
+    "lockedBadge": "Locked. Select \"Unlock to edit settings.js\" to edit the file directly; a backup is taken before any write.",
+    "cancelEdit": "Cancel",
+    "directEdit": "Direct edit · bypasses the change circuit (no diff review)",
+    "parseError": "Invalid settings.js: {{message}}"
   },
   "preset": {
     "confirmApply": "Confirm apply",
     "acknowledgement": "I understand that confirming a preset will rewrite the managed key in settings.js and the original managed value cannot be recovered unless a backup exists.",
     "loadingCurated": "Loading curated presets...",
     "loadError": "Presets could not be loaded.",
+    "unavailable": "Curated presets are not available on this NRCC server.",
     "sectionLabel": "Curated presets",
     "title": "Curated presets",
     "description": "Vetted high-value recipes for advanced Node-RED 5 settings. Each preset declares the editor / HTTP / Socket.IO surfaces it touches and never rewrites operator-owned code outside its declared scope.",
@@ -53,7 +57,8 @@
   "aiLoading": "Loading AI provider settings…",
   "aiProvider": "AI Provider",
   "aiProviderDesc": "Configure optional, review-first AI flow assistance.",
-  "pageTitle": "Node-RED Configuration",
+  "pageTitle": "Configuration",
+  "sectionsLabel": "Configuration sections",
   "discardChanges": "Discard Changes",
   "runtimeVersionLabel": "Runtime version",
   "configSourceLabel": "Configuration source",
@@ -64,51 +69,6 @@
   "rotateSecretTitle": "Rotate credential secret",
   "rotateSecretDescription": "Saving a new credential secret invalidates the encryption of every stored credential. Existing flows with encrypted credentials will need to be re-entered or restored from a backup taken before this rotation. Continue only if you understand the impact.",
   "rotateSecretAcknowledgement": "I understand that existing encrypted credentials must be re-entered after this rotation.",
-  "securityCenter": {
-    "title": "Security Center",
-    "subtitle": "Passwords and bcrypt hashes are never shown. Leave a password blank to preserve its existing value.",
-    "previewLabel": "Redacted transaction preview",
-    "previewTitle": "Redacted transaction preview",
-    "previewBody": "Canonical surfaces: adminAuth, httpNodeAuth, and httpStaticAuth. Credential values, hashes, and passwords are redacted.",
-    "readOnly": "Security Center is read-only because this runtime configuration is not editable.",
-    "legacyTitle": "Legacy authentication detected",
-    "legacyBody": "Saving will migrate {{aliases}} to the canonical surfaces. Secrets remain redacted.",
-    "adminAuth": "Admin authentication",
-    "addUser": "Add user",
-    "sessionExpiry": "Session expiry (seconds)",
-    "username": "Username",
-    "permission": "Permission",
-    "fullAccess": "Full access",
-    "readOnlyPermission": "Read only",
-    "newPassword": "New password",
-    "nodeAuth": "HTTP node authentication",
-    "staticAuth": "Static HTTP authentication",
-    "save": "Save Security Center",
-    "bcryptHash": "Replacement bcrypt hash",
-    "bcryptHint": "Leave blank to preserve the existing hash. New values must be bcrypt hashes and are never displayed."
-  },
-  "dashboardAccess": {
-    "title": "Dashboard Access",
-    "subtitle": "Configure a reviewed access policy without exposing credentials.",
-    "discovery": "Discovery:",
-    "discoverySummary": "packages {{packages}}; flows {{flows}}; legacy {{legacy}}; FlowFuse paths {{paths}}.",
-    "previewLabel": "Redacted dashboard policy preview",
-    "previewTitle": "Redacted policy preview",
-    "previewBody": "Target: {{target}}. Recipe: {{recipe}}. Credentials, hashes, and authorization values are never shown.",
-    "readOnly": "Dashboard Access is read-only because this runtime configuration is not editable.",
-    "target": "Dashboard target",
-    "legacyOption": "Legacy dashboard (deprecated)",
-    "unavailable": "(unavailable)",
-    "flowFuseOption": "FlowFuse dashboard ({{count}} ui-base paths)",
-    "recipe": "Access recipe",
-    "basicAuth": "Basic authentication",
-    "reverseProxySso": "Reverse proxy SSO",
-    "username": "Username",
-    "secret": "Access secret",
-    "applying": "Applying…",
-    "apply": "Apply dashboard access",
-    "absent": "absent"
-  },
   "fieldStatus": {
     "header": {
       "field": "Field",
@@ -119,22 +79,12 @@
       "pending": "Pending",
       "restart": "Restart"
     },
-    "source": {
-      "settingsJs": "settings.js",
-      "formDefault": "form default"
-    },
     "validation": {
-      "valid": "Valid",
       "pending": "Pending",
       "invalid": "Invalid"
     },
     "pending": {
       "changed": "Changed"
-    },
-    "restart": {
-      "hard": "Restart required",
-      "soft": "Redeploy flows",
-      "none": "—"
     },
     "invalid": {
       "uiPort": "Port out of range",
@@ -175,23 +125,75 @@
     "groupNone": "Other ({{count}})",
     "configuredLabel": "Current",
     "newLabel": "New",
-    "apply": "Apply",
+    "apply": "Apply and restart Node-RED",
+    "consequence_one": "{{count}} change · Node-RED restarts · backup taken first",
+    "consequence_other": "{{count}} changes · Node-RED restarts · backup taken first",
     "cancel": "Cancel",
     "applying": "Applying…",
     "applied": "Applied successfully.",
-    "appliedError": "Failed to apply: {{message}}",
-    "confirmTitle": "Apply changes?",
-    "confirmDescription": "{{count}} pending change(s) will be written to {{target}}. Node-RED may restart, which can take a while."
+    "appliedError": "Failed to apply: {{message}}"
   },
   "topology": {
-    "title": "Configuration topology",
     "subtitle": "NRCC edits settings.js; Node-RED reads it on (re)start.",
     "nodeNrcc": "NRCC",
-    "nodeNrccSubtitle": "control plane",
     "nodeSettings": "settings.js",
-    "nodeSettingsSubtitle": "source of truth",
     "nodeRed": "Node-RED + Dashboard",
     "arrowNrccSettings": "edits",
     "arrowSettingsNodeRed": "loads"
+  },
+  "circuit": {
+    "title": "Change circuit",
+    "summary": "Step {{index}} of {{total}} · {{step}} · {{state}}",
+    "steps": {
+      "edit": "Edit",
+      "diff": "Diff",
+      "validate": "Validate",
+      "backup": "Backup",
+      "apply": "Apply",
+      "ready": "Ready"
+    },
+    "state": {
+      "idle": "Waiting",
+      "blocked": "Open",
+      "active": "Pending",
+      "passed": "Closed",
+      "failed": "Failed",
+      "unknown": "Not confirmed"
+    },
+    "proof": {
+      "changes_one": "{{count}} change",
+      "changes_other": "{{count}} changes",
+      "noChanges": "No changes",
+      "readOnly": "Read-only runtime",
+      "notReviewed": "Not reviewed",
+      "reviewed": "Diff reviewed",
+      "invalid_one": "{{count}} field invalid",
+      "invalid_other": "{{count}} fields invalid",
+      "localValid": "Fields valid; the server checks on apply",
+      "running": "Transaction running on the server",
+      "serverAccepted": "Accepted by the server",
+      "rejected": "Rejected; nothing written",
+      "notReached": "Not reached",
+      "backupTaken": "Taken before write",
+      "backupFailed": "Backup failed; nothing written",
+      "written": "settings.js written, Node-RED restarted",
+      "writeFailed": "Write failed",
+      "restartFailed": "Restart failed",
+      "recoveryFailed": "Recovery failed",
+      "ready": "Readiness OK",
+      "notReady": "Readiness failed",
+      "unknown": "Outcome not confirmed; check the runtime"
+    },
+    "rollback": {
+      "restored": "Rollback: restored from backup",
+      "failed": "Rollback failed: runtime recovery unsuccessful"
+    },
+    "total_one": "{{count}} change",
+    "total_other": "{{count}} changes",
+    "restartCost_one": "{{count}} needs restart",
+    "restartCost_other": "{{count}} need restart",
+    "review_one": "Review {{count}} change",
+    "review_other": "Review {{count}} changes",
+    "reviewNone": "No changes to review"
   }
 }

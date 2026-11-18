@@ -1,4 +1,6 @@
+import { useT } from '@/i18n';
 import { useDashboardActions, useDashboardData } from '../hooks';
+import { backupState, formatAge, postureFromConfig, runtimeKey, securityVerdict, summaryAction } from '../lib';
 import { DashboardHeader } from './DashboardHeader';
 import { DashboardWarnings } from './DashboardWarnings';
 import { RestartConfirmationModal } from './RestartConfirmationModal';
@@ -7,28 +9,12 @@ import { BackupHealthTile } from './OverviewTiles/BackupHealthTile';
 import { NodeRedHealthTile } from './OverviewTiles/NodeRedHealthTile';
 
 /**
- * DashboardView — issue #766 slice D
- *
- * Overview page composition. Slice D replaces the previous generic
- * cards (SystemHealthCard + the metric row + DashboardDetails) with
- * three operational decision tiles:
- *
- *  1. SecurityPostureTile  — adminAuth / httpNodeAuth / httpStaticAuth
- *                            + requireHttps, with a deep link to
- *                            /security.
- *  2. NodeRedHealthTile    — host readiness, runtime status, compact
- *                            resource indicator + restart/open
- *                            actions. Deep link to /configuration.
- *  3. BackupHealthTile     — scheduler health + last backup / last
- *                            automatic / storage. Deep link to
- *                            /backups.
- *
- * Each tile is built on the slice B StatusChip palette; no new visual
- * primitives. The existing DashboardDetails component is removed
- * (its disk card and backup card were either collapsed into the new
- * tiles or absorbed by slice E's Security separation).
+ * Overview (T8): one summary sentence and at most one next action, then the
+ * sections (Node-RED, security, backups) in the sentence's order, separated
+ * by hairline rules on the layout's single sheet (no nested cards).
  */
 export function DashboardView() {
+  const { t, i18n } = useT();
   const { container, system, config, host, runtime, backups, dockerSuccess, dockerLoading, dockerError } = useDashboardData();
   const {
     pendingConfirm,
@@ -46,36 +32,36 @@ export function DashboardView() {
     !!container?.status &&
     container.status !== 'running';
 
-  // Derive the four security surfaces from the loose-typed config
-  // payload that useDashboardData forwards. The cast is intentional —
-  // the dashboard layer doesn't yet import NodeRedConfig, but every
-  // field below is consumed by ConfigurationView as well.
-  const adminAuth = Boolean((config as { adminAuth?: unknown } | undefined)?.adminAuth);
-  const httpNodeAuth = Boolean((config as { nodeHttpAuth?: unknown } | undefined)?.nodeHttpAuth);
-  const httpStaticAuth = Boolean((config as { staticAuth?: unknown } | undefined)?.staticAuth);
-  const requireHttps = Boolean((config as { requireHttps?: unknown } | undefined)?.requireHttps);
+  const posture = postureFromConfig(config);
+  const verdict = posture && securityVerdict(posture);
+  const backup = backupState(backups);
+  const runtimeStatus = runtimeKey(runtime?.status ?? (host?.nodeRed.running ? 'running' : undefined));
+  const summary = t('dashboard:summary.sentence', {
+    runtime: t(`dashboard:summary.runtime.${runtimeStatus}`),
+    security: t(`dashboard:summary.security.${verdict ?? 'unknown'}`),
+    backup: backup.kind === 'age'
+      ? t('dashboard:summary.backup.age', { age: formatAge(backup.createdAt, i18n.language) })
+      : t(`dashboard:summary.backup.${backup.kind}`),
+  });
 
   return (
-    <div className="space-y-8">
-      <DashboardHeader edgeMode={system?.edgeMode} />
+    <div className="space-y-4">
+      <DashboardHeader summary={summary} action={summaryAction(verdict, backup)} />
       <DashboardWarnings showDockerWarning={showDockerWarning} host={host} />
-      <SecurityPostureTile
-        adminAuth={adminAuth}
-        httpNodeAuth={httpNodeAuth}
-        httpStaticAuth={httpStaticAuth}
-        requireHttps={requireHttps}
-      />
-      <NodeRedHealthTile
-        host={host}
-        runtime={runtime}
-        system={system}
-        container={container}
-        inDocker={inDocker}
-        isRestarting={isRestarting}
-        onRequestRestart={() => setPendingConfirm(true)}
-        onOpenNodeRed={handleOpenNodeRed}
-      />
-      <BackupHealthTile backups={backups} />
+      <div className="divide-y divide-ds-border-subtle">
+        <NodeRedHealthTile
+          host={host}
+          runtime={runtime}
+          system={system}
+          container={container}
+          inDocker={inDocker}
+          isRestarting={isRestarting}
+          onRequestRestart={() => setPendingConfirm(true)}
+          onOpenNodeRed={handleOpenNodeRed}
+        />
+        <SecurityPostureTile {...posture} />
+        <BackupHealthTile backups={backups} />
+      </div>
       <RestartConfirmationModal
         isOpen={pendingConfirm}
         onConfirm={handleRestartConfirm}

@@ -1,57 +1,49 @@
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
+import { useEnvironment } from '@/features/bootstrap/hooks/useEnvironment';
+import { dashboardService } from '@/features/dashboard/services';
 import { queryKeys } from '@/shared/lib/queryKeys';
-import type { SystemInfo, HostStatus } from '@/shared/types';
 
 /**
- * useAppChrome — issue #766 slice C
+ * useAppChrome: the runtime context the persistent header shows.
  *
- * Returns the runtime context the persistent header needs:
- * - `nodeRedVersion` from /api/system/info (Node-RED detected version)
- * - `edgeMode` from /api/system/info (NRCC edge deployment flag)
- * - `configuration` from /api/bootstrap/status (ConfigurationCapabilities)
- *
- * Implementation note (re: PR #839 follow-up): reading via
- * `queryClient.getQueryData` instead of `useQuery` subscriptions avoids
- * introducing a third parallel subscription for keys that are already
- * managed by useDashboardData (Overview) and useConfigurationData
- * (Settings + Security). Three useQuery calls sharing the same keys
- * raced with Playwright's page.route override (one of the three would
- * fire before the route registered and pre-populate the cache with the
- * default mock, freezing editable=false on Settings/Security). Reading
- * from the cache means whichever hook first populates the key wins —
- * and Header stays in sync via queryClient's existing subscription
- * notifications without adding a third subscription.
- *
- * Fields are `undefined` until the dashboard or settings page populates
- * the shared cache. Chips render the neutral loading palette during
- * that window, which is fine for an authenticated operator navigation.
+ * The runtime status comes from the same /api/bootstrap/status query
+ * (queryKeys.bootstrap.status) that Configuration renders as
+ * "Node-RED <version> · Editable", with the same derivation, so the
+ * header can never contradict the page. It subscribes to the query: the
+ * former cache peek never re-rendered, and read the cache one `.data`
+ * level too deep, so it stayed "unknown / Mode pending" forever.
  */
+export type RuntimeStatus =
+  | { state: 'loading' }
+  | { state: 'unknown' }
+  | { state: 'known'; version: string | undefined; editable: boolean; reason: string | undefined };
+
 export interface AppChromeData {
-  nodeRedVersion: string | undefined;
+  runtime: RuntimeStatus;
+  /** NRCC edge deployment flag from /api/system/info; undefined until known. */
   edgeMode: boolean | undefined;
-  configurationEditable: boolean | undefined;
-  configurationMode: 'editable' | 'read-only' | undefined;
-  configurationReason: string | undefined;
-  configurationRuntimeVersion: string | undefined;
 }
 
-type SystemInfoCached = { data?: { data?: SystemInfo } };
-type HostStatusCached = { data?: { data?: HostStatus } };
-
 export function useAppChrome(): AppChromeData {
-  const queryClient = useQueryClient();
-  const systemCached = queryClient.getQueryData(queryKeys.system.info) as SystemInfoCached | undefined;
-  const hostCached = queryClient.getQueryData(queryKeys.bootstrap.status) as HostStatusCached | undefined;
+  const host = useEnvironment();
+  const system = useQuery({
+    queryKey: queryKeys.system.info,
+    queryFn: () => dashboardService.getSystemInfo(),
+  });
 
-  const systemInfo = systemCached?.data?.data;
-  const hostStatus = hostCached?.data?.data;
+  const status = host.data;
+  let runtime: RuntimeStatus;
+  if (status) {
+    runtime = {
+      state: 'known',
+      version: status.configuration?.runtimeVersion || status.nodeRed?.version || undefined,
+      // Same rule as ConfigurationView: only an explicit `false` is read-only.
+      editable: status.configuration?.editable !== false,
+      reason: status.configuration?.reason,
+    };
+  } else {
+    runtime = { state: host.isPending ? 'loading' : 'unknown' };
+  }
 
-  return {
-    nodeRedVersion: systemInfo?.nodeRedVersion,
-    edgeMode: systemInfo?.edgeMode,
-    configurationEditable: hostStatus?.configuration?.editable,
-    configurationMode: hostStatus?.configuration?.mode,
-    configurationReason: hostStatus?.configuration?.reason,
-    configurationRuntimeVersion: hostStatus?.configuration?.runtimeVersion,
-  };
+  return { runtime, edgeMode: system.data?.data?.data?.edgeMode };
 }

@@ -1,4 +1,3 @@
-import { Shield } from 'lucide-react';
 import { InputField, ToggleField } from './FormFields';
 import { FieldStatusChip } from './FieldStatusChip';
 import type { NodeRedConfigFormData } from '@/shared/types';
@@ -25,16 +24,12 @@ export function SecuritySettings({ settings, onUpdate, disabled, fieldErrors }: 
   const { t } = useT();
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2 mb-4">
-        <Shield className="w-5 h-5 text-base-content/60" />
-        <h3 className="text-lg font-medium text-base-content">{t('configuration:security')}</h3>
-      </div>
-
       <div>
-        <h4 className="mb-3 text-sm font-medium text-base-content/60">{t('configuration:credentialEncryption')}</h4>
+        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ds-text-secondary">{t('configuration:credentialEncryption')}</h4>
         <div className="space-y-1">
           <InputField
             label="Credential Secret"
+            field="credentialSecret"
             value={settings.credentialSecret ?? ''}
             onChange={(v) => onUpdate('credentialSecret', v as string)}
             type="password"
@@ -51,10 +46,11 @@ export function SecuritySettings({ settings, onUpdate, disabled, fieldErrors }: 
       </div>
 
       <div>
-        <h4 className="mb-3 text-sm font-medium text-base-content/60">{t('configuration:httpsRedirect')}</h4>
+        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ds-text-secondary">{t('configuration:httpsRedirect')}</h4>
         <div className="space-y-1">
           <ToggleField
             label="Require HTTPS"
+            field="requireHttps"
             value={settings.requireHttps ?? false}
             onChange={(v) => onUpdate('requireHttps', v)}
             help="Redirect plain HTTP traffic to the HTTPS listener. Requires the TLS block below and a Node-RED restart."
@@ -70,14 +66,15 @@ export function SecuritySettings({ settings, onUpdate, disabled, fieldErrors }: 
       {/* TLS settings. Each input is an on-disk path rendered as
           fs.readFileSync(<path>) — certificate bytes never embedded. */}
       <div>
-        <h4 className="mb-3 text-sm font-medium text-base-content/60">{t('configuration:tlsHttpsListener')}</h4>
-        <p className="mb-3 text-xs text-base-content/60">
+        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ds-text-secondary">{t('configuration:tlsHttpsListener')}</h4>
+        <p className="mb-3 text-xs text-ds-text-muted">
           On-disk paths to PEM-encoded files. Node-RED reads each entry through fs.readFileSync at startup; the file must remain readable by the Node-RED process and Node-RED must be restarted for changes to take effect.
         </p>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="space-y-1">
             <InputField
               label="Private Key Path"
+              field="httpsKey"
               value={settings.httpsKey ?? ''}
               onChange={(v) => onUpdate('httpsKey', v as string)}
               placeholder="/etc/node-red/key.pem"
@@ -90,6 +87,7 @@ export function SecuritySettings({ settings, onUpdate, disabled, fieldErrors }: 
           <div className="space-y-1">
             <InputField
               label="Certificate Path"
+              field="httpsCert"
               value={settings.httpsCert ?? ''}
               onChange={(v) => onUpdate('httpsCert', v as string)}
               placeholder="/etc/node-red/cert.pem"
@@ -102,6 +100,7 @@ export function SecuritySettings({ settings, onUpdate, disabled, fieldErrors }: 
           <div className="space-y-1">
             <InputField
               label="CA Bundle Path"
+              field="httpsCA"
               value={settings.httpsCA ?? ''}
               onChange={(v) => onUpdate('httpsCA', v as string)}
               placeholder="/etc/node-red/ca.pem"
@@ -114,6 +113,7 @@ export function SecuritySettings({ settings, onUpdate, disabled, fieldErrors }: 
           <div className="space-y-1">
             <InputField
               label="HTTPS Port"
+              field="httpsPort"
               value={settings.httpsPort ?? 0}
               onChange={(v) => onUpdate('httpsPort', v as number)}
               type="number"
@@ -127,6 +127,7 @@ export function SecuritySettings({ settings, onUpdate, disabled, fieldErrors }: 
           <div className="md:col-span-2 space-y-1">
             <InputField
               label="Private Key Passphrase"
+              field="httpsPassphrase"
               value={settings.httpsPassphrase ?? ''}
               onChange={(v) => onUpdate('httpsPassphrase', v as string)}
               type="password"

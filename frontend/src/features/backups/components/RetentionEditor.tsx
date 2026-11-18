@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { LoaderCircle } from 'lucide-react';
 import { useT } from '@/i18n';
+import { Button, Input } from '@/shared/components/ui';
 
 export interface RetentionEditorProps {
   retentionManual: number;
@@ -32,64 +33,36 @@ export function RetentionEditor({
     onSave(manual, auto, preRestore);
   };
 
+  const fields = [
+    { key: 'manual', label: t('backups:retention.manual'), value: manual, set: setManual },
+    { key: 'auto', label: t('backups:retention.auto'), value: auto, set: setAuto },
+    { key: 'preRestore', label: t('backups:retention.preRestore'), value: preRestore, set: setPreRestore },
+  ];
+
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-3">
-        <label className="space-y-2">
-          <span className="text-sm font-medium text-base-content">{t('backups:manualBackups')}</span>
-          <input
+      <div className="grid gap-3 sm:grid-cols-3">
+        {fields.map((field) => (
+          <Input
+            key={field.key}
+            id={`backup-retention-${field.key}`}
+            label={field.label}
             type="number"
+            inputMode="numeric"
             min={1}
             max={3650}
-            value={manual}
-            onChange={(e) => setManual(Number(e.target.value) || 1)}
-            className="glass-panel w-full rounded-xl border border-border px-3 py-2 text-base-content focus:outline-none focus:ring-2 focus:ring-primary/50"
+            value={field.value}
+            onChange={(e) => field.set(Number(e.target.value) || 1)}
+            className="tabular-nums"
           />
-          <p className="text-xs text-base-content/55">{t('backups:daysKeepManual')}</p>
-        </label>
-
-        <label className="space-y-2">
-          <span className="text-sm font-medium text-base-content">{t('backups:automaticBackups')}</span>
-          <input
-            type="number"
-            min={1}
-            max={3650}
-            value={auto}
-            onChange={(e) => setAuto(Number(e.target.value) || 1)}
-            className="glass-panel w-full rounded-xl border border-border px-3 py-2 text-base-content focus:outline-none focus:ring-2 focus:ring-primary/50"
-          />
-          <p className="text-xs text-base-content/55">{t('backups:daysKeepAutomatic')}</p>
-        </label>
-
-        <label className="space-y-2">
-          <span className="text-sm font-medium text-base-content">{t('backups:preRestoreSnapshots')}</span>
-          <input
-            type="number"
-            min={1}
-            max={3650}
-            value={preRestore}
-            onChange={(e) => setPreRestore(Number(e.target.value) || 1)}
-            className="glass-panel w-full rounded-xl border border-border px-3 py-2 text-base-content focus:outline-none focus:ring-2 focus:ring-primary/50"
-          />
-          <p className="text-xs text-base-content/55">{t('backups:daysKeepPreRestore')}</p>
-        </label>
+        ))}
       </div>
 
-      <div className="flex justify-end gap-3">
-        {isSaving && (
-          <div className="inline-flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/8 px-3 py-2 text-xs text-base-content/75">
-            <LoaderCircle className="h-3.5 w-3.5 animate-spin text-primary" />
-            {t('common:saving')}...
-          </div>
-        )}
-        <button
-          onClick={handleSave}
-          disabled={isSaving}
-          className="action-btn-primary"
-        >
-          {isSaving && <LoaderCircle className="h-4 w-4 animate-spin" />}
-          {t('backups:saveRetentionPolicy')}
-        </button>
+      <div className="flex justify-end">
+        <Button type="button" onClick={handleSave} disabled={isSaving} aria-busy={isSaving}>
+          {isSaving && <LoaderCircle className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />}
+          {t('backups:retention.save')}
+        </Button>
       </div>
     </div>
   );

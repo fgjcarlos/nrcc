@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { i18n } from '@/i18n'
 import { EnvVarModal } from './EnvVarModal'
 import type { EnvVar } from '../services/envService'
 
@@ -69,8 +70,8 @@ describe('EnvVarModal polish', () => {
 
     const valueField = screen.getByTestId('env-var-value-field')
     expect(valueField).toHaveClass('min-h-12')
-    expect(valueField).toHaveClass('transition-all')
-    expect(valueField).toHaveClass('duration-150')
+    // DESIGN.md Motion: the minimum height holds the layout; nothing animates it.
+    expect(valueField).not.toHaveClass('transition-all')
   })
 
   it('renders the boolean value toggle as an accessible medium control with a status badge', () => {
@@ -78,6 +79,21 @@ describe('EnvVarModal polish', () => {
 
     expect(screen.getByRole('checkbox', { name: /boolean value/i })).toHaveClass('toggle-md')
     expect(screen.getByText('true')).toHaveClass('badge')
+  })
+
+  it('takes its placeholders from the env-vars catalog', async () => {
+    await i18n.changeLanguage('es')
+    try {
+      const { unmount } = renderModal({ editing: false, formData: { ...baseFormData, key: '', type: 'string', value: '' } })
+      expect(screen.getByPlaceholderText('MI_VARIABLE')).toBeInTheDocument()
+      expect(screen.getByPlaceholderText('Para qué sirve esta variable')).toBeInTheDocument()
+      unmount()
+
+      renderModal({ formData: { ...baseFormData, type: 'secret', value: '' } })
+      expect(screen.getByPlaceholderText('Déjalo vacío para conservar el valor actual')).toBeInTheDocument()
+    } finally {
+      await i18n.changeLanguage('en')
+    }
   })
 
   describe('keyboard behaviour (#889)', () => {

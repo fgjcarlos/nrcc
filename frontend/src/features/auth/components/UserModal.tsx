@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { type User } from '@/features/auth/services/authService';
 import { useT } from '@/i18n';
 import { passwordSchema } from '@/shared/validation/schemas';
+import { Button, Dialog, DialogBody, DialogFooter, Input, Select } from '@/shared/components/ui';
 
 type ModalMode = 'create' | 'edit_full' | 'edit_password';
 
@@ -112,106 +113,73 @@ export function UserModal({
   };
 
   return (
-    <div className="modal-overlay" onClick={(e) => {
-      // Only close if clicking the overlay directly (not the modal)
-      if (e.target === e.currentTarget) {
-        onClose();
-      }
-    }}>
-      <div className="surface-panel w-full max-w-md border border-border p-6 shadow-glow">
-        <h2 className="mb-4 text-xl font-bold text-base-content">{getTitle()}</h2>
-        
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Username field - visible in create and edit_full modes */}
+    <Dialog open onClose={onClose} title={getTitle()} dismissible={!isPending}>
+      <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+        <DialogBody className="space-y-4">
+          {/* Username and role: create and edit_full modes */}
           {(mode === 'create' || mode === 'edit_full') && (
-            <div>
-              <label className="mb-1 block text-sm font-medium text-base-content">
-                {t('auth:usernameLabel')}
-              </label>
-              <input
+            <>
+              <Input
+                label={t('auth:usernameLabel')}
                 type="text"
                 value={formData.username}
                 onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                 disabled={mode === 'edit_full'}
-                className={`glass-panel w-full rounded-xl border border-border px-3 py-2 text-base-content focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-                  mode === 'edit_full' ? 'opacity-60 cursor-not-allowed' : ''
-                }`}
                 required={mode === 'create'}
               />
-            </div>
+
+              <div className="space-y-1">
+                <Select
+                  label={t('auth:roleLabel')}
+                  value={formData.role}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value as 'admin' | 'viewer' })}
+                  disabled={isLastAdmin || isCurrentUser}
+                  required={mode === 'create'}
+                >
+                  <option value="viewer">{t('auth:roles.viewer')}</option>
+                  <option value="admin">{t('auth:roles.admin')}</option>
+                </Select>
+                {isLastAdmin && (
+                  <p className="text-xs text-ds-on-tint-error">{t('auth:cannotDemoteLastAdmin')}</p>
+                )}
+                {isCurrentUser && (
+                  <p className="text-xs text-ds-text-secondary">{t('auth:cannotChangeOwnRole')}</p>
+                )}
+              </div>
+            </>
           )}
 
-          {/* Role selector - visible in create and edit_full modes */}
-          {(mode === 'create' || mode === 'edit_full') && (
-            <div>
-              <label className="mb-1 block text-sm font-medium text-base-content">
-                {t('auth:roleLabel')}
-              </label>
-              <select
-                value={formData.role}
-                onChange={(e) => setFormData({ ...formData, role: e.target.value as 'admin' | 'viewer' })}
-                disabled={isLastAdmin || isCurrentUser}
-                className={`glass-panel w-full rounded-xl border border-border px-3 py-2 text-base-content focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-                  isLastAdmin || isCurrentUser ? 'opacity-60 cursor-not-allowed' : ''
-                }`}
-                required={mode === 'create'}
-              >
-                <option value="viewer">Viewer</option>
-                <option value="admin">Admin</option>
-              </select>
-              {isLastAdmin && (
-                <p className="mt-2 text-sm text-error">{t('auth:cannotDemoteLastAdmin')}</p>
-              )}
-              {isCurrentUser && (
-                <p className="mt-2 text-sm text-base-content/60">{t('auth:cannotChangeOwnRole')}</p>
-              )}
-            </div>
-          )}
+          {/* Password: every mode */}
+          <Input
+            label={mode === 'create' ? t('auth:passwordLabel') : t('auth:newPasswordLabel')}
+            type="password"
+            value={formData.password}
+            onChange={(e) => {
+              setFormData({ ...formData, password: e.target.value });
+              if (passwordError) setPasswordError('');
+            }}
+            error={passwordError || undefined}
+            required={mode === 'create' || mode === 'edit_password'}
+            minLength={8}
+            placeholder={mode === 'edit_full' ? t('auth:keepCurrentPasswordPlaceholder') : undefined}
+          />
+        </DialogBody>
 
-          {/* Password field - visible in all modes */}
-          <div>
-            <label className="mb-1 block text-sm font-medium text-base-content">
-              {mode === 'create' ? t('auth:passwordLabel') : t('auth:newPasswordLabel')}
-            </label>
-            <input
-              type="password"
-              value={formData.password}
-              onChange={(e) => {
-                setFormData({ ...formData, password: e.target.value });
-                if (passwordError) setPasswordError('');
-              }}
-              className="glass-panel w-full rounded-xl border border-border px-3 py-2 text-base-content focus:outline-none focus:ring-2 focus:ring-primary/50"
-              required={mode === 'create' || mode === 'edit_password'}
-              minLength={8}
-              placeholder={mode === 'edit_full' ? t('auth:keepCurrentPasswordPlaceholder') : undefined}
-            />
-            {passwordError && (
-              <p className="mt-1 text-sm text-error">{passwordError}</p>
+        <DialogFooter>
+          <Button type="button" variant="secondary" onClick={onClose} disabled={isPending}>
+            {t('common:cancel')}
+          </Button>
+          <Button type="submit" variant="solid" disabled={!canSubmit}>
+            {isPending && (
+              <span
+                className="h-4 w-4 animate-spin rounded-full border-b-2 border-current motion-reduce:animate-none"
+                aria-hidden="true"
+              />
             )}
-          </div>
-
-          <div className="flex justify-end space-x-2 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isPending}
-              className="action-btn-secondary disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {t('common:cancel')}
-            </button>
-            <button
-              type="submit"
-              disabled={!canSubmit}
-              className="action-btn-primary disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {isPending && (
-                <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-current"></div>
-              )}
-              {mode === 'create' ? t('auth:createUser') : t('common:confirm')}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+            {mode === 'create' ? t('auth:createUser') : t('common:confirm')}
+          </Button>
+        </DialogFooter>
+      </form>
+    </Dialog>
   );
 }

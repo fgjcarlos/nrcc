@@ -1,12 +1,14 @@
 import { StrictMode } from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EnvVarsView } from './EnvVarsView';
 
-const { importFromNodeRed, refetchEnvVars, toastError } = vi.hoisted(() => ({
+const { importFromNodeRed, refetchEnvVars, toastError, dataState } = vi.hoisted(() => ({
   importFromNodeRed: vi.fn(),
   refetchEnvVars: vi.fn(),
   toastError: vi.fn(),
+  dataState: { isLoading: false },
 }));
 
 vi.mock('@/features/env-vars/services', () => ({
@@ -14,7 +16,7 @@ vi.mock('@/features/env-vars/services', () => ({
 }));
 
 vi.mock('@/features/env-vars/hooks', () => ({
-  useEnvVarsData: () => ({ envVars: [], isLoading: false, refetchEnvVars }),
+  useEnvVarsData: () => ({ envVars: [], isLoading: dataState.isLoading, refetchEnvVars }),
   useEnvVarsActions: () => ({
     createMutation: { mutate: vi.fn(), isPending: false },
     deleteMutation: { mutate: vi.fn(), isPending: false },
@@ -25,6 +27,9 @@ vi.mock('@/features/auth/hooks', () => ({
   useAuth: () => ({ user: { role: 'admin' } }),
 }));
 
+// The .env editor fetches through React Query; the tab switch only needs its panel.
+vi.mock('./DotenvEditor', () => ({ DotenvEditor: () => <p>dotenv editor</p> }));
+
 vi.mock('sonner', () => ({ toast: { error: toastError } }));
 
 describe('EnvVarsView', () => {
@@ -32,6 +37,46 @@ describe('EnvVarsView', () => {
     importFromNodeRed.mockReset();
     refetchEnvVars.mockReset();
     toastError.mockReset();
+    dataState.isLoading = false;
+    importFromNodeRed.mockResolvedValue({ lines: [], issues: [], valid: true, summary: '', status: 'synced' });
+  });
+
+  it('switches between the configured table and the .env file through a labelled tablist', async () => {
+    const user = userEvent.setup();
+    render(<EnvVarsView />);
+
+    const tablist = screen.getByRole('tablist', { name: 'Environment variable views' });
+    const [configured, dotenv] = within(tablist).getAllByRole('tab');
+    expect(configured).toHaveAccessibleName('Configured');
+    expect(configured).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tabpanel', { name: 'Configured' })).toHaveTextContent('No environment variables configured');
+
+    configured.focus();
+    await user.keyboard('{ArrowRight}');
+    expect(dotenv).toHaveFocus();
+    expect(dotenv).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tabpanel', { name: '.env file' })).toHaveTextContent('dotenv editor');
+    await waitFor(() => expect(importFromNodeRed).toHaveBeenCalled());
+  });
+
+  it('opens on the heading and a one-line intro, without a kicker', async () => {
+    render(<EnvVarsView />);
+
+    const heading = screen.getByRole('heading', { level: 1, name: 'Environment variables' });
+    expect(heading.previousElementSibling).toBeNull();
+    expect(screen.queryByText('Secrets')).toBeNull();
+    expect(screen.getByText('Variables Node-RED runs with. Any change restarts Node-RED if it is running.')).toBeInTheDocument();
+    await waitFor(() => expect(importFromNodeRed).toHaveBeenCalled());
+  });
+
+  it('announces loading through the shared status instead of a table row', async () => {
+    dataState.isLoading = true;
+    render(<EnvVarsView />);
+
+    const panel = screen.getByRole('tabpanel', { name: 'Configured' });
+    expect(within(panel).getByRole('status')).toHaveTextContent('Loading...');
+    expect(within(panel).queryByRole('table')).toBeNull();
+    await waitFor(() => expect(importFromNodeRed).toHaveBeenCalled());
   });
 
   it('imports Node-RED globals once on mount and refreshes the list', async () => {

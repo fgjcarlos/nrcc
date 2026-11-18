@@ -8,7 +8,7 @@ import * as path from 'node:path';
 
 const LOCALES_DIR = path.join(import.meta.dirname, '../../locales');
 const NAMESPACES = ['common', 'auth', 'backups', 'configuration',
-  'dashboard', 'env-vars', 'files', 'flows', 'libraries', 'updates'];
+  'dashboard', 'env-vars', 'libraries', 'updates'];
 
 function flatten(obj: Record<string, unknown>, prefix = ''): Record<string, string> {
   const out: Record<string, string> = {};

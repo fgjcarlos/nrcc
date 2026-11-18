@@ -1,27 +1,30 @@
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useT } from '@/i18n';
+import { Button, Input } from '@/shared/components/ui';
+import { AuthAlert, AuthPage } from './LoginView';
 
+// Messages are catalog keys; the view translates them at render.
 const setupSchema = z.object({
   username: z
     .string()
-    .min(3, 'Username must be 3-32 characters')
-    .max(32, 'Username must be 3-32 characters')
+    .min(3, 'auth:setup.errors.usernameLength')
+    .max(32, 'auth:setup.errors.usernameLength')
     .regex(
       /^[a-zA-Z0-9_]+$/,
-      'Username can only contain letters, numbers, and underscores'
+      'auth:setup.errors.usernameChars'
     ),
   password: z
     .string()
-    .min(8, 'Password must be at least 8 characters'),
+    .min(8, 'auth:setup.errors.passwordLength'),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
-  message: 'Passwords do not match',
+  message: 'auth:setup.errors.passwordMismatch',
   path: ['confirmPassword'],
 });
 
@@ -56,95 +59,100 @@ export function SetupView() {
   const onSubmit = async (data: SetupFormData) => {
     try {
       await authService.setup(data.username, data.password);
-      toast.success('Setup completed successfully!');
+      toast.success(t('auth:setup.success'));
       navigate('/dashboard', { replace: true });
     } catch (error: unknown) {
-      const err = error as { response?: { status?: number; data?: { error?: { message?: string } } } };
+      const err = error as { response?: { status?: number; data?: { error?: { code?: string } } } };
       // If already initialized (403), redirect to login
       if (err.response?.status === 403) {
-        toast.error('System already initialized. Redirecting to login...');
+        toast.error(t('auth:setup.errors.alreadyConfiguredRedirect'));
         navigate('/login', { replace: true });
         return;
       }
-      const message = err.response?.data?.error?.message || 'Setup failed';
+      // Copy by outcome: no response = network, then 409, 400 weak password, 429, anything else.
+      const status = err.response?.status;
+      const code = err.response?.data?.error?.code;
+      if (status === 409) {
+        setError('root', { type: 'alreadyConfigured', message: t('auth:setup.errors.alreadyConfigured') });
+        return;
+      }
+      const message =
+        status === undefined ? t('auth:setup.errors.network')
+        : code === 'WEAK_PASSWORD' ? t('auth:setup.errors.weakPassword')
+        : status === 429 ? t('auth:setup.errors.rateLimited')
+        : t('auth:setup.errors.unexpected', { status });
+      // Inline only: the alert carries it, a toast would announce it twice.
       setError('root', { message });
-      toast.error(message);
     }
   };
 
   return (
-    <div className="auth-shell min-h-screen flex items-center justify-center px-4">
-      <div className="surface-card w-full max-w-md space-y-6 border border-border p-8">
-        <div className="text-center">
-          <p className="mb-2 text-xs uppercase tracking-[0.24em] text-base-content/50">{t('auth:setup.bootstrap')}</p>
-          <h1 className="text-2xl font-bold text-base-content">{t('common:productFullName')}</h1>
-          <p className="mt-2 text-base-content/70">{t('auth:setup.initialSetup')}</p>
+    <AuthPage>
+      <h1 className="text-balance text-xl font-bold text-ds-text-primary">{t('auth:setup.title')}</h1>
+      <p className="text-sm text-ds-text-secondary">{t('auth:setup.intro')}</p>
+
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        {errors.root && (
+          <AuthAlert>
+            <p>{errors.root.message}</p>
+            {errors.root.type === 'alreadyConfigured' && (
+              <Link to="/login" className="inline-flex min-h-11 items-center font-semibold underline underline-offset-2">
+                {t('auth:setup.goToSignIn')}
+              </Link>
+            )}
+          </AuthAlert>
+        )}
+
+        <div className="space-y-1">
+          <Input
+            id="username"
+            type="text"
+            label={t('auth:setup.usernameLabel')}
+            autoComplete="username"
+            autoCapitalize="none"
+            aria-describedby="username-hint"
+            className="min-h-11"
+            error={errors.username?.message && t(errors.username.message)}
+            {...register('username')}
+          />
+          <p id="username-hint" className="text-xs text-ds-text-secondary">{t('auth:setup.usernameHint')}</p>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          {errors.root && (
-            <div className="rounded-xl border border-error/20 bg-error/10 p-3 text-sm text-error">
-              {errors.root.message}
-            </div>
-          )}
+        <div className="space-y-1">
+          <Input
+            id="password"
+            type="password"
+            label={t('auth:setup.passwordLabel')}
+            autoComplete="new-password"
+            aria-describedby="password-hint"
+            className="min-h-11"
+            error={errors.password?.message && t(errors.password.message)}
+            {...register('password')}
+          />
+          <p id="password-hint" className="text-xs text-ds-text-secondary">{t('auth:setup.passwordHint')}</p>
+        </div>
 
-          <div>
-            <label htmlFor="username" className="mb-1 block text-sm font-medium text-base-content">
-              {t('auth:setup.usernameLabel')}
-            </label>
-            <input
-              id="username"
-              type="text"
-              {...register('username')}
-              className="w-full rounded-xl border border-border bg-base-100/70 px-3 py-2 text-base-content focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="admin"
-            />
-            {errors.username && (
-              <p className="mt-1 text-sm text-error">{errors.username.message}</p>
-            )}
-          </div>
+        <Input
+          id="confirmPassword"
+          type="password"
+          label={t('auth:setup.confirmPasswordLabel')}
+          autoComplete="new-password"
+          className="min-h-11"
+          error={errors.confirmPassword?.message && t(errors.confirmPassword.message)}
+          {...register('confirmPassword')}
+        />
 
-          <div>
-            <label htmlFor="password" className="mb-1 block text-sm font-medium text-base-content">
-              {t('auth:setup.passwordLabel')}
-            </label>
-            <input
-              id="password"
-              type="password"
-              {...register('password')}
-              className="w-full rounded-xl border border-border bg-base-100/70 px-3 py-2 text-base-content focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="••••••••"
-            />
-            {errors.password && (
-              <p className="mt-1 text-sm text-error">{errors.password.message}</p>
-            )}
-          </div>
-
-          <div>
-            <label htmlFor="confirmPassword" className="mb-1 block text-sm font-medium text-base-content">
-              {t('auth:setup.confirmPasswordLabel')}
-            </label>
-            <input
-              id="confirmPassword"
-              type="password"
-              {...register('confirmPassword')}
-              className="w-full rounded-xl border border-border bg-base-100/70 px-3 py-2 text-base-content focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="••••••••"
-            />
-            {errors.confirmPassword && (
-              <p className="mt-1 text-sm text-error">{errors.confirmPassword.message}</p>
-            )}
-          </div>
-
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full rounded-xl bg-primary px-4 py-2 text-primary-content hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {isSubmitting ? t('auth:setup.creatingAccount') : t('auth:setup.createAccount')}
-          </button>
-        </form>
-      </div>
-    </div>
+        <Button
+          type="submit"
+          variant="solid"
+          size="lg"
+          className="w-full"
+          disabled={isSubmitting}
+          aria-busy={isSubmitting}
+        >
+          {isSubmitting ? t('auth:setup.creatingAccount') : t('auth:setup.createAccount')}
+        </Button>
+      </form>
+    </AuthPage>
   );
 }

@@ -2,7 +2,8 @@
   "host": {
     "installationDetected": "Instalación detectada",
     "nodeRedNotDetected": "(sin Node-RED detectado)",
-    "pathNotDetected": "sin ruta detectada"
+    "pathNotDetected": "sin ruta detectada",
+    "revisionTitle": "Revisión de settings.js {{fingerprint}}"
   },
   "advanced": {
     "title": "Ajustes avanzados de settings.js",
@@ -14,14 +15,17 @@
     "unlockAcknowledgement": "Entiendo que un guardado incorrecto puede bloquear el inicio de Node-RED.",
     "saveRaw": "Guardar settings.js sin procesar",
     "savingRaw": "Guardando settings.js...",
-    "lockedBadge": "Bloqueado - haz clic en \"Desbloquear para editar\" para realizar cambios",
-    "cancelEdit": "Cancelar"
+    "lockedBadge": "Bloqueado. Selecciona \"Desbloquear para editar settings.js\" para editar el archivo directamente; se toma un respaldo antes de cualquier escritura.",
+    "cancelEdit": "Cancelar",
+    "directEdit": "Edición directa · no pasa por el circuito de cambios (sin revisión del diff)",
+    "parseError": "settings.js no válido: {{message}}"
   },
   "preset": {
     "confirmApply": "Confirmar aplicación",
     "acknowledgement": "Entiendo que al confirmar un preset se reescribirá la clave gestionada en settings.js y el valor original no se podrá recuperar a menos que exista un respaldo.",
     "loadingCurated": "Cargando presets curados...",
     "loadError": "No se pudieron cargar los presets.",
+    "unavailable": "Los presets curados no están disponibles en este servidor de NRCC.",
     "sectionLabel": "Presets curados",
     "title": "Presets curados",
     "description": "Recetas verificadas para ajustes avanzados de Node-RED 5. Cada preset declara las superficies editor / HTTP / Socket.IO que toca y nunca reescribe código del operador fuera de su alcance declarado.",
@@ -53,7 +57,8 @@
   "aiLoading": "Cargando ajustes del proveedor de IA…",
   "aiProvider": "Proveedor de IA",
   "aiProviderDesc": "Configura la asistencia opcional de IA con revisión previa.",
-  "pageTitle": "Configuración de Node-RED",
+  "pageTitle": "Configuración",
+  "sectionsLabel": "Secciones de configuración",
   "discardChanges": "Descartar cambios",
   "runtimeVersionLabel": "Versión del runtime",
   "configSourceLabel": "Origen de configuración",
@@ -64,51 +69,6 @@
   "rotateSecretTitle": "Rotar secret de credenciales",
   "rotateSecretDescription": "Guardar un nuevo secret invalida el cifrado de cada credencial almacenada. Los flows con credenciales cifradas tendrán que re-introducirse o restaurarse desde un respaldo previo a la rotación. Continúa solo si entiendes el impacto.",
   "rotateSecretAcknowledgement": "Entiendo que las credenciales cifradas existentes deben re-introducirse tras esta rotación.",
-  "securityCenter": {
-    "title": "Centro de seguridad",
-    "subtitle": "Las contraseñas y hashes bcrypt nunca se muestran. Deja una contraseña vacía para mantener su valor actual.",
-    "previewLabel": "Previsualización de transacción con datos ocultos",
-    "previewTitle": "Previsualización con datos ocultos",
-    "previewBody": "Superficies canónicas: adminAuth, httpNodeAuth y httpStaticAuth. Los valores de credenciales, hashes y contraseñas están ocultos.",
-    "readOnly": "El Centro de seguridad es de solo lectura porque esta configuración no es editable.",
-    "legacyTitle": "Autenticación legacy detectada",
-    "legacyBody": "Guardar migrará {{aliases}} a las superficies canónicas. Los secretos siguen ocultos.",
-    "adminAuth": "Autenticación de administrador",
-    "addUser": "Añadir usuario",
-    "sessionExpiry": "Expiración de sesión (segundos)",
-    "username": "Usuario",
-    "permission": "Permiso",
-    "fullAccess": "Acceso completo",
-    "readOnlyPermission": "Solo lectura",
-    "newPassword": "Nueva contraseña",
-    "nodeAuth": "Autenticación HTTP de nodos",
-    "staticAuth": "Autenticación HTTP estática",
-    "save": "Guardar Centro de seguridad",
-    "bcryptHash": "Hash bcrypt de reemplazo",
-    "bcryptHint": "Deja vacío para conservar el hash actual. Los nuevos valores deben ser hashes bcrypt y nunca se muestran."
-  },
-  "dashboardAccess": {
-    "title": "Acceso al dashboard",
-    "subtitle": "Configura una política de acceso revisada sin exponer credenciales.",
-    "discovery": "Descubrimiento:",
-    "discoverySummary": "paquetes {{packages}}; flows {{flows}}; legacy {{legacy}}; rutas FlowFuse {{paths}}.",
-    "previewLabel": "Previsualización con datos ocultos",
-    "previewTitle": "Previsualización de política con datos ocultos",
-    "previewBody": "Objetivo: {{target}}. Receta: {{recipe}}. Las credenciales, hashes y valores de autorización nunca se muestran.",
-    "readOnly": "El Acceso al dashboard es de solo lectura porque esta configuración no es editable.",
-    "target": "Objetivo del dashboard",
-    "legacyOption": "Dashboard legacy (deprecado)",
-    "unavailable": "(no disponible)",
-    "flowFuseOption": "Dashboard FlowFuse ({{count}} rutas ui-base)",
-    "recipe": "Receta de acceso",
-    "basicAuth": "Autenticación básica",
-    "reverseProxySso": "SSO por proxy inverso",
-    "username": "Usuario",
-    "secret": "Secreto de acceso",
-    "applying": "Aplicando…",
-    "apply": "Aplicar acceso al dashboard",
-    "absent": "ausente"
-  },
   "fieldStatus": {
     "header": {
       "field": "Campo",
@@ -119,22 +79,12 @@
       "pending": "Pendiente",
       "restart": "Reinicio"
     },
-    "source": {
-      "settingsJs": "settings.js",
-      "formDefault": "predeterminado del formulario"
-    },
     "validation": {
-      "valid": "Válido",
       "pending": "Pendiente",
       "invalid": "Inválido"
     },
     "pending": {
       "changed": "Cambiado"
-    },
-    "restart": {
-      "hard": "Requiere reinicio",
-      "soft": "Redesplegar flows",
-      "none": "—"
     },
     "invalid": {
       "uiPort": "Puerto fuera de rango",
@@ -175,23 +125,75 @@
     "groupNone": "Otros ({{count}})",
     "configuredLabel": "Actual",
     "newLabel": "Nuevo",
-    "apply": "Aplicar",
+    "apply": "Aplicar y reiniciar Node-RED",
+    "consequence_one": "{{count}} cambio · Node-RED se reinicia · respaldo antes de escribir",
+    "consequence_other": "{{count}} cambios · Node-RED se reinicia · respaldo antes de escribir",
     "cancel": "Cancelar",
     "applying": "Aplicando…",
     "applied": "Aplicado correctamente.",
-    "appliedError": "Error al aplicar: {{message}}",
-    "confirmTitle": "¿Aplicar cambios?",
-    "confirmDescription": "Se escribirán {{count}} cambio(s) pendiente(s) en {{target}}. Node-RED puede reiniciarse, lo que puede tardar un poco."
+    "appliedError": "Error al aplicar: {{message}}"
   },
   "topology": {
-    "title": "Topología de configuración",
     "subtitle": "NRCC edita settings.js; Node-RED lo lee al (re)iniciar.",
     "nodeNrcc": "NRCC",
-    "nodeNrccSubtitle": "panel de control",
     "nodeSettings": "settings.js",
-    "nodeSettingsSubtitle": "fuente de verdad",
     "nodeRed": "Node-RED + Dashboard",
     "arrowNrccSettings": "edita",
     "arrowSettingsNodeRed": "carga"
+  },
+  "circuit": {
+    "title": "Circuito de cambios",
+    "summary": "Paso {{index}} de {{total}} · {{step}} · {{state}}",
+    "steps": {
+      "edit": "Editar",
+      "diff": "Diff",
+      "validate": "Validar",
+      "backup": "Respaldo",
+      "apply": "Aplicar",
+      "ready": "Listo"
+    },
+    "state": {
+      "idle": "En espera",
+      "blocked": "Abierto",
+      "active": "Pendiente",
+      "passed": "Cerrado",
+      "failed": "Fallido",
+      "unknown": "Sin confirmar"
+    },
+    "proof": {
+      "changes_one": "{{count}} cambio",
+      "changes_other": "{{count}} cambios",
+      "noChanges": "Sin cambios",
+      "readOnly": "Runtime de solo lectura",
+      "notReviewed": "Sin revisar",
+      "reviewed": "Diff revisado",
+      "invalid_one": "{{count}} campo no válido",
+      "invalid_other": "{{count}} campos no válidos",
+      "localValid": "Campos válidos; el servidor valida al aplicar",
+      "running": "Transacción en curso en el servidor",
+      "serverAccepted": "Aceptado por el servidor",
+      "rejected": "Rechazado; no se escribió nada",
+      "notReached": "No alcanzado",
+      "backupTaken": "Tomado antes de escribir",
+      "backupFailed": "Falló el respaldo; no se escribió nada",
+      "written": "settings.js escrito, Node-RED reiniciado",
+      "writeFailed": "Falló la escritura",
+      "restartFailed": "Falló el reinicio",
+      "recoveryFailed": "Falló la recuperación",
+      "ready": "Readiness OK",
+      "notReady": "Falló el readiness",
+      "unknown": "Resultado sin confirmar; revisa el runtime"
+    },
+    "rollback": {
+      "restored": "Rollback: restaurado desde el respaldo",
+      "failed": "Falló el rollback: no se pudo recuperar el runtime"
+    },
+    "total_one": "{{count}} cambio",
+    "total_other": "{{count}} cambios",
+    "restartCost_one": "{{count}} requiere reinicio",
+    "restartCost_other": "{{count}} requieren reinicio",
+    "review_one": "Revisar {{count}} cambio",
+    "review_other": "Revisar {{count}} cambios",
+    "reviewNone": "No hay cambios que revisar"
   }
 }

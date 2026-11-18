@@ -1,7 +1,12 @@
 import type { BackupSummary, BackupSchedulerStatus } from '@/features/backups/services';
 import { formatBackupDate, formatBackupSize, getBackupDisplayName } from '@/features/backups/lib/formatters';
-import { cn } from '@/shared/lib';
+import { StatusChip } from '@/shared/components/ui';
 import { useT } from '@/i18n';
+
+export type SchedulerState = 'failed' | 'unscheduled' | 'scheduled';
+
+// Red only for a failed run; an unscheduled scheduler is a held gate (amber).
+const STATE_VARIANT = { failed: 'danger', unscheduled: 'warning', scheduled: 'success' } as const;
 
 interface StorageSummary {
   totalBackups: number;
@@ -12,74 +17,69 @@ interface BackupSummaryCardsProps {
   /** First item of the current backup list (or null if empty) */
   latestBackup: BackupSummary | null;
   /** Effective scheduler status (merged from API or draft config) */
-  schedulerStatus: BackupSchedulerStatus & {
-    nextRunAt: string;
-    schedule: string;
-    customSchedule?: string;
-    activeSpec?: string;
-  };
-  /** Derived scheduler tone used for badge styling */
-  schedulerTone: 'healthy' | 'muted' | 'error';
-  /** Derived scheduler label text */
-  schedulerLabel: string;
+  schedulerStatus: BackupSchedulerStatus;
+  schedulerState: SchedulerState;
   /** Effective storage summary (from observability or storage query) */
   storage: StorageSummary;
 }
 
-export function BackupSummaryCards(props: BackupSummaryCardsProps) {
-  const { latestBackup, schedulerStatus, schedulerTone, schedulerLabel, storage } = props;
-  const { t } = useT();
+/** Last backup, next run and storage as one flat row of terms on the page sheet. */
+export function BackupSummaryCards({ latestBackup, schedulerStatus, schedulerState, storage }: BackupSummaryCardsProps) {
+  const { t, i18n } = useT();
+  const date = (value: string) => formatBackupDate(value, i18n.language) ?? t('backups:dateUnavailable');
+  const stateLabel = t(`backups:schedulerStatus.${schedulerState}`);
+  const spec = schedulerStatus.schedule === 'custom' ? schedulerStatus.customSchedule : schedulerStatus.activeSpec;
+
+  const items = [
+    {
+      key: 'last',
+      label: t('backups:summary.lastBackup'),
+      value: latestBackup ? getBackupDisplayName(latestBackup) : t('backups:summary.none'),
+      detail: latestBackup ? date(latestBackup.createdAt) : t('backups:summary.noneDesc'),
+    },
+    {
+      key: 'next',
+      label: t('backups:summary.nextRun'),
+      value: schedulerStatus.nextRunAt ? date(schedulerStatus.nextRunAt) : t('backups:summary.noRunPlanned'),
+      detail: spec ? t('backups:summary.cron', { spec }) : t('backups:summary.saveToActivate'),
+      mono: Boolean(spec),
+    },
+    {
+      key: 'storage',
+      label: t('backups:summary.storage'),
+      value: formatBackupSize(storage.totalSize),
+      detail: t('backups:summary.count', { count: storage.totalBackups }),
+    },
+  ];
 
   return (
-    <div className="grid gap-3 md:grid-cols-3">
-      {/* Last Backup Card */}
-      <div className="surface-card p-5">
-        <p className="text-xs uppercase tracking-[0.18em] text-base-content/45">{t('backups:lastBackupLabel')}</p>
-        <div className="mt-2 text-lg font-semibold text-base-content">
-          {latestBackup ? getBackupDisplayName(latestBackup) : t('backups:noBackupsShort')}
-        </div>
-        <p className="mt-1 text-sm text-base-content/60">
-          {latestBackup
-            ? formatBackupDate(latestBackup.createdAt)
-            : t('backups:createFirstLocal')}
-        </p>
-      </div>
+    <section className="space-y-3 pb-4">
+      <dl className="grid gap-x-6 sm:grid-cols-3">
+        {items.map((item) => (
+          <div key={item.key} className="min-w-0 border-b border-ds-border-subtle py-2">
+            <dt className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ds-text-secondary">
+              {item.label}
+              {item.key === 'next' && (
+                <StatusChip variant={STATE_VARIANT[schedulerState]} size="sm" ariaLabel={t('backups:summary.statusAria', { state: stateLabel })}>
+                  {stateLabel}
+                </StatusChip>
+              )}
+            </dt>
+            <dd className="min-w-0">
+              <span className="block break-words text-sm font-semibold tabular-nums text-ds-text-primary">{item.value}</span>
+              <span className={`block break-words text-xs tabular-nums text-ds-text-muted ${item.mono ? 'font-mono' : ''}`}>
+                {item.detail}
+              </span>
+            </dd>
+          </div>
+        ))}
+      </dl>
 
-      {/* Next Execution Card */}
-      <div className="surface-card p-5">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-xs uppercase tracking-[0.18em] text-base-content/45">{t('backups:nextRunLabel')}</p>
-          <span
-            className={cn(
-              'inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium',
-              schedulerTone === 'healthy'
-                ? 'border-success/30 bg-success/10 text-success'
-                : schedulerTone === 'error'
-                  ? 'border-error/30 bg-error/10 text-error'
-                  : 'border-border bg-base-200/30 text-base-content/70'
-            )}
-          >
-            {schedulerLabel}
-          </span>
-        </div>
-        <div className="mt-2 text-lg font-semibold text-base-content">
-          {schedulerStatus.nextRunAt ? formatBackupDate(schedulerStatus.nextRunAt) : t('backups:notScheduled')}
-        </div>
-        <p className="mt-1 text-sm text-base-content/60">
-          {schedulerStatus.schedule === 'custom' && schedulerStatus.customSchedule
-            ? `${t('backups:cronPrefix')} ${schedulerStatus.customSchedule}`
-            : schedulerStatus.activeSpec
-              ? `${t('backups:activeSpecPrefix')} ${schedulerStatus.activeSpec}`
-              : t('backups:saveFrequencyToActivate')}
+      {schedulerStatus.lastError && (
+        <p className="rounded-box border border-ds-danger/35 bg-ds-danger/10 px-3 py-2 text-sm text-ds-on-tint-error">
+          {schedulerStatus.lastError}
         </p>
-      </div>
-
-      {/* Storage Card */}
-      <div className="surface-card p-5">
-        <p className="text-xs uppercase tracking-[0.18em] text-base-content/45">{t('backups:storageLabel')}</p>
-        <div className="mt-2 text-lg font-semibold text-base-content">{formatBackupSize(storage.totalSize)}</div>
-        <p className="mt-1 text-sm text-base-content/60">{t('backups:storageBackupsDetected', { count: storage.totalBackups })}</p>
-      </div>
-    </div>
+      )}
+    </section>
   );
 }

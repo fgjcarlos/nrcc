@@ -1,33 +1,35 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
+import { History, Loader2 } from 'lucide-react';
 import { ConfirmationDialog } from '@/shared/components';
-import { Loader2, CheckCircle2, AlertCircle, Database, Zap } from 'lucide-react';
+import { EmptyState, Skeleton } from '@/shared/components/feedback';
+import { Button, StatusChip, Table, type StatusChipProps } from '@/shared/components/ui';
 import { useUpdatesData } from '@/features/updates/hooks/useUpdatesData';
 import { useUpdatesActions } from '@/features/updates/hooks/useUpdatesActions';
 import { formatCheckedAt } from '@/features/updates/lib/updatesFormatters';
 import { useT } from '@/i18n';
 
 const knownVersionPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+const isKnownVersion = (version: string | undefined) => !!version && knownVersionPattern.test(version);
+
+type CheckState = 'checking' | 'failed' | 'available' | 'current' | 'unknown';
+const CHECK_CHIP: Record<CheckState, StatusChipProps['variant']> = {
+  checking: 'neutral',
+  failed: 'danger',
+  available: 'info',
+  current: 'success',
+  unknown: 'neutral',
+};
+
+const designator = 'font-mono text-xs font-semibold tabular-nums text-ds-text-primary';
 
 export function UpdatesView() {
   const [checkingNow, setCheckingNow] = useState(false);
-  const { t } = useT();
-  const [confirmConfig, setConfirmConfig] = useState<{
-    isOpen: boolean;
-    title: string;
-    description: string;
-    confirmText?: string;
-    variant: 'danger' | 'warning' | 'default';
-    onConfirm: () => void;
-  } | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const { t, i18n } = useT();
 
-  // Data from queries
-  const { status, statusLoading, statusRefetch, flowState, history, historyLoading } =
-    useUpdatesData();
-
-  // Actions (mutations)
+  const { status, statusLoading, statusRefetch, flowState, history, historyLoading } = useUpdatesData();
   const { checkMutation, applyMutation } = useUpdatesActions();
 
-  // Local handlers
   const handleCheckNow = async () => {
     setCheckingNow(true);
     try {
@@ -38,31 +40,26 @@ export function UpdatesView() {
     }
   };
 
-  const handleApplyUpdate = () => {
-    setConfirmConfig({
-      isOpen: true,
-      title: t('updates:confirmTitle'),
-      description: t('updates:confirmDescription', {
-        currentVersion: status?.currentVersion ?? t('updates:unknown'),
-        latestVersion: status?.latestVersion ?? t('updates:unknown'),
-      }),
-      variant: 'warning',
-      onConfirm: () => {
-        setConfirmConfig(null);
-        applyMutation.mutate();
-      },
-    });
-  };
-
-  // Derived state
-  const isLoading = statusLoading;
   const isChecking = checkingNow || checkMutation.isPending;
-  const hasError = status?.error;
-  const hasUpdate = status?.updateAvailable && !hasError;
-  const hasKnownVersions = [status?.currentVersion, status?.latestVersion].every(
-    (version) => !!version && knownVersionPattern.test(version),
-  );
-  const canApplyUpdate = status?.strategy === 'npm-global' && status.canInplaceApply === true && hasKnownVersions && !!hasUpdate;
+  const hasError = !!status?.error;
+  const hasUpdate = !!status?.updateAvailable && !hasError;
+  const currentVersion = status?.currentVersion;
+  const latestVersion = status?.latestVersion;
+  const hasKnownVersions = isKnownVersion(currentVersion) && isKnownVersion(latestVersion);
+  const canApplyUpdate = status?.strategy === 'npm-global' && status.canInplaceApply === true && hasKnownVersions && hasUpdate;
+
+  // "Up to date" only when both versions are real; anything else is unconfirmed.
+  const checkState: CheckState =
+    isChecking || (statusLoading && !status)
+      ? 'checking'
+      : hasError
+        ? 'failed'
+        : hasUpdate
+          ? 'available'
+          : hasKnownVersions
+            ? 'current'
+            : 'unknown';
+
   const updateGuidance = status?.strategy === 'image-local'
     ? t('updates:imageGuidance')
     : status?.strategy === 'external'
@@ -71,290 +68,218 @@ export function UpdatesView() {
         ? t('updates:npmGuidance')
         : t('updates:unknownGuidance');
 
-  const isUpdateActive = flowState?.state && ['BackingUp', 'Applying'].includes(flowState.state);
-  const isUpdateCompleted = flowState?.state === 'Completed';
-  const isUpdateFailed = flowState?.state === 'Failed';
+  const flow = flowState?.state;
+  const isUpdateActive = flow === 'BackingUp' || flow === 'Applying';
+  const targetVersion = latestVersion || t('updates:unknown');
+  const failureCopy = flowState?.error === 'image_unsupported' || flowState?.error === 'external_unsupported'
+    ? t(`updates:${flowState.error}`)
+    : flowState?.error === 'backup_failed'
+      ? t('updates:failed.backup_failed')
+      : t('updates:failed.update_failed');
+
+  const versionValue = (version: string | undefined) =>
+    isKnownVersion(version)
+      ? <span className={designator}>{version}</span>
+      : <span className="text-sm text-ds-text-secondary">{t('updates:unknown')}</span>;
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <p className="text-xs uppercase tracking-[0.24em] text-base-content/50">{t('updates:maintenance')}</p>
-          <h1 className="text-2xl font-bold text-base-content">{t('updates:title')}</h1>
+    <div className="space-y-4">
+      <header className="flex flex-col gap-3 border-b border-ds-border-subtle pb-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0 space-y-1">
+          <h1 className="text-xl font-bold text-ds-text-primary">{t('updates:title')}</h1>
+          <p className="max-w-[75ch] text-pretty text-sm text-ds-text-secondary">{t('updates:intro')}</p>
         </div>
-      </div>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={handleCheckNow}
+          disabled={isChecking || statusLoading || isUpdateActive}
+          className="min-h-11 shrink-0 self-start whitespace-nowrap md:min-h-9 sm:self-auto"
+        >
+          {isChecking && <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />}
+          {t('updates:checkNow')}
+        </Button>
+      </header>
 
-      {/* Status Panel */}
-      <div className="surface-card p-6">
-        <h2 className="mb-4 text-lg font-semibold text-base-content">{t('updates:currentStatus')}</h2>
-
-        {isLoading && !status ? (
-          <div className="space-y-4">
-            <div className="flex flex-col items-center justify-center py-8">
-              <Loader2 className="w-8 h-8 text-accent animate-spin mb-3" />
-              <p className="text-sm text-base-content/60">{t('updates:checking')}</p>
-            </div>
+      {/* One sheet: sections separated by hairline rules, no nested cards. */}
+      <div className="divide-y divide-ds-border-subtle">
+        <section aria-labelledby="updates-runtime-title" className="space-y-3 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 id="updates-runtime-title" className="text-sm font-semibold text-ds-text-primary">
+              {t('updates:runtimeTitle')}
+            </h2>
+            <StatusChip
+              size="sm"
+              variant={CHECK_CHIP[checkState]}
+              icon={checkState === 'checking' ? <Loader2 className="h-3 w-3 animate-spin motion-reduce:animate-none" /> : undefined}
+            >
+              {t(`updates:state.${checkState}`)}
+            </StatusChip>
           </div>
-        ) : (
-          <div className="space-y-3">
-            {/* Current Version */}
-            <div className="flex items-center justify-between">
-              <span className="text-base-content/60">{t('updates:currentVersion')}</span>
-              <span className="font-mono font-medium text-base-content">
-                {status?.currentVersion || t('updates:unknown')}
-              </span>
+
+          <dl className="grid gap-x-8 gap-y-3 sm:grid-cols-3">
+            <Fact label={t('updates:installed')}>{versionValue(currentVersion)}</Fact>
+            <Fact label={t('updates:latestOnNpm')}>{versionValue(latestVersion)}</Fact>
+            <Fact label={t('updates:lastChecked')}>
+              <span className="text-sm text-ds-text-primary">{formatCheckedAt(status?.checkedAt, t, i18n.language)}</span>
+            </Fact>
+          </dl>
+
+          {hasError && !isChecking && (
+            <div className="space-y-1 text-sm">
+              <p className="text-ds-on-tint-error">{t('updates:checkFailedDetail')}</p>
+              <p className="text-xs text-ds-text-secondary">{status?.error}</p>
             </div>
+          )}
 
-            {/* Latest Version */}
-            {hasUpdate && (
-              <div className="flex items-center justify-between">
-                <span className="text-base-content/60">{t('updates:latestVersion')}</span>
-                <span className="font-mono font-medium text-base-content">
-                  {status?.latestVersion || t('updates:unknown')}
-                </span>
-              </div>
-            )}
+          <p className="max-w-[75ch] text-sm text-ds-text-secondary" role="note">{updateGuidance}</p>
 
-            {/* Last Checked */}
-            <div className="flex items-center justify-between">
-              <span className="text-base-content/60">{t('updates:lastChecked')}</span>
-              <span className="text-sm text-base-content">{formatCheckedAt(status?.checkedAt)}</span>
-            </div>
+          {canApplyUpdate && !isUpdateActive && (
+            <Button
+              type="button"
+              variant="solid"
+              onClick={() => setConfirmOpen(true)}
+              disabled={applyMutation.isPending || isChecking}
+              className="min-h-11 md:min-h-9"
+            >
+              {applyMutation.isPending ? t('updates:updating') : t('updates:updateTo', { version: latestVersion })}
+            </Button>
+          )}
+        </section>
 
-            {/* Status Badge */}
-            <div className="flex items-center justify-between">
-              <span className="text-base-content/60">{t('updates:status')}</span>
-              {isChecking ? (
-                <span className="flex items-center gap-2 text-sm text-accent">
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  {t('updates:checking')}
-                </span>
-              ) : hasError ? (
-                <span
-                  className="rounded-full bg-error/15 px-2 py-1 text-xs text-ds-on-tint-error"
-                  title={status?.error}
-                >
-                  {t('updates:error')}
-                </span>
-              ) : hasUpdate ? (
-                <span className="rounded-full bg-success/15 px-2 py-1 text-xs text-ds-on-tint-success">
-                  {t('updates:updateAvailable')}
-                </span>
-              ) : (
-                <span className="rounded-full bg-base-300/70 px-2 py-1 text-xs text-base-content">
-                  {t('updates:upToDate')}
-                </span>
-              )}
-            </div>
-
-            <p className="text-sm text-base-content/70" role="note">{updateGuidance}</p>
-
-            {/* Error message */}
-            {hasError && (
-              <div className="mt-4 p-3 rounded-lg bg-error/10 border border-error/20">
-                <p className="text-sm text-ds-on-tint-error">{status?.error}</p>
-              </div>
-            )}
-
-            {/* Update Flow Progress (when active) */}
-            {isUpdateActive && (
-              <div className="mt-6 pt-6 border-t ghost-divider">
-                <h3 className="mb-4 text-sm font-semibold text-base-content flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-accent" />
-                  {t('updates:progress')}
-                </h3>
-
-                {/* Step Progress UI */}
-                <div className="space-y-3">
-                  {/* Step 1: Backup */}
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-accent/20 text-accent">
-                      {flowState?.state === 'BackingUp' ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Database className="w-4 h-4" />
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-base-content">{t('updates:createBackup')}</p>
-                      {flowState?.state === 'BackingUp' && (
-                        <p className="text-xs text-base-content/60">{t('updates:backingUp')}</p>
-                      )}
-                    </div>
-                    {flowState?.state === 'BackingUp' && (
-                      <span className="text-xs px-2 py-1 rounded-full bg-accent/10 text-accent font-medium">
-                        {t('updates:active')}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Step 2: Apply */}
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-accent/20 text-accent">
-                      {flowState?.state === 'Applying' ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Zap className="w-4 h-4" />
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-base-content">{t('updates:updateNodeRed')}</p>
-                      {flowState?.state === 'Applying' && (
-                        <p className="text-xs text-base-content/60">{t('updates:installing')}</p>
-                      )}
-                    </div>
-                    {flowState?.state === 'Applying' && (
-                      <span className="text-xs px-2 py-1 rounded-full bg-accent/10 text-accent font-medium">
-                        {t('updates:active')}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Status message for backup completion */}
-                  {flowState?.state === 'Applying' && flowState?.backupId && (
-                    <div className="mt-2 p-2 rounded-lg bg-success/10 border border-success/20 flex items-start gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0 mt-0.5" />
-                      <p className="text-xs text-ds-on-tint-success">
-                        {t('updates:backupCompleted', { id: flowState.backupId.substring(0, 8) })}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Update Completion Feedback */}
-            {isUpdateCompleted && (
-              <div className="mt-6 pt-6 border-t ghost-divider">
-                <div className="p-4 rounded-lg bg-success/10 border border-success/20 flex items-start gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-medium text-ds-on-tint-success">{t('updates:completed')}</p>
-                    <p className="text-sm text-ds-on-tint-success mt-1">
-                      {t('updates:completedDetail', { version: status?.latestVersion ?? t('updates:unknown') })}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Update Error Feedback */}
-            {isUpdateFailed && (
-              <div className="mt-6 pt-6 border-t ghost-divider">
-                <div className="p-4 rounded-lg bg-error/10 border border-error/20 flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-error flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-medium text-ds-on-tint-error">{t('updates:updateFailed')}</p>
-                    <p className="text-sm text-ds-on-tint-error mt-1">
-                      {flowState?.error === 'image_unsupported'
-                        ? t('updates:image_unsupported')
-                        : flowState?.error === 'external_unsupported'
-                          ? t('updates:external_unsupported')
-                          : t('updates:failedDetail')}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Action Buttons */}
-            <div className="mt-4 flex gap-2 border-t ghost-divider pt-4">
-              <button
-                onClick={handleCheckNow}
-                disabled={isChecking || isLoading || isUpdateActive}
-                className="action-btn-secondary disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                aria-label={t('updates:checkNow')}
-              >
-                {isChecking && <Loader2 className="w-4 h-4 animate-spin" />}
-                {t('updates:checkNow')}
-              </button>
-              {canApplyUpdate && !isUpdateActive && (
-                <button
-                  onClick={handleApplyUpdate}
-                  disabled={applyMutation.isPending || isChecking || isUpdateActive}
-                  className="action-btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                  aria-label={t('updates:applyUpdate')}
-                >
-                  {applyMutation.isPending ? t('updates:updating') : t('updates:updateNow')}
-                </button>
-              )}
-            </div>
-          </div>
+        {isUpdateActive && (
+          <section aria-labelledby="updates-progress-title" aria-live="polite" className="space-y-3 py-4">
+            <h2 id="updates-progress-title" className="text-sm font-semibold text-ds-text-primary">
+              {t('updates:progress')}
+            </h2>
+            <ol className="space-y-2 text-sm">
+              <Step
+                label={t('updates:steps.backup')}
+                state={flow === 'BackingUp' ? 'running' : 'done'}
+                detail={flowState?.backupId && (
+                  <>
+                    {t('updates:steps.backupId')} <span className={designator}>{flowState.backupId.substring(0, 8)}</span>
+                  </>
+                )}
+              />
+              <Step
+                label={t('updates:steps.install', { version: flowState?.availableVersion || targetVersion })}
+                state={flow === 'Applying' ? 'running' : 'waiting'}
+              />
+            </ol>
+          </section>
         )}
-      </div>
 
-      {/* Confirmation Dialog */}
-      {confirmConfig && (
-        <ConfirmationDialog
-          isOpen={confirmConfig.isOpen}
-          title={confirmConfig.title}
-          description={confirmConfig.description}
-          confirmText={confirmConfig.confirmText}
-          variant={confirmConfig.variant}
-          isPending={applyMutation.isPending}
-          onConfirm={confirmConfig.onConfirm}
-          onCancel={() => setConfirmConfig(null)}
-        />
-      )}
+        {flow === 'Completed' && (
+          <section role="status" className="space-y-1 py-4">
+            <h2 className="text-sm font-semibold text-ds-on-tint-success">
+              {t('updates:completedTitle', { version: targetVersion })}
+            </h2>
+            <p className="max-w-[75ch] text-sm text-ds-text-secondary">
+              {t('updates:completedDetail', { version: targetVersion })}
+            </p>
+          </section>
+        )}
 
-      {/* History Table */}
-      <div className="surface-card p-6">
-        <h2 className="mb-4 text-lg font-semibold text-base-content">{t('updates:history')}</h2>
+        {flow === 'Failed' && (
+          <section role="alert" className="space-y-1 py-4">
+            <h2 className="text-sm font-semibold text-ds-on-tint-error">{t('updates:updateFailed')}</h2>
+            <p className="max-w-[75ch] text-sm text-ds-text-secondary">{failureCopy}</p>
+          </section>
+        )}
 
-        {historyLoading ? (
-          <div className="animate-pulse">
-            <div className="mb-2 h-8 rounded skeleton-dark"></div>
-            <div className="mb-2 h-8 rounded skeleton-dark"></div>
-            <div className="h-8 rounded skeleton-dark"></div>
+        <section aria-labelledby="updates-history-title" className="space-y-3 py-4">
+          <div className="space-y-1">
+            <h2 id="updates-history-title" className="text-sm font-semibold text-ds-text-primary">
+              {t('updates:historyTitle')}
+            </h2>
+            <p className="text-xs text-ds-text-secondary">{t('updates:historyHint')}</p>
           </div>
-        ) : history.length === 0 ? (
-          <p className="text-sm text-base-content/60">{t('updates:noHistory')}</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
+
+          {historyLoading ? (
+            <Skeleton rows={3} className="h-8" />
+          ) : history.length === 0 ? (
+            <EmptyState
+              icon={<History className="h-6 w-6" />}
+              title={t('updates:historyEmpty')}
+              description={t('updates:historyEmptyHint')}
+            />
+          ) : (
+            <Table stacked caption={t('updates:historyTitle')}>
               <thead>
-                <tr className="border-b ghost-divider">
-                  <th className="px-2 py-3 text-left text-sm font-medium text-base-content">{t('updates:date')}</th>
-                  <th className="px-2 py-3 text-left text-sm font-medium text-base-content">
-                    {t('updates:fromVersion')}
-                  </th>
-                  <th className="px-2 py-3 text-left text-sm font-medium text-base-content">
-                    {t('updates:toVersion')}
-                  </th>
-                  <th className="px-2 py-3 text-left text-sm font-medium text-base-content">{t('updates:user')}</th>
-                  <th className="px-2 py-3 text-left text-sm font-medium text-base-content">{t('updates:status')}</th>
+                <tr>
+                  <th>{t('updates:date')}</th>
+                  <th>{t('updates:fromVersion')}</th>
+                  <th>{t('updates:backup')}</th>
                 </tr>
               </thead>
               <tbody>
                 {history.map((entry) => (
-                  <tr key={entry.id} className="border-b ghost-divider">
-                    <td className="px-2 py-3 text-sm text-base-content">
-                      {new Date(entry.timestamp).toLocaleString()}
+                  <tr key={entry.id}>
+                    <td data-label={t('updates:date')} className="tabular-nums text-ds-text-secondary">
+                      {new Date(entry.timestamp).toLocaleString(i18n.language)}
                     </td>
-                    <td className="px-2 py-3 font-mono text-sm text-base-content">{entry.fromVersion}</td>
-                    <td className="px-2 py-3 font-mono text-sm text-base-content">{entry.toVersion}</td>
-                    <td className="px-2 py-3 text-sm text-base-content">{entry.appliedBy}</td>
-                    <td className="py-3 px-2">
-                      {entry.status === 'success' ? (
-                        <span className="rounded-full bg-success/15 px-2 py-1 text-xs text-ds-on-tint-success">
-                          {t('common:ok')}
-                        </span>
-                      ) : (
-                        <span
-                          className="rounded-full bg-error/15 px-2 py-1 text-xs text-ds-on-tint-error"
-                          title={entry.errorMessage}
-                        >
-                          {t('updates:error')}
-                        </span>
-                      )}
+                    <td data-label={t('updates:fromVersion')}>
+                      <span className={designator}>{entry.fromVersion}</span>
+                    </td>
+                    <td data-label={t('updates:backup')}>
+                      <span className={designator} title={entry.id}>{entry.id.substring(0, 8)}</span>
                     </td>
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
-        )}
+            </Table>
+          )}
+        </section>
       </div>
+
+      <ConfirmationDialog
+        isOpen={confirmOpen}
+        title={t('updates:confirmTitle', { version: targetVersion })}
+        description={t('updates:confirmDescription', {
+          currentVersion: currentVersion ?? t('updates:unknown'),
+          latestVersion: targetVersion,
+        })}
+        variant="warning"
+        isPending={applyMutation.isPending}
+        onConfirm={() => {
+          setConfirmOpen(false);
+          applyMutation.mutate();
+        }}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </div>
+  );
+}
+
+function Fact({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <dt className="text-xs text-ds-text-secondary">{label}</dt>
+      <dd>{children}</dd>
+    </div>
+  );
+}
+
+function Step({ label, state, detail }: { label: string; state: 'waiting' | 'running' | 'done'; detail?: ReactNode }) {
+  const { t } = useT();
+  return (
+    <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+      <span className="text-ds-text-primary">{label}</span>
+      <span className="flex items-baseline gap-3 text-xs">
+        {detail && <span className="text-ds-text-secondary">{detail}</span>}
+        <span
+          className={
+            state === 'done'
+              ? 'font-semibold text-ds-on-tint-success'
+              : state === 'running'
+                ? 'font-semibold text-ds-on-tint-info'
+                : 'text-ds-text-muted'
+          }
+        >
+          {t(`updates:steps.${state}`)}
+        </span>
+      </span>
+    </li>
   );
 }

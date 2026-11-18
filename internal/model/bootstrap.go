@@ -70,19 +70,29 @@ type ConfigurationCapabilities struct {
 	Reason         string `json:"reason,omitempty"`
 }
 
+// Stable recommendation codes. Clients localize these; the human string in
+// HostStatus.Recommendations is kept only for existing consumers.
+const (
+	RecommendationPortlessOptional    = "portless_optional"
+	RecommendationSettingsNotWritable = "settings_not_writable"
+)
+
 // HostStatus summarizes the detected host and runtime environment.
+// RecommendationCodes[i] identifies Recommendations[i]; both have the same
+// length and order.
 type HostStatus struct {
-	Platform        string                    `json:"platform"`
-	Ready           bool                      `json:"ready"`
-	Interactive     bool                      `json:"interactive"`
-	NodeJS          DependencyStatus          `json:"nodejs"`
-	NPM             DependencyStatus          `json:"npm"`
-	NodeRedBinary   DependencyStatus          `json:"nodeRedBinary"`
-	Portless        DependencyStatus          `json:"portless"`
-	Docker          DependencyStatus          `json:"docker"`
-	DockerCompose   DependencyStatus          `json:"dockerCompose"`
-	NodeRed         NodeRedEnvironment        `json:"nodeRed"`
-	Settings        SettingsDocument          `json:"settings"`
-	Configuration   ConfigurationCapabilities `json:"configuration"`
-	Recommendations []string                  `json:"recommendations,omitempty"`
+	Platform            string                    `json:"platform"`
+	Ready               bool                      `json:"ready"`
+	Interactive         bool                      `json:"interactive"`
+	NodeJS              DependencyStatus          `json:"nodejs"`
+	NPM                 DependencyStatus          `json:"npm"`
+	NodeRedBinary       DependencyStatus          `json:"nodeRedBinary"`
+	Portless            DependencyStatus          `json:"portless"`
+	Docker              DependencyStatus          `json:"docker"`
+	DockerCompose       DependencyStatus          `json:"dockerCompose"`
+	NodeRed             NodeRedEnvironment        `json:"nodeRed"`
+	Settings            SettingsDocument          `json:"settings"`
+	Configuration       ConfigurationCapabilities `json:"configuration"`
+	Recommendations     []string                  `json:"recommendations,omitempty"`
+	RecommendationCodes []string                  `json:"recommendationCodes,omitempty"`
 }
