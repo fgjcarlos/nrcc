@@ -335,14 +335,14 @@ export function BackupsView() {
           retentionPreRestore={configDraft.retentionPreRestore}
           isSaving={actions.retentionMutation.isPending}
           onSave={(manual, auto, preRestore) => {
-            const updatedConfig = {
-              ...configDraft,
+            const retention = {
               retentionManual: manual,
               retentionAuto: auto,
               retentionPreRestore: preRestore,
             };
-            setConfigDraft(updatedConfig);
-            actions.retentionMutation.mutate(manual);
+            setConfigDraft((current) => ({ ...current, ...retention }));
+            // Base on the persisted config so unsaved scheduler edits are not saved here.
+            actions.retentionMutation.mutate({ ...(backupsData.config ?? configDraft), ...retention });
           }}
         />
       </div>
