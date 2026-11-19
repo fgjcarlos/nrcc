@@ -21,7 +21,8 @@ func nodeCheck(t *testing.T, src string) {
 	if err := os.WriteFile(f, []byte(src), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if out, err := exec.Command(node, "--check", f).CombinedOutput(); err != nil {
+	// node comes from LookPath and f from t.TempDir: no user input reaches the command.
+	if out, err := exec.Command(node, "--check", f).CombinedOutput(); err != nil { //nolint:gosec // G204: fixed binary, test-owned path
 		t.Fatalf("patched settings.js is not valid JavaScript: %v\n%s\n---\n%s", err, out, src)
 	}
 }

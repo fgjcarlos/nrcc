@@ -178,9 +178,7 @@ func httpsTLSPreset() Preset {
 		ChannelBoundary: "http-only",
 		ManagedKeys:     []string{"https"},
 		Inputs:          []string{"key", "cert"},
-		BuildEdits: func(content string, currentValues map[string]string) ([]SourceEdit, error) {
-			return buildHTTPSEdits(content, currentValues)
-		},
+		BuildEdits:      buildHTTPSEdits,
 	}
 }
 
