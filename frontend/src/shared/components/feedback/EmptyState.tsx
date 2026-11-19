@@ -18,6 +18,8 @@ export interface EmptyStateProps {
   icon?: ReactNode;
   actionLabel?: string;
   onAction?: () => void;
+  /** Heading level for the title; pick the next level below the enclosing heading. */
+  headingLevel?: 2 | 3;
 }
 
 export function EmptyState({
@@ -26,8 +28,10 @@ export function EmptyState({
   icon,
   actionLabel,
   onAction,
+  headingLevel = 3,
 }: EmptyStateProps) {
   const hasAction = Boolean(actionLabel && onAction);
+  const Heading = headingLevel === 2 ? 'h2' : 'h3';
 
   return (
     <div
@@ -40,7 +44,7 @@ export function EmptyState({
           {icon}
         </span>
       ) : null}
-      <h3 className="text-sm font-semibold text-ds-text-primary">{title}</h3>
+      <Heading className="text-sm font-semibold text-ds-text-primary">{title}</Heading>
       {description ? (
         <p className="max-w-sm text-sm text-ds-text-secondary">{description}</p>
       ) : null}
