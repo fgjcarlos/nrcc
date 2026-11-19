@@ -3,7 +3,9 @@ package service
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"sort"
+	"strings"
 )
 
 // Surface names a Node-RED surface that a preset is allowed to touch.
@@ -81,7 +83,10 @@ type Preset struct {
 	Trust           TrustTier
 	ChannelBoundary string
 	ManagedKeys     []string
-	BuildEdits      func(content string, currentValues map[string]string) ([]SourceEdit, error)
+	// Inputs names the operator values BuildEdits reads (absolute file
+	// paths today). A preset with inputs cannot be previewed without them.
+	Inputs     []string
+	BuildEdits func(content string, currentValues map[string]string) ([]SourceEdit, error)
 }
 
 // PresetRegistry is a defensive lookup for curated presets.
@@ -172,21 +177,9 @@ func httpsTLSPreset() Preset {
 		Trust:           TrustManaged,
 		ChannelBoundary: "http-only",
 		ManagedKeys:     []string{"https"},
+		Inputs:          []string{"key", "cert"},
 		BuildEdits: func(content string, currentValues map[string]string) ([]SourceEdit, error) {
-			// Slice 1: emit a fixed placeholder block. Slice 2 will
-			// derive the block content from currentValues plus the
-			// operator's inputs (key path, cert path, etc.) and the
-			// readiness probe for the live document.
-			_ = content
-			_ = currentValues
-			return []SourceEdit{{
-				Key:     "https",
-				IsBlock: true,
-				Block: "https: {\n" +
-					"  key: $KEY_PATH,\n" +
-					"  cert: $CERT_PATH,\n" +
-					"}",
-			}}, nil
+			return buildHTTPSEdits(content, currentValues)
 		},
 	}
 }
@@ -291,4 +284,56 @@ func loggingCallbackMiddlewarePreset() Preset {
 			}}, nil
 		},
 	}
+}
+
+// ErrPresetNeedsInput reports that a preset cannot build a loadable
+// settings.js edit without operator input (for example file paths).
+var ErrPresetNeedsInput = errors.New("preset needs operator input")
+
+// buildHTTPSEdits renders the managed https block from the operator's
+// absolute key and cert paths. Without paths it keeps an existing https
+// block byte-identical, and with neither it refuses: emitting a
+// placeholder would write a settings.js Node-RED cannot load.
+func buildHTTPSEdits(content string, values map[string]string) ([]SourceEdit, error) {
+	if _, ok := findModuleExportsClosingBrace(content); !ok {
+		return nil, ErrSourceNotExports
+	}
+	key, cert := strings.TrimSpace(values["key"]), strings.TrimSpace(values["cert"])
+	if key == "" && cert == "" {
+		if start, end, ok := findTopLevelBlock(content, "https"); ok {
+			return []SourceEdit{{Key: "https", IsBlock: true, Block: content[start:end]}}, nil
+		}
+		return nil, fmt.Errorf("%w: https-tls-preset requires absolute key and cert file paths", ErrPresetNeedsInput)
+	}
+	for name, p := range map[string]string{"key": key, "cert": cert} {
+		if !isSafeAbsolutePath(p) {
+			return nil, fmt.Errorf("%w: %s must be an absolute file path", ErrPresetNeedsInput, name)
+		}
+	}
+	indent := detectIndent(content)
+	inner := indent + indent
+	block := indent + "https: {\n" +
+		inner + "key: require(\"fs\").readFileSync(" + jsString(key) + "),\n" +
+		inner + "cert: require(\"fs\").readFileSync(" + jsString(cert) + "),\n" +
+		indent + "},"
+	// An appended block needs its own line before the root brace; a
+	// replaced block reuses the line ending of the block it replaces.
+	if _, _, exists := findTopLevelBlock(content, "https"); !exists {
+		block += "\n"
+	}
+	return []SourceEdit{{Key: "https", IsBlock: true, Block: block}}, nil
+}
+
+// isSafeAbsolutePath accepts clean absolute paths without control or
+// quote characters, so the rendered string literal cannot break out.
+func isSafeAbsolutePath(p string) bool {
+	if !filepath.IsAbs(p) || strings.ContainsAny(p, "\"'`\\") {
+		return false
+	}
+	for _, r := range p {
+		if r < 0x20 || r == 0x7f {
+			return false
+		}
+	}
+	return true
 }

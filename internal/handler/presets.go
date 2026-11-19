@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -47,13 +46,15 @@ type presetView struct {
 	Trust           string   `json:"trust"`
 	ChannelBoundary string   `json:"channelBoundary"`
 	ManagedKeys     []string `json:"managedKeys"`
+	Inputs          []string `json:"inputs"`
 }
 
 // presetPreviewRequest is the body of POST /api/presets/{id}/preview.
 // Content is the live settings.js source the operator wants to
 // preview the preset against.
 type presetPreviewRequest struct {
-	Content string `json:"content"`
+	Content string            `json:"content"`
+	Values  map[string]string `json:"values,omitempty"`
 }
 
 // presetPreviewResponse carries the redacted diff the UI renders.
@@ -85,6 +86,7 @@ func (h *PresetsHandler) List(w http.ResponseWriter, r *http.Request) {
 			Trust:           string(p.Trust),
 			ChannelBoundary: p.ChannelBoundary,
 			ManagedKeys:     append([]string(nil), p.ManagedKeys...),
+			Inputs:          append([]string{}, p.Inputs...),
 		})
 	}
 	model.RespondJSON(w, http.StatusOK, out)
@@ -101,18 +103,19 @@ func (h *PresetsHandler) List(w http.ResponseWriter, r *http.Request) {
 // (400) from "source patch rejected" (422).
 func (h *PresetsHandler) Preview(w http.ResponseWriter, r *http.Request, presetID string) {
 	var req presetPreviewRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		model.RespondError(w, http.StatusBadRequest, "INVALID_REQUEST", err.Error())
+	if !DecodeJSON(w, r, &req) {
 		return
 	}
 
-	res, err := h.registry.ApplyPreset(req.Content, presetID, nil)
+	res, err := h.registry.ApplyPreset(req.Content, presetID, req.Values)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrUnknownPreset):
 			model.RespondError(w, http.StatusNotFound, "PRESET_NOT_REGISTERED", err.Error())
 		case errors.Is(err, service.ErrSourceNotExports):
 			model.RespondError(w, http.StatusUnprocessableEntity, "SOURCE_NOT_EXPORTS", err.Error())
+		case errors.Is(err, service.ErrPresetNeedsInput):
+			model.RespondError(w, http.StatusUnprocessableEntity, "PRESET_NEEDS_INPUT", err.Error())
 		default:
 			model.RespondError(w, http.StatusInternalServerError, "PRESET_PREVIEW_FAILED", err.Error())
 		}

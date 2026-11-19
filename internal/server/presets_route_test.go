@@ -38,7 +38,12 @@ func TestPresetsRoutes_Mounted(t *testing.T) {
 		{"admin preview malformed body", http.MethodPost, "/api/presets/https-tls-preset/preview", "{", admin, http.StatusBadRequest, "INVALID_REQUEST", ""},
 		{"unauthenticated preview", http.MethodPost, "/api/presets/https-tls-preset/preview", previewBody, "", http.StatusUnauthorized, "UNAUTHORIZED", ""},
 		{"viewer preview", http.MethodPost, "/api/presets/https-tls-preset/preview", previewBody, viewer, http.StatusForbidden, "FORBIDDEN", ""},
-		{"admin preview valid redacts", http.MethodPost, "/api/presets/https-tls-preset/preview", `{"content":"module.exports = {\n  credentialSecret: \"hunter2\",\n}\n"}`, admin, http.StatusOK, "", `credentialSecret: [redacted]`},
+		{"admin preview valid redacts", http.MethodPost, "/api/presets/https-tls-preset/preview", `{"content":"module.exports = {\n  credentialSecret: \"hunter2\",\n  https: {\n    passphrase: \"hunter3\",\n  },\n}\n","values":{"key":"/data/key.pem","cert":"/data/cert.pem"}}`, admin, http.StatusOK, "", `credentialSecret: [redacted]`},
+		{"admin preview https with paths", http.MethodPost, "/api/presets/https-tls-preset/preview", `{"content":"module.exports = {\n  uiPort: 1880,\n}\n","values":{"key":"/data/key.pem","cert":"/data/cert.pem"}}`, admin, http.StatusOK, "", `readFileSync(\"/data/cert.pem\")`},
+		{"admin preview https without paths", http.MethodPost, "/api/presets/https-tls-preset/preview", previewBody, admin, http.StatusUnprocessableEntity, "PRESET_NEEDS_INPUT", ""},
+		{"admin preview empty body", http.MethodPost, "/api/presets/https-tls-preset/preview", "", admin, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body"},
+		{"admin preview body over 1 MiB within 2 MiB", http.MethodPost, "/api/presets/https-tls-preset/preview", `{"content":"` + strings.Repeat("a", 3<<19) + `"}`, admin, http.StatusUnprocessableEntity, "SOURCE_NOT_EXPORTS", ""},
+		{"admin preview body over 2 MiB", http.MethodPost, "/api/presets/https-tls-preset/preview", `{"content":"` + strings.Repeat("a", 2<<20) + `"}`, admin, http.StatusRequestEntityTooLarge, "", "request body too large"},
 		{"admin preview encoded traversal id", http.MethodPost, "/api/presets/..%2F..%2Fetc%2Fpasswd/preview", previewBody, admin, http.StatusNotFound, "PRESET_NOT_REGISTERED", ""},
 		{"admin preview empty content", http.MethodPost, "/api/presets/https-tls-preset/preview", `{"content":""}`, admin, http.StatusUnprocessableEntity, "SOURCE_NOT_EXPORTS", ""},
 	}

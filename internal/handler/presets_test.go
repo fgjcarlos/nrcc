@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -30,7 +31,7 @@ func TestPresetsHandler_ListReturnsCorePresets(t *testing.T) {
 		t.Fatalf("List status: got %d want %d", w.Code, http.StatusOK)
 	}
 	var body struct {
-		Success bool                       `json:"success"`
+		Success bool             `json:"success"`
 		Data    []map[string]any `json:"data"`
 	}
 	if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
@@ -54,12 +55,22 @@ func TestPresetsHandler_ListReturnsCorePresets(t *testing.T) {
 			t.Errorf("List response missing core preset %q (got %v)", want, ids)
 		}
 	}
+	inputs := map[string]any{}
+	for _, p := range body.Data {
+		inputs[p["id"].(string)] = p["inputs"]
+	}
+	if got := fmt.Sprint(inputs["https-tls-preset"]); got != "[key cert]" {
+		t.Errorf("https-tls-preset inputs = %s, want [key cert]", got)
+	}
+	if got := fmt.Sprint(inputs["functionGlobalContext-strict"]); got != "[]" {
+		t.Errorf("presets without inputs must send an empty list, got %s", got)
+	}
 }
 
 // Test fixture: settings.js with a passphrase-bearing https block,
 // formatted so source_patch.go's findModuleExportsClosingBrace can
 // find the closing brace on its own line.
-const presetPreviewFixture = `{"content":"module.exports = {\n  https: {\n    key: 'k',\n    cert: 'c',\n    passphrase: 'super-secret',\n  },\n}\n"}`
+const presetPreviewFixture = `{"content":"module.exports = {\n  https: {\n    key: 'k',\n    cert: 'c',\n    passphrase: 'super-secret',\n  },\n}\n","values":{"key":"/data/key.pem","cert":"/data/cert.pem"}}`
 
 func TestPresetsHandler_PreviewRedactsSecrets(t *testing.T) {
 	h := NewPresetsHandler()

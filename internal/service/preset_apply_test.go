@@ -83,12 +83,14 @@ func TestAdvancedPatchPreservesUnmanagedCode(t *testing.T) {
 		presetID string
 		fixture  string
 		needle   string // substring that must appear unchanged in After
+		values   map[string]string
 	}{
 		{
 			name:     "https-preserve-httpMiddleware",
 			presetID: "https-tls-preset",
 			fixture:  "functionGlobalContext-supported.js",
 			needle:   "httpMiddleware: function(req, res, next) { next(); }",
+			values:   map[string]string{"key": "/data/certs/key.pem", "cert": "/data/certs/cert.pem"},
 		},
 		{
 			name:     "fgc-relaxed-preserve-require-expressions",
@@ -101,7 +103,7 @@ func TestAdvancedPatchPreservesUnmanagedCode(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			original := readFixture(t, tc.fixture)
-			res, err := reg.ApplyPreset(original, tc.presetID, map[string]string{})
+			res, err := reg.ApplyPreset(original, tc.presetID, tc.values)
 			if err != nil {
 				t.Fatalf("ApplyPreset: %v", err)
 			}
@@ -128,7 +130,7 @@ func TestPresetApply_PreviewRedactsSecrets(t *testing.T) {
   },
 }
 `
-	res, err := reg.ApplyPreset(original, "https-tls-preset", map[string]string{})
+	res, err := reg.ApplyPreset(original, "https-tls-preset", map[string]string{"key": "/etc/ssl/new-key.pem", "cert": "/etc/ssl/new-cert.pem"})
 	if err != nil {
 		t.Fatalf("ApplyPreset: %v", err)
 	}

@@ -77,6 +77,8 @@ func TestBodyLimit_DefaultOverrides(t *testing.T) {
 		http.MethodPut + " /api/env/dotenv":       5 << 20,
 		http.MethodPost + " /api/settings/raw":    2 << 20,
 		http.MethodPost + " /api/ai/analyze/flow": 5 << 20,
+		// Path patterns use path.Match; "*" matches one segment.
+		http.MethodPost + " /api/presets/*/preview": 2 << 20,
 	}
 	cfg := middleware.DefaultBodyLimitConfig()
 	if cfg.DefaultLimit != 1<<20 {
