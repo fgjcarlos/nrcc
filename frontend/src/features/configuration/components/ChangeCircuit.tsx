@@ -1,7 +1,7 @@
 import { useId, type CSSProperties } from 'react';
 import { useT } from '@/i18n';
 import { cn } from '@/shared/lib';
-import type { Circuit, CircuitStep, ContactState } from '../lib/changeCircuit';
+import { isCircuitAtRest, type Circuit, type CircuitStep, type ContactState } from '../lib/changeCircuit';
 import { SettingKey } from './FormFields';
 
 /**
@@ -12,6 +12,10 @@ import { SettingKey } from './FormFields';
  *
  * Every state is carried by text and symbol shape, never by colour alone.
  * Below `xl` the same list renders as a compact horizontal strip.
+ *
+ * At rest (no change, review, run or outcome) every contact would say
+ * "Waiting", so the circuit draws one idle line on the conductor instead;
+ * the first change expands it to the six contacts.
  */
 export interface ChangeCircuitProps {
   circuit: Circuit;
@@ -48,7 +52,7 @@ const STATE_STROKE: Record<ContactState, string> = {
  * leaving a gap. Closed: the blade lies on the line and bridges it. The
  * surface-coloured rect cuts the shared conductor between the terminals.
  */
-function ContactSymbol({ state, index }: { state: ContactState; index: number }) {
+function ContactSymbol({ state, index, horizontal = false }: { state: ContactState; index: number; horizontal?: boolean }) {
   const closed = state === 'passed';
   return (
     <svg
@@ -57,7 +61,7 @@ function ContactSymbol({ state, index }: { state: ContactState; index: number })
       height="20"
       aria-hidden="true"
       // Rotating 90° about the centre keeps x=10.5 on the strip's y=10.5 conductor.
-      className={cn('relative shrink-0 max-xl:rotate-90', STATE_STROKE[state])}
+      className={cn('relative shrink-0', horizontal ? 'rotate-90' : 'max-xl:rotate-90', STATE_STROKE[state])}
     >
       <rect x="6.5" y="5" width="8" height="10" className="fill-ds-bg-surface" />
       {/* x=10.5 sits on the 1px conductor drawn at whole pixels (12–13px in the gutter). */}
@@ -133,15 +137,18 @@ export function ChangeCircuit({
   const proofText = (s: CircuitStep) =>
     s.proof ? t(`configuration:circuit.proof.${s.proof.key}`, { count: s.proof.count }) : '';
 
+  const atRest = isCircuitAtRest(circuit);
+  const idleText = t('configuration:circuit.idle');
+
   // The frontier is the step the operator should look at next.
   const frontier =
     circuit.steps.find((s) => s.state === 'failed') ??
     circuit.steps.find((s) => s.state !== 'passed') ??
     circuit.steps[circuit.steps.length - 1];
   const frontierIndex = circuit.steps.indexOf(frontier);
-  const announcement = [`${stepName(frontier)}: ${stateLabel(frontier)}`, proofText(frontier)]
-    .filter(Boolean)
-    .join('. ');
+  const announcement = atRest
+    ? idleText
+    : [`${stepName(frontier)}: ${stateLabel(frontier)}`, proofText(frontier)].filter(Boolean).join('. ');
 
   const total = [
     t('configuration:circuit.total', { count: pendingCount }),
@@ -164,72 +171,88 @@ export function ChangeCircuit({
         {t('configuration:circuit.title')}
       </h2>
 
-      {/* Below xl: a short summary over the six symbols; the list items
-          keep the full state text for assistive tech. */}
-      <p className="mb-1 truncate text-xs text-ds-text-secondary xl:hidden" aria-hidden="true">
-        {t('configuration:circuit.summary', {
-          index: frontierIndex + 1,
-          total: circuit.steps.length,
-          step: stepName(frontier),
-          state: stateLabel(frontier),
-        })}
-      </p>
+      {atRest ? (
+        // One line on the conductor at every width: an open contact and the
+        // idle state in words. No list: there is nothing reached to enumerate.
+        <p className="flex min-w-0 items-center gap-2 text-xs text-ds-text-secondary" data-testid="change-circuit-idle">
+          <span
+            aria-hidden="true"
+            className="relative flex w-10 shrink-0 justify-center before:pointer-events-none before:absolute before:inset-x-0 before:top-2.5 before:h-px before:bg-[var(--ds-border-strong)] before:content-['']"
+          >
+            <ContactSymbol state="idle" index={0} horizontal />
+          </span>
+          <span className="min-w-0">{idleText}</span>
+        </p>
+      ) : (
+        <>
+          {/* Below xl: a short summary over the six symbols; the list items
+              keep the full state text for assistive tech. */}
+          <p className="mb-1 truncate text-xs text-ds-text-secondary xl:hidden" aria-hidden="true">
+            {t('configuration:circuit.summary', {
+              index: frontierIndex + 1,
+              total: circuit.steps.length,
+              step: stepName(frontier),
+              state: stateLabel(frontier),
+            })}
+          </p>
 
-      {/* One continuous conductor (the ::before hairline) runs through all six contacts. */}
-      <ol
-        aria-labelledby={titleId}
-        className={cn(
-          'relative flex min-w-0 justify-between xl:flex-col xl:justify-start',
-          // Ink conductor: the control-border token (>=3:1 in both themes),
-          // 1px on whole pixels so it is never antialiased to half strength.
-          "before:pointer-events-none before:absolute before:bg-[var(--ds-border-strong)] before:content-['']",
-          'max-xl:before:inset-x-0 max-xl:before:top-2.5 max-xl:before:h-px',
-          'xl:before:inset-y-0 xl:before:left-3 xl:before:w-px',
-        )}
-        data-testid="change-circuit-steps"
-      >
-        {circuit.steps.map((s, index) => {
-          const last = index === circuit.steps.length - 1;
-          const branch = circuit.rollback && (s.id === 'backup' || s.id === 'apply');
-          return (
-            <li key={s.id} className="relative flex min-w-0 justify-center xl:justify-start xl:gap-3" data-state={s.state}>
-              <span className="flex w-6 shrink-0 justify-center">
-                <ContactSymbol state={s.state} index={index} />
-              </span>
-              {branch && (
-                <span
-                  aria-hidden="true"
-                  className={cn(
-                    'absolute left-0 w-3 border-dashed border-ds-danger max-xl:hidden',
-                    s.id === 'backup' ? 'bottom-0 top-2.5 border-l border-t' : 'top-0 h-2.5 border-b border-l',
-                  )}
-                />
-              )}
-
-              <div className={cn('min-w-0 max-xl:sr-only xl:flex-1', !last && 'xl:pb-3')}>
-                <div className="flex items-baseline gap-2">
-                  <span className="font-mono text-xs text-ds-text-muted">{`K${index + 1}`}</span>
-                  <span className="text-sm font-semibold text-ds-text-primary">{stepName(s)}</span>
-                  <span className={cn('ml-auto text-xs font-semibold', STATE_TEXT[s.state])}>
-                    {stateLabel(s)}
+          {/* One continuous conductor (the ::before hairline) runs through all six contacts. */}
+          <ol
+            aria-labelledby={titleId}
+            className={cn(
+              'relative flex min-w-0 justify-between xl:flex-col xl:justify-start',
+              // Ink conductor: the control-border token (>=3:1 in both themes),
+              // 1px on whole pixels so it is never antialiased to half strength.
+              "before:pointer-events-none before:absolute before:bg-[var(--ds-border-strong)] before:content-['']",
+              'max-xl:before:inset-x-0 max-xl:before:top-2.5 max-xl:before:h-px',
+              'xl:before:inset-y-0 xl:before:left-3 xl:before:w-px',
+            )}
+            data-testid="change-circuit-steps"
+          >
+            {circuit.steps.map((s, index) => {
+              const last = index === circuit.steps.length - 1;
+              const branch = circuit.rollback && (s.id === 'backup' || s.id === 'apply');
+              return (
+                <li key={s.id} className="relative flex min-w-0 justify-center xl:justify-start xl:gap-3" data-state={s.state}>
+                  <span className="flex w-6 shrink-0 justify-center">
+                    <ContactSymbol state={s.state} index={index} />
                   </span>
-                </div>
-                {s.proof && <p className="text-xs text-ds-text-secondary">{proofText(s)}</p>}
-                {s.code && (
-                  <p className="font-mono text-xs text-ds-text-secondary">
-                    {s.code.split(', ').map((designator, i) => (
-                      <span key={designator}>
-                        {i > 0 && ', '}
-                        <SettingKey path={designator} className="" />
+                  {branch && (
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        'absolute left-0 w-3 border-dashed border-ds-danger max-xl:hidden',
+                        s.id === 'backup' ? 'bottom-0 top-2.5 border-l border-t' : 'top-0 h-2.5 border-b border-l',
+                      )}
+                    />
+                  )}
+
+                  <div className={cn('min-w-0 max-xl:sr-only xl:flex-1', !last && 'xl:pb-3')}>
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-mono text-xs text-ds-text-muted">{`K${index + 1}`}</span>
+                      <span className="text-sm font-semibold text-ds-text-primary">{stepName(s)}</span>
+                      <span className={cn('ml-auto text-xs font-semibold', STATE_TEXT[s.state])}>
+                        {stateLabel(s)}
                       </span>
-                    ))}
-                  </p>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ol>
+                    </div>
+                    {s.proof && <p className="text-xs text-ds-text-secondary">{proofText(s)}</p>}
+                    {s.code && (
+                      <p className="font-mono text-xs text-ds-text-secondary">
+                        {s.code.split(', ').map((designator, i) => (
+                          <span key={designator}>
+                            {i > 0 && ', '}
+                            <SettingKey path={designator} className="" />
+                          </span>
+                        ))}
+                      </p>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        </>
+      )}
 
       {circuit.rollback && (
         <p

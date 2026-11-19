@@ -35,7 +35,7 @@ export function ErrorState({
     <div
       role="alert"
       aria-live="assertive"
-      className="flex flex-col items-center justify-center gap-2 rounded-box border border-error px-6 py-10 text-center"
+      className="flex flex-col items-center justify-center gap-2 border-y border-error px-6 py-10 text-center"
     >
       <span aria-hidden="true" className="text-ds-on-tint-error">
         {icon ?? <AlertCircle className="h-6 w-6" />}

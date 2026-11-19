@@ -142,6 +142,8 @@
     --ds-rail-hairline:        #22262d;
     /* Elevation: hairline border plus at most this shadow */
     --ds-shadow-raised:        0 1px 2px rgb(0 0 0 / 0.4);
+    /* Modal scrim: the dark ink rail at 72%, never a new hue */
+    --ds-scrim:                color-mix(in srgb, var(--ds-rail-bg) 72%, transparent);
 
     --radius-selector: 2px;
     --radius-field:    4px;
@@ -235,6 +237,8 @@
     --ds-rail-hairline:        #2e323a;
     /* Elevation: hairline border plus at most this shadow */
     --ds-shadow-raised:        0 1px 2px rgb(21 23 28 / 0.08);
+    /* Modal scrim: ink at 32%, never a new hue */
+    --ds-scrim:                color-mix(in srgb, var(--ds-text-primary) 32%, transparent);
 
     --radius-selector: 2px;
     --radius-field:    4px;
@@ -268,6 +272,13 @@
   input,
   textarea {
     caret-color: var(--color-primary);
+  }
+
+  /* Body copy never leaves one word alone on its last line (DESIGN.md
+     Typography). Base layer, so a truncate or whitespace-nowrap utility
+     on a single-line paragraph still wins. */
+  p {
+    text-wrap: pretty;
   }
 
   table,
@@ -386,12 +397,9 @@
     isolation: isolate;
   }
 
-  [data-theme="corporateDark"] .modal-overlay {
-    background-color: rgb(0 0 0 / 0.72);
-  }
-
-  [data-theme="corporateLight"] .modal-overlay {
-    background-color: color-mix(in srgb, var(--ds-text-primary) 32%, transparent);
+  /* Scrim colour per theme: --ds-scrim (DESIGN.md Colors, Neutral). */
+  .modal-overlay {
+    background-color: var(--ds-scrim);
   }
 
   /* ── Action buttons: the one button spec (DESIGN.md Buttons) ──
@@ -501,12 +509,12 @@
 
   /* ── Data table (<Table>, DESIGN.md Tabular Data Rule) ──────
      Hairline row rules, 12px sentence-case headers on the sunken
-     ground, 14px cells, tabular numerals, dense rows. */
+     ground, 14px cells, tabular numerals, dense rows. The table lies
+     flat on the page sheet between two hairline rules; it is never a
+     second card inside the sheet. */
   .ds-table-wrap {
     overflow-x: auto;
-    background: var(--ds-bg-surface);
-    border: 1px solid var(--ds-border-default);
-    border-radius: var(--radius-box);
+    border-block: 1px solid var(--ds-border-default);
   }
 
   .ds-table {
@@ -546,12 +554,12 @@
     background-color: color-mix(in srgb, var(--color-primary) 6%, transparent);
   }
 
-  /* Stacked: below sm each row is a labelled card (the Users page pattern). */
+  /* Stacked: below sm each row is a labelled block of label/value lines,
+     separated from the next by a hairline rule (the Users page pattern). */
   @media (max-width: 639.98px) {
     .ds-table-wrap[data-stacked] {
       overflow: visible;
-      background: transparent;
-      border: 0;
+      border-block: 0;
     }
 
     .ds-table-wrap[data-stacked] thead {
@@ -563,14 +571,8 @@
     }
 
     .ds-table-wrap[data-stacked] tr {
-      padding: 0.25rem 0.75rem;
-      background: var(--ds-bg-surface);
-      border: 1px solid var(--ds-border-default);
-      border-radius: var(--radius-box);
-    }
-
-    .ds-table-wrap[data-stacked] tr + tr {
-      margin-top: 0.5rem;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--ds-border-default);
     }
 
     .ds-table-wrap[data-stacked] td {
@@ -583,10 +585,6 @@
       padding: 0.25rem 0;
       overflow-wrap: anywhere;
       text-align: start;
-    }
-
-    .ds-table-wrap[data-stacked] td + td {
-      border-top: 1px solid var(--ds-border-default);
     }
 
     .ds-table-wrap[data-stacked] td,

@@ -8,6 +8,7 @@
   "advanced": {
     "title": "Advanced settings.js",
     "description": "Edit the live settings.js file detected by nrcc. A backup is created automatically before saving.",
+    "disclosure": "Show the settings.js editor",
     "lastBackup": "Last backup: {{path}}",
     "unlockToEdit": "Unlock to edit settings.js",
     "unlockDialogTitle": "Edit Node-RED settings.js directly",
@@ -167,6 +168,7 @@
   "circuit": {
     "title": "Change circuit",
     "summary": "Step {{index}} of {{total}} · {{step}} · {{state}}",
+    "idle": "Circuit idle · no pending changes",
     "steps": {
       "edit": "Edit",
       "diff": "Diff",

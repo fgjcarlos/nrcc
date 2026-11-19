@@ -25,6 +25,7 @@ colors:
   ink-secondary: "#3d424b"
   ink-muted: "#5c626c"
   rail-text: "#e9e7df"
+  scrim: "#15171c52"
   # Dark theme (corporateDark, "drawing negative") — src/index.css
   conductor-blue-dark: "#7fa6ea"
   conductor-blue-hover-dark: "#9ab9ef"
@@ -43,6 +44,7 @@ colors:
   ink-secondary-dark: "#c3c1b8"
   ink-muted-dark: "#9a9ea6"
   rail-dark: "#0a0b0d"
+  scrim-dark: "#0a0b0db8"
 typography:
   title:
     fontFamily: "Overpass Variable, system-ui, sans-serif"
@@ -126,8 +128,7 @@ components:
     width: "20rem"
   lock-banner:
     textColor: "{colors.ink-secondary}"
-    rounded: "{rounded.box}"
-    padding: "8px 12px"
+    padding: "4px 0 4px 12px"
 ---
 
 # Design System: NRCC
@@ -173,6 +174,7 @@ Conductor colours on a warm drawing sheet; every hue has one job, and the job ho
 - **Hairline** (`hairline` / `hairline-dark`): decorative dividers and panel edges.
 - **Control Border** (`control-border` / `control-border-dark`): every control edge and the circuit conductor; it clears 3:1 against the grounds (WCAG 1.4.11).
 - **Ink** (`ink` / `ink-dark`), **Ink Secondary**, **Ink Muted**: primary, secondary and muted text. Light `ink` is also the navigation rail ground; `rail-dark` is the dark rail and `rail-text` its label colour.
+- **Scrim** (`scrim` / `scrim-dark`, `--ds-scrim`): the modal backdrop. It is the ink, never a new hue: light is `ink` at 32% (`color-mix(in srgb, var(--ds-text-primary) 32%, transparent)`), dark is `rail-dark` at 72% (`color-mix(in srgb, var(--ds-rail-bg) 72%, transparent)`). Dialogs and the review drawer use it through `.modal-overlay`.
 
 ### Named Rules
 **The One Job Rule.** A conductor colour means one thing everywhere: blue acts or selects, brown is pending, green and green-yellow are verified, red is critical or rollback, amber is a held gate. Never use a conductor colour as decoration.
@@ -199,6 +201,8 @@ Conductor colours on a warm drawing sheet; every hue has one job, and the job ho
 
 **The Tabular Data Rule.** Tables, code, counts and totals use tabular numerals so columns and digits never shift.
 
+**The No Straggler Rule.** Paragraphs set `text-wrap: pretty` (one base rule on `p` in `src/index.css`), so body copy never leaves a single word on its last line. Fix a straggler with the rule, not by rewriting copy.
+
 ## Layout
 
 Dense, column-based operating layout. From `lg` (1024px) the ink rail (16rem) sits beside the content; below `lg` it is a drawer opened from the header menu button, and the header controls are icon-only (the command palette below `lg`, the theme and update labels below `xl`) so the header never needs a second row. At `xl` (1280px) and up, Configuration is a two-column grid: the settings form takes the remaining width and the change circuit is a sticky right column of 20rem, with a 24px gap. Below `xl` the circuit becomes a sticky horizontal strip above the form: six contact symbols on a horizontal conductor and a one-line summary ("Step 3 of 6 · Validate · Waiting"). The column waits for `xl` because at `lg` the rail already takes 16rem and a column would leave the form narrower than a phone.
@@ -208,6 +212,8 @@ Dense, column-based operating layout. From `lg` (1024px) the ink rail (16rem) si
 **Nothing scrolls sideways.** The document never scrolls horizontally at any width from 320px (`e2e/responsive.spec.ts` checks 320 and 768). Grid and flex children that hold text carry `min-w-0`; rows wrap instead of scrolling (tab lists wrap onto a second line); tables stack into labelled rows below `sm` (640px) through the shared `<Table stacked>`; paths, ids and package names break anywhere (`break-all`) rather than truncate; content takes no fixed pixel widths.
 
 Spacing runs on a 4px base: 4px inside label rows, 8px between a control and its neighbours and inside the circuit foot, 12px between contacts and between header items, 16px between page blocks, 24px between columns. The page header sits on a hairline rule (12px below it), and sections are separated by hairline rules rather than by cards.
+
+**One sheet level.** The page content already sits on one sheet (`page-content-shell`). Nothing inside it is a second card: tables lie between two hairline rules (stacked rows below `sm` are separated by hairline rules, not boxed), empty and error states sit between rules, and notices such as the lock banner or the read-only notice carry a 2px leading rule instead of a box. Dialogs, drawers and menus are overlays, not nested cards.
 
 ## Elevation & Depth
 
@@ -264,13 +270,14 @@ Flat sheet, conductor-coloured edge; the colour is the job.
 - **Ink rail:** `--ds-rail-bg` and `--ds-rail-text` define an ink navigation rail (light: ink; dark: `rail-dark`). The app shell applies it: the sidebar sits on the rail ground and the selected link carries an action-blue edge bar.
 
 ### Lock banner
-The raw `settings.js` editor is locked by default. The locked state is a 4px-cornered banner with a control-border edge, 14px secondary text explaining the lock and the backup, and a secondary "Unlock to edit settings.js" button beside the text. Unlocking requires an acknowledgement dialog. The section states plainly that direct editing bypasses the change circuit.
+The raw `settings.js` editor is locked by default and sits behind a closed-by-default disclosure ("Show the settings.js editor", a secondary-styled `<summary>` with a chevron) so it does not compete with the form under every tab; the section heading and the bypass statement stay visible above it. Inside, the locked state is a flat band with a 2px control-border rule on its leading edge (no box, no corners), 14px secondary text explaining the lock and the backup, and a secondary "Unlock to edit settings.js" button beside the text. Unlocking requires an acknowledgement dialog. The section states plainly that direct editing bypasses the change circuit.
 
 ### Page header and designators
 The page title (Title type) shares a baseline with its designator `REV` plus the first 8 characters of the settings revision fingerprint (Designator type, full fingerprint in the tooltip) and exactly one runtime status: `Node-RED <version>` in mono, then "Editable" in verified green or "Read-only" in warning amber. Host details follow in 12px secondary type, and a hairline rule closes the header.
 
 ### Change Circuit (signature)
 The gated change sequence as a single-line schematic.
+- **At rest:** with no pending change, no review, no run and no outcome, every contact would say Waiting, so the circuit draws one compact line instead: an open contact on a short horizontal conductor and "Circuit idle · no pending changes" in 12px secondary ink, at every width. The live region says the same line. The first change, review, run or outcome expands it to the six contacts below.
 - **Structure:** an ordered list of six contacts, Edit, Diff, Validate, Backup, Apply and Ready, numbered `K1`–`K6` in Designator type. They hang on one continuous 1px conductor drawn in the control-border colour on whole pixels: vertical in the `xl` column, horizontal in the narrow strip.
 - **Symbol:** an IEC normally-open contact, 20×20px. It has two terminal stubs and a blade that pivots on the lower terminal, drawn with a 1.5px square-capped stroke. Open: the blade is rotated −30° off the line. Closed: the blade lies on the line, a 4×4px green-yellow square with an ink stroke sits beside it, and the stroke turns to ink.
 - **State vocabulary (text, symbol, colour):**

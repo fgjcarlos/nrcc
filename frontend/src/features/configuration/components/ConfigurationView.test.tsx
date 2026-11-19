@@ -88,6 +88,12 @@ function reviewAction() {
   return screen.getByRole('button', { name: /^Review \d+ changes?$/ });
 }
 
+/** The raw settings.js editor sits behind a closed-by-default disclosure. */
+async function openRawEditor(user: ReturnType<typeof userEvent.setup>) {
+  const summary = await screen.findByText('Show the settings.js editor');
+  if (!summary.closest('details')?.open) await user.click(summary);
+}
+
 async function switchToTab(user: ReturnType<typeof userEvent.setup>, label: string) {
   // The sections are a tablist; each tab's accessible name is its
   // visible label (the icon is aria-hidden).
@@ -172,6 +178,29 @@ describe('ConfigurationView (issue #363 — Advanced settings panel i18n)', () =
 });
 
 describe('ConfigurationView (issue #364 — gated raw settings editor)', () => {
+  // P3 follow-up: the raw editor sits behind a closed-by-default
+  // disclosure so it does not compete with the form on every tab.
+  it('keeps the raw editor behind a closed disclosure that opens on its summary', async () => {
+    const user = userEvent.setup();
+    renderConfiguration();
+
+    const summary = await screen.findByText('Show the settings.js editor');
+    const details = summary.closest('details') as HTMLDetailsElement;
+    expect(summary.tagName).toBe('SUMMARY');
+    expect(details).not.toHaveAttribute('open');
+    // Lock banner, textarea and unlock control all live inside it.
+    expect(details).toContainElement(await screen.findByTestId('raw-settings-locked-banner'));
+    expect(details).toContainElement(screen.getByDisplayValue(/module\.exports/));
+    // The heading and the bypass statement stay outside, always visible.
+    expect(details).not.toContainElement(screen.getByRole('heading', { level: 2, name: 'Advanced settings.js' }));
+    expect(details).not.toContainElement(screen.getByText(/bypasses the change circuit/i));
+
+    await user.click(summary);
+    expect(details).toHaveAttribute('open');
+    expect(screen.getByRole('textbox', { name: 'Advanced settings.js' })).toHaveAttribute('readonly');
+    expect(screen.getByRole('button', { name: 'Unlock to edit settings.js' })).toBeInTheDocument();
+  });
+
   // The lock-state textarea renders the loaded file content but cannot
   // be edited, and the only available action is the "Unlock" button.
   it('renders the textarea read-only by default with an unlock button', async () => {
@@ -197,6 +226,7 @@ describe('ConfigurationView (issue #364 — gated raw settings editor)', () => {
     const user = userEvent.setup();
     renderConfiguration();
 
+    await openRawEditor(user);
     const unlockBtn = await screen.findByTestId('raw-settings-unlock-btn');
     await user.click(unlockBtn);
 
@@ -228,6 +258,7 @@ describe('ConfigurationView (issue #364 — gated raw settings editor)', () => {
     const user = userEvent.setup();
     renderConfiguration();
 
+    await openRawEditor(user);
     const unlockBtn = await screen.findByTestId('raw-settings-unlock-btn');
     await user.click(unlockBtn);
 
@@ -257,6 +288,7 @@ describe('ConfigurationView (issue #364 — gated raw settings editor)', () => {
     const user = userEvent.setup();
     renderConfiguration();
 
+    await openRawEditor(user);
     const unlockBtn = await screen.findByTestId('raw-settings-unlock-btn');
     await user.click(unlockBtn);
 
@@ -592,21 +624,48 @@ describe('ConfigurationView (change circuit)', () => {
     vi.spyOn(configModule.configService, 'updateConfig').mockImplementation(impl);
   }
 
-  it('renders the six contacts in order, each with its state in text', async () => {
+  it('draws a compact idle line at rest instead of six Waiting contacts', async () => {
     renderConfiguration();
+    const idle = await screen.findByTestId('change-circuit-idle');
+    expect(idle).toHaveTextContent('Circuit idle · no pending changes');
+    // Nothing is reached yet, so no contact list and no "Waiting" rows.
+    expect(screen.queryByRole('list', { name: 'Change circuit' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Waiting')).not.toBeInTheDocument();
+    expect(screen.queryByText('Step 1 of 6 · Edit · Waiting')).not.toBeInTheDocument();
+    // The polite live region stays and says the same thing.
+    expect(screen.getByTestId('change-circuit-live')).toHaveTextContent('Circuit idle · no pending changes');
+    expect(screen.getByTestId('change-circuit-live')).toHaveAttribute('aria-live', 'polite');
+  });
+
+  it('expands from the idle line to the six contacts on the first change and back on discard', async () => {
+    const user = userEvent.setup();
+    renderConfiguration();
+    await screen.findByTestId('change-circuit-idle');
+
+    await user.click(await screen.findByRole('tab', { name: /^TLS & Secrets$/ }));
+    await user.click(findToggleButton(/^Require HTTPS$/));
+
+    expect(screen.queryByTestId('change-circuit-idle')).not.toBeInTheDocument();
     const steps = await circuitSteps();
     expect(steps).toHaveLength(6);
     steps.forEach((step, index) => {
       expect(within(step).getByText(STEP_NAMES[index])).toBeInTheDocument();
       expect(within(step).getByText(`K${index + 1}`)).toBeInTheDocument();
     });
-    // No pending edit: nothing is reached yet. "Open" is reserved for a
-    // failed or blocked step, so the idle circuit says "Waiting".
-    for (const step of steps) {
+    expect(within(steps[0]).getByText('Closed')).toBeInTheDocument();
+    expect(within(steps[1]).getByText('Pending')).toBeInTheDocument();
+    // Steps not reached yet say "Waiting"; "Open" is reserved for a
+    // failed or blocked step.
+    for (const step of steps.slice(2)) {
       expect(within(step).getByText('Waiting')).toBeInTheDocument();
       expect(within(step).queryByText('Open')).not.toBeInTheDocument();
     }
-    expect(screen.getByText('Step 1 of 6 · Edit · Waiting')).toBeInTheDocument();
+    expect(screen.getByText('Step 2 of 6 · Diff · Pending')).toBeInTheDocument();
+    expect(screen.getByTestId('change-circuit-live')).toHaveTextContent('Diff: Pending');
+
+    await user.click(screen.getByRole('button', { name: 'Discard Changes' }));
+    expect(await screen.findByTestId('change-circuit-idle')).toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Change circuit' })).not.toBeInTheDocument();
   });
 
   it('marks the Edit contact "Open" when the runtime is read-only', async () => {
@@ -623,18 +682,24 @@ describe('ConfigurationView (change circuit)', () => {
   // explicit minmax(0,1fr) column, the circuit and its list must be allowed
   // to shrink, and no step may force its min-content width.
   it('keeps the circuit shrinkable so it cannot widen the page on narrow screens', async () => {
+    const user = userEvent.setup();
     renderConfiguration();
     const circuit = await screen.findByTestId('change-circuit');
     expect(circuit).toHaveClass('min-w-0');
     expect(circuit.parentElement).toHaveClass('grid-cols-1');
+    expect(screen.getByTestId('change-circuit-idle')).toHaveClass('min-w-0');
+    const review = screen.getByRole('button', { name: 'No changes to review' });
+    expect(review).toHaveClass('w-full');
+
+    // The expanded circuit (any pending change) holds the same guard.
+    await user.click(await screen.findByRole('tab', { name: /^TLS & Secrets$/ }));
+    await user.click(findToggleButton(/^Require HTTPS$/));
     const list = screen.getByTestId('change-circuit-steps');
     expect(list).toHaveClass('min-w-0');
     expect(list.className).not.toMatch(/overflow-x-auto|min-w-max/);
     for (const step of within(list).getAllByRole('listitem')) {
       expect(step.className).not.toMatch(/min-w-max/);
     }
-    const review = screen.getByRole('button', { name: 'No changes to review' });
-    expect(review).toHaveClass('w-full');
   });
 
   it('registers each change live: pending count, restart cost and step states', async () => {
@@ -864,6 +929,7 @@ describe('ConfigurationView (finish review)', () => {
     const { toast } = await import('sonner');
     renderConfiguration();
 
+    await openRawEditor(user);
     await user.click(await screen.findByTestId('raw-settings-unlock-btn'));
     const dialog = await screen.findByRole('dialog');
     await user.click(within(dialog).getByTestId('confirmation-dialog-ack'));

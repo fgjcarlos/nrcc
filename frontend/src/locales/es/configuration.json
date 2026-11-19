@@ -8,6 +8,7 @@
   "advanced": {
     "title": "Ajustes avanzados de settings.js",
     "description": "Edita el archivo settings.js detectado por nrcc. Se crea un respaldo automáticamente antes de guardar.",
+    "disclosure": "Mostrar el editor de settings.js",
     "lastBackup": "Último respaldo: {{path}}",
     "unlockToEdit": "Desbloquear para editar settings.js",
     "unlockDialogTitle": "Editar Node-RED settings.js directamente",
@@ -167,6 +168,7 @@
   "circuit": {
     "title": "Circuito de cambios",
     "summary": "Paso {{index}} de {{total}} · {{step}} · {{state}}",
+    "idle": "Circuito en reposo · sin cambios pendientes",
     "steps": {
       "edit": "Editar",
       "diff": "Diff",
