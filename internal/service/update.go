@@ -499,11 +499,25 @@ func (s *UpdateService) ClaimUpdate() (*UpdateRun, error) {
 func (r *UpdateRun) State() model.UpdateFlowState { return r.claimed }
 
 // Run executes the claimed flow: backup, persist to catalog, Applying, npm
-// install, then Completed or Failed. applyMu is released when Run returns,
-// including on panic.
-func (r *UpdateRun) Run(ctx context.Context) error {
+// install, then Completed or Failed. applyMu is released when Run returns.
+// A panic is recovered and reported as Failed/internal_error: Run runs in a
+// handler goroutine, where an unrecovered panic would stop the process and
+// leave the persisted flow stuck in an in-progress state.
+func (r *UpdateRun) Run(ctx context.Context) (err error) {
 	s := r.svc
 	defer s.applyMu.Unlock()
+	phase, backupID := "backup", ""
+	defer func() {
+		if p := recover(); p != nil {
+			s.setFlowState(model.UpdateFlowState{
+				State:    model.StateFailed,
+				Error:    "internal_error",
+				Phase:    phase,
+				BackupID: backupID,
+			})
+			err = fmt.Errorf("update run panicked: %v", p)
+		}
+	}()
 
 	preApplyStatus := r.preApplyStatus
 	fromVersion := preApplyStatus.CurrentVersion
@@ -529,6 +543,7 @@ func (r *UpdateRun) Run(ctx context.Context) error {
 	}
 
 	// Step 2: Applying
+	phase, backupID = "applying", backupEntry.ID
 	s.setFlowState(model.UpdateFlowState{
 		State:            model.StateApplying,
 		Phase:            "applying",

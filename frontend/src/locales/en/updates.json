@@ -34,7 +34,8 @@
   "updateFailed": "Update failed",
   "failed": {
     "backup_failed": "The pre-update backup could not be written, so nothing was installed.",
-    "update_failed": "npm did not install the new version, the installed version did not match, or npm audit found a critical vulnerability. Node-RED was not restarted, and the pre-update backup is in Backups."
+    "update_failed": "npm did not install the new version, the installed version did not match, or npm audit found a critical vulnerability. Node-RED was not restarted, and the pre-update backup is in Backups.",
+    "internal_error": "The update stopped because of an internal NRCC error. Check the NRCC log, then try again."
   },
   "checkNow": "Check now",
   "updateTo": "Update to {{version}}",

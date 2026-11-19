@@ -119,6 +119,13 @@ describe('UpdatesView', () => {
     expect(screen.getByText('The pre-update backup could not be written, so nothing was installed.')).toBeInTheDocument();
   });
 
+  it('reports an internal error without blaming npm', () => {
+    mockData(npmStatus, { flowState: { state: 'Failed', phase: 'applying', error: 'internal_error' } });
+    render(<UpdatesView />);
+    expect(screen.getByText('The update stopped because of an internal NRCC error. Check the NRCC log, then try again.')).toBeInTheDocument();
+    expect(screen.queryByText(/npm did not install/)).not.toBeInTheDocument();
+  });
+
   it('says a completed update still needs a Node-RED restart', () => {
     mockData(npmStatus, { flowState: { state: 'Completed', phase: 'completed', backupId: 'abcdef1234567890' } });
     render(<UpdatesView />);
