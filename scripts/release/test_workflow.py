@@ -637,6 +637,23 @@ class TestReleaseWorkflowArtifacts(unittest.TestCase):
         self.assertIn("platforms: linux/amd64,linux/arm64\n", pushes[0])
         self.assertNotIn("arm/v7", self.release)
 
+    def test_acceptance_smokes_the_arm64_image(self):
+        # #1010: the cross-compiled arm64 image must start and answer
+        # /healthz under emulation in the acceptance workflow.
+        job = job_blocks(read_workflow("acceptance.yml"))["arm64-smoke"]
+        self.assertTrue(steps_using(job, "docker/setup-qemu-action"))
+        script = "\n".join(step_run(step) for step in step_blocks(job))
+        self.assertIn("--platform linux/arm64", script)
+        self.assertIn("/healthz", script)
+        self.assertIn("docker rm -f -v", script)
+
+    def test_acceptance_job_keeps_its_compose_log_step(self):
+        # #1010 regression: the arm64-smoke job must not capture the
+        # acceptance job's trailing failure-cleanup step.
+        jobs = job_blocks(read_workflow("acceptance.yml"))
+        self.assertIn("Upload compose logs on failure", jobs["acceptance"])
+        self.assertNotIn("nrcc-acc-a", jobs["arm64-smoke"])
+
     def test_prerelease_flags_come_from_the_policy_module(self):
         releases = steps_using(self.jobs["release"], "softprops/action-gh-release")
         self.assertTrue(releases)
