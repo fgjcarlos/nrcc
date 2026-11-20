@@ -21,7 +21,9 @@ and every decision is unit tested in `scripts/release/test_workflow.py`.
 1. `git tag v1.2.3 && git push origin v1.2.3`.
 2. The workflow validates the tag, re-runs the required checks at the
    tagged commit, packages the artifacts, pushes the image and creates
-   the GitHub release.
+   the GitHub release. The release is created last, only after the
+   binaries and the image both succeeded: a failed image job leaves no
+   GitHub release behind.
 
 There is no publish switch: a manual run is always a dry run.
 
@@ -95,7 +97,9 @@ not authenticate against.
 | `scripts/release/verify.sh` | `verify.sh VERSION OUTPUT_DIR` — checksums, cross-architecture Go build metadata, isolated install and start smoke |
 | `Dockerfile` | `ARG VERSION` (default `dev`) — the OCI version label and the embedded binary version agree |
 
-The image is built for `linux/amd64`, `linux/arm64` and `linux/arm/v7`.
+The image is built for `linux/amd64` and `linux/arm64`; the pinned base
+images publish no `linux/arm/v7` variant. On 32-bit ARM, use the
+`nrcc-linux-armv7` binary.
 Before anything is pushed, a single-platform build is loaded into the
 local daemon and checked twice: the `org.opencontainers.image.version`
 label must equal the release version, and the started container must
