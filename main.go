@@ -45,6 +45,10 @@ func runServer() {
 		dataDir = "./data"
 	}
 
+	if _, err := service.ReadinessTimeoutFromEnv(); err != nil {
+		log.Fatalf("Invalid configuration: %v", err)
+	}
+
 	jwtSecret, err := resolveJWTSecret(dataDir)
 	if err != nil {
 		log.Fatalf("JWT secret error: %v", err)

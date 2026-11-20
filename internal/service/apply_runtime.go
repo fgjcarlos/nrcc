@@ -78,7 +78,8 @@ func (c *ApplyCoordinator) applyRuntime(ctx context.Context, req ApplyRequest) (
 		original := &ApplyError{Stage: stage, Cause: cause, Path: req.Path, Request: req}
 		recoveryTimeout := req.RecoveryTimeout
 		if recoveryTimeout <= 0 {
-			recoveryTimeout = defaultApplyRecoveryTimeout
+			// A raised readiness deadline must also fit the post-rollback probe.
+			recoveryTimeout = max(defaultApplyRecoveryTimeout, readinessDeadline())
 		}
 		recoveryCtx, cancel := context.WithTimeout(context.Background(), recoveryTimeout)
 		recoveryErr := ExecuteRollback(recoveryCtx, RollbackRequest{

@@ -3,8 +3,8 @@
 // After a successful atomic write + adapter.Restart the orchestrator
 // must verify Node-RED is actually serving the new settings before it
 // declares apply.success. probeAdminReady is that probe: it hits the
-// Node-RED admin HTTP endpoint (/settings) with bounded retries and
-// reports readiness via a small set of typed sentinels.
+// Node-RED admin HTTP endpoint (/settings) until a readiness deadline
+// expires and reports readiness via a small set of typed sentinels.
 //
 // Probe contract
 // ==============
@@ -25,10 +25,12 @@
 //                              the error so the orchestrator can map it
 //                              to a typed ApplyError.
 //
-// The function is intentionally context-driven so slice C can wire a
-// readiness deadline (default: 30s) into the apply pipeline without
-// touching this file. Probe timeouts are derived from ctx via
-// http.NewRequestWithContext.
+// The probe retries until its own deadline (default 30s, overridable
+// with NRCC_APPLY_READINESS_TIMEOUT) or the caller's ctx expires,
+// whichever comes first. The deadline is wall-clock, not an attempt
+// count: while Node-RED boots the connection is refused at once, so a
+// fixed number of attempts would only wait for the backoff sleeps
+// (issue #1011).
 
 package service
 
@@ -38,26 +40,59 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
 
-// Readiness probe tunables. Defaults are conservative: Node-RED boot
-// on a Pi takes ~3s; a docker-compose restart adds another 1-2s for
-// the compose orchestration. 5s per attempt × 6 attempts = 30s total,
-// matching the readiness deadline documented in apply-progress.md.
+// Readiness probe tunables. Node-RED boot on a Pi takes ~3s and a
+// docker-compose restart adds another 1-2s; the 30s deadline leaves
+// room for slower hardware, and NRCC_APPLY_READINESS_TIMEOUT raises it.
 const (
+	defaultReadinessDeadline   = 30 * time.Second
 	defaultReadinessTimeout    = 5 * time.Second
-	defaultReadinessAttempts   = 6
 	defaultReadinessBackoffMin = 200 * time.Millisecond
 	defaultReadinessBackoffMax = 2 * time.Second
 )
 
-// ErrReadinessNotReady is returned by probeAdminReady when the probe
-// exhausted all attempts without seeing an alive response. The
+// ReadinessTimeoutEnv overrides the readiness deadline with a Go
+// duration such as "45s" or "2m".
+const ReadinessTimeoutEnv = "NRCC_APPLY_READINESS_TIMEOUT"
+
+// ReadinessTimeoutFromEnv returns the readiness deadline: the default
+// when ReadinessTimeoutEnv is empty, an error when it is not a
+// positive Go duration. main calls it at startup so a bad value stops
+// the server instead of failing every apply.
+func ReadinessTimeoutFromEnv() (time.Duration, error) {
+	raw := strings.TrimSpace(os.Getenv("NRCC_APPLY_READINESS_TIMEOUT"))
+	if raw == "" {
+		return defaultReadinessDeadline, nil
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil {
+		return 0, fmt.Errorf("parse %s: %w", ReadinessTimeoutEnv, err)
+	}
+	if d <= 0 {
+		return 0, fmt.Errorf("parse %s: %q must be positive", ReadinessTimeoutEnv, raw)
+	}
+	return d, nil
+}
+
+// readinessDeadline is ReadinessTimeoutFromEnv with the default for an
+// invalid value; startup already rejected one.
+func readinessDeadline() time.Duration {
+	d, err := ReadinessTimeoutFromEnv()
+	if err != nil {
+		return defaultReadinessDeadline
+	}
+	return d
+}
+
+// ErrReadinessNotReady is returned by probeAdminReady when the
+// readiness deadline expired without an alive response. The
 // orchestrator catches this sentinel (via errors.Is) and triggers the
 // rollback flow.
-var ErrReadinessNotReady = errors.New("apply: readiness probe exhausted attempts without an alive response")
+var ErrReadinessNotReady = errors.New("apply: readiness probe found no alive response before the deadline")
 
 // ReadinessProbe is the dependency port the probe uses to issue HTTP
 // requests. Tests substitute a fake that returns canned responses;
@@ -82,7 +117,7 @@ func (d defaultReadinessProbe) Do(req *http.Request) (*http.Response, error) {
 type readinessConfig struct {
 	client    ReadinessProbe
 	timeout   time.Duration
-	attempts  int
+	deadline  time.Duration
 	backoff   time.Duration // base backoff; doubles each attempt up to 2s
 	userAgent string
 }
@@ -109,12 +144,12 @@ func withReadinessTimeout(d time.Duration) readinessOption {
 	}
 }
 
-// withReadinessAttempts overrides the number of probe attempts before
-// ErrReadinessNotReady is returned.
-func withReadinessAttempts(n int) readinessOption {
+// withReadinessDeadline overrides the total time the probe keeps
+// retrying before ErrReadinessNotReady is returned.
+func withReadinessDeadline(d time.Duration) readinessOption {
 	return func(c *readinessConfig) {
-		if n > 0 {
-			c.attempts = n
+		if d > 0 {
+			c.deadline = d
 		}
 	}
 }
@@ -129,7 +164,7 @@ func withReadinessBackoff(d time.Duration) readinessOption {
 }
 
 // probeAdminReady probes adminURL until Node-RED responds with an
-// alive signal or the attempts are exhausted. See the file header for
+// alive signal or the readiness deadline expires. See the file header for
 // the alive / notYetReady / cancelled contract.
 //
 // The function tolerates a nil ReadinessProbe via the package default
@@ -139,7 +174,7 @@ func withReadinessBackoff(d time.Duration) readinessOption {
 func probeAdminReady(ctx context.Context, adminURL string, opts ...readinessOption) error {
 	cfg := readinessConfig{
 		timeout:   defaultReadinessTimeout,
-		attempts:  defaultReadinessAttempts,
+		deadline:  readinessDeadline(),
 		backoff:   defaultReadinessBackoffMin,
 		userAgent: "nrcc-apply/1.0 (+readiness)",
 	}
@@ -153,37 +188,47 @@ func probeAdminReady(ctx context.Context, adminURL string, opts ...readinessOpti
 		return errors.New("apply: readiness probe URL is empty")
 	}
 
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	probeCtx, cancel := context.WithTimeout(ctx, cfg.deadline)
+	defer cancel()
+
 	var lastErr error
 	delay := cfg.backoff
-	for attempt := 1; attempt <= cfg.attempts; attempt++ {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		err := probeAttempt(ctx, cfg.client, cfg.userAgent, adminURL)
+	for {
+		err := probeAttempt(probeCtx, cfg.client, cfg.userAgent, adminURL)
 		if err == nil {
 			return nil
 		}
-		lastErr = err
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
+		}
 		if errors.Is(err, ErrReadinessNotReady) {
-			// Non-retryable from the probe's perspective: the
-			// server answered with a fatal signal (we don't have
-			// one today, but future-proof). Bail out immediately.
+			// The server answered with a non-alive status. Bail out
+			// immediately; only connection-level errors are retried.
 			return err
 		}
-		// Don't sleep after the final attempt.
-		if attempt == cfg.attempts {
+		if probeCtx.Err() != nil {
+			// The deadline cut this attempt short; keep the previous
+			// attempt's error, which says more than "deadline exceeded".
+			if lastErr == nil {
+				lastErr = err
+			}
 			break
 		}
-		// Honour ctx during the backoff sleep so cancellation
-		// doesn't have to wait for the full retry window.
+		lastErr = err
+		// Honour the caller's ctx and the deadline during the sleep.
 		select {
-		case <-ctx.Done():
-			return ctx.Err()
+		case <-probeCtx.Done():
 		case <-time.After(delay):
 		}
-		// Exponential backoff capped at 2s so a slow Node-RED boot
-		// doesn't push the total probe time past the readiness
-		// deadline.
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
+		}
+		if probeCtx.Err() != nil {
+			break
+		}
 		delay *= 2
 		if delay > defaultReadinessBackoffMax {
 			delay = defaultReadinessBackoffMax
@@ -223,7 +268,7 @@ func probeAttempt(ctx context.Context, client ReadinessProbe, userAgent, adminUR
 	if err != nil {
 		// Connection refused / DNS / timeout / ctx cancellation
 		// all surface here. The outer loop retries until ctx
-		// expires or attempts are exhausted.
+		// expires or the readiness deadline passes.
 		return err
 	}
 	// Drain + close so HTTP keep-alive connections don't leak across

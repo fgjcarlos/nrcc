@@ -253,9 +253,11 @@ The ordered transaction is:
 
 Recovery uses an independent bounded context, so cancellation of
 the caller cannot interrupt restoration. Candidate readiness uses
-the request's context and the readiness probe's bounded retry
-window; recovery defaults to 30 seconds unless configured by the
-request. These are separate budgets. If recovery itself fails, the
+the request's context and keeps probing until the readiness
+deadline passes: 30 seconds by default, or the Go duration in
+`NRCC_APPLY_READINESS_TIMEOUT` for slow hardware. Recovery defaults
+to 30 seconds, or to the readiness deadline when that is longer,
+unless configured by the request. These are separate budgets. If recovery itself fails, the
 failure is recorded and surfaced for operator intervention; inspect
 the restored files and runtime before attempting another apply.
 

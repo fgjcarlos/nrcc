@@ -52,8 +52,9 @@ variable has exactly one routing decision, pinned by
 - **Forwarded** as `"${NAME:-}"`: `JWT_SECRET`, `NRCC_CORS_ORIGINS`,
   `NRCC_CORS_UNSAFE_WILDCARD`, `NRCC_TRUSTED_PROXIES`, `NRCC_TLS`,
   `EDGE_MODE`, `NRCC_METRICS_PUBLIC`, `NRCC_BULK_MAX_ENTRIES`,
-  `NRCC_BULK_MAX_ENTRY_BYTES`, `NRCC_AI_ENABLED`, `NRCC_AI_PROVIDER`,
-  `NRCC_AI_ENDPOINT`, `NRCC_AI_MODEL`, `NRCC_AI_API_KEY`. An unset host
+  `NRCC_BULK_MAX_ENTRY_BYTES`, `NRCC_APPLY_READINESS_TIMEOUT`,
+  `NRCC_AI_ENABLED`, `NRCC_AI_PROVIDER`, `NRCC_AI_ENDPOINT`,
+  `NRCC_AI_MODEL`, `NRCC_AI_API_KEY`. An unset host
   value reaches the container as the empty string, which every one of
   these readers treats like unset, so the default in the tables below
   applies.
@@ -108,6 +109,7 @@ does not apply the change.
 | `NRCC_BACKUP_ROOT` | `$DATA_DIR` | Restore destination containment root for the restic provider restore endpoint | yes |
 | `NRCC_BULK_MAX_ENTRIES` | `1000` | Maximum non-comment records accepted by a bulk environment import | yes |
 | `NRCC_BULK_MAX_ENTRY_BYTES` | `8192` | Maximum UTF-8 bytes in one parsed bulk key plus value | yes |
+| `NRCC_APPLY_READINESS_TIMEOUT` | `30s` | How long an apply waits for Node-RED to answer after a restart, as a Go duration (`45s`, `2m`). Raise it on slow hardware. An invalid or non-positive value stops the server at startup | yes |
 | `NRCC_RESTIC_REPO` | empty | **Deferred (#432)** — Restic repository URL. The provider activates when this and one of `_PASSWORD` / `_PASSWORD_FILE` are set; not supported by the canonical Compose stack | yes |
 | `NRCC_RESTIC_BINARY` | `restic` (on `PATH`) | Deferred (#432) — path to the restic binary; the image does not ship one | yes |
 | `NRCC_RESTIC_PASSWORD` | empty | Deferred (#432) — restic repository password | yes |
