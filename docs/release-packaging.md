@@ -79,8 +79,9 @@ job uploads its SARIF report with that permission.
 
 The release also passes `fail-on-findings: true` to the Security
 workflow: the Trivy job then fails on any critical or high image
-finding not listed in `.trivyignore`, and nothing is published. The
-same call from a pull request stays advisory. See `SECURITY.md`,
+finding not listed in `.trivyignore`, and nothing is published. Pull
+requests, pushes to `main` and the weekly scan run the same workflow
+without the input, so Trivy stays advisory there. See `SECURITY.md`,
 "Release gate", for how an exception is accepted.
 
 ## Secrets and permissions
