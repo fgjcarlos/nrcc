@@ -11,11 +11,13 @@ S5. "Then drop `continue-on-error` from the `smoke-install-url` job."
 S6. Acceptance: "On a machine with Docker and no Go or Node toolchain, the README quick start reaches a healthy stack." / "`docker compose pull && docker compose up -d` upgrades an existing stack." / "Every install command in the README and in `docs/` has been run once against the release candidate."
 
 ## Tasks
-- T1 [S1,S2,S3] compose `image:` + installer pulls and pins the released image, fails without a resolvable release; installer test; env-contract doc. Route: inline, test-first. Risk: item 5. Commit: pending.
-- T2 [S4,S6] docs: README, quick-start, docker-stack upgrade, production guide, CONTRIBUTING, openspec project map, installer header use the raw GitHub URL and the pull/upgrade flow. Route: inline. Commit: pending.
-- T3 [S5,S6] release workflow: `smoke-install-url` runs the raw-URL installer end to end against the published tag as a hard gate. Route: inline. Risk: item 5. Commit: pending.
+- T1 [S1,S2,S3] compose `image:` + installer pulls and pins the released image, fails without a resolvable release; installer test; env-contract doc. Route: inline, test-first. Risk: item 5. Commit: 9ca014b.
+- T2 [S4,S6] docs: README, quick-start, docker-stack upgrade, production guide, CONTRIBUTING, openspec project map, installer header use the raw GitHub URL and the pull/upgrade flow. Route: inline. Commit: 957bee1.
+- T3 [S5,S6] release workflow: `smoke-install-url` runs the raw-URL installer end to end against the published tag as a hard gate. Route: inline. Risk: item 5. Commit: 818e109.
 - T4 [S1-S6] independent verification (`gentle-ai-verify`, Risk: item 5). Pending.
 
 ## Log
 L1. User: "Resuelve la issue #1008"
 L2. User chose: "Fijar siempre la versión exacta en .env (recomendado)". Variable named `NRCC_IMAGE_TAG` (no `v` prefix) to match published image tags.
+L3. Evidence T1: RED 7 subtests x2 shells failed before the script change; GREEN `go test ./internal/installer/ ./internal/service/` ok; `shellcheck -s sh` + `dash -n` clean. Real Compose v5.5.1: `docker compose pull` with a missing tag exits 1 (warning only about build), `up -d --no-build` exits 1 with `No such image`. A drop-in compose in an empty dir falls back to build and fails without a Dockerfile when the image is missing, so the quick start depends on a published image.
+L4. Evidence T2/T3: `node --test docs/sections/*.test.mjs docs/assets/*.test.mjs` pass 3; `python3 -m unittest scripts/release/test_workflow.py` 57 OK after updating the smoke-job assertion (old one asserted get.nrcc.dev).

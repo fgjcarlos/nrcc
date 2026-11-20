@@ -17,7 +17,9 @@ one command, one stack.
 4. Open `http://localhost:3001`, create the admin, and edit
    `settings.js` from the Configuration view.
 
-Upgrade with `docker compose pull && docker compose up -d`.
+Upgrade with `docker compose pull && docker compose up -d`. A stack pinned
+with `NRCC_IMAGE_TAG`, as the installer does, upgrades by re-running the
+installer with the new version.
 Or let the installer do steps 1–3:
 `curl -fsSL https://raw.githubusercontent.com/fgjcarlos/nrcc/main/docs/install.sh | sh`.
 
