@@ -22,12 +22,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    name: Deploy docs/ to GitHub Pages
+  # Upload and deploy run in separate jobs: when they share one job, the
+  # artifact lookup in deploy-pages can come back empty right after the
+  # upload finalizes (actions/deploy-pages#451).
+  build:
+    name: Build docs/ Pages artifact
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # pin to commit (v7.0.0)
@@ -40,6 +40,14 @@ jobs:
         with:
           path: ./docs
 
+  deploy:
+    name: Deploy docs/ to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - name: Deploy to Pages
         id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346  # pin to commit (v5.0.0)
