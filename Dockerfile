@@ -11,10 +11,14 @@
 # they only accelerate repeated builds. Bump them to a tiny
 # /tmp/pnpm-store and /tmp/go-build inside the stage.
 #
+# Both builder stages run on the build host ($BUILDPLATFORM): the
+# frontend bundle is architecture independent and Go cross-compiles via
+# GOARCH, so a multi-arch build never emulates them under QEMU (#1010).
+#
 # ref: node:26-slim — pinned to digest for supply-chain integrity.
 # Dependabot (docker ecosystem, weekly) bumps the digest when upstream
 # changes. See issue #593 and auditoria/devops-security.md §2.1.
-FROM node:26-slim@sha256:e6bedef217677b276c591795e169840edd9096dbf13f29df8ef8d1856b8820bc AS builder
+FROM --platform=$BUILDPLATFORM node:26-slim@sha256:e6bedef217677b276c591795e169840edd9096dbf13f29df8ef8d1856b8820bc AS builder
 
 RUN npm install -g pnpm@11.12.0 --no-audit --no-fund
 
@@ -29,11 +33,13 @@ RUN pnpm build
 # ref: golang:1.27.4-alpine — pinned to digest for supply-chain integrity.
 # Dependabot (docker ecosystem, weekly) bumps the digest when upstream
 # changes. See issue #593 and auditoria/devops-security.md §2.1.
-FROM golang:1.27.4-alpine@sha256:0a5f7fe796599ff487605987432e7619ae45beeb2fba4c2ce0b907879932aebf AS go-builder
+FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine@sha256:0a5f7fe796599ff487605987432e7619ae45beeb2fba4c2ce0b907879932aebf AS go-builder
 # VERSION is embedded in the binary (main.Version) and mirrored by the
 # OCI org.opencontainers.image.version label in the runtime stage. The
 # default keeps local builds on the "dev" version.
 ARG VERSION=dev
+# Set by BuildKit from the requested --platform.
+ARG TARGETOS TARGETARCH
 WORKDIR /build
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod \
@@ -42,7 +48,7 @@ COPY --from=builder /build/frontend/dist ./frontend/dist
 COPY . .
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w -X main.Version=${VERSION}" -o nrcc .
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w -X main.Version=${VERSION}" -o nrcc .
 
 # ref: nodered/node-red:5.0.4-24-minimal — community image, pinned to
 # digest. Dependabot (docker ecosystem, weekly) bumps the digest when

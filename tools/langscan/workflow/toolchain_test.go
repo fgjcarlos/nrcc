@@ -50,8 +50,9 @@ func TestPatchedGoToolchainContract(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		want := "FROM golang:1.27.4-alpine@sha256:0a5f7fe796599ff487605987432e7619ae45beeb2fba4c2ce0b907879932aebf AS go-builder"
-		builders := regexp.MustCompile(`(?m)^FROM golang:[^\r\n]+`).FindAllString(string(body), -1)
+		// #1010: the Go builder runs on the build host and cross-compiles.
+		want := "FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine@sha256:0a5f7fe796599ff487605987432e7619ae45beeb2fba4c2ce0b907879932aebf AS go-builder"
+		builders := regexp.MustCompile(`(?m)^FROM (?:--platform=\S+ )?golang:[^\r\n]+`).FindAllString(string(body), -1)
 		if len(builders) != 1 || builders[0] != want {
 			t.Fatalf("unexpected Go builder: %v; want %s", builders, want)
 		}

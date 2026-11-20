@@ -107,6 +107,10 @@ not authenticate against.
 The image is built for `linux/amd64` and `linux/arm64`; the pinned base
 images publish no `linux/arm/v7` variant. On 32-bit ARM, use the
 `nrcc-linux-armv7` binary.
+The frontend and Go builder stages run on the build host and
+cross-compile with `GOARCH`; only the final runtime stage is per
+architecture. The acceptance workflow starts the arm64 image under QEMU
+and waits for `/healthz`.
 Before anything is pushed, a single-platform build is loaded into the
 local daemon and checked twice: the `org.opencontainers.image.version`
 label must equal the release version, and the started container must

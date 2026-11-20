@@ -284,6 +284,14 @@ class ReleasePackagingTest(unittest.TestCase):
         self.assertIn("-X main.Version=${VERSION}", text)
         self.assertIn('org.opencontainers.image.version="${VERSION}"', text)
 
+    def test_10b_dockerfile_cross_compiles_instead_of_emulating(self) -> None:
+        """#1010: builder stages run on the build host, never under QEMU."""
+        text = DOCKERFILE.read_text()
+        for stage in ("builder", "go-builder"):
+            self.assertRegex(text, rf"(?m)^FROM --platform=\$BUILDPLATFORM \S+ AS {stage}$")
+        self.assertIn("ARG TARGETOS TARGETARCH", text)
+        self.assertIn("GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build", text)
+
     def test_11_armv7_target_still_compiles(self) -> None:
         """The armv7 artifact is claimed as supported, so it must compile.
 
