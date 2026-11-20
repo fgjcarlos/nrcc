@@ -459,6 +459,11 @@ class TestReleaseWorkflowGates(unittest.TestCase):
         security_job = self.jobs["security-checks"]
         self.assertIn("security-events: write", security_job)
 
+    def test_release_turns_on_the_trivy_gate(self):
+        # #1009: the release call fails on unignored CRITICAL/HIGH findings.
+        security_job = self.jobs["security-checks"]
+        self.assertRegex(security_job, r"(?m)^      fail-on-findings: true$")
+
     def test_no_commit_status_api_gate(self):
         # The gate is the reusable workflows themselves, never a lookup of
         # check names or commit statuses.
@@ -468,6 +473,44 @@ class TestReleaseWorkflowGates(unittest.TestCase):
     def test_no_untrusted_event_interpolation_in_run_scripts(self):
         for script in all_run_scripts(self.release):
             self.assertNotIn("${{", script)
+
+
+class TestTrivyReleaseGate(unittest.TestCase):
+    """#1009: Trivy blocks the release, pull requests stay advisory."""
+
+    def setUp(self):
+        self.security = read_workflow("security.yml")
+        self.trivy_steps = steps_using(
+            job_blocks(self.security)["trivy"], "aquasecurity/trivy-action@"
+        )
+
+    def gate_steps(self) -> list[str]:
+        return [s for s in self.trivy_steps if 'exit-code: "1"' in s]
+
+    def test_workflow_call_declares_an_opt_in_gate_input(self):
+        call = self.security.split("workflow_call:", 1)[1].split("\nconcurrency:", 1)[0]
+        self.assertIn("fail-on-findings:", call)
+        self.assertIn("type: boolean", call)
+        self.assertIn("default: false", call)
+
+    def test_gate_fails_only_on_critical_and_high(self):
+        gates = self.gate_steps()
+        self.assertEqual(len(gates), 1)
+        self.assertIn("severity: CRITICAL,HIGH", gates[0])
+        self.assertIn("format: table", gates[0])
+
+    def test_gate_runs_only_when_the_caller_asks_for_it(self):
+        self.assertEqual(step_condition(self.gate_steps()[0]), "inputs.fail-on-findings")
+
+    def test_gate_honours_the_reviewed_exceptions_file(self):
+        self.assertIn("trivyignores: .trivyignore", self.gate_steps()[0])
+        self.assertTrue((REPO_ROOT / ".trivyignore").is_file())
+
+    def test_sarif_report_stays_advisory(self):
+        sarif = [s for s in self.trivy_steps if "format: sarif" in s]
+        self.assertEqual(len(sarif), 1)
+        self.assertIn('exit-code: "0"', sarif[0])
+        self.assertEqual(step_condition(sarif[0]), "")
 
 
 class TestReleaseWorkflowDryRun(unittest.TestCase):
