@@ -172,7 +172,7 @@ func TestProbeAdminReady_WaitsForLateListener(t *testing.T) {
 	if srv == nil {
 		t.Fatalf("could not listen on %s after the delay", addr)
 	}
-	defer srv.Close()
+	defer func() { _ = srv.Close() }()
 	if err != nil {
 		t.Fatalf("probeAdminReady after %v: %v", elapsed, err)
 	}
