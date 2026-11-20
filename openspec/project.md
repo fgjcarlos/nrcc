@@ -49,7 +49,7 @@ nrcc/
 │   ├── configuration/
 │   ├── operations/
 │   ├── openapi.yaml
-│   └── install.sh            # served at get.nrcc.dev/install.sh
+│   └── install.sh            # installer, served from raw.githubusercontent.com
 ├── internal/                 # Go backend (audit, config, handler, metrics,
 │                             # middleware, model, server, service, setup, store, ui)
 ├── frontend/                 # React/TypeScript SPA

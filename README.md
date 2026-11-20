@@ -72,12 +72,12 @@ One stack = one NRCC + one Node-RED + one persistent volume. Distinct host ports
 For a ready-to-use install from the latest published release, run:
 
 ```sh
-curl -fsSL https://get.nrcc.dev/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/fgjcarlos/nrcc/main/docs/install.sh | sh
 ```
 
-The installer prepares the encryption key, starts the stack and waits until it is ready. It also supports explicit versions; see the [production install guide](docs/production-install-launch-guide.md).
+The installer prepares the encryption key, pulls the released image (`ghcr.io/fgjcarlos/nrcc`), starts the stack and waits until it is ready. Nothing is compiled on the host. Release candidates are never the latest release, so install them explicitly (`… | sh -s -- v1.0.0-rc.1`); see the [production install guide](docs/production-install-launch-guide.md).
 
-To configure the stack manually:
+To configure the stack manually from a checkout (`--build` compiles this checkout; drop it to run the released image):
 
 ```bash
 git clone https://github.com/fgjcarlos/nrcc.git

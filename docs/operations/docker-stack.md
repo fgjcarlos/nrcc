@@ -17,9 +17,10 @@ echo "NRCC_ENCRYPTION_KEY=$(openssl rand -base64 48)"  >> .env
 docker compose up -d --build
 ```
 
-The first `docker compose up` builds the image from the local
-`Dockerfile`. Subsequent ups reuse the cached image; pass `--build`
-to force a rebuild after a code change.
+`--build` compiles the image from the local `Dockerfile` and tags it
+as the compose `image:`. Without it, `docker compose up -d` pulls the
+released `ghcr.io/fgjcarlos/nrcc:${NRCC_IMAGE_TAG:-latest}` and nothing
+is compiled on the host.
 
 Once the stack is up:
 
@@ -199,13 +200,16 @@ recoverable from the NRCC configuration; lose it, lose the backup.
 When a new image is available (a tagged release):
 
 ```bash
-docker compose pull           # only works after a registry image is published
-docker compose up -d --build  # rebuilds from local source otherwise
+docker compose pull
+docker compose up -d
 ```
 
-Until a registry image is published (issue #508 — Docker Hub secrets
-pending), `docker compose pull` is a no-op. Use
-`docker compose up -d --build` to pick up the latest code.
+This moves a stack that follows `latest` (no `NRCC_IMAGE_TAG` in
+`.env`) to the newest stable release. A stack pinned with
+`NRCC_IMAGE_TAG`, as the installer does, stays on that version: change
+the tag before pulling, or re-run the installer with the new version.
+A stack built from source upgrades with `git pull` and
+`docker compose up -d --build`.
 
 After the upgrade the database schema may have changed. The release
 notes call out any required migrations; most upgrades are
@@ -262,9 +266,8 @@ Common pitfalls:
   strings. Generate a real secret with `openssl rand -base64 48`.
 - **Two stacks sharing `DATA_DIR`** — the second one will corrupt
   the first one's database. Use distinct volumes.
-- **`docker compose pull` does nothing** — by design, the shipped
-  compose file uses `build:` not `image:`. Use
-  `docker compose up -d --build` to pick up source changes.
+- **`docker compose pull` does not upgrade** — the stack is pinned
+  with `NRCC_IMAGE_TAG` in `.env`. Change the tag, then pull again.
 - **Node-RED won't start** — check `docker compose logs` for the
   child process output. Verify `NODE_RED_CMD` (default `node-red`)
   is on the container's `$PATH`.
