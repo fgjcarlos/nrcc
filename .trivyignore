@@ -1,0 +1,10 @@
+# Accepted Trivy findings for the release gate (#1009).
+#
+# The release fails on any unignored CRITICAL or HIGH image finding.
+# Add an entry only after a maintainer has reviewed the finding, and keep
+# the reason next to it:
+#
+#   # <why it is accepted: not reachable, no fix upstream, ...> (#<issue>)
+#   CVE-YYYY-NNNNN exp:YYYY-MM-DD
+#
+# `exp:` makes the exception expire so it is reviewed again.

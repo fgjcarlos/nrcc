@@ -103,6 +103,9 @@ jobs:
     name: Security checks (reusable)
     needs: version
     uses: ./.github/workflows/security.yml
+    with:
+      # Unignored CRITICAL/HIGH image findings block the release (#1009).
+      fail-on-findings: true
     permissions:
       contents: read
       # The reused Security workflow uploads a SARIF report to the

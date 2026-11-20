@@ -77,6 +77,13 @@ no status API is called. Because the whole Security workflow is reused,
 the caller (`release.yml`) grants `security-events: write` — the Trivy
 job uploads its SARIF report with that permission.
 
+The release also passes `fail-on-findings: true` to the Security
+workflow: the Trivy job then fails on any critical or high image
+finding not listed in `.trivyignore`, and nothing is published. Pull
+requests, pushes to `main` and the weekly scan run the same workflow
+without the input, so Trivy stays advisory there. See `SECURITY.md`,
+"Release gate", for how an exception is accepted.
+
 ## Secrets and permissions
 
 | Secret | Needed for | Without it |
@@ -114,6 +121,7 @@ version metadata retain any `+build` suffix; container tags omit it.
 | `error: 'v1.2' is not a strict semantic version` | the tag or the manual version is not strict semver |
 | `Run release policy tests` fails | `scripts/release/metadata.py` and its test suite disagree — run `python3 scripts/release/test_workflow.py` locally |
 | The image job is skipped | the check workflows failed; read the `pr-checks` / `security-checks` jobs |
+| `Trivy release gate (CRITICAL,HIGH)` fails | the image has an unignored critical or high finding; fix it or accept it in `.trivyignore` (`SECURITY.md`, "Release gate") |
 | No DockerHub image was published | `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` are not configured — this is expected, not an error |
 
 ## Next step
