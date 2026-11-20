@@ -4,10 +4,10 @@ import type { NodeRedConfig, ApiResponse, SettingsDocument } from '@/shared/type
 /**
  * Per-request timeout for saves that write settings.js and restart Node-RED.
  *
- * The backend answers only after the restart passed its readiness probe:
- * up to 6 attempts of 5 s each plus backoff (internal/service/apply_readiness.go,
- * defaultReadinessTimeout x defaultReadinessAttempts = 30 s), and a rollback
- * restart on failure. The 10 s axios default is shorter than that, and an
+ * The backend answers only after the restart passed its readiness probe,
+ * which retries until a 30 s deadline (internal/service/apply_readiness.go,
+ * NRCC_APPLY_READINESS_TIMEOUT), and a rollback restart on failure. A
+ * readiness deadline raised well past 30 s can outlast this timeout. The 10 s axios default is shorter than that, and an
  * aborted request cancels the transaction server-side, so a healthy save is
  * rolled back and reported as a failure. Read and validation requests keep
  * the default.

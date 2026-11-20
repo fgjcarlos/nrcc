@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -126,25 +128,126 @@ func TestProbeAdminReady_RetryUntilAlive(t *testing.T) {
 	}
 }
 
-// TestProbeAdminReady_ExhaustionReturnsErrReadinessNotReady asserts
-// the probe exhausts its attempts and wraps the last underlying error.
-func TestProbeAdminReady_ExhaustionReturnsErrReadinessNotReady(t *testing.T) {
-	probe := &fakeReadinessProbe{responses: []probeResponse{
-		{err: errors.New("connection refused")},
-		{err: errors.New("connection refused")},
-		{err: errors.New("connection refused")},
-	}}
-	err := probeAdminReady(context.Background(), "http://127.0.0.1:1/settings",
-		withReadinessProbe(probe),
-		withReadinessAttempts(3),
-		withReadinessBackoff(10*time.Millisecond),
-		withReadinessTimeout(50*time.Millisecond),
-	)
-	if !errors.Is(err, ErrReadinessNotReady) {
-		t.Errorf("err = %v, want ErrReadinessNotReady", err)
+// refusedAddr returns a loopback address nothing listens on, so a
+// connection to it is refused at once.
+func refusedAddr(t *testing.T) string {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
 	}
-	if got := atomic.LoadInt32(&probe.calls); got != 3 {
-		t.Errorf("probe calls = %d, want 3 (attempts exhausted)", got)
+	addr := ln.Addr().String()
+	if err := ln.Close(); err != nil {
+		t.Fatalf("close listener: %v", err)
+	}
+	return addr
+}
+
+// TestProbeAdminReady_WaitsForLateListener is the issue #1011
+// acceptance case: Node-RED starts accepting connections 15s after the
+// restart, and the default deadline still sees it come up.
+func TestProbeAdminReady_WaitsForLateListener(t *testing.T) {
+	if testing.Short() {
+		t.Skip("waits 15s for a late listener")
+	}
+	addr := refusedAddr(t)
+	served := make(chan *http.Server, 1)
+	go func() {
+		time.Sleep(15 * time.Second)
+		ln, err := net.Listen("tcp", addr)
+		if err != nil {
+			served <- nil
+			return
+		}
+		srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}), ReadHeaderTimeout: time.Second}
+		served <- srv
+		_ = srv.Serve(ln)
+	}()
+	start := time.Now()
+	err := probeAdminReady(context.Background(), "http://"+addr+"/settings")
+	elapsed := time.Since(start)
+	srv := <-served
+	if srv == nil {
+		t.Fatalf("could not listen on %s after the delay", addr)
+	}
+	defer func() { _ = srv.Close() }()
+	if err != nil {
+		t.Fatalf("probeAdminReady after %v: %v", elapsed, err)
+	}
+	if elapsed < 15*time.Second {
+		t.Errorf("probe returned after %v, before the listener started", elapsed)
+	}
+}
+
+// TestProbeAdminReady_FailsAtDeadlineNotBefore asserts a listener that
+// never starts fails the probe once the deadline passes, not earlier,
+// and keeps the last connection error in the message.
+func TestProbeAdminReady_FailsAtDeadlineNotBefore(t *testing.T) {
+	const deadline = time.Second
+	start := time.Now()
+	err := probeAdminReady(context.Background(), "http://"+refusedAddr(t)+"/settings",
+		withReadinessDeadline(deadline),
+	)
+	elapsed := time.Since(start)
+	if !errors.Is(err, ErrReadinessNotReady) {
+		t.Fatalf("err = %v, want ErrReadinessNotReady", err)
+	}
+	if !strings.Contains(err.Error(), "connection refused") {
+		t.Errorf("err = %v, want the last connection error", err)
+	}
+	if elapsed < deadline {
+		t.Errorf("probe gave up after %v, before the %v deadline", elapsed, deadline)
+	}
+	if elapsed > deadline+500*time.Millisecond {
+		t.Errorf("probe gave up after %v, well past the %v deadline", elapsed, deadline)
+	}
+}
+
+// TestProbeAdminReady_DeadlineFromEnv asserts NRCC_APPLY_READINESS_TIMEOUT
+// sets the deadline when the caller passes none.
+func TestProbeAdminReady_DeadlineFromEnv(t *testing.T) {
+	t.Setenv(ReadinessTimeoutEnv, "300ms")
+	start := time.Now()
+	err := probeAdminReady(context.Background(), "http://"+refusedAddr(t)+"/settings")
+	elapsed := time.Since(start)
+	if !errors.Is(err, ErrReadinessNotReady) {
+		t.Fatalf("err = %v, want ErrReadinessNotReady", err)
+	}
+	if elapsed < 300*time.Millisecond || elapsed > time.Second {
+		t.Errorf("probe gave up after %v, want about 300ms", elapsed)
+	}
+}
+
+func TestReadinessTimeoutFromEnv(t *testing.T) {
+	cases := []struct {
+		raw     string
+		want    time.Duration
+		wantErr bool
+	}{
+		{raw: "", want: 30 * time.Second},
+		{raw: "45s", want: 45 * time.Second},
+		{raw: " 2m ", want: 2 * time.Minute},
+		{raw: "30", wantErr: true},
+		{raw: "soon", wantErr: true},
+		{raw: "0s", wantErr: true},
+		{raw: "-5s", wantErr: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.raw, func(t *testing.T) {
+			t.Setenv(ReadinessTimeoutEnv, tc.raw)
+			got, err := ReadinessTimeoutFromEnv()
+			if tc.wantErr {
+				if err == nil || !strings.Contains(err.Error(), ReadinessTimeoutEnv) {
+					t.Fatalf("err = %v, want an error naming %s", err, ReadinessTimeoutEnv)
+				}
+				return
+			}
+			if err != nil || got != tc.want {
+				t.Fatalf("got %v, %v; want %v", got, err, tc.want)
+			}
+		})
 	}
 }
 
