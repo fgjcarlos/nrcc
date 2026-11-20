@@ -509,11 +509,36 @@ class TestReleaseWorkflowDryRun(unittest.TestCase):
             self.assertIn("publish", step_condition(step))
 
     def test_github_release_is_gated_on_publication(self):
-        package = self.jobs["package"]
-        releases = steps_using(package, "softprops/action-gh-release")
-        self.assertTrue(releases)
-        for step in releases:
-            self.assertIn("publish", step_condition(step))
+        release = self.jobs["release"]
+        self.assertIn("if: needs.version.outputs.publish == 'true'", release)
+        self.assertTrue(steps_using(release, "softprops/action-gh-release"))
+
+    def test_github_release_waits_for_package_and_image(self):
+        # #1007: a failing image job must leave no GitHub release behind.
+        needs = job_needs(self.jobs["release"])
+        self.assertIn("package", needs)
+        self.assertIn("image", needs)
+
+    def test_only_the_release_job_publishes_the_github_release(self):
+        for job_id, job in self.jobs.items():
+            with self.subTest(job=job_id):
+                if job_id == "release":
+                    self.assertIn("contents: write", job)
+                else:
+                    self.assertFalse(steps_using(job, "softprops/action-gh-release"))
+                    self.assertNotIn("contents: write", job)
+
+    def test_release_job_publishes_the_verified_artifacts(self):
+        downloads = steps_using(self.jobs["release"], "actions/download-artifact@")
+        self.assertEqual(len(downloads), 1)
+        self.assertIn("nrcc-${{ needs.version.outputs.version }}", downloads[0])
+        # The download path and the `files:` glob must agree, with no nested directory.
+        self.assertRegex(downloads[0], r"(?m)^\s+path: dist\s*$")
+        publish = steps_using(self.jobs["release"], "softprops/action-gh-release")
+        self.assertRegex(publish[0], r"(?m)^\s+files: dist/\*\s*$")
+
+    def test_install_url_smoke_runs_after_the_release(self):
+        self.assertIn("release", job_needs(self.jobs["smoke-install-url"]))
 
     def test_dry_run_still_packages_and_verifies_artifacts(self):
         package = self.jobs["package"]
@@ -560,22 +585,18 @@ class TestReleaseWorkflowArtifacts(unittest.TestCase):
             self.assertIn("VERSION=", step)
             self.assertIn("needs.version.outputs.version", step)
 
-    def test_three_linux_platforms_are_preserved(self):
+    def test_image_platforms_match_the_base_images(self):
+        # #1007: the pinned base images publish amd64 and arm64 only, so
+        # an arm/v7 image cannot be built. The armv7 binary stays.
         image = self.jobs["image"]
-        builds = steps_using(image, "docker/build-push-action")
-        multi_arch = [step for step in builds if "linux/arm64" in step]
-        self.assertTrue(multi_arch)
-        for step in multi_arch:
-            self.assertIn("linux/amd64", step)
-            self.assertIn("linux/arm/v7", step)
-        supported = {"linux/amd64", "linux/arm64", "linux/arm/v7"}
-        for step in builds:
-            for platform in re.findall(r"linux/[a-z0-9/]+", step):
-                self.assertIn(platform, supported)
+        pushes = [step for step in steps_using(image, "docker/build-push-action") if "push: true" in step]
+        self.assertEqual(len(pushes), 1)
+        self.assertIn("platforms: linux/amd64,linux/arm64\n", pushes[0])
+        self.assertNotIn("arm/v7", self.release)
 
     def test_prerelease_flags_come_from_the_policy_module(self):
-        package = self.jobs["package"]
-        releases = steps_using(package, "softprops/action-gh-release")
+        releases = steps_using(self.jobs["release"], "softprops/action-gh-release")
+        self.assertTrue(releases)
         for step in releases:
             self.assertIn("needs.version.outputs.prerelease", step)
             self.assertIn("needs.version.outputs.make_latest", step)
@@ -650,6 +671,7 @@ class TestPriorBehaviourIsPreserved(unittest.TestCase):
         "actions/checkout",
         "actions/setup-go",
         "actions/setup-node",
+        "actions/upload-artifact",
         "docker/login-action",
         "docker/build-push-action",
         "softprops/action-gh-release",
