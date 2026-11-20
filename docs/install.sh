@@ -1,7 +1,11 @@
 #!/bin/sh
 # nrcc docker-first installer (ADR 0003).
-# Usage: curl -fsSL https://get.nrcc.dev/install.sh | sh
-# Explicit version: curl -fsSL https://get.nrcc.dev/install.sh | sh -s -- v1.2.3
+# Usage: curl -fsSL https://raw.githubusercontent.com/fgjcarlos/nrcc/main/docs/install.sh | sh
+# Explicit version: curl -fsSL https://raw.githubusercontent.com/fgjcarlos/nrcc/main/docs/install.sh | sh -s -- v1.2.3
+#
+# The stack runs the released image (ghcr.io/fgjcarlos/nrcc); nothing is
+# built on this machine. The installed version is pinned as NRCC_IMAGE_TAG in
+# .env, so re-running the installer is the upgrade path.
 #
 # Portable POSIX sh: no `set -o pipefail`, no bashisms. The script needs
 # git, a reachable Docker daemon and (optionally) curl.
@@ -24,17 +28,23 @@ if ! docker info >/dev/null 2>&1; then
 fi
 
 # Version selection: positional argument, then NRCC_VERSION, then the latest
-# published release. `main` is the last resort and is always announced.
+# published release. Without a release there is no image to run, so the
+# installer stops instead of tracking a branch. GitHub's latest release never
+# names a prerelease: release candidates are always installed explicitly.
 if [ -z "$VERSION" ]; then
 	if command -v curl >/dev/null 2>&1; then
 		VERSION=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null |
 			sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1 || true)
 	fi
 	if [ -z "$VERSION" ]; then
-		VERSION=main
-		echo "Warning: could not resolve the latest release for $REPO; falling back to main." >&2
+		echo "Error: could not resolve the latest release for $REPO." >&2
+		echo "Pass a version explicitly, for example: sh -s -- v1.2.3" >&2
+		exit 1
 	fi
 fi
+# Published image tags carry no `v` prefix (ghcr.io/fgjcarlos/nrcc:1.2.3).
+NRCC_IMAGE_TAG="${VERSION#v}"
+export NRCC_IMAGE_TAG
 
 # Re-installing over an existing nrcc install keeps the operator's .env (and
 # docker-compose.override.yml) and replaces the checkout, so the new revision
@@ -133,6 +143,24 @@ if [ -z "${NRCC_ENCRYPTION_KEY:-}" ]; then
 	ensure_encryption_key .env
 fi
 
+# Pins the installed release in .env, replacing any previous pin, so a later
+# `docker compose up -d` keeps the image that matches this checkout.
+pin_image_tag() {
+	env_file="$1"
+	umask 077
+	touch "$env_file"
+	env_tmp="$env_file.tmp.$$"
+	awk -v t="$NRCC_IMAGE_TAG" '
+		/^[[:space:]]*(export[[:space:]]+)?NRCC_IMAGE_TAG=/ { next }
+		{ print }
+		END { print "NRCC_IMAGE_TAG=" t }
+	' "$env_file" >"$env_tmp"
+	mv "$env_tmp" "$env_file"
+	chmod 600 "$env_file"
+}
+
+pin_image_tag .env
+
 # A failed reinstall keeps the previous checkout on disk until the replacement
 # is verified, so this hint can always recover the working install.
 restore_previous() {
@@ -142,8 +170,10 @@ restore_previous() {
 	fi
 }
 
-echo "→ Building and starting stack"
-if ! docker compose up -d --build; then
+# Pull first so a missing image fails here; --no-build keeps Compose from
+# silently compiling the checkout when the release image is unavailable.
+echo "→ Pulling ghcr.io/fgjcarlos/nrcc:$NRCC_IMAGE_TAG and starting stack"
+if ! docker compose pull || ! docker compose up -d --no-build; then
 	restore_previous
 	docker compose ps || true
 	docker compose logs --tail=50 || true

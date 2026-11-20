@@ -64,6 +64,10 @@ variable has exactly one routing decision, pinned by
   `NODE_RED_SETTINGS=/data/settings.js`. Change the host side with
   `NRCC_HOST_PORT` and `NODE_RED_HOST_PORT` (Compose interpolation only,
   never seen by the binary) instead.
+- **Image**: `NRCC_IMAGE_TAG` selects `ghcr.io/fgjcarlos/nrcc:<tag>`
+  (Compose interpolation only, never seen by the binary). It takes the
+  version without the `v` prefix and defaults to `latest`; the installer
+  pins the installed version.
 - **Not forwarded**, on purpose. Setting them in `.env` has no effect on
   the canonical stack:
 
@@ -74,7 +78,7 @@ variable has exactly one routing decision, pinned by
   | `NRCC_BACKUP_DIR`, `NRCC_BACKUP_ROOT` | Pinned to the `nrcc_backups` and `nrcc_data` volumes. |
   | `NRCC_RESTIC_*` | Restic is deferred ([#432](https://github.com/fgjcarlos/nrcc/issues/432)): the image ships no `restic` binary. |
   | `NPM_BIN` | The image ships its own npm. |
-  | `NRCC_IMAGE` | Display label only; the stack builds its image locally. |
+  | `NRCC_IMAGE` | Display label only; `NRCC_IMAGE_TAG` selects the image the stack runs. |
 
   Deployments outside the canonical Compose file (bare binary, custom
   Compose overrides) may still set them; the tables below describe the

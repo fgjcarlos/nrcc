@@ -1,10 +1,16 @@
-# nrcc — single compose, single Dockerfile, builds locally.
+# nrcc — single compose, single Dockerfile.
 #
 # One service, one nrcc + one Node-RED process. To run more stacks on
 # the same host, copy this file and remap ports + volume name.
 #
-#   docker compose up --build
+#   docker compose up -d            # run the released image
+#   docker compose up -d --build    # build from this checkout (contributors)
 #   open http://localhost:3001 (nrcc UI) and http://localhost:1880 (Node-RED)
+#
+# NRCC_IMAGE_TAG selects the released image (no `v` prefix, e.g. 1.2.3) and
+# defaults to `latest`, the newest stable release. Release candidates never
+# publish `latest`: set NRCC_IMAGE_TAG to the exact version to run one.
+# Upgrade with `docker compose pull && docker compose up -d`.
 #
 # Set JWT_SECRET via .env or host env; if absent nrcc generates one in /data.
 #
@@ -24,6 +30,7 @@
 # "0.0.0.0" or remove the prefix.
 services:
   nrcc:
+    image: ghcr.io/fgjcarlos/nrcc:${NRCC_IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: Dockerfile

@@ -34,6 +34,74 @@ func TestInstallScriptContract(t *testing.T) {
 					t.Fatalf("default did not use release tag:\n%s", h.readLog())
 				}
 			})
+			t.Run("pulls and pins the released image instead of building", func(t *testing.T) {
+				h := newHarness(t, script, shell)
+				result := h.run(t, nil)
+				if result.err != nil {
+					t.Fatalf("installer failed: %v\n%s", result.err, result.output)
+				}
+				log := h.readLog()
+				if !strings.Contains(log, "docker compose pull\n") || !strings.Contains(log, "docker compose up -d --no-build\n") {
+					t.Fatalf("installer did not pull and start the released image:\n%s", log)
+				}
+				if strings.Contains(log, " --build") {
+					t.Fatalf("installer still builds from source:\n%s", log)
+				}
+				path := filepath.Join(h.installDir, ".env")
+				//nolint:gosec // G304: the path is a test-controlled fixture.
+				got, err := os.ReadFile(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !strings.Contains(string(got), "\nNRCC_IMAGE_TAG=9.8.7\n") {
+					t.Fatalf("release not pinned as an image tag without the v prefix: %q", got)
+				}
+				assertKeyFile(t, path)
+			})
+			t.Run("pin replaces a previous image tag", func(t *testing.T) {
+				h := newHarness(t, script, shell)
+				h.writeExistingInstall("NRCC_IMAGE_TAG=1.0.0\nNRCC_ENCRYPTION_KEY=operator-secret\nLAST=line")
+				result := h.runArgs(t, []string{"v1.2.3"}, nil)
+				if result.err != nil {
+					t.Fatalf("installer failed: %v\n%s", result.err, result.output)
+				}
+				got, err := os.ReadFile(filepath.Join(h.installDir, ".env"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if string(got) != "NRCC_ENCRYPTION_KEY=operator-secret\nLAST=line\nNRCC_IMAGE_TAG=1.2.3\n" {
+					t.Fatalf("pin not replaced: %q", got)
+				}
+			})
+			t.Run("fails without a resolvable release instead of using main", func(t *testing.T) {
+				h := newHarness(t, script, shell)
+				h.set("CURL_MODE", "no-release")
+				result := h.run(t, nil)
+				if result.err == nil {
+					t.Fatalf("expected failure without a release, got success:\n%s", result.output)
+				}
+				if !strings.Contains(result.output, "Pass a version explicitly") {
+					t.Fatalf("expected explicit-version guidance:\n%s", result.output)
+				}
+				if log := h.readLog(); strings.Contains(log, "git clone") || strings.Contains(log, "docker compose") {
+					t.Fatalf("installer kept going without a release:\n%s", log)
+				}
+			})
+			t.Run("pull failure prints diagnostics and keeps the previous checkout", func(t *testing.T) {
+				h := newHarness(t, script, shell)
+				h.writeExistingInstall("NRCC_ENCRYPTION_KEY=operator-secret\n")
+				h.set("DOCKER_MODE", "pull-fail")
+				result := h.run(t, nil)
+				if result.err == nil || !strings.Contains(result.output, "DIAGNOSTIC LOGS") {
+					t.Fatalf("expected failed exit and compose logs, got %v\n%s", result.err, result.output)
+				}
+				if !strings.Contains(result.output, "previous checkout was kept") {
+					t.Fatalf("expected rollback guidance:\n%s", result.output)
+				}
+				if strings.Contains(h.readLog(), "docker compose up") {
+					t.Fatalf("stack started after a failed pull:\n%s", h.readLog())
+				}
+			})
 			t.Run("generates key without openssl", func(t *testing.T) {
 				h := newHarness(t, script, shell)
 				h.removeStub("openssl")
@@ -58,7 +126,7 @@ func TestInstallScriptContract(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if string(got) != original {
+				if string(got) != original+"NRCC_IMAGE_TAG=1.2.3\n" {
 					t.Fatalf(".env changed: %q", got)
 				}
 				if !strings.Contains(h.readLog(), "git clone --depth 1 --branch v1.2.3") {
@@ -104,7 +172,7 @@ func TestInstallScriptContract(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if string(got) != "NRCC_ENCRYPTION_KEY=operator-secret\n" {
+				if string(got) != "NRCC_ENCRYPTION_KEY=operator-secret\nNRCC_IMAGE_TAG=9.8.7\n" {
 					t.Fatalf(".env changed: %q", got)
 				}
 				// The verified reinstall must keep the previous checkout under the
@@ -156,7 +224,7 @@ func TestInstallScriptContract(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if string(got) != "NRCC_ENCRYPTION_KEY=operator-secret\n" {
+				if string(got) != "NRCC_ENCRYPTION_KEY=operator-secret\nNRCC_IMAGE_TAG=9.8.7\n" {
 					t.Fatalf(".env changed: %q", got)
 				}
 			})
@@ -320,6 +388,7 @@ printf 'git' >> "$CALL_LOG"; for arg do printf ' %s' "$arg" >> "$CALL_LOG"; done
 printf 'docker' >> "$CALL_LOG"; for arg do printf ' %s' "$arg" >> "$CALL_LOG"; done; printf '\n' >> "$CALL_LOG"
 case "$1 $2" in
   'info ') exit 0;;
+  'compose pull') [ "${DOCKER_MODE:-}" != pull-fail ] || exit 1;;
   'compose up') [ "${DOCKER_MODE:-}" != up-fail ] || exit 1;;
   'compose ps') if [ "${3:-}" = -q ]; then if [ "${DOCKER_MODE:-}" = partial-health ]; then echo id1; echo id2; else echo container-id; fi; else echo 'DIAGNOSTIC PS'; fi;;
   'compose logs') echo 'DIAGNOSTIC LOGS';;
@@ -335,7 +404,7 @@ case "$1 $2" in
 esac
 `)
 	h.writeStub("curl", `#!/bin/sh
-case "$*" in *releases/latest*) echo '{"tag_name":"v9.8.7"}';; *healthz*) case " $* " in *" --max-time "*) exit 0;; *) exit 1;; esac;; *) exit 0;; esac
+case "$*" in *releases/latest*) [ "${CURL_MODE:-}" != no-release ] || exit 22; echo '{"tag_name":"v9.8.7"}';; *healthz*) case " $* " in *" --max-time "*) exit 0;; *) exit 1;; esac;; *) exit 0;; esac
 `)
 	return h
 }
