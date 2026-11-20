@@ -135,9 +135,9 @@ compose_call() {
 # ports and its own NRCC_ENCRYPTION_KEY derived from the seed (#888); the
 # JWT secret is generated inside each project's own /data volume.
 #
-# The canonical docker-compose.yml builds the image locally (`build:`), so
-# NRCC_IMAGE is informational here: the acceptance workflow builds the image
-# with `docker compose build` before invoking the script.
+# NRCC_IMAGE is informational here: the acceptance workflow builds the
+# checkout with `docker compose build`, which tags it as the compose `image:`,
+# so `up` runs the local build instead of pulling a released image.
 set_compose_env() {
   local project="$1" api_port="$2" nr_port="$3"
   export COMPOSE_PROJECT_NAME="$project"

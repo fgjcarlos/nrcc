@@ -62,7 +62,7 @@ var composePinned = map[string]string{
 var composeNotForwarded = map[string]string{ //nolint:gosec // G101 variable names and reasons, not credentials.
 	"NODE_RED_PORT":             "container port 1880 is fixed by the port mapping; use NODE_RED_HOST_PORT",
 	"NRCC_MANAGE_NODE_RED":      "false would leave the one-container stack without a Node-RED process",
-	"NRCC_IMAGE":                "display label only; the stack builds the image locally",
+	"NRCC_IMAGE":                "display label only; NRCC_IMAGE_TAG selects the image the stack runs",
 	"NRCC_BACKUP_DIR":           "pinned to the nrcc_backups volume at /data/backups",
 	"NRCC_BACKUP_ROOT":          "pinned to the /data volume",
 	"NPM_BIN":                   "the image ships its own npm",

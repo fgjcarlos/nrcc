@@ -695,7 +695,10 @@ class TestPriorBehaviourIsPreserved(unittest.TestCase):
     def test_release_workflow_keeps_the_install_url_smoke_job(self):
         release = read_workflow("release.yml")
         self.assertIn("smoke-install-url:", release)
-        self.assertIn("get.nrcc.dev/install.sh", release)
+        # #1008: the smoke runs the documented raw URL and is a hard gate.
+        smoke = job_blocks(release)["smoke-install-url"]
+        self.assertIn("raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/docs/install.sh", smoke)
+        self.assertNotIn("continue-on-error", smoke)
 
     def test_every_action_stays_pinned_to_a_commit_sha(self):
         for name in ("release.yml", "pr.yml", "security.yml"):

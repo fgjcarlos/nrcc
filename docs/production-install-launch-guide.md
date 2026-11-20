@@ -17,11 +17,14 @@ CLI installer and Darwin/Windows binaries that the project does not ship.
 ## Quick path — container image (recommended)
 
 ```bash
-git clone https://github.com/fgjcarlos/nrcc.git
-cd nrcc
+mkdir nrcc && cd nrcc
+curl -fsSLO https://raw.githubusercontent.com/fgjcarlos/nrcc/main/docker-compose.yml
 printf 'NRCC_ENCRYPTION_KEY=%s\n' "$(openssl rand -hex 32)" > .env
-docker compose up -d --build
+docker compose up -d
 ```
+
+This pulls the latest stable `ghcr.io/fgjcarlos/nrcc` image. For a release
+candidate, add `NRCC_IMAGE_TAG=1.0.0-rc.1` to `.env` before `up`.
 
 Then open:
 
@@ -49,33 +52,36 @@ Supported command forms:
 
 ```sh
 # Latest published release
-curl -fsSL https://get.nrcc.dev/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/fgjcarlos/nrcc/main/docs/install.sh | sh
 
 # Explicit version as a positional argument
-curl -fsSL https://get.nrcc.dev/install.sh | sh -s -- v1.2.3
+curl -fsSL https://raw.githubusercontent.com/fgjcarlos/nrcc/main/docs/install.sh | sh -s -- v1.2.3
 
 # Explicit version through the installer process environment
-NRCC_VERSION=v1.2.3 sh -c "$(curl -fsSL https://get.nrcc.dev/install.sh)"
+NRCC_VERSION=v1.2.3 sh -c "$(curl -fsSL https://raw.githubusercontent.com/fgjcarlos/nrcc/main/docs/install.sh)"
 ```
 
 `NRCC_VERSION=… curl … | sh` is **not** supported: the assignment binds to
-`curl`, not to the installer. The custom domain is published from GitHub
-Pages; when it is not live yet, fetch the same script from the repository:
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/fgjcarlos/nrcc/main/docs/install.sh | sh
-```
+`curl`, not to the installer.
 
 Version selection is positional argument, then `NRCC_VERSION`, then the latest
-published GitHub release for `NRCC_REPO` (default `fgjcarlos/nrcc`). If that
-release cannot be resolved, the installer visibly warns and falls back to
-`main`. `NRCC_REPO` and `INSTALL_DIR` can be overridden.
+published GitHub release for `NRCC_REPO` (default `fgjcarlos/nrcc`). GitHub
+never reports a prerelease as the latest release, so release candidates are
+always installed explicitly. If no release can be resolved, the installer
+stops and asks for an explicit version. `NRCC_REPO` and `INSTALL_DIR` can be
+overridden.
+
+The installer pins the installed version as `NRCC_IMAGE_TAG` (without the
+`v`) in `.env`, replacing any earlier pin, then runs `docker compose pull` and
+`docker compose up -d --no-build`: the stack runs the released
+`ghcr.io/fgjcarlos/nrcc` image and nothing is compiled on the host. To
+upgrade, re-run the installer with the new version.
 
 An exported `NRCC_ENCRYPTION_KEY` is used as-is. Otherwise an existing
 `$INSTALL_DIR/.env` key and all other lines are preserved; if no key exists,
 the installer creates a 32-byte random key (64 hexadecimal characters) in
 `.env` with mode `0600`. An existing but empty key is replaced, because
-Compose refuses to start without one. After `docker compose up -d --build`,
+Compose refuses to start without one. After the stack starts,
 it waits up to `NRCC_READY_TIMEOUT` seconds (default 300). Compose startup
 failures and readiness timeouts print `docker compose ps` and the last 50 log
 lines before exiting non-zero.
