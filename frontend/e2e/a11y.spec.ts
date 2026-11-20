@@ -55,7 +55,10 @@ test.describe('Issue #766 slice G W4 — WCAG 2.1 AA gate', () => {
     await login(page)
     await page.goto('/configuration')
     await expect(page.getByRole('heading', { name: 'Configuration', exact: true })).toBeVisible()
-    // The raw settings.js editor renders after its fixture loads.
+    // The raw settings.js editor sits behind a closed disclosure; open it so
+    // axe scans the lock banner and the textarea too. It renders after its
+    // fixture loads.
+    await page.getByText('Show the settings.js editor', { exact: true }).click()
     await expect(page.getByRole('textbox', { name: 'Advanced settings.js' })).toHaveValue(/fixture settings\.js/)
     await expectNoAxeBlockers(page, 'configuration')
   })

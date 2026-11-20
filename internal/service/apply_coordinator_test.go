@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -20,11 +21,11 @@ import (
 // returned so callers can assert the failure_stage meta key
 // the slice C acceptance criteria pin.
 type applyCoordinatorFixture struct {
-	dir       string
-	svc       *ConfigService
-	apply     *ApplyService
-	recorder  *coordinatorRecorder
-	coordinator *ApplyCoordinator
+	dir          string
+	svc          *ConfigService
+	apply        *ApplyService
+	recorder     *coordinatorRecorder
+	coordinator  *ApplyCoordinator
 	settingsPath string
 }
 
@@ -61,6 +62,7 @@ func (r *coordinatorRecorder) snapshot() []recordedAudit {
 
 func newApplyCoordinatorFixture(t *testing.T) *applyCoordinatorFixture {
 	t.Helper()
+	stubHostCommands(t)
 	dir := t.TempDir()
 	svc := NewIsolatedConfigService(dir)
 	settingsPath := filepath.Join(dir, "settings.js")
@@ -369,3 +371,15 @@ func TestApplyCoordinator_ReleaseAfterCompletionUnlocks(t *testing.T) {
 // test compilation model treats each _test.go file as part of
 // the same package, so the type declared in
 // apply_revision_test.go is visible here without re-import.
+// stubHostCommands keeps host detection off the real machine. Rendering a
+// structured settings.js runs HostService.Detect, which otherwise spawns
+// node, npm, node-red, portless and docker; their startup time made apply
+// tests depend on the host (npm alone can take seconds).
+func stubHostCommands(t *testing.T) {
+	t.Helper()
+	oldLookPath := execLookPath
+	t.Cleanup(func() { execLookPath = oldLookPath })
+	execLookPath = func(name string) (string, error) {
+		return "", &exec.Error{Name: name, Err: exec.ErrNotFound}
+	}
+}

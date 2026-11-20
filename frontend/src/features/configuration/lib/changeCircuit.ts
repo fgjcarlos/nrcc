@@ -187,3 +187,12 @@ export function deriveCircuit(input: CircuitInput): Circuit {
 
   return { steps: [edit, diff, ...serverSteps(run, input)], rollback };
 }
+
+/**
+ * At rest: no pending change, no review, no run and no outcome, so every
+ * contact is Waiting. The circuit then draws one compact idle line
+ * instead of six identical rows.
+ */
+export function isCircuitAtRest(circuit: Circuit): boolean {
+  return circuit.rollback === null && circuit.steps.every((s) => s.state === 'idle');
+}

@@ -9,6 +9,11 @@ describe('EmptyState', () => {
     expect(screen.getByRole('heading', { level: 3, name: 'No backups yet' })).toBeInTheDocument();
   });
 
+  it('takes a heading level that fits the page outline', () => {
+    render(<EmptyState title="No backups yet" headingLevel={2} />);
+    expect(screen.getByRole('heading', { level: 2, name: 'No backups yet' })).toBeInTheDocument();
+  });
+
   it('renders an accessible status role so screen readers announce the empty state', () => {
     render(<EmptyState title="No backups yet" />);
     expect(screen.getByRole('status')).toBeInTheDocument();

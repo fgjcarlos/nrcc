@@ -73,8 +73,8 @@ export function UpdatesView() {
   const targetVersion = latestVersion || t('updates:unknown');
   const failureCopy = flowState?.error === 'image_unsupported' || flowState?.error === 'external_unsupported'
     ? t(`updates:${flowState.error}`)
-    : flowState?.error === 'backup_failed'
-      ? t('updates:failed.backup_failed')
+    : flowState?.error === 'backup_failed' || flowState?.error === 'internal_error'
+      ? t(`updates:failed.${flowState.error}`)
       : t('updates:failed.update_failed');
 
   const versionValue = (version: string | undefined) =>

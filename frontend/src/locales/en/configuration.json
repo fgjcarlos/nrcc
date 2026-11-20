@@ -8,6 +8,7 @@
   "advanced": {
     "title": "Advanced settings.js",
     "description": "Edit the live settings.js file detected by nrcc. A backup is created automatically before saving.",
+    "disclosure": "Show the settings.js editor",
     "lastBackup": "Last backup: {{path}}",
     "unlockToEdit": "Unlock to edit settings.js",
     "unlockDialogTitle": "Edit Node-RED settings.js directly",
@@ -21,19 +22,42 @@
     "parseError": "Invalid settings.js: {{message}}"
   },
   "preset": {
-    "confirmApply": "Confirm apply",
-    "acknowledgement": "I understand that confirming a preset will rewrite the managed key in settings.js and the original managed value cannot be recovered unless a backup exists.",
+    "confirmApply": "Apply preset",
+    "acknowledgement": "I reviewed the diff. Applying rewrites the managed keys in settings.js; NRCC backs up settings.js first and restarts Node-RED.",
     "loadingCurated": "Loading curated presets...",
     "loadError": "Presets could not be loaded.",
     "unavailable": "Curated presets are not available on this NRCC server.",
     "sectionLabel": "Curated presets",
     "title": "Curated presets",
-    "description": "Vetted high-value recipes for advanced Node-RED 5 settings. Each preset declares the editor / HTTP / Socket.IO surfaces it touches and never rewrites operator-owned code outside its declared scope.",
-    "previewAria": "preview {{name}}",
+    "description": "Vetted recipes for advanced Node-RED 5 settings. Each one rewrites only the keys it lists and leaves the rest of settings.js as it is.",
+    "touches": "Rewrites",
+    "surfaces": "Surfaces",
+    "previewAria": "Preview {{name}}",
     "preview": "Preview",
     "previewTitle": "Preview: {{name}}",
-    "reviewDiff": "Review the redacted diff. Confirm to write the patched source through /api/settings/raw (or cancel to discard).",
-    "generatingPreview": "Generating redacted preview..."
+    "reviewDiff": "Nothing is written until you apply. Secrets in the diff are redacted.",
+    "inputsHint": "This preset needs the files it points Node-RED at. Enter absolute paths inside the Node-RED container.",
+    "input": {
+      "key": "Private key file",
+      "cert": "Certificate file"
+    },
+    "inputPlaceholder": {
+      "key": "/data/certs/privkey.pem",
+      "cert": "/data/certs/fullchain.pem"
+    },
+    "generate": "Generate preview",
+    "generatingPreview": "Generating the redacted preview...",
+    "unchanged": "This preset would not change settings.js.",
+    "diffLabel": "Redacted diff",
+    "applied": "Applied {{name}}.",
+    "error": {
+      "needsInput": "Enter absolute file paths (starting with /) for every field.",
+      "sourceNotExports": "settings.js has no module.exports object this preset can patch.",
+      "notRegistered": "This preset is no longer available on the server.",
+      "tooLarge": "settings.js is too large to preview (limit 2 MiB).",
+      "generic": "The preview could not be generated. Try again.",
+      "applyFailed": "The preset could not be applied. settings.js was not changed."
+    }
   },
   "saveErrorRaw": "Save returned a non-JSON response",
   "basicSettings": "Basic Settings",
@@ -144,6 +168,7 @@
   "circuit": {
     "title": "Change circuit",
     "summary": "Step {{index}} of {{total}} · {{step}} · {{state}}",
+    "idle": "Circuit idle · no pending changes",
     "steps": {
       "edit": "Edit",
       "diff": "Diff",

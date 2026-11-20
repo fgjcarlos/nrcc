@@ -23,7 +23,7 @@ const settingsKeys = (fields: string[]) =>
 
 import {
   Server, Shield, Activity, Palette,
-  Save, Lock, LockOpen, Bot
+  Save, Lock, LockOpen, Bot, ChevronDown
 } from 'lucide-react';
 import { useConfigurationData, useConfigurationActions, useConfigurationDiff, useConfigurationSave, fieldValidationMap } from '../hooks';
 import { useT } from '@/i18n';
@@ -436,7 +436,7 @@ export function ConfigurationView() {
 
       <TabPanel idBase="config" selected={activeTab}>
         {readOnly ? (
-          <div className="rounded-box border border-warning/40 bg-warning/10 p-4 text-sm text-warning" role="status">
+          <div className="border-l-2 border-ds-warning py-1 pl-3 text-sm text-ds-on-tint-warning" role="status">
             {t('configuration:controlsUnavailable')}
           </div>
         ) : activeTab === 'ai' ? <AIProviderSettings /> : <ActiveComponent settings={formData} onUpdate={handleUpdateField} disabled={isSaving} fieldErrors={fieldValidationMap(diff.fields)} />}
@@ -470,78 +470,90 @@ export function ConfigurationView() {
           )}
         </div>
 
-        {/* Locked is the safe default, so the banner is neutral ink with the
-            unlock control beside its text. */}
-        {!rawEditorUnlocked && (
-          <div
-            data-testid="raw-settings-locked-banner"
-            className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-box border border-[var(--ds-border-strong)] px-3 py-2 text-sm text-ds-text-secondary"
-          >
-            <Lock className="h-4 w-4 shrink-0 text-ds-text-primary" aria-hidden="true" />
-            <span className="min-w-0 flex-[1_1_14rem]">{t('configuration:advanced.lockedBadge')}</span>
-            <button
-              type="button"
-              onClick={() => setUnlockDialogOpen(true)}
-              disabled={!data.settingsDoc?.writable || actions.saveRawSettingsMutation.isPending}
-              data-testid="raw-settings-unlock-btn"
-              className="action-btn-secondary min-h-9 text-sm"
-            >
-              <LockOpen className="h-4 w-4" aria-hidden="true" />
-              {t('configuration:advanced.unlockToEdit')}
-            </button>
-          </div>
-        )}
+        {/* The raw editor is an escape hatch: closed by default so it does
+            not compete with the form under every tab. Its heading and the
+            bypass statement above stay visible. */}
+        <details className="group" data-testid="raw-settings-disclosure">
+          <summary className="action-btn-secondary w-fit cursor-pointer list-none text-sm [&::-webkit-details-marker]:hidden">
+            <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden="true" />
+            {t('configuration:advanced.disclosure')}
+          </summary>
+          <div className="mt-4 space-y-4">
+            {/* Locked is the safe default, so the banner is neutral ink with the
+                unlock control beside its text. A leading control-border rule,
+                not a box: it sits flat on the sheet (DESIGN.md Lock banner). */}
+            {!rawEditorUnlocked && (
+              <div
+                data-testid="raw-settings-locked-banner"
+                className="flex flex-wrap items-center gap-x-3 gap-y-2 border-l-2 border-[var(--ds-border-strong)] py-1 pl-3 text-sm text-ds-text-secondary"
+              >
+                <Lock className="h-4 w-4 shrink-0 text-ds-text-primary" aria-hidden="true" />
+                <span className="min-w-0 flex-[1_1_14rem]">{t('configuration:advanced.lockedBadge')}</span>
+                <button
+                  type="button"
+                  onClick={() => setUnlockDialogOpen(true)}
+                  disabled={!data.settingsDoc?.writable || actions.saveRawSettingsMutation.isPending}
+                  data-testid="raw-settings-unlock-btn"
+                  className="action-btn-secondary min-h-9 text-sm"
+                >
+                  <LockOpen className="h-4 w-4" aria-hidden="true" />
+                  {t('configuration:advanced.unlockToEdit')}
+                </button>
+              </div>
+            )}
 
-        <textarea
-          value={rawSettingsContent}
-          onChange={(event) => {
-            if (!rawEditorUnlocked) return;
-            setRawSettingsContent(event.target.value);
-            setRawParseError(null);
-            if (actions.saveRawSettingsMutation.error) actions.saveRawSettingsMutation.reset();
-          }}
-          readOnly={!rawEditorUnlocked}
-          aria-readonly={!rawEditorUnlocked}
-          aria-labelledby={rawSettingsHeadingId}
-          aria-invalid={rawError ? true : undefined}
-          aria-describedby={rawError ? rawErrorId : undefined}
-          // Sized to the source: one row per line between 8 and 24, then scroll.
-          rows={Math.min(Math.max(rawSettingsContent.split('\n').length, 8), 24)}
-          className={cn(
-            'w-full resize-y overflow-auto rounded-box border border-border p-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-primary',
-            rawEditorUnlocked ? 'bg-base-100 text-base-content' : 'cursor-not-allowed bg-ds-bg-base text-ds-text-secondary'
-          )}
-          spellCheck={false}
-        />
-        {rawError && (
-          <p id={rawErrorId} role="alert" className="text-sm text-ds-on-tint-error" data-testid="raw-settings-error">
-            {rawError}
-          </p>
-        )}
+            <textarea
+              value={rawSettingsContent}
+              onChange={(event) => {
+                if (!rawEditorUnlocked) return;
+                setRawSettingsContent(event.target.value);
+                setRawParseError(null);
+                if (actions.saveRawSettingsMutation.error) actions.saveRawSettingsMutation.reset();
+              }}
+              readOnly={!rawEditorUnlocked}
+              aria-readonly={!rawEditorUnlocked}
+              aria-labelledby={rawSettingsHeadingId}
+              aria-invalid={rawError ? true : undefined}
+              aria-describedby={rawError ? rawErrorId : undefined}
+              // Sized to the source: one row per line between 8 and 24, then scroll.
+              rows={Math.min(Math.max(rawSettingsContent.split('\n').length, 8), 24)}
+              className={cn(
+                'w-full resize-y overflow-auto rounded-box border border-border p-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-primary',
+                rawEditorUnlocked ? 'bg-base-100 text-base-content' : 'cursor-not-allowed bg-ds-bg-base text-ds-text-secondary'
+              )}
+              spellCheck={false}
+            />
+            {rawError && (
+              <p id={rawErrorId} role="alert" className="text-sm text-ds-on-tint-error" data-testid="raw-settings-error">
+                {rawError}
+              </p>
+            )}
 
-        {rawEditorUnlocked && (
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={handleCancelRawEdit}
-              disabled={actions.saveRawSettingsMutation.isPending}
-              data-testid="raw-settings-cancel-btn"
-              className="action-btn-secondary"
-            >
-              {t('configuration:advanced.cancelEdit')}
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSaveRawSettingsLocked(rawSettingsContent)}
-              disabled={!data.settingsDoc?.writable || actions.saveRawSettingsMutation.isPending}
-              data-testid="raw-settings-save-btn"
-              className="action-btn-primary"
-            >
-              <Save className="w-4 h-4" />
-              {actions.saveRawSettingsMutation.isPending ? t('configuration:advanced.savingRaw') : t('configuration:advanced.saveRaw')}
-            </button>
+            {rawEditorUnlocked && (
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={handleCancelRawEdit}
+                  disabled={actions.saveRawSettingsMutation.isPending}
+                  data-testid="raw-settings-cancel-btn"
+                  className="action-btn-secondary"
+                >
+                  {t('configuration:advanced.cancelEdit')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSaveRawSettingsLocked(rawSettingsContent)}
+                  disabled={!data.settingsDoc?.writable || actions.saveRawSettingsMutation.isPending}
+                  data-testid="raw-settings-save-btn"
+                  className="action-btn-primary"
+                >
+                  <Save className="w-4 h-4" />
+                  {actions.saveRawSettingsMutation.isPending ? t('configuration:advanced.savingRaw') : t('configuration:advanced.saveRaw')}
+                </button>
+              </div>
+            )}
           </div>
-        )}
+        </details>
       </div>
 
       </div>

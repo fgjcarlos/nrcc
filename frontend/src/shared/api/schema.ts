@@ -469,6 +469,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/presets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List curated settings.js presets
+         * @description **Admin only.** Returns the embedded curated-preset catalogue in stable ID-sorted order. No network access is involved.
+         */
+        get: operations["getPresets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/presets/{id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview a curated preset against settings.js source
+         * @description **Admin only.** Applies the preset to the supplied settings.js source
+         *     in memory and returns the patched source plus a redacted diff. Nothing
+         *     is written to disk; the operator confirms by sending `after` to
+         *     `POST /api/settings/raw`.
+         */
+        post: operations["postPresetPreview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/bootstrap/status": {
         parameters: {
             query?: never;
@@ -1268,9 +1311,11 @@ export interface paths {
         put?: never;
         /**
          * Apply pending update
-         * @description Starts an asynchronous update flow: BackingUp → Applying → Completed/Failed.
-         *     Returns immediately with the current flow state. Poll `GET /api/updates/state`
-         *     every 500 ms to track progress.
+         * @description Claims the single update run synchronously, then runs it asynchronously:
+         *     BackingUp → Applying → Completed/Failed. A 200 means this request claimed
+         *     the run (state is already `BackingUp`); no other request can start one
+         *     until it finishes. Poll `GET /api/updates/state` every 500 ms to track
+         *     progress. A new update can start from `Idle`, `Completed` or `Failed`.
          */
         post: operations["postUpdatesApply"];
         delete?: never;
@@ -1702,7 +1747,7 @@ export interface components {
              * @example INVALID_REQUEST
              * @enum {string}
              */
-            code: "INVALID_REQUEST" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "WEAK_PASSWORD" | "USERNAME_EXISTS" | "UPDATE_IN_PROGRESS" | "BACKUP_ERROR" | "FLOW_ERROR" | "ENV_ERROR" | "AUTH_FAILED" | "RATE_LIMITED" | "SETUP_REQUIRED" | "ALREADY_INITIALIZED" | "SETTINGS_REVISION_CONFLICT";
+            code: "INVALID_REQUEST" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "WEAK_PASSWORD" | "USERNAME_EXISTS" | "UPDATE_IN_PROGRESS" | "BACKUP_ERROR" | "FLOW_ERROR" | "ENV_ERROR" | "AUTH_FAILED" | "RATE_LIMITED" | "SETUP_REQUIRED" | "ALREADY_INITIALIZED" | "SETTINGS_REVISION_CONFLICT" | "PRESET_NOT_REGISTERED" | "SOURCE_NOT_EXPORTS" | "PRESET_PREVIEW_FAILED";
             /**
              * @description Human-readable error description
              * @example Username and password are required
@@ -2020,6 +2065,40 @@ export interface components {
             /** @description Full text content to write to settings.js */
             content: string;
         };
+        PresetView: {
+            /** @example https-tls-preset */
+            id: string;
+            name: string;
+            description: string;
+            surfaces: string[];
+            trust: string;
+            channelBoundary: string;
+            managedKeys: string[];
+            /**
+             * @description Operator values the preview needs in `values` (absolute file paths); empty when none
+             * @example [
+             *       "key",
+             *       "cert"
+             *     ]
+             */
+            inputs: string[];
+        };
+        PresetPreviewRequest: {
+            /** @description Live settings.js source to preview the preset against */
+            content: string;
+            /** @description Values for the preset's declared `inputs`, e.g. absolute `key` and `cert` paths for https-tls-preset */
+            values?: {
+                [key: string]: string;
+            };
+        };
+        PresetPreview: {
+            /** @description Patched settings.js source; confirm by writing it through POST /api/settings/raw */
+            after: string;
+            /** @description Redacted unified diff for display and audit */
+            preview: string;
+            replaced: string[] | null;
+            inserted: string[] | null;
+        };
         ValidResult: {
             /** @example true */
             valid: boolean;
@@ -2058,7 +2137,21 @@ export interface components {
             nodeRed: components["schemas"]["NodeRedEnvironment"];
             settings: components["schemas"]["SettingsDocument"];
             configuration: components["schemas"]["ConfigurationCapabilities"];
+            /**
+             * @description Human-readable recommendations, kept for existing consumers. The text
+             *     is not localized; clients should prefer `recommendationCodes`.
+             */
             recommendations?: string[];
+            /**
+             * @description Stable machine code for each entry in `recommendations`, in the same
+             *     order and with the same length. Clients localize the code and fall
+             *     back to the matching `recommendations` string for codes they do not
+             *     know. Omitted when there are no recommendations.
+             * @example [
+             *       "portless_optional"
+             *     ]
+             */
+            recommendationCodes?: string[];
         };
         CpuInfo: {
             /**
@@ -2614,6 +2707,22 @@ export interface components {
             timestamp: string;
         } & {
             data?: components["schemas"]["ValidResult"];
+        };
+        SuccessEnvelope_PresetList: {
+            /** @enum {boolean} */
+            success: true;
+            /** Format: date-time */
+            timestamp: string;
+        } & {
+            data?: components["schemas"]["PresetView"][];
+        };
+        SuccessEnvelope_PresetPreview: {
+            /** @enum {boolean} */
+            success: true;
+            /** Format: date-time */
+            timestamp: string;
+        } & {
+            data?: components["schemas"]["PresetPreview"];
         };
         SuccessEnvelope_SettingsDocument: {
             /** @enum {boolean} */
@@ -3832,6 +3941,92 @@ export interface operations {
             403: components["responses"]["Forbidden"];
         };
     };
+    getPresets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Curated preset catalogue */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope_PresetList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    postPresetPreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Preset id from `GET /api/presets` */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PresetPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Preview of the preset apply */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope_PresetPreview"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            /** @description Preset id is not registered (`PRESET_NOT_REGISTERED`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Request body exceeds the 2 MiB limit for preset previews */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Source has no patchable `module.exports` object (`SOURCE_NOT_EXPORTS`), or the preset's declared inputs are missing or not absolute paths (`PRESET_NEEDS_INPUT`) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Preview failed unexpectedly (`PRESET_PREVIEW_FAILED`) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
     getBootstrapStatus: {
         parameters: {
             query?: never;
@@ -4878,7 +5073,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Update flow started */
+            /** @description Run claimed and started; `state` is `BackingUp` */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4888,7 +5083,15 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
-            409: components["responses"]["Conflict"];
+            /** @description `UPDATE_IN_PROGRESS`: another request holds the update run (`BackingUp` or `Applying`). Completed or failed flows do not block a new update. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
         };
     };
     getUpdatesState: {

@@ -8,6 +8,7 @@
   "advanced": {
     "title": "Ajustes avanzados de settings.js",
     "description": "Edita el archivo settings.js detectado por nrcc. Se crea un respaldo automáticamente antes de guardar.",
+    "disclosure": "Mostrar el editor de settings.js",
     "lastBackup": "Último respaldo: {{path}}",
     "unlockToEdit": "Desbloquear para editar settings.js",
     "unlockDialogTitle": "Editar Node-RED settings.js directamente",
@@ -21,19 +22,42 @@
     "parseError": "settings.js no válido: {{message}}"
   },
   "preset": {
-    "confirmApply": "Confirmar aplicación",
-    "acknowledgement": "Entiendo que al confirmar un preset se reescribirá la clave gestionada en settings.js y el valor original no se podrá recuperar a menos que exista un respaldo.",
+    "confirmApply": "Aplicar preset",
+    "acknowledgement": "Revisé el diff. Aplicarlo reescribe las claves gestionadas de settings.js; NRCC respalda settings.js antes y reinicia Node-RED.",
     "loadingCurated": "Cargando presets curados...",
     "loadError": "No se pudieron cargar los presets.",
     "unavailable": "Los presets curados no están disponibles en este servidor de NRCC.",
     "sectionLabel": "Presets curados",
     "title": "Presets curados",
-    "description": "Recetas verificadas para ajustes avanzados de Node-RED 5. Cada preset declara las superficies editor / HTTP / Socket.IO que toca y nunca reescribe código del operador fuera de su alcance declarado.",
-    "previewAria": "previsualizar {{name}}",
-    "preview": "Previsualizar",
-    "previewTitle": "Previsualización: {{name}}",
-    "reviewDiff": "Revisa el diff con datos sensibles ocultos. Confirma para escribir el parche a través de /api/settings/raw (o cancela para descartar).",
-    "generatingPreview": "Generando previsualización con datos sensibles ocultos..."
+    "description": "Recetas verificadas para ajustes avanzados de Node-RED 5. Cada una reescribe solo las claves que lista y deja el resto de settings.js como está.",
+    "touches": "Reescribe",
+    "surfaces": "Superficies",
+    "previewAria": "Vista previa de {{name}}",
+    "preview": "Vista previa",
+    "previewTitle": "Vista previa: {{name}}",
+    "reviewDiff": "No se escribe nada hasta que lo apliques. Los secretos del diff se ocultan.",
+    "inputsHint": "Este preset necesita los archivos a los que apunta Node-RED. Escribe rutas absolutas dentro del contenedor de Node-RED.",
+    "input": {
+      "key": "Archivo de clave privada",
+      "cert": "Archivo de certificado"
+    },
+    "inputPlaceholder": {
+      "key": "/data/certs/privkey.pem",
+      "cert": "/data/certs/fullchain.pem"
+    },
+    "generate": "Generar vista previa",
+    "generatingPreview": "Generando la vista previa con secretos ocultos...",
+    "unchanged": "Este preset no cambiaría settings.js.",
+    "diffLabel": "Diff con secretos ocultos",
+    "applied": "{{name}} aplicado.",
+    "error": {
+      "needsInput": "Escribe rutas de archivo absolutas (que empiecen por /) en todos los campos.",
+      "sourceNotExports": "settings.js no tiene un objeto module.exports que este preset pueda modificar.",
+      "notRegistered": "Este preset ya no está disponible en el servidor.",
+      "tooLarge": "settings.js es demasiado grande para la vista previa (límite 2 MiB).",
+      "generic": "No se pudo generar la vista previa. Vuelve a intentarlo.",
+      "applyFailed": "No se pudo aplicar el preset. settings.js no cambió."
+    }
   },
   "saveErrorRaw": "La respuesta del guardado no es JSON",
   "basicSettings": "Ajustes básicos",
@@ -144,6 +168,7 @@
   "circuit": {
     "title": "Circuito de cambios",
     "summary": "Paso {{index}} de {{total}} · {{step}} · {{state}}",
+    "idle": "Circuito en reposo · sin cambios pendientes",
     "steps": {
       "edit": "Editar",
       "diff": "Diff",

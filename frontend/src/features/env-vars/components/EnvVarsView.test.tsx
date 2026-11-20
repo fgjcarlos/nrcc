@@ -69,6 +69,14 @@ describe('EnvVarsView', () => {
     await waitFor(() => expect(importFromNodeRed).toHaveBeenCalled());
   });
 
+  it('ranks the empty state directly under the page heading (no skipped level)', async () => {
+    render(<EnvVarsView />);
+
+    expect(screen.getByRole('heading', { level: 2, name: 'No environment variables configured' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 3 })).toBeNull();
+    await waitFor(() => expect(importFromNodeRed).toHaveBeenCalled());
+  });
+
   it('announces loading through the shared status instead of a table row', async () => {
     dataState.isLoading = true;
     render(<EnvVarsView />);

@@ -211,7 +211,7 @@ export function EnvVarsView() {
             isError={!!isError}
             isEmpty={envVars.length === 0}
             errorSlot={<ErrorState title={t('env-vars:loadError')} onRetry={() => void refetchEnvVars()} />}
-            emptySlot={<EmptyState title={t('env-vars:noEnvVarsConfigured')} description={t('env-vars:noEnvVarsHint')} />}
+            emptySlot={<EmptyState headingLevel={2} title={t('env-vars:noEnvVarsConfigured')} description={t('env-vars:noEnvVarsHint')} />}
           >
             <Table stacked caption={t('env-vars:pageTitle')}>
               <thead>

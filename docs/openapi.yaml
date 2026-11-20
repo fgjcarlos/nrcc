@@ -834,8 +834,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
+        "413":
+          description: Request body exceeds the 2 MiB limit for preset previews
         "422":
-          description: Source has no patchable `module.exports` object (`SOURCE_NOT_EXPORTS`)
+          description: Source has no patchable `module.exports` object (`SOURCE_NOT_EXPORTS`), or the preset's declared inputs are missing or not absolute paths (`PRESET_NEEDS_INPUT`)
           content:
             application/json:
               schema:
@@ -3113,7 +3115,7 @@ components:
 
     PresetView:
       type: object
-      required: [id, name, description, surfaces, trust, channelBoundary, managedKeys]
+      required: [id, name, description, surfaces, trust, channelBoundary, managedKeys, inputs]
       properties:
         id:
           type: string
@@ -3134,6 +3136,12 @@ components:
           type: array
           items:
             type: string
+        inputs:
+          type: array
+          description: Operator values the preview needs in `values` (absolute file paths); empty when none
+          items:
+            type: string
+          example: [key, cert]
 
     PresetPreviewRequest:
       type: object
@@ -3142,6 +3150,11 @@ components:
         content:
           type: string
           description: Live settings.js source to preview the preset against
+        values:
+          type: object
+          description: Values for the preset's declared `inputs`, e.g. absolute `key` and `cert` paths for https-tls-preset
+          additionalProperties:
+            type: string
 
     PresetPreview:
       type: object

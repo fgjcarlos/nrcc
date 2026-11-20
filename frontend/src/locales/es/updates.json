@@ -34,7 +34,8 @@
   "updateFailed": "La actualización falló",
   "failed": {
     "backup_failed": "No se pudo escribir la copia previa a la actualización, así que no se instaló nada.",
-    "update_failed": "npm no instaló la nueva versión, la versión instalada no coincide o npm audit encontró una vulnerabilidad crítica. Node-RED no se reinició y la copia previa a la actualización está en Respaldos."
+    "update_failed": "npm no instaló la nueva versión, la versión instalada no coincide o npm audit encontró una vulnerabilidad crítica. Node-RED no se reinició y la copia previa a la actualización está en Respaldos.",
+    "internal_error": "La actualización se detuvo por un error interno de NRCC. Revisa el registro de NRCC y vuelve a intentarlo."
   },
   "checkNow": "Comprobar ahora",
   "updateTo": "Actualizar a {{version}}",

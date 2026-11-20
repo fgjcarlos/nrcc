@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"net/http"
+	"path"
 	"strings"
 )
 
@@ -11,7 +12,9 @@ const (
 	miB              int64 = 1 << 20
 )
 
-// BodyLimitConfig defines the default request body limit and exact route overrides.
+// BodyLimitConfig defines the default request body limit and route overrides.
+// An override key is "METHOD /path"; a key containing "*" is a path.Match
+// pattern where "*" matches one path segment, checked after exact keys.
 type BodyLimitConfig struct {
 	DefaultLimit int64
 	Overrides    map[string]int64
@@ -26,6 +29,8 @@ func DefaultBodyLimitConfig() BodyLimitConfig {
 			http.MethodPut + " /api/env/dotenv":       5 * miB,
 			http.MethodPost + " /api/settings/raw":    2 * miB,
 			http.MethodPost + " /api/ai/analyze/flow": 5 * miB,
+			// A preset preview carries the same settings.js source as a raw save.
+			http.MethodPost + " /api/presets/*/preview": 2 * miB,
 		},
 	}
 }
@@ -38,8 +43,14 @@ func BodyLimitMiddleware(cfg BodyLimitConfig) func(http.Handler) http.Handler {
 	}
 
 	overrides := make(map[string]int64, len(cfg.Overrides))
+	patterns := make(map[string]int64)
 	for route, limit := range cfg.Overrides {
-		if limit > 0 {
+		if limit <= 0 {
+			continue
+		}
+		if strings.Contains(route, "*") {
+			patterns[route] = limit
+		} else {
 			overrides[route] = limit
 		}
 	}
@@ -52,9 +63,17 @@ func BodyLimitMiddleware(cfg BodyLimitConfig) func(http.Handler) http.Handler {
 				return
 			}
 
+			key := r.Method + " " + r.URL.Path
 			limit := defaultLimit
-			if override, ok := overrides[r.Method+" "+r.URL.Path]; ok {
+			if override, ok := overrides[key]; ok {
 				limit = override
+			} else {
+				for pattern, override := range patterns {
+					if matched, _ := path.Match(pattern, key); matched {
+						limit = override
+						break
+					}
+				}
 			}
 			r.Body = http.MaxBytesReader(w, r.Body, limit)
 			next.ServeHTTP(w, r)

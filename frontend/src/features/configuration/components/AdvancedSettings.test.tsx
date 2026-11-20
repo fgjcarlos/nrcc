@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import { AdvancedSettings } from './AdvancedSettings';
 import { server } from '@/test/msw/server';
+import { i18n } from '@/i18n';
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
@@ -20,6 +21,7 @@ const corePresets = [
     trust: 'managed',
     channelBoundary: 'http-only',
     managedKeys: ['https'],
+    inputs: ['key', 'cert'],
   },
   {
     id: 'functionGlobalContext-strict',
@@ -29,6 +31,7 @@ const corePresets = [
     trust: 'managed',
     channelBoundary: 'editor-only',
     managedKeys: ['functionGlobalContext'],
+    inputs: [],
   },
 ];
 
@@ -66,13 +69,117 @@ describe('AdvancedSettings', () => {
     expect(screen.getAllByText(/editor/).length).toBeGreaterThan(0);
   });
 
-  it('shows a redacted preview when the operator clicks Preview', async () => {
+  it('asks for the declared paths, sends them, and shows the redacted preview', async () => {
     const user = userEvent.setup();
+    let body: unknown;
+    server.use(
+      http.post('/api/presets/https-tls-preset/preview', async ({ request }) => {
+        body = await request.json();
+        return ok({ after: 'patched', preview: '+ https: [redacted]\n', replaced: ['https'], inserted: [] });
+      }),
+    );
     renderAdvanced();
     const card = await screen.findByRole('region', { name: /https-tls-preset/i });
     await user.click(within(card).getByRole('button', { name: /preview/i }));
     const dialog = await screen.findByRole('dialog');
+    const generate = within(dialog).getByRole('button', { name: 'Generate preview' });
+    expect(generate).toBeDisabled();
+    await user.type(within(dialog).getByLabelText('Private key file'), '/data/certs/key.pem');
+    await user.type(within(dialog).getByLabelText('Certificate file'), '/data/certs/cert.pem');
+    await user.click(generate);
     expect(await within(dialog).findByText(/\[redacted\]/)).toBeVisible();
+    expect(body).toEqual({
+      content: 'module.exports = {}',
+      values: { key: '/data/certs/key.pem', cert: '/data/certs/cert.pem' },
+    });
+  });
+
+  it('previews a preset without inputs straight away', async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.post('/api/presets/functionGlobalContext-strict/preview', () =>
+        ok({ after: 'patched', preview: '+ functionGlobalContext: {}\n', replaced: [], inserted: ['functionGlobalContext'] }),
+      ),
+    );
+    renderAdvanced();
+    const card = await screen.findByRole('region', { name: /functionGlobalContext-strict/i });
+    await user.click(within(card).getByRole('button', { name: /preview/i }));
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByText(/functionGlobalContext: \{\}/)).toBeVisible();
+    expect(within(dialog).queryByRole('button', { name: 'Generate preview' })).not.toBeInTheDocument();
+  });
+
+  it('applies only after acknowledgement, without typing a confirmation phrase', async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.post('/api/presets/functionGlobalContext-strict/preview', () =>
+        ok({ after: 'patched', preview: '+ functionGlobalContext: {}\n', replaced: [], inserted: ['functionGlobalContext'] }),
+      ),
+    );
+    renderAdvanced();
+    const card = await screen.findByRole('region', { name: /functionGlobalContext-strict/i });
+    await user.click(within(card).getByRole('button', { name: /preview/i }));
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByText(/functionGlobalContext: \{\}/);
+    const apply = within(dialog).getByRole('button', { name: 'Apply preset' });
+    expect(apply).toBeDisabled();
+    expect(within(dialog).queryByRole('textbox')).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole('checkbox'));
+    expect(apply).toBeEnabled();
+  });
+
+  it('reports an unchanged result and keeps apply disabled', async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.post('/api/presets/functionGlobalContext-strict/preview', () =>
+        ok({ after: 'module.exports = {}', preview: '', replaced: ['functionGlobalContext'], inserted: [] }),
+      ),
+    );
+    renderAdvanced();
+    const card = await screen.findByRole('region', { name: /functionGlobalContext-strict/i });
+    await user.click(within(card).getByRole('button', { name: /preview/i }));
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByText('This preset would not change settings.js.')).toBeVisible();
+    await user.click(within(dialog).getByRole('checkbox'));
+    expect(within(dialog).getByRole('button', { name: 'Apply preset' })).toBeDisabled();
+  });
+
+  it('explains a rejected path inline instead of the HTTP status', async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.post('/api/presets/https-tls-preset/preview', () =>
+        HttpResponse.json(
+          { success: false, error: { code: 'PRESET_NEEDS_INPUT', message: 'key must be an absolute file path' } },
+          { status: 422 },
+        ),
+      ),
+    );
+    renderAdvanced();
+    const card = await screen.findByRole('region', { name: /https-tls-preset/i });
+    await user.click(within(card).getByRole('button', { name: /preview/i }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByLabelText('Private key file'), 'certs/key.pem');
+    await user.type(within(dialog).getByLabelText('Certificate file'), '/data/cert.pem');
+    await user.click(within(dialog).getByRole('button', { name: 'Generate preview' }));
+    const alert = await within(dialog).findByRole('alert');
+    expect(alert).toHaveTextContent('Enter absolute file paths (starting with /) for every field.');
+    expect(alert).not.toHaveTextContent(/status code/);
+  });
+
+  it('renders the catalogue copy from the Spanish catalog', async () => {
+    await i18n.changeLanguage('es');
+    try {
+      const user = userEvent.setup();
+      renderAdvanced();
+      const card = await screen.findByRole('region', { name: /https-tls-preset/i });
+      expect(within(card).queryByText(/trust:/)).not.toBeInTheDocument();
+      await user.click(within(card).getByRole('button', { name: /vista previa/i }));
+      const dialog = await screen.findByRole('dialog');
+      expect(within(dialog).getByLabelText('Archivo de clave privada')).toBeVisible();
+      expect(within(dialog).getByRole('button', { name: 'Generar vista previa' })).toBeVisible();
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 
   it('surfaces a 404 when the preset is not registered', async () => {
