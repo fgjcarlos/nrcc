@@ -337,31 +337,30 @@ jobs:
           prerelease: ${{ needs.version.outputs.prerelease }}
           make_latest: ${{ needs.version.outputs.make_latest }}
 
-  # ── Post-release smoke test of the public install URL ─────────────────────
-  # NON-BLOCKING for now: get.nrcc.dev (GitHub Pages custom domain) is not live
-  # yet — there is no docs/CNAME and the host does not resolve. This job surfaces
-  # a warning in the Actions log without failing the release. Once DNS + Pages +
-  # docs/CNAME are configured, remove `continue-on-error` to make it a hard gate.
+  # ── Post-release smoke test of the documented install command ─────────────
+  # Hard gate (#1008). Runs the public README command against the release just
+  # published, on a runner with no registry login, so it also proves the image
+  # is anonymously pullable. Then exercises the documented upgrade commands.
   smoke-install-url:
-    name: Install URL smoke (non-blocking)
+    name: Install URL smoke
     runs-on: ubuntu-latest
     needs: [version, release]
     if: needs.version.outputs.publish == 'true'
-    continue-on-error: true
     permissions:
       contents: read
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+      INSTALL_DIR: /tmp/nrcc-install-smoke
     steps:
-      - name: Curl get.nrcc.dev/install.sh (HTTP 200 + shebang)
+      - name: Install the release with the documented command
         run: |
-          code=$(curl -fsSL -o /tmp/install.sh -w '%{http_code}' --max-time 30 \
-            https://get.nrcc.dev/install.sh) || true
-          echo "HTTP status: ${code:-000}"
-          if [ "${code:-000}" != "200" ]; then
-            echo "::warning::get.nrcc.dev/install.sh returned HTTP ${code:-000} (expected 200); DNS/Pages may not be live yet."
-            exit 1
-          fi
-          if ! head -1 /tmp/install.sh | grep -qE '^#!/'; then
-            echo "::warning::Served install.sh is missing a shebang on its first line."
-            exit 1
-          fi
-          echo "OK: install.sh served with HTTP 200 and a shebang."
+          set -Eeuo pipefail
+          curl -fsSL "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/docs/install.sh" |
+            NRCC_REPO="$GITHUB_REPOSITORY" sh -s -- "$RELEASE_TAG"
+
+      - name: Run the documented upgrade commands
+        run: |
+          set -Eeuo pipefail
+          cd "$INSTALL_DIR"
+          docker compose pull
+          docker compose up -d --no-build --wait --wait-timeout 180
