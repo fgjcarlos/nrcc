@@ -83,10 +83,10 @@ type settingsRecorder struct {
 	calls   int
 }
 
-func (r *settingsRecorder) update(transform func(string) string) error {
+func (r *settingsRecorder) update(_ context.Context, transform func(string) string) (bool, error) {
 	r.calls++
 	r.content = transform(r.content)
-	return nil
+	return false, nil
 }
 
 func TestLibraryServiceInstallActivatesLibraryInSettings(t *testing.T) {
