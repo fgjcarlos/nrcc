@@ -87,6 +87,16 @@ func runServer() {
 	configSvc := service.NewConfigServiceWithHost(dataDir, hostSvc)
 	pm.SetEnvService(service.NewEnvService(configSvc, os.Getenv("NRCC_ENCRYPTION_KEY")))
 
+	// Roll back an apply a previous run never confirmed ready (issue #1012),
+	// before any Node-RED instance loads the unverified settings.js.
+	restored, err := configSvc.RecoverInterruptedApply(context.Background(), hostSvc.Detect().Settings.Path)
+	if restored != "" {
+		ui.Warn("Interrupted settings apply rolled back: restored " + restored)
+	}
+	if err != nil {
+		ui.Error(fmt.Sprintf("Interrupted apply recovery: %v", err))
+	}
+
 	// Node-RED managed mode is ON by default.
 	// Set NRCC_MANAGE_NODE_RED=false to disable.
 	ui.SectionHeader("Node-RED Startup")
