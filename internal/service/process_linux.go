@@ -3,6 +3,7 @@
 package service
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -52,6 +53,10 @@ type ProcessManager struct {
 	// counts against the crash budget (issue #1013).
 	stableUptime time.Duration
 
+	// output receives the child's stdout and stderr, prefixed per line, so
+	// Node-RED start-up errors reach `docker logs nrcc` (issue #1015).
+	output io.Writer
+
 	// set via setter, guarded by mu
 	envSvc *EnvService
 
@@ -97,6 +102,7 @@ func NewProcessManager(cmd, dataDir string) *ProcessManager {
 		dataDir:      dataDir,
 		maxRestarts:  10,
 		restartDelay: 2 * time.Second,
+		output:       os.Stdout,
 		stableUptime: 5 * time.Minute,
 		doneCh:       closedChan(), // sentinel so Stop() doesn't block when nothing is running
 		// Two sources of truth about restarts, on purpose (see restart_tracker.go):
@@ -384,13 +390,12 @@ func (pm *ProcessManager) startLocked(resetCounter bool, attachAllowed bool) err
 		pm.restartCount = 0
 	}
 
-	// Drain the child stdout/stderr into io.Discard so the kernel pipe buffer
-	// never fills and `cmd.Wait()` exits cleanly. The captured lines are no
-	// longer exposed via a /logs page; Node-RED's own stdout is still visible
-	// in `docker logs nrcc`.
+	// Forward the child stdout/stderr to the NRCC output (the container log;
+	// Docker rotates it) so a failed start explains itself. Draining also keeps
+	// the kernel pipe buffer from filling, so `cmd.Wait()` exits cleanly.
 	drainDone := make(chan struct{}, 2)
-	go func() { _, _ = io.Copy(io.Discard, stdoutPipe); drainDone <- struct{}{} }()
-	go func() { _, _ = io.Copy(io.Discard, stderrPipe); drainDone <- struct{}{} }()
+	go func() { forwardOutput(pm.output, stdoutPipe, "node-red: "); drainDone <- struct{}{} }()
+	go func() { forwardOutput(pm.output, stderrPipe, "node-red: "); drainDone <- struct{}{} }()
 	// Pass local copies of the channels — waitForExit must not read pm.stopCh/doneCh
 	// after the lock is released, as a new Start() could replace them.
 	go pm.waitForExit(cmd, stopCh, doneCh)
@@ -403,6 +408,36 @@ func (pm *ProcessManager) startLocked(resetCounter bool, attachAllowed bool) err
 	}()
 
 	return nil
+}
+
+// forwardOutput copies src to dst until EOF, starting each line with prefix.
+// Each line goes out in one Write so the stdout and stderr forwarders do not
+// interleave mid-line; lines longer than the read buffer are split into
+// chunks. Write errors are ignored: src must keep draining or the child
+// blocks on a full pipe.
+func forwardOutput(dst io.Writer, src io.Reader, prefix string) {
+	r := bufio.NewReader(src)
+	lineStart := true
+	for {
+		chunk, err := r.ReadSlice('\n')
+		if len(chunk) > 0 {
+			buf := chunk
+			if lineStart {
+				buf = append([]byte(prefix), chunk...)
+			}
+			_, _ = dst.Write(buf)
+			lineStart = chunk[len(chunk)-1] == '\n'
+		}
+		if errors.Is(err, bufio.ErrBufferFull) {
+			continue
+		}
+		if err != nil {
+			if !lineStart {
+				_, _ = dst.Write([]byte("\n"))
+			}
+			return
+		}
+	}
 }
 
 // Stop gracefully stops the node-red process and waits for it to exit,
