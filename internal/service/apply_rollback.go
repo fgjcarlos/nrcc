@@ -262,8 +262,8 @@ func restoreSnapshotContext(ctx context.Context, backupPath, activePath string) 
 	if err := validateSettingsPath(activePath); err != nil {
 		return err
 	}
-	// #nosec G304 -- backupPath is the operator-supplied snapshot path from ApplyResult.BackupPath; we re-validate before reading.
-	data, err := os.ReadFile(backupPath)
+	// #nosec G304 G703 -- backupPath is the snapshot path from ApplyResult.BackupPath or the boot-recovery marker in the operator-supplied dataDir; re-validated above.
+	data, err := os.ReadFile(backupPath) //nolint:gosec // G304 G703 snapshot path inside the operator-supplied dataDir, re-validated above.
 	if err != nil {
 		return fmt.Errorf("read backup %s: %w", backupPath, err)
 	}

@@ -23,7 +23,7 @@ func (killAfterWriteAdapter) Restart(context.Context) error {
 
 func readFile(t *testing.T, path string) string {
 	t.Helper()
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // G304 test temp-dir path.
 	if err != nil {
 		t.Fatal(err)
 	}
