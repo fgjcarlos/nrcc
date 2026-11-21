@@ -96,7 +96,7 @@ unreachable" for more than 60 seconds.
 **Diagnosis.**
 
 ```
-docker logs <node-red> --tail 50 | grep -iE "error|fatal|settings"
+docker logs <nrcc> --tail 200 | grep "node-red:" | grep -iE "error|fatal|settings"
 ```
 
 Common causes:

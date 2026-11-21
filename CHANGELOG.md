@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Node-RED's stdout and stderr now appear in the NRCC container log
+  (`docker logs nrcc`), each line prefixed with `node-red: `, so a failed start
+  (for example a syntax error in `settings.js`) explains itself. Previously the
+  output was discarded.
 - Installing a library now activates it in settings.js: `functionExternalModules`
   is enabled and plain npm libraries are exposed in `functionGlobalContext` under
   their alias (guarded `require`, so a module that fails to load cannot stop

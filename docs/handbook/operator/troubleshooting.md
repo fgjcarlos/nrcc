@@ -180,7 +180,7 @@ The recommended UID is `1000` (the Node-RED default).
 **Diagnosis.**
 
 ```
-docker logs <node-red> --tail 50 | grep -iE "ready|listen|error"
+docker logs <nrcc> --tail 200 | grep "node-red:" | grep -iE "ready|listen|error"
 ```
 
 Common causes:
