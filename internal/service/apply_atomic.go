@@ -140,7 +140,8 @@ func AtomicWriteSettings(ctx context.Context, path, content string) error {
 }
 
 // atomicWriteFile atomically replaces an NRCC-owned file outside the JSON
-// store (.env, backup_config.json, backup_events.json; #1016): tmp sibling,
+// store (.env, backup_config.json, backup_events.json and the legacy
+// settings.js save; #1016): tmp sibling,
 // fsync, rename, parent fsync, mode 0600. Unlike AtomicWriteSettings it does
 // not reject symlinked parent directories, so a DATA_DIR reached through a
 // symlink keeps working.

@@ -109,6 +109,10 @@ func TestOwnedFileWritersAcceptSymlinkedDataDir(t *testing.T) {
 	if err := newBackupEventStore(link).Append(model.BackupEvent{Type: "t", Message: "m"}); err != nil {
 		t.Errorf("Append: %v", err)
 	}
+	cfg := NewConfigServiceWithHost(link, NewIsolatedHostService(link))
+	if _, err := cfg.SaveRawSettings("module.exports = { uiPort: 1880, httpAdminRoot: '/' }\n"); err != nil {
+		t.Errorf("SaveRawSettings: %v", err)
+	}
 }
 
 func TestCorruptBackupEventLogIsReplacedByEmptyLog(t *testing.T) {

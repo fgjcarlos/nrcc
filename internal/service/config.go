@@ -792,7 +792,9 @@ func (s *ConfigService) writeSettingsFile(content string, syncStore bool) (model
 	if err != nil {
 		return doc, err
 	}
-	if err := AtomicWriteSettings(context.Background(), doc.Path, content); err != nil {
+	// The apply coordinator owns the strict symlink policy; this legacy path
+	// only gains atomicity so a symlinked DATA_DIR keeps saving (#1016).
+	if err := atomicWriteFile(doc.Path, []byte(content)); err != nil {
 		return doc, err
 	}
 	if syncStore {
