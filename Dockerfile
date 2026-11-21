@@ -33,7 +33,7 @@ RUN pnpm build
 # ref: golang:1.27.4-alpine — pinned to digest for supply-chain integrity.
 # Dependabot (docker ecosystem, weekly) bumps the digest when upstream
 # changes. See issue #593 and auditoria/devops-security.md §2.1.
-FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine@sha256:0a5f7fe796599ff487605987432e7619ae45beeb2fba4c2ce0b907879932aebf AS go-builder
+FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine@sha256:70bd7ddea8b6cbe5d6943cde279d6b67feb10cc924fb9100d1d8757c1575b280 AS go-builder
 # VERSION is embedded in the binary (main.Version) and mirrored by the
 # OCI org.opencontainers.image.version label in the runtime stage. The
 # default keeps local builds on the "dev" version.
