@@ -412,6 +412,12 @@ func (pm *ProcessManager) startLocked(resetCounter bool, attachAllowed bool) err
 func (pm *ProcessManager) Stop(ctx context.Context) error {
 	pm.mu.Lock()
 	if !pm.running || pm.currentCmd == nil {
+		// No child, but a crashed one may be waiting out its restart
+		// backoff: closing its stopCh cancels that restart (issue #1014).
+		if pm.stopOnce != nil {
+			stopCh := pm.stopCh
+			pm.stopOnce.Do(func() { close(stopCh) })
+		}
 		pm.mu.Unlock()
 		return nil
 	}
@@ -619,9 +625,21 @@ func (pm *ProcessManager) waitForExit(cmd *exec.Cmd, stopCh, doneCh chan struct{
 
 	ui.Warnf("node-red exited unexpectedly (attempt %d/%d) — restarting in %s", restartCount+1, pm.maxRestarts, delay)
 
-	time.Sleep(delay)
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-stopCh:
+		return // Stop cancelled the pending restart (issue #1014)
+	case <-timer.C:
+	}
 
 	pm.mu.Lock()
+	// Re-check under the lock: Stop may have run after the timer fired, or
+	// a user Start may already own a newer child.
+	if pm.stopCh != stopCh || isClosed(stopCh) {
+		pm.mu.Unlock()
+		return
+	}
 	pm.restartCount++
 	pm.cumulativeRestarts++
 	if saveErr := pm.restartStore.Save(pm.cumulativeRestarts); saveErr != nil {
@@ -635,6 +653,15 @@ func (pm *ProcessManager) waitForExit(cmd *exec.Cmd, stopCh, doneCh chan struct{
 		ui.Errorf("node-red auto-restart failed — giving up automatic restarts: %v", startErr)
 	}
 	pm.mu.Unlock()
+}
+
+func isClosed(ch chan struct{}) bool {
+	select {
+	case <-ch:
+		return true
+	default:
+		return false
+	}
 }
 
 // RestartEvents returns the recorded unexpected-exit events in chronological
