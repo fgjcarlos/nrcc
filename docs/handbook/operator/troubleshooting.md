@@ -35,7 +35,10 @@ curl -sI http://<nrcc-host>:8080/healthz
 
 If the request times out, NRCC is unreachable from the browser's
 network. If it returns `200 OK`, the issue is between the browser
-and NRCC (often a reverse proxy).
+and NRCC (often a reverse proxy). A `503 Service Unavailable` means
+NRCC is up but the Node-RED it manages crashed repeatedly and NRCC
+gave up restarting it; see
+[`/healthz` returns 503](#healthz-returns-503).
 
 **Fix.**
 
@@ -46,6 +49,20 @@ and NRCC (often a reverse proxy).
 
 **Verification.** The browser banner turns green within the next
 poll (typically 5 seconds).
+
+### `/healthz` returns 503
+
+NRCC restarts a crashed Node-RED with backoff, up to 10 times. Only
+crashes close together count: once Node-RED has run for 5 minutes,
+its next crash starts a fresh budget. When the budget is spent, NRCC
+logs `node-red crashed 10 times — giving up automatic restarts` and
+`/healthz` returns 503, so Docker marks the container unhealthy.
+
+**Fix.** Read `docker logs <nrcc>` for the crash cause, fix it, then
+start or restart Node-RED from the NRCC UI. The first successful
+manual start or restart returns `/healthz` to 200. If the log shows
+`node-red auto-restart failed`, NRCC could not launch Node-RED at
+all (for example, a missing binary); `/healthz` also returns 503.
 
 ### The structured UI shows "Audit log full"
 

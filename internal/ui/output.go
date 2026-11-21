@@ -2,10 +2,15 @@ package ui
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/pterm/pterm"
 )
+
+// printMu serializes the shared pterm prefix printers, whose Print calls
+// mutate package-level state: log lines come from several goroutines.
+var printMu sync.Mutex
 
 // Init configures pterm defaults based on terminal capabilities and environment.
 // Call this once at the top of main() before any other output.
@@ -28,36 +33,50 @@ func SectionHeader(title string) {
 
 // Info logs an informational message with green [INFO] prefix (or plain text in non-TTY).
 func Info(msg string) {
+	printMu.Lock()
+	defer printMu.Unlock()
 	pterm.Info.Println(msg)
 }
 
 // Infof logs a formatted informational message.
 func Infof(format string, args ...any) {
+	printMu.Lock()
+	defer printMu.Unlock()
 	pterm.Info.Printfln(format, args...)
 }
 
 // Warn logs a warning message with yellow [WARN] prefix.
 func Warn(msg string) {
+	printMu.Lock()
+	defer printMu.Unlock()
 	pterm.Warning.Println(msg)
 }
 
 // Warnf logs a formatted warning message.
 func Warnf(format string, args ...any) {
+	printMu.Lock()
+	defer printMu.Unlock()
 	pterm.Warning.Printfln(format, args...)
 }
 
 // Error logs an error message with red [ERROR] prefix.
 func Error(msg string) {
+	printMu.Lock()
+	defer printMu.Unlock()
 	pterm.Error.Println(msg)
 }
 
 // Errorf logs a formatted error message.
 func Errorf(format string, args ...any) {
+	printMu.Lock()
+	defer printMu.Unlock()
 	pterm.Error.Printfln(format, args...)
 }
 
 // Debug logs a debug message with muted [DEBUG] prefix.
 func Debug(msg string) {
+	printMu.Lock()
+	defer printMu.Unlock()
 	pterm.Debug.Println(msg)
 }
 
@@ -135,5 +154,7 @@ func HTTPLog(method, path string, statusCode int, duration time.Duration) {
 	logLine := fmt.Sprintf("%s %s %s %dms", methodPad, path, coloredStatus, durationMs)
 
 	// Print via pterm Info to maintain consistency
+	printMu.Lock()
+	defer printMu.Unlock()
 	pterm.Info.Println(logLine)
 }

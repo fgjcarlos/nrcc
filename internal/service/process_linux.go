@@ -48,6 +48,9 @@ type ProcessManager struct {
 	dataDir      string
 	maxRestarts  int
 	restartDelay time.Duration
+	// stableUptime is how long a child must run before its exit no longer
+	// counts against the crash budget (issue #1013).
+	stableUptime time.Duration
 
 	// set via setter, guarded by mu
 	envSvc *EnvService
@@ -60,10 +63,13 @@ type ProcessManager struct {
 	runtimePort  int  // port resolved for the most recent successful Start; guarded by mu
 	startedAt    time.Time
 	restartCount int
-	lastError    error
-	stopCh       chan struct{} // closed to signal intentional stop to waitForExit
-	stopOnce     *sync.Once    // guards closing stopCh so Stop is idempotent
-	doneCh       chan struct{} // closed by waitForExit when the process fully exits
+	// restartsExhausted is set when automatic restarts give up and cleared
+	// by the next successful user-initiated Start; /healthz reports it.
+	restartsExhausted bool
+	lastError         error
+	stopCh            chan struct{} // closed to signal intentional stop to waitForExit
+	stopOnce          *sync.Once    // guards closing stopCh so Stop is idempotent
+	doneCh            chan struct{} // closed by waitForExit when the process fully exits
 
 	// restart history (ring buffer, capacity 50)
 	tracker *restartTracker
@@ -91,6 +97,7 @@ func NewProcessManager(cmd, dataDir string) *ProcessManager {
 		dataDir:      dataDir,
 		maxRestarts:  10,
 		restartDelay: 2 * time.Second,
+		stableUptime: 5 * time.Minute,
 		doneCh:       closedChan(), // sentinel so Stop() doesn't block when nothing is running
 		// Two sources of truth about restarts, on purpose (see restart_tracker.go):
 		//   - tracker: in-memory ring buffer of recent events for the
@@ -255,7 +262,25 @@ func (pm *ProcessManager) IsExternalMode() bool {
 func (pm *ProcessManager) Start() error {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
-	return pm.startLocked(true, true)
+	if err := pm.startLocked(true, true); err != nil {
+		return err
+	}
+	pm.restartsExhausted = false
+	return nil
+}
+
+// RestartBudgetExhausted reports whether automatic restarts gave up after
+// repeated crashes and no user-initiated start has succeeded since.
+func (pm *ProcessManager) RestartBudgetExhausted() bool {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+	return pm.restartsExhausted
+}
+
+// ranStableLocked reports whether the current child has been up for the
+// stable-uptime threshold. Must be called with pm.mu held.
+func (pm *ProcessManager) ranStableLocked(now time.Time) bool {
+	return !pm.startedAt.IsZero() && now.Sub(pm.startedAt) >= pm.stableUptime
 }
 
 // startLocked starts the process. Must be called with pm.mu held.
@@ -465,7 +490,11 @@ func (pm *ProcessManager) Restart(ctx context.Context) error {
 	}
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
-	return pm.startLocked(true, false)
+	if err := pm.startLocked(true, false); err != nil {
+		return err
+	}
+	pm.restartsExhausted = false
+	return nil
 }
 
 // Status returns the current runtime status.
@@ -477,8 +506,12 @@ func (pm *ProcessManager) Status() model.RuntimeStatus {
 	var pid int
 	var uptime int64
 	var startedAt string
+	failures := pm.restartCount
 
 	if pm.running && pm.currentCmd != nil {
+		if pm.ranStableLocked(time.Now()) {
+			failures = 0 // the next exit resets the budget (issue #1013)
+		}
 		status = "running"
 		pid = pm.currentCmd.Process.Pid
 		uptime = int64(time.Since(pm.startedAt).Seconds())
@@ -497,7 +530,7 @@ func (pm *ProcessManager) Status() model.RuntimeStatus {
 		PID:                 pid,
 		Uptime:              uptime,
 		RestartCount:        pm.cumulativeRestarts,
-		ConsecutiveFailures: pm.restartCount,
+		ConsecutiveFailures: failures,
 		Version:             pm.version,
 		StartedAt:           startedAt,
 	}
@@ -531,10 +564,24 @@ func (pm *ProcessManager) waitForExit(cmd *exec.Cmd, stopCh, doneCh chan struct{
 	err := cmd.Wait()
 
 	pm.mu.Lock()
+	// The budget counts crashes close together, not over the lifetime of
+	// the container: a child that ran stably starts a fresh budget (#1013).
+	if pm.ranStableLocked(time.Now()) {
+		pm.restartCount = 0
+	}
 	pm.running = false
 	pm.currentCmd = nil
 	pm.lastError = err
 	restartCount := pm.restartCount
+	// Set in the same critical section as running=false so a concurrent
+	// user Start cannot clear the flag before it is raised.
+	select {
+	case <-stopCh:
+	default:
+		if restartCount >= pm.maxRestarts {
+			pm.restartsExhausted = true
+		}
+	}
 	pm.mu.Unlock()
 
 	close(doneCh) // unblocks Stop() if it is waiting
@@ -582,7 +629,10 @@ func (pm *ProcessManager) waitForExit(cmd *exec.Cmd, stopCh, doneCh chan struct{
 		ui.Warnf("restart count store: save failed: %v", saveErr)
 	}
 	if startErr := pm.startLocked(false, true); startErr != nil {
+		// No watcher runs after a failed launch: Node-RED is down for good.
 		pm.lastError = startErr
+		pm.restartsExhausted = true
+		ui.Errorf("node-red auto-restart failed — giving up automatic restarts: %v", startErr)
 	}
 	pm.mu.Unlock()
 }
