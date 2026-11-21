@@ -635,8 +635,8 @@ func (pm *ProcessManager) waitForExit(cmd *exec.Cmd, stopCh, doneCh chan struct{
 
 	pm.mu.Lock()
 	// Re-check under the lock: Stop may have run after the timer fired, or
-	// a user Start may already own a newer child.
-	if pm.stopCh != stopCh || isClosed(stopCh) {
+	// a user Start may already own a newer child or an attached runtime.
+	if pm.running || pm.stopCh != stopCh || isClosed(stopCh) {
 		pm.mu.Unlock()
 		return
 	}
