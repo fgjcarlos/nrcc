@@ -1,7 +1,9 @@
 package service
 
 import (
+	"context"
 	"net"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -68,4 +70,91 @@ func TestCrashBudgetExhaustedUntilManualStart(t *testing.T) {
 	if pm.RestartBudgetExhausted() {
 		t.Fatal("RestartBudgetExhausted() = true after a manual start")
 	}
+}
+
+func TestStatusReportsNoConsecutiveFailuresWhileRunningStably(t *testing.T) {
+	pm := NewProcessManager("node-red", t.TempDir())
+	cmd := exec.Command("sleep", "30")
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = cmd.Process.Kill(); _ = cmd.Wait() })
+	pm.mu.Lock()
+	pm.running = true
+	pm.currentCmd = cmd
+	pm.restartCount = 3
+	pm.startedAt = time.Now().Add(-pm.stableUptime - time.Second)
+	pm.mu.Unlock()
+
+	if got := pm.Status().ConsecutiveFailures; got != 0 {
+		t.Fatalf("ConsecutiveFailures = %d while running stably, want 0", got)
+	}
+}
+
+// crashingNodeRed writes a stub Node-RED that exits at once and points the
+// runtime contract at a free port and a temp user dir.
+func crashingNodeRed(t *testing.T) (pm *ProcessManager, script string) {
+	t.Helper()
+	dir := t.TempDir()
+	script = filepath.Join(dir, "fake-node-red")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\nexit 1\n"), 0o700); err != nil { //nolint:gosec // G306 the stub must be executable.
+		t.Fatal(err)
+	}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := ln.Addr().(*net.TCPAddr).Port
+	_ = ln.Close()
+	userDir := t.TempDir()
+	t.Setenv("NODE_RED_PORT", strconv.Itoa(port))
+	t.Setenv("NODE_RED_USER_DIR", userDir)
+	t.Setenv("NODE_RED_SETTINGS", filepath.Join(userDir, "settings.js"))
+	pm = NewProcessManager(script, dir)
+	pm.restartDelay = time.Millisecond
+	return pm, script
+}
+
+func waitExhausted(t *testing.T, pm *ProcessManager) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for !pm.RestartBudgetExhausted() && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
+	if !pm.RestartBudgetExhausted() {
+		t.Fatal("restart budget not exhausted")
+	}
+}
+
+func TestCrashBudgetExhaustedClearedByRestart(t *testing.T) {
+	pm, script := crashingNodeRed(t)
+	pm.maxRestarts = 1
+	if err := pm.Start(); err != nil {
+		t.Fatal(err)
+	}
+	waitExhausted(t, pm)
+
+	if err := os.WriteFile(script, []byte("#!/bin/sh\nexec sleep 30\n"), 0o700); err != nil { //nolint:gosec // G306 the stub must be executable.
+		t.Fatal(err)
+	}
+	if err := pm.Restart(context.Background()); err != nil {
+		t.Fatalf("Restart: %v", err)
+	}
+	t.Cleanup(func() { _ = pm.Stop(context.Background()) })
+	if pm.RestartBudgetExhausted() {
+		t.Fatal("RestartBudgetExhausted() = true after a successful Restart")
+	}
+}
+
+func TestFailedAutoRestartLaunchExhaustsBudget(t *testing.T) {
+	pm, script := crashingNodeRed(t)
+	pm.restartDelay = 200 * time.Millisecond
+	if err := pm.Start(); err != nil {
+		t.Fatal(err)
+	}
+	// The running child keeps its open script; the relaunch cannot find it.
+	if err := os.Remove(script); err != nil {
+		t.Fatal(err)
+	}
+	waitExhausted(t, pm)
 }

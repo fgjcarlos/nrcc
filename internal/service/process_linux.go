@@ -490,7 +490,11 @@ func (pm *ProcessManager) Restart(ctx context.Context) error {
 	}
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
-	return pm.startLocked(true, false)
+	if err := pm.startLocked(true, false); err != nil {
+		return err
+	}
+	pm.restartsExhausted = false
+	return nil
 }
 
 // Status returns the current runtime status.
@@ -569,6 +573,15 @@ func (pm *ProcessManager) waitForExit(cmd *exec.Cmd, stopCh, doneCh chan struct{
 	pm.currentCmd = nil
 	pm.lastError = err
 	restartCount := pm.restartCount
+	// Set in the same critical section as running=false so a concurrent
+	// user Start cannot clear the flag before it is raised.
+	select {
+	case <-stopCh:
+	default:
+		if restartCount >= pm.maxRestarts {
+			pm.restartsExhausted = true
+		}
+	}
 	pm.mu.Unlock()
 
 	close(doneCh) // unblocks Stop() if it is waiting
@@ -594,9 +607,6 @@ func (pm *ProcessManager) waitForExit(cmd *exec.Cmd, stopCh, doneCh chan struct{
 
 	// Unexpected crash — attempt auto-restart with exponential backoff.
 	if restartCount >= pm.maxRestarts {
-		pm.mu.Lock()
-		pm.restartsExhausted = true
-		pm.mu.Unlock()
 		ui.Errorf("node-red crashed %d times — giving up automatic restarts", restartCount)
 		return
 	}
@@ -619,7 +629,10 @@ func (pm *ProcessManager) waitForExit(cmd *exec.Cmd, stopCh, doneCh chan struct{
 		ui.Warnf("restart count store: save failed: %v", saveErr)
 	}
 	if startErr := pm.startLocked(false, true); startErr != nil {
+		// No watcher runs after a failed launch: Node-RED is down for good.
 		pm.lastError = startErr
+		pm.restartsExhausted = true
+		ui.Errorf("node-red auto-restart failed — giving up automatic restarts: %v", startErr)
 	}
 	pm.mu.Unlock()
 }
