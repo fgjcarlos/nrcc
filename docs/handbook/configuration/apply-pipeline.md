@@ -261,6 +261,23 @@ unless configured by the request. These are separate budgets. If recovery itself
 failure is recorded and surfaced for operator intervention; inspect
 the restored files and runtime before attempting another apply.
 
+Between the write and a settled outcome, a marker file
+`settings.js.pending-apply` next to `settings.js` holds the path of
+the pre-apply snapshot. It is removed when the candidate is ready or
+the rollback succeeds, and kept when recovery fails. If NRCC stops in
+that window (power loss, out of memory, `docker stop`), the next boot
+restores the snapshot before starting Node-RED, re-derives the
+structured fields from it, removes the marker, and logs
+`Interrupted settings apply rolled back: restored <snapshot>`. A first
+write with no previous `settings.js` has no snapshot and no marker.
+
+Two limits apply. Boot recovery rewrites the file only: a Node-RED
+that NRCC does not start itself (systemd, a separate container) keeps
+the settings it loaded until its next restart. And a marker kept after
+a failed recovery also reverts any `settings.js` change saved outside
+the apply pipeline before the next boot; remove the marker by hand
+once you have repaired `settings.js`.
+
 The referenced TLS key/certificate paths are not part of the apply
 write-set. NRCC stores their paths and Node-RED reads the files at
 startup; recovery restores `settings.js` and structured configuration

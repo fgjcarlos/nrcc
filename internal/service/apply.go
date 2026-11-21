@@ -260,8 +260,30 @@ func (s *ApplyService) apply(ctx context.Context, req ApplyRequest, emitSuccess 
 	}
 	s.emit(req, "apply.backup", ApplyStageBackup, "ok", nil)
 
+	// A runtime apply records its snapshot before the write so a process
+	// killed before readiness is rolled back at the next boot (issue
+	// #1012). The runtime coordinator clears the marker once the outcome
+	// is settled.
+	// shortcut: a first write (no previous file, no snapshot) gets no
+	// marker, matching ExecuteRollback, which also needs a snapshot.
+	pending := req.runtimeAdapter != nil && backupPath != ""
+	if pending {
+		if err := writeApplyPendingMarker(ctx, req.Path, backupPath); err != nil {
+			err = fmt.Errorf("record pending apply: %w", err)
+			s.emit(req, "apply.failure", ApplyStageBackup, "error", err)
+			return ApplyResult{}, &ApplyError{Stage: ApplyStageBackup, Cause: err, Path: req.Path, Request: req}
+		}
+	}
+
 	// --- Stage 3: atomic write --------------------------------------------
 	if err := AtomicWriteSettings(ctx, req.Path, req.Content); err != nil {
+		// The writer can fail after the rename (parent fsync, chmod): keep
+		// the marker unless the previous bytes are provably still in place.
+		if current, readErr := os.ReadFile(req.Path); pending && readErr == nil && string(current) == liveContent {
+			if rmErr := removeApplyPendingMarker(req.Path); rmErr != nil {
+				err = errors.Join(err, fmt.Errorf("remove pending apply marker: %w", rmErr))
+			}
+		}
 		s.emit(req, "apply.failure", ApplyStageWrite, "error", err)
 		return ApplyResult{}, &ApplyError{Stage: ApplyStageWrite, Cause: err, Path: req.Path, Request: req}
 	}
@@ -283,7 +305,12 @@ func (s *ApplyService) apply(ctx context.Context, req ApplyRequest, emitSuccess 
 			// whole. The pre-write source bytes are restored so neither
 			// representation keeps a partial effect.
 			if restoreErr := restoreSourceBytes(ctx, req.Path, liveContent, backupPath != ""); restoreErr != nil {
+				// The marker stays: the next boot restores the snapshot.
 				err = errors.Join(err, fmt.Errorf("restore source after failed reconciliation: %w", restoreErr))
+			} else if pending {
+				if rmErr := removeApplyPendingMarker(req.Path); rmErr != nil {
+					err = errors.Join(err, fmt.Errorf("remove pending apply marker: %w", rmErr))
+				}
 			}
 			s.emit(req, "apply.failure", ApplyStageReconcile, "error", err)
 			return ApplyResult{}, &ApplyError{Stage: ApplyStageReconcile, Cause: err, Path: req.Path, Request: req}

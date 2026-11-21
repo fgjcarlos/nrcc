@@ -103,10 +103,21 @@ func (c *ApplyCoordinator) applyRuntime(ctx context.Context, req ApplyRequest) (
 		})
 		cancel()
 		if recoveryErr != nil {
+			// The pending-apply marker stays so the next boot restores the
+			// snapshot again (issue #1012).
 			original.Cause = errors.Join(cause, fmt.Errorf("recovery failed: %w", recoveryErr))
+		} else if err := removeApplyPendingMarker(req.Path); err != nil {
+			original.Cause = errors.Join(cause, fmt.Errorf("remove pending apply marker: %w", err))
 		}
 		c.apply.emit(req, "apply.failure", stage, "error", original.Cause)
 		return ApplyResult{}, original
+	}
+	if err := removeApplyPendingMarker(req.Path); err != nil {
+		// The candidate is live and ready, but a stale marker would roll it
+		// back at the next boot. Fail loudly instead of reporting success.
+		err = fmt.Errorf("remove pending apply marker: %w", err)
+		c.apply.emit(req, "apply.failure", ApplyStageReady, "error", err)
+		return ApplyResult{}, &ApplyError{Stage: ApplyStageReady, Cause: err, Path: req.Path, Request: req}
 	}
 	c.apply.emit(req, "apply.success", ApplyStageReady, "ok", nil)
 	return result, nil
