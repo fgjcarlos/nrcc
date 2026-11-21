@@ -792,10 +792,7 @@ func (s *ConfigService) writeSettingsFile(content string, syncStore bool) (model
 	if err != nil {
 		return doc, err
 	}
-	if err := os.WriteFile(doc.Path, []byte(content), 0600); err != nil {
-		return doc, err
-	}
-	if err := os.Chmod(doc.Path, 0600); err != nil {
+	if err := AtomicWriteSettings(context.Background(), doc.Path, content); err != nil {
 		return doc, err
 	}
 	if syncStore {
