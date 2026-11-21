@@ -361,16 +361,17 @@ func (pm *ProcessManager) startLocked(resetCounter bool, attachAllowed bool) err
 		cmd.Env = append(cmd.Env, k+"="+v)
 	}
 
-	stdoutPipe, err := cmd.StdoutPipe()
-	if err != nil {
-		return fmt.Errorf("stdout pipe: %w", err)
-	}
-	stderrPipe, err := cmd.StderrPipe()
-	if err != nil {
-		return fmt.Errorf("stderr pipe: %w", err)
-	}
+	// Wait returns only after exec has copied all output into these pipes,
+	// unlike StdoutPipe, whose read end Wait closes while still unread.
+	stdoutR, stdoutW := io.Pipe()
+	stderrR, stderrW := io.Pipe()
+	cmd.Stdout = stdoutW
+	cmd.Stderr = stderrW
+	cmd.WaitDelay = outputWaitDelay
 
 	if err := cmd.Start(); err != nil {
+		_ = stdoutW.Close()
+		_ = stderrW.Close()
 		return fmt.Errorf("failed to start node-red: %w", err)
 	}
 
@@ -391,24 +392,20 @@ func (pm *ProcessManager) startLocked(resetCounter bool, attachAllowed bool) err
 	}
 
 	// Forward the child stdout/stderr to the NRCC output (the container log;
-	// Docker rotates it) so a failed start explains itself. Draining also keeps
-	// the kernel pipe buffer from filling, so `cmd.Wait()` exits cleanly.
-	drainDone := make(chan struct{}, 2)
-	go func() { forwardOutput(pm.output, stdoutPipe, "node-red: "); drainDone <- struct{}{} }()
-	go func() { forwardOutput(pm.output, stderrPipe, "node-red: "); drainDone <- struct{}{} }()
+	// Docker rotates it) so a failed start explains itself. The forwarders end
+	// at EOF when waitForExit closes the pipe writers.
+	go forwardOutput(pm.output, stdoutR, "node-red: ")
+	go forwardOutput(pm.output, stderrR, "node-red: ")
 	// Pass local copies of the channels — waitForExit must not read pm.stopCh/doneCh
 	// after the lock is released, as a new Start() could replace them.
 	go pm.waitForExit(cmd, stopCh, doneCh)
-	// Best-effort wait for the drainers to finish when the child exits, so
-	// their goroutines don't leak past the lifetime of the cmd.
-	go func() {
-		<-doneCh
-		<-drainDone
-		<-drainDone
-	}()
 
 	return nil
 }
+
+// outputWaitDelay bounds how long Wait copies output after the child exits:
+// a grandchild holding the fd must not block exit detection and restart.
+const outputWaitDelay = 2 * time.Second
 
 // forwardOutput copies src to dst until EOF, starting each line with prefix.
 // Each line goes out in one Write so the stdout and stderr forwarders do not
@@ -603,6 +600,12 @@ func (pm *ProcessManager) ManagedRuntime() ManagedRuntime {
 // goroutine is not affected by a subsequent Start() creating new channels.
 func (pm *ProcessManager) waitForExit(cmd *exec.Cmd, stopCh, doneCh chan struct{}) {
 	err := cmd.Wait()
+	// EOF lets the forwarders flush a trailing line without newline and exit.
+	for _, w := range []io.Writer{cmd.Stdout, cmd.Stderr} {
+		if c, ok := w.(*io.PipeWriter); ok {
+			_ = c.Close()
+		}
+	}
 
 	pm.mu.Lock()
 	// The budget counts crashes close together, not over the lifetime of

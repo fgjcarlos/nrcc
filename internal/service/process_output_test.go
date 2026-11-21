@@ -71,6 +71,40 @@ func TestStartForwardsNodeRedOutput(t *testing.T) {
 	}
 }
 
+// slowWriter delays each Write so the child exits while output is unread.
+type slowWriter struct{ syncBuffer }
+
+func (w *slowWriter) Write(p []byte) (int, error) {
+	time.Sleep(time.Millisecond)
+	return w.syncBuffer.Write(p)
+}
+
+// cmd.Wait must not close the output pipes while the forwarders still read
+// them: a child that exits while its output is still unread must still get
+// its last line into the log (#1015 follow-up).
+func TestStartForwardsOutputTailAfterExit(t *testing.T) {
+	pm, script := crashingNodeRed(t)
+	body := "#!/bin/sh\ni=0\nwhile [ $i -lt 500 ]; do echo \"line $i padding padding padding\"; i=$((i+1)); done\necho 'LAST LINE'\nexit 1\n"
+	if err := os.WriteFile(script, []byte(body), 0o700); err != nil { //nolint:gosec // G306 the stub must be executable.
+		t.Fatal(err)
+	}
+	pm.maxRestarts = 0
+	out := &slowWriter{}
+	pm.output = out
+
+	if err := pm.Start(); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) && !strings.Contains(out.String(), "node-red: LAST LINE\n") {
+		time.Sleep(10 * time.Millisecond)
+	}
+	_ = pm.Stop(context.Background())
+	if got := out.String(); !strings.Contains(got, "node-red: LAST LINE\n") {
+		t.Fatalf("last line lost; forwarded %d bytes, tail %q", len(got), got[max(0, len(got)-120):])
+	}
+}
+
 func TestForwardOutputPrefixesEachLine(t *testing.T) {
 	long := strings.Repeat("x", 10000)
 	src := strings.NewReader("a\n\nb\n" + long + "\ntail")
