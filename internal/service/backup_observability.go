@@ -1,7 +1,6 @@
 package service
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -99,7 +98,7 @@ func (s *backupEventStore) saveLocked(events []model.BackupEvent) error {
 	}
 
 	path := filepath.Join(s.dataDir, backupEventsFile)
-	if err := AtomicWriteSettings(context.Background(), path, string(data)); err != nil {
+	if err := atomicWriteFile(path, data); err != nil {
 		return fmt.Errorf("write backup event log: %w", err)
 	}
 

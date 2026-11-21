@@ -5,7 +5,6 @@ package service
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -501,7 +500,7 @@ func ReadDotenv(dataDir string) (string, error) {
 // WriteDotenv writes content to the .env file
 func WriteDotenv(dataDir string, content string) error {
 	dotenvPath := filepath.Join(dataDir, ".env")
-	if err := AtomicWriteSettings(context.Background(), dotenvPath, content); err != nil {
+	if err := atomicWriteFile(dotenvPath, []byte(content)); err != nil {
 		return fmt.Errorf("failed to write .env file: %w", err)
 	}
 	return nil

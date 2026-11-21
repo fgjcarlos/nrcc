@@ -87,10 +87,6 @@ var ErrSettingsSymlinkRejected = errors.New("settings.js destination resolves to
 // caller-supplied timeout does not leave a stale .apply-* sibling on disk
 // forever. On cancellation the tmp file is removed before returning.
 //
-// Every other file NRCC owns outside the JSON store (.env,
-// backup_config.json, backup_events.json) is written through this helper
-// too (#1016); the 0600 mode and symlink policy apply to all of them.
-//
 // The function does NOT consult audit, do revision checks, or touch the
 // backup directory; those are the orchestrator's responsibility (see
 // ApplyService.Apply).
@@ -141,6 +137,23 @@ func AtomicWriteSettings(ctx context.Context, path, content string) error {
 		return fmt.Errorf("chmod %s: %w", path, err)
 	}
 	return nil
+}
+
+// atomicWriteFile atomically replaces an NRCC-owned file outside the JSON
+// store (.env, backup_config.json, backup_events.json; #1016): tmp sibling,
+// fsync, rename, parent fsync, mode 0600. Unlike AtomicWriteSettings it does
+// not reject symlinked parent directories, so a DATA_DIR reached through a
+// symlink keeps working.
+func atomicWriteFile(path string, data []byte) error {
+	tmpPath, err := writeSettingsTmp(path, string(data))
+	if err != nil {
+		return err
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("rename tmp to %s: %w", path, err)
+	}
+	return syncParentDir(filepath.Dir(path))
 }
 
 // writeSettingsTmp writes content to a unique tmp sibling of path and

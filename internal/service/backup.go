@@ -454,7 +454,7 @@ func (s *BackupService) SaveConfig(cfg model.BackupConfig) (model.BackupConfig, 
 	}
 
 	path := filepath.Join(s.dataDir, backupConfigFile)
-	if err := AtomicWriteSettings(context.Background(), path, string(data)); err != nil {
+	if err := atomicWriteFile(path, data); err != nil {
 		return model.BackupConfig{}, fmt.Errorf("failed to save backup config: %w", err)
 	}
 

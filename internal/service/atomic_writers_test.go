@@ -88,6 +88,29 @@ func TestSaveRawSettingsReplacesFileAtomically(t *testing.T) {
 	})
 }
 
+// A DATA_DIR reached through a symlink (e.g. /home -> /var/home) must keep
+// working for the files NRCC owns outside settings.js.
+func TestOwnedFileWritersAcceptSymlinkedDataDir(t *testing.T) {
+	root := t.TempDir()
+	real := filepath.Join(root, "real")
+	if err := os.MkdirAll(real, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(root, "link")
+	if err := os.Symlink(real, link); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteDotenv(link, "A=1\n"); err != nil {
+		t.Errorf("WriteDotenv: %v", err)
+	}
+	if _, err := NewBackupService(link).SaveConfig(model.BackupConfig{Schedule: "daily"}); err != nil {
+		t.Errorf("SaveConfig: %v", err)
+	}
+	if err := newBackupEventStore(link).Append(model.BackupEvent{Type: "t", Message: "m"}); err != nil {
+		t.Errorf("Append: %v", err)
+	}
+}
+
 func TestCorruptBackupEventLogIsReplacedByEmptyLog(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, backupEventsFile)

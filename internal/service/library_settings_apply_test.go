@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -81,6 +82,28 @@ func TestLibrarySettingsUpdaterFallsBackWithoutAdapter(t *testing.T) {
 		t.Fatalf("update = (%t, %v), want (false, nil)", restarted, err)
 	}
 	assertSettingsContain(t, f.settingsPath, `require("lodash")`)
+}
+
+// A concurrent apply is surfaced, not bypassed: settings.js is not written
+// and the coordinator does not restart.
+func TestLibrarySettingsUpdaterSurfacesApplyInFlight(t *testing.T) {
+	f := newApplyCoordinatorFixture(t)
+	adapter := &fakeAdapter{name: "runtime"}
+	coordinator := NewRuntimeApplyCoordinator(f.apply, func(ApplyRequest) (ApplyAdapter, error) { return adapter, nil })
+	if _, err := coordinator.acquire(f.settingsPath); err != nil {
+		t.Fatal(err)
+	}
+	restarted, err := LibrarySettingsUpdater(coordinator, f.svc, func() bool { return true })(context.Background(), activateLodash)
+	if !errors.Is(err, ErrApplyInFlight) || restarted || adapter.restartCalls != 0 {
+		t.Fatalf("got (%t, %v, restarts=%d), want (false, ErrApplyInFlight, 0)", restarted, err, adapter.restartCalls)
+	}
+	data, readErr := os.ReadFile(f.settingsPath)
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	if strings.Contains(string(data), "lodash") {
+		t.Fatal("settings.js was written while another apply was in flight")
+	}
 }
 
 // When the settings hook already restarted Node-RED, Install and Uninstall
