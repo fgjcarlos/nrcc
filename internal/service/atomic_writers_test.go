@@ -19,6 +19,7 @@ func assertReplacedByRename(t *testing.T, path, previous string, write func()) {
 		t.Fatalf("link %s: %v", path, err)
 	}
 	write()
+	// #nosec G304 -- link is derived from t.TempDir(), not user input.
 	got, err := os.ReadFile(link)
 	if err != nil {
 		t.Fatalf("read link: %v", err)
@@ -92,12 +93,12 @@ func TestSaveRawSettingsReplacesFileAtomically(t *testing.T) {
 // working for the files NRCC owns outside settings.js.
 func TestOwnedFileWritersAcceptSymlinkedDataDir(t *testing.T) {
 	root := t.TempDir()
-	real := filepath.Join(root, "real")
-	if err := os.MkdirAll(real, 0o750); err != nil {
+	target := filepath.Join(root, "target")
+	if err := os.MkdirAll(target, 0o750); err != nil {
 		t.Fatal(err)
 	}
 	link := filepath.Join(root, "link")
-	if err := os.Symlink(real, link); err != nil {
+	if err := os.Symlink(target, link); err != nil {
 		t.Fatal(err)
 	}
 	if err := WriteDotenv(link, "A=1\n"); err != nil {
@@ -132,6 +133,7 @@ func TestCorruptBackupEventLogIsReplacedByEmptyLog(t *testing.T) {
 	if _, err := svc.SaveConfig(model.BackupConfig{Enabled: false, Schedule: "daily"}); err != nil {
 		t.Fatalf("SaveConfig: %v", err)
 	}
+	// #nosec G304 -- path is derived from t.TempDir(), not user input.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read event log: %v", err)

@@ -73,7 +73,7 @@ func (s *backupEventStore) loadLocked() ([]model.BackupEvent, error) {
 	if err := json.Unmarshal(data, &events); err != nil {
 		// A torn log must not fail every observability request (#1016): treat it
 		// as empty so the next Append replaces it with a valid file.
-		return []model.BackupEvent{}, nil
+		return []model.BackupEvent{}, nil //nolint:nilerr // a corrupt log is recoverable, not a failure
 	}
 
 	sort.SliceStable(events, func(i, j int) bool {

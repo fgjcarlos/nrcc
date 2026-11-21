@@ -127,6 +127,7 @@ func TestLibraryServiceSkipsRestartAfterCoordinatedApply(t *testing.T) {
 
 func assertSettingsContain(t *testing.T, path, want string) {
 	t.Helper()
+	// #nosec G304 -- path is derived from t.TempDir(), not user input.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read settings.js: %v", err)
