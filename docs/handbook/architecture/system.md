@@ -163,6 +163,7 @@ discussion, not to add a side-channel write.
 |---------|-------------|---------------|
 | NRCC crashes | NRCC `healthz` goes red, container restarts | UI 502 |
 | Node-RED crashes | NRCC `readyz` flips red | banner in Security Center |
+| Managed Node-RED exhausts its restart budget | NRCC `healthz` returns 503 | container unhealthy |
 | `settings.js` corrupts | apply pipeline `apply.failure` | revert from backup |
 | Audit log full | apply pipeline `audit.failure` | offline dump and rotate |
 | Backup directory full | apply pipeline `backup.failure` | operator must free space |

@@ -252,9 +252,10 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 	// GetHealth replaces the old inline closure; it returns status + uptime +
 	// restartCount (the durable cumulative counter, not the backoff one).
 	r.Get("/api/health", systemHandler.GetHealth)
-	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
+	r.Get("/healthz", healthz(func() bool {
+		pm := server.processManager
+		return pm != nil && pm.RestartBudgetExhausted()
+	}))
 	// Public image assets referenced by Node-RED's editorTheme. The handler
 	// verifies content bytes and refuses to serve non-images.
 	r.Get("/uploads/{name}", filesHandler.ServeImage)
@@ -657,4 +658,16 @@ func mfaDisableTarget(r *http.Request) (string, bool) {
 		return "", false
 	}
 	return req.UserID, true
+}
+
+// healthz answers the container health check: 503 once a managed Node-RED
+// has exhausted its automatic restarts (issue #1013), 200 otherwise.
+func healthz(restartsExhausted func() bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		if restartsExhausted() {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}
 }
