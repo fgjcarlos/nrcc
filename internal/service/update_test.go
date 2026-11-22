@@ -10,6 +10,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -31,6 +32,19 @@ func imageLocalProcessManager(t *testing.T) (*ProcessManager, string) {
 		t.Fatal(err)
 	}
 	return NewProcessManager(executable, root), executable
+}
+
+// updatableService returns an UpdateService whose update can run: an npm-global
+// runtime and a resolved target version, so the flow reaches the backup step.
+func updatableService(t *testing.T) *UpdateService {
+	t.Helper()
+	svc := newTestUpdateService(t, t.TempDir())
+	pm, _ := npmGlobalProcessManager(t)
+	svc.SetProcessManager(pm)
+	svc.cacheMu.Lock()
+	svc.cache = model.UpdateCacheEntry{CurrentVersion: "4.0.1", LatestVersion: "4.0.2", UpdateAvailable: true}
+	svc.cacheMu.Unlock()
+	return svc
 }
 
 func npmGlobalProcessManager(t *testing.T) (*ProcessManager, string) {
@@ -1001,6 +1015,56 @@ func TestApplyUpdateWithBackupReportsImageUnsupportedCode(t *testing.T) {
 	}
 }
 
+// An update that cannot run must be refused before the pre-update backup,
+// whose retention would otherwise evict the oldest manual backup (#1017).
+func TestApplyUpdateWithBackupRefusesBeforeBackup(t *testing.T) {
+	cases := []struct {
+		name, latest, wantErr string
+	}{
+		{name: "image install", latest: "4.0.2", wantErr: "image_unsupported"},
+		{name: "no resolved target", latest: "", wantErr: "update_failed"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			svc := newTestUpdateService(t, dir)
+			_, executable := imageLocalProcessManager(t)
+			svc.SetProcessManager(NewProcessManager(executable, dir))
+			backups := NewBackupService(dir)
+			svc.SetBackupCreator(backups)
+			if _, err := backups.CreateTyped(model.BackupTypeManual, "existing"); err != nil {
+				t.Fatalf("seed backup: %v", err)
+			}
+			before, err := backups.List()
+			if err != nil {
+				t.Fatalf("list backups: %v", err)
+			}
+			svc.cacheMu.Lock()
+			svc.cache = model.UpdateCacheEntry{CurrentVersion: "4.0.1", LatestVersion: tc.latest, UpdateAvailable: tc.latest != ""}
+			svc.cacheMu.Unlock()
+
+			if err := svc.ApplyUpdateWithBackup(context.Background()); err == nil {
+				t.Fatal("expected the update to be refused")
+			}
+
+			state := svc.GetFlowState()
+			if state.State != model.StateFailed || state.Error != tc.wantErr || state.BackupID != "" {
+				t.Fatalf("flow state = %+v, want Failed/%s with no backup ID", state, tc.wantErr)
+			}
+			after, err := backups.List()
+			if err != nil {
+				t.Fatalf("list backups: %v", err)
+			}
+			if !reflect.DeepEqual(before, after) {
+				t.Fatalf("backup list changed: before %+v, after %+v", before, after)
+			}
+			if h := svc.History(); len(h) != 0 {
+				t.Fatalf("update backup catalog = %+v, want empty", h)
+			}
+		})
+	}
+}
+
 // TestApplyUpdateWithBackup_NpmFailure tests failure during npm update phase
 func TestApplyUpdateWithBackup_NpmFailure(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -1058,6 +1122,8 @@ func TestApplyUpdateWithBackup_NpmFailure(t *testing.T) {
 func TestApplyUpdateWithBackup_AbortsWhenBackupFails(t *testing.T) {
 	tmpDir := t.TempDir()
 	svc := newTestUpdateService(t, tmpDir)
+	pm, _ := npmGlobalProcessManager(t)
+	svc.SetProcessManager(pm)
 	svc.SetBackupCreator(failingBackupCreator{})
 
 	svc.getInstalledVersionFn = func(ctx context.Context) string { return "4.0.1" }

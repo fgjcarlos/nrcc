@@ -12,6 +12,7 @@ import (
 
 	"github.com/fgjcarlos/nrcc/internal/model"
 	"github.com/fgjcarlos/nrcc/internal/service"
+	"github.com/fgjcarlos/nrcc/internal/store"
 )
 
 // TestUpdateHandler_GetStatus_ReturnsOK tests that GET /api/updates/status returns 200
@@ -513,12 +514,21 @@ func TestUpdateHandler_PostApply_ConcurrencyLogic_DocumentedBehavior(t *testing.
 // be test-owned executables rather than the host installation.
 func installFakeNPM(t *testing.T) {
 	t.Helper()
-	binDir := t.TempDir()
-	for _, name := range []string{"npm", "node-red"} {
-		// #nosec G306 -- test fixture: the file must be executable by the shell to shadow the host binary.
-		if err := os.WriteFile(filepath.Join(binDir, name), []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
-			t.Fatalf("failed to write fake %s: %v", name, err)
+	root := t.TempDir()
+	binDir := filepath.Join(root, "bin")
+	// node-red resolves into lib/node_modules so the runtime is updatable (npm-global).
+	nodeRed := filepath.Join(root, "lib", "node_modules", "node-red", "bin", "node-red.js")
+	for _, path := range []string{filepath.Join(binDir, "npm"), nodeRed} {
+		if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+			t.Fatal(err)
 		}
+		// #nosec G306 -- test fixture: the file must be executable by the shell to shadow the host binary.
+		if err := os.WriteFile(path, []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
+			t.Fatalf("failed to write fake %s: %v", path, err)
+		}
+	}
+	if err := os.Symlink(nodeRed, filepath.Join(binDir, "node-red")); err != nil {
+		t.Fatal(err)
 	}
 	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 }
@@ -556,7 +566,14 @@ func (g gatedBackupCreator) CreateTyped(model.BackupType, string) (model.Backup,
 // an update actually in flight must still be rejected with 409.
 func TestUpdateHandler_PostApply_RestartsAfterTerminalAndRejectsInFlight(t *testing.T) {
 	installFakeNPM(t)
-	svc := service.NewUpdateService(t.TempDir())
+	dataDir := t.TempDir()
+	// A resolved target version lets the run pass preflight and reach the backup.
+	if err := store.NewJSONStore[model.UpdateCacheEntry](filepath.Join(dataDir, "update_cache.json")).Write(model.UpdateCacheEntry{
+		CurrentVersion: "4.0.1", LatestVersion: "4.0.2", UpdateAvailable: true, CheckedAt: time.Now().UTC(),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	svc := service.NewUpdateService(dataDir)
 	creator := gatedBackupCreator{started: make(chan struct{}), release: make(chan struct{})}
 	svc.SetBackupCreator(creator)
 	handler := NewUpdateHandler(svc)

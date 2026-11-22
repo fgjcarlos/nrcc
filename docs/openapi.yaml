@@ -1929,6 +1929,9 @@ paths:
         the run (state is already `BackingUp`); no other request can start one
         until it finishes. Poll `GET /api/updates/state` every 500 ms to track
         progress. A new update can start from `Idle`, `Completed` or `Failed`.
+        An update that cannot run (no resolved target version, or a runtime
+        that cannot be updated in place) fails before the backup is taken, so
+        no backup is created or evicted.
       security:
         - bearerAuth: []
       responses:
