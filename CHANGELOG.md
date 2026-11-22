@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Behavior change:** NRCC no longer attaches to a Node-RED it did not
+  start. With `NRCC_MANAGE_NODE_RED=true` (the default), start now fails with
+  "node-red port is already bound by a foreign process" when another process
+  binds the Node-RED port; set `NRCC_MANAGE_NODE_RED=false` to run beside a
+  Node-RED another supervisor owns. The broken attach mode marked the runtime
+  running without a process, so a later stop did nothing and a start crashed.
+  The `running (external)` status and the `EXTERNAL_NODE_RED` error are gone.
 - Node-RED's stdout and stderr now appear in the NRCC container log
   (`docker logs nrcc`), each line prefixed with `node-red: `, so a failed start
   (for example a syntax error in `settings.js`) explains itself. Previously the

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -104,9 +105,11 @@ func runServer() {
 	if manageRuntime {
 		spinner := ui.StartSpinner("Starting Node-RED…")
 		if err := pm.Start(); err != nil {
-			spinner.Fail(fmt.Sprintf("Failed to start Node-RED: %v", err))
-		} else if pm.IsExternalMode() {
-			spinner.Success("Attached to existing Node-RED — http://localhost:1880")
+			msg := fmt.Sprintf("Failed to start Node-RED: %v", err)
+			if errors.Is(err, service.ErrForeignListener) {
+				msg += " (set NRCC_MANAGE_NODE_RED=false to run beside a Node-RED that NRCC does not manage)"
+			}
+			spinner.Fail(msg)
 		} else {
 			spinner.Success("Node-RED started — http://localhost:1880")
 		}

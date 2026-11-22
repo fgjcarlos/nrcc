@@ -94,7 +94,7 @@ body:
     id: logs
     attributes:
       label: Relevant logs
-      description: Paste logs from the UI, `docker compose logs`, or `nrcc install` output. Wrap in a fenced code block.
+      description: Paste logs from the UI, `docker compose logs`, or the `nrcc` binary output. Wrap in a fenced code block.
     validations:
       required: false
   - type: textarea

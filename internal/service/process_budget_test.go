@@ -39,7 +39,11 @@ func TestCrashBudgetResetsAfterStableUptime(t *testing.T) {
 }
 
 func TestCrashBudgetExhaustedUntilManualStart(t *testing.T) {
-	pm := NewProcessManager("node-red", t.TempDir())
+	script := filepath.Join(t.TempDir(), "fake-node-red.sh")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\nexec sleep 30\n"), 0o700); err != nil { //nolint:gosec // G306: the fake Node-RED script must stay executable.
+		t.Fatal(err)
+	}
+	pm := NewProcessManager(script, t.TempDir())
 	pm.mu.Lock()
 	pm.restartCount = pm.maxRestarts
 	pm.startedAt = time.Now()
@@ -53,20 +57,15 @@ func TestCrashBudgetExhaustedUntilManualStart(t *testing.T) {
 		t.Fatalf("ConsecutiveFailures = %d, want %d (crashes close together still count)", got, pm.maxRestarts)
 	}
 
-	// A manual start that attaches to a listener on the runtime port succeeds
-	// without spawning a child.
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = ln.Close() }()
+	// A successful manual start clears the exhausted flag.
 	runtimeDir := t.TempDir()
-	t.Setenv("NODE_RED_PORT", strconv.Itoa(ln.Addr().(*net.TCPAddr).Port))
+	t.Setenv("NODE_RED_PORT", strconv.Itoa(unusedRuntimePortForTest(t)))
 	t.Setenv("NODE_RED_USER_DIR", runtimeDir)
 	t.Setenv("NODE_RED_SETTINGS", filepath.Join(runtimeDir, "settings.js"))
 	if err := pm.Start(); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
+	t.Cleanup(func() { _ = pm.Stop(context.Background()) })
 	if pm.RestartBudgetExhausted() {
 		t.Fatal("RestartBudgetExhausted() = true after a manual start")
 	}

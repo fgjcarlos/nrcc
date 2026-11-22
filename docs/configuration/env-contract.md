@@ -75,7 +75,7 @@ variable has exactly one routing decision, pinned by
   | Variable | Reason |
   |---|---|
   | `NODE_RED_PORT` | The container port `1880` is fixed by the port mapping; use `NODE_RED_HOST_PORT`. |
-  | `NRCC_MANAGE_NODE_RED` | `false` would leave the one-container stack without any Node-RED process to attach to. |
+  | `NRCC_MANAGE_NODE_RED` | `false` would leave the one-container stack without any Node-RED process. |
   | `NRCC_BACKUP_DIR`, `NRCC_BACKUP_ROOT` | Pinned to the `nrcc_backups` and `nrcc_data` volumes. |
   | `NRCC_RESTIC_*` | Restic is deferred ([#432](https://github.com/fgjcarlos/nrcc/issues/432)): the image ships no `restic` binary. |
   | `NPM_BIN` | The image ships its own npm. |
@@ -103,7 +103,7 @@ does not apply the change.
 | `NRCC_TRUSTED_PROXIES` | empty | Comma-separated CIDRs/IPs trusted for forwarded headers | yes |
 | `NRCC_TLS` | `false` | Mark setup refresh cookies Secure when TLS terminates outside the request path | yes |
 | `EDGE_MODE` | `false` | Resource-safe defaults for Pi/NAS (ADR 0002) | yes |
-| `NRCC_MANAGE_NODE_RED` | `true` | If `false`, NRCC never starts/stops Node-RED; it only attaches | yes |
+| `NRCC_MANAGE_NODE_RED` | `true` | If `false`, NRCC never starts, stops or restarts Node-RED; use it beside a Node-RED another supervisor owns. If `true`, NRCC refuses to start when another process already binds `NODE_RED_PORT` | yes |
 | `NRCC_IMAGE` | `nrcc` | Image label reported by `GET /api/docker/status` inside Docker | yes |
 | `NRCC_BACKUP_DIR` | `$DATA_DIR/backups` | Backup storage root | yes |
 | `NRCC_BACKUP_ROOT` | `$DATA_DIR` | Restore destination containment root for the restic provider restore endpoint | yes |
@@ -131,7 +131,7 @@ keep today's behavior.
 | Variable | Default | Purpose |
 |---|---|---|
 | `NODE_RED_CMD` | `node-red` | Executable to spawn |
-| `NODE_RED_PORT` | `1880` | `--port` and external-attachment probe port |
+| `NODE_RED_PORT` | `1880` | `--port`; start fails if another process already binds it |
 | `NODE_RED_USER_DIR` | `<DATA_DIR>` | `--userDir` (flows, settings, lib, node_modules) |
 | `NODE_RED_SETTINGS` | `<userDir>/settings.js` | `--settings` path |
 

@@ -4,6 +4,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"net"
 	"os"
 	"path/filepath"
@@ -37,9 +38,46 @@ func TestProcessManager_StopCancelsPendingRestart(t *testing.T) {
 	}
 }
 
-// TestProcessManager_StartDuringBackoffWins attaches to a listener during the
-// backoff: the stale restart must not relaunch over the attached runtime.
-func TestProcessManager_StartDuringBackoffWins(t *testing.T) {
+// TestProcessManager_StartRefusesForeignListener binds the runtime port
+// before Start: Start must refuse instead of attaching, Stop must be a no-op,
+// and Start must launch the child once the port is free (issue #1018).
+func TestProcessManager_StartRefusesForeignListener(t *testing.T) {
+	pm, starts, port := crashingProcessManager(t)
+	ln, err := net.Listen("tcp", "127.0.0.1:"+strconv.Itoa(port))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := pm.Start(); !errors.Is(err, ErrForeignListener) {
+		t.Fatalf("Start over foreign listener = %v, want ErrForeignListener", err)
+	}
+	if got := pm.Status().Status; got != "stopped" {
+		t.Fatalf("Status = %q after refused Start, want stopped", got)
+	}
+	if _, err := os.Stat(starts); !os.IsNotExist(err) {
+		t.Fatalf("Node-RED was launched over a foreign listener (stat err=%v)", err)
+	}
+	if err := pm.Stop(context.Background()); err != nil {
+		t.Fatalf("Stop after refused Start: %v", err)
+	}
+
+	_ = ln.Close()
+	if err := pm.Start(); err != nil {
+		t.Fatalf("Start after the port is free: %v", err)
+	}
+	waitForCrash(t, pm)
+	if err := pm.Stop(context.Background()); err != nil {
+		t.Fatalf("Stop: %v", err)
+	}
+	if n := countStarts(t, starts); n != 1 {
+		t.Fatalf("Node-RED started %d times, want 1", n)
+	}
+}
+
+// TestProcessManager_StartDuringBackoffRefusesForeignListener binds the port
+// during the crash backoff: neither the user Start nor the pending automatic
+// restart may adopt or launch over the foreign listener (issues #918, #1018).
+func TestProcessManager_StartDuringBackoffRefusesForeignListener(t *testing.T) {
 	pm, starts, port := crashingProcessManager(t)
 	if err := pm.Start(); err != nil {
 		t.Fatalf("Start: %v", err)
@@ -51,8 +89,8 @@ func TestProcessManager_StartDuringBackoffWins(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = ln.Close() }()
-	if err := pm.Start(); err != nil {
-		t.Fatalf("Start during backoff: %v", err)
+	if err := pm.Start(); !errors.Is(err, ErrForeignListener) {
+		t.Fatalf("Start during backoff = %v, want ErrForeignListener", err)
 	}
 
 	time.Sleep(3 * pm.restartDelay)
@@ -60,9 +98,10 @@ func TestProcessManager_StartDuringBackoffWins(t *testing.T) {
 	if n := countStarts(t, starts); n != 1 {
 		t.Fatalf("Node-RED started %d times, want 1", n)
 	}
-	if !pm.IsExternalMode() || pm.RestartBudgetExhausted() {
-		t.Fatalf("external=%v exhausted=%v, want attached and not exhausted", pm.IsExternalMode(), pm.RestartBudgetExhausted())
+	if got := pm.Status().Status; got != "stopped" {
+		t.Fatalf("Status = %q, want stopped", got)
 	}
+	_ = pm.Stop(context.Background())
 }
 
 // crashingProcessManager returns a manager whose fake Node-RED records each

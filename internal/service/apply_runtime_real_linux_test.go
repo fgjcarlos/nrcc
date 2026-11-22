@@ -463,9 +463,6 @@ func waitOwnedLoopbackListener(ctx context.Context, manager *ProcessManager, por
 		if manager == nil {
 			return 0, errors.New("ProcessManager is nil")
 		}
-		if manager.IsExternalMode() {
-			return 0, errors.New("ProcessManager attached to external runtime")
-		}
 		status := manager.Status()
 		if status.Status != "running" || status.PID <= 0 {
 			return 0, fmt.Errorf("ProcessManager has no tracked running child: status=%q PID=%d", status.Status, status.PID)
@@ -489,9 +486,6 @@ func waitOwnedLoopbackListener(ctx context.Context, manager *ProcessManager, por
 func currentOwnedProcessPID(manager *ProcessManager) (int, error) {
 	if manager == nil {
 		return 0, errors.New("ProcessManager is nil")
-	}
-	if manager.IsExternalMode() {
-		return 0, errors.New("ProcessManager attached to external runtime")
 	}
 	status := manager.Status()
 	if status.Status != "running" || status.PID <= 0 {
@@ -573,9 +567,6 @@ func newRealAcceptanceFixture(t *testing.T, binary string) *realAcceptanceFixtur
 	// exponential auto-restart loop after the test has cleaned its temp root.
 	// The apply transaction itself exercises the real restart/recovery path.
 	manager.maxRestarts = 0
-	if manager.IsExternalMode() {
-		t.Fatal("new ProcessManager unexpectedly entered external mode")
-	}
 	if err := manager.Start(); err != nil {
 		t.Fatalf("start real Node-RED child: %v", err)
 	}
@@ -583,8 +574,8 @@ func newRealAcceptanceFixture(t *testing.T, binary string) *realAcceptanceFixtur
 		config: config, manager: manager, baseline: baseline, baselineConfig: baselineConfig, recorder: &realAcceptanceAudit{}}
 	t.Cleanup(func() {
 		status := manager.Status()
-		if manager.IsExternalMode() || status.PID <= 0 {
-			t.Errorf("refusing cleanup without owned child identity: external=%v status=%+v", manager.IsExternalMode(), status)
+		if status.PID <= 0 {
+			t.Errorf("refusing cleanup without owned child identity: status=%+v", status)
 			return
 		}
 		if err := manager.Stop(context.Background()); err != nil {
@@ -593,7 +584,7 @@ func newRealAcceptanceFixture(t *testing.T, binary string) *realAcceptanceFixtur
 		if after := manager.Status(); after.PID != 0 || after.Status == "running" {
 			t.Errorf("owned Node-RED child remained after cleanup: %+v", after)
 		} else {
-			t.Logf("cleanup: stopped owned PID %d; manager status=%q PID=%d external=false", status.PID, after.Status, after.PID)
+			t.Logf("cleanup: stopped owned PID %d; manager status=%q PID=%d", status.PID, after.Status, after.PID)
 		}
 	})
 	selectedAdapter, err := SelectApplyAdapter(model.ConfigurationCapabilities{Adapter: "nodered-5"}, model.NodeRedEnvironment{
@@ -607,7 +598,7 @@ func newRealAcceptanceFixture(t *testing.T, binary string) *realAcceptanceFixtur
 	f.adapter = &ownedRealApplyAdapter{ApplyAdapter: selectedAdapter, manager: manager, port: port}
 	f.coordinator = f.runtimeCoordinator(f.adapter)
 	f.assertRuntimeOwnedReady(t)
-	t.Logf("isolated fixture root=%q userDir=%q initial owned PID=%d external=false", root, userDir, f.ownedPID(t))
+	t.Logf("isolated fixture root=%q userDir=%q initial owned PID=%d", root, userDir, f.ownedPID(t))
 	return f
 }
 
@@ -636,9 +627,6 @@ func (f *realAcceptanceFixture) request(structured *model.NodeRedConfig) ApplyRe
 
 func (f *realAcceptanceFixture) ownedPID(t *testing.T) int {
 	t.Helper()
-	if f.manager.IsExternalMode() {
-		t.Fatal("runtime authority unexpectedly attached to an external listener")
-	}
 	status := f.manager.Status()
 	if status.Status != "running" || status.PID <= 0 {
 		t.Fatalf("no tracked owned Node-RED process: %+v", status)
