@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/fgjcarlos/nrcc/internal/model"
-	"github.com/fgjcarlos/nrcc/internal/service"
 )
 
 // All three handlers refuse to do anything when no ProcessManager is wired
@@ -83,22 +82,4 @@ func TestRestartNodeRed_NoProcess_DoesNotPanic(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/runtime/restart", nil)
 	w := httptest.NewRecorder()
 	h.RestartNodeRed(w, req)
-}
-
-// TestStartStopNodeRed_ProcessAlreadyRunning_Returns409 covers the
-// "process already running" path on Start (Start fails fast; the
-// ProcessManager returns a typed error rather than crashing).
-func TestStartStopNodeRed_ExternalMode_Returns409(t *testing.T) {
-	// We can't reach the external-mode branch without a port-collision
-	// side effect, so this test just pins that the no-PM path is the
-	// primary guard. A future test that flips IsExternalMode would slot
-	// in here.
-	_ = service.NewProcessManager
-	h := NewSystemHandler()
-	req := httptest.NewRequest(http.MethodPost, "/api/runtime/start", nil)
-	w := httptest.NewRecorder()
-	h.StartNodeRed(w, req)
-	if w.Code != http.StatusServiceUnavailable {
-		t.Fatalf("no-PM Start must 503, got %d", w.Code)
-	}
 }

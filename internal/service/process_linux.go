@@ -22,10 +22,11 @@ import (
 	"github.com/fgjcarlos/nrcc/internal/ui"
 )
 
-// ErrForeignListener is returned by ProcessManager.Restart when the runtime
-// port is already bound by a process this manager does not own (issue #918).
-// Attaching to a foreign listener would let an unrelated process satisfy
-// readiness, so the strict restart path refuses instead.
+// ErrForeignListener is returned by ProcessManager.Start, Restart and the
+// automatic restart when the runtime port is already bound by a process this
+// manager does not own (issues #918, #1018). Attaching to a foreign listener
+// would let an unrelated process satisfy readiness, so the manager refuses.
+// Run NRCC beside a Node-RED it does not own with NRCC_MANAGE_NODE_RED=false.
 var ErrForeignListener = errors.New("node-red port is already bound by a foreign process")
 
 // Env precedence for the Node-RED child process (and any helper that
@@ -64,8 +65,7 @@ type ProcessManager struct {
 	mu           sync.Mutex
 	currentCmd   *exec.Cmd
 	running      bool
-	externalMode bool // true when attaching to a pre-existing Node-RED process
-	runtimePort  int  // port resolved for the most recent successful Start; guarded by mu
+	runtimePort  int // port resolved for the most recent successful Start; guarded by mu
 	startedAt    time.Time
 	restartCount int
 	// restartsExhausted is set when automatic restarts give up and cleared
@@ -255,20 +255,12 @@ func mergeEnvLayers(osEnviron []string, stored map[string]string, dotenvVars map
 	return envMap
 }
 
-// IsExternalMode returns true if ProcessManager is attached to an externally managed Node-RED.
-func (pm *ProcessManager) IsExternalMode() bool {
-	pm.mu.Lock()
-	defer pm.mu.Unlock()
-	return pm.externalMode
-}
-
-// Start starts the Node-RED process. Returns an error if already running.
-// Start may attach to an already-running external Node-RED instance bound
-// to the configured port (attach is the documented UX for manual starts).
+// Start starts the Node-RED process. Returns an error if already running,
+// or ErrForeignListener if another process already binds the runtime port.
 func (pm *ProcessManager) Start() error {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
-	if err := pm.startLocked(true, true); err != nil {
+	if err := pm.startLocked(true); err != nil {
 		return err
 	}
 	pm.restartsExhausted = false
@@ -292,11 +284,7 @@ func (pm *ProcessManager) ranStableLocked(now time.Time) bool {
 // startLocked starts the process. Must be called with pm.mu held.
 // resetCounter resets the crash counter (true for user-initiated starts,
 // false for auto-restarts so the backoff counter is preserved).
-// attachAllowed controls the occupied-port policy: user-facing Start()
-// attaches to an existing listener, while the strict restart path
-// (issue #918) refuses so readiness can never be satisfied by a
-// foreign process.
-func (pm *ProcessManager) startLocked(resetCounter bool, attachAllowed bool) error {
+func (pm *ProcessManager) startLocked(resetCounter bool) error {
 	if pm.running {
 		pid := pm.currentCmd.Process.Pid
 		return fmt.Errorf("process already running (PID: %d)", pid)
@@ -313,30 +301,11 @@ func (pm *ProcessManager) startLocked(resetCounter bool, attachAllowed bool) err
 		return fmt.Errorf("invalid resolved Node-RED runtime port %q: %w", rt.Port, err)
 	}
 
-	// Check if Node-RED is already running externally on the configured port
+	// No child of ours is running, so any listener is a foreign process.
+	// Adopting it would let it satisfy readiness (issues #918, #1018).
 	if isPortInUse(rt.Port) {
-		if !attachAllowed {
-			// Strict path (restart): we just stopped the child we own, so any
-			// remaining listener is a foreign process. Attaching would let it
-			// satisfy the readiness probe; refuse instead (issue #918).
-			return fmt.Errorf("%w: port %s", ErrForeignListener, rt.Port)
-		}
-		// Attach to existing instance
-		pm.externalMode = true
-		pm.running = true
-		pm.runtimePort = runtimePort
-		// Try to find the PID for status reporting
-		running, pid := processRunning("node-red")
-		if running {
-			ui.Info(fmt.Sprintf("Node-RED already running (PID: %d) — attaching", pid))
-		} else {
-			ui.Info(fmt.Sprintf("Node-RED already running on :%s — attaching", rt.Port))
-		}
-		return nil
+		return fmt.Errorf("%w: port %s", ErrForeignListener, rt.Port)
 	}
-
-	// Normal path: start as child process
-	pm.externalMode = false
 
 	if err := ensureSettings(rt.SettingsPath); err != nil {
 		return fmt.Errorf("failed to create settings.js: %w", err)
@@ -454,15 +423,6 @@ func (pm *ProcessManager) Stop(ctx context.Context) error {
 		return nil
 	}
 
-	// If in external mode, just detach without killing the process
-	if pm.externalMode {
-		pm.running = false
-		pm.externalMode = false
-		pm.mu.Unlock()
-		ui.Info("Detached from external Node-RED instance (process not stopped)")
-		return nil
-	}
-
 	stopCh := pm.stopCh
 	stopOnce := pm.stopOnce
 	doneCh := pm.doneCh
@@ -509,17 +469,9 @@ func (pm *ProcessManager) Stop(ctx context.Context) error {
 const stopGraceTimeout = 5 * time.Second
 
 // Restart stops and starts the node-red process, bounded by ctx
-// (issue #918). The start leg uses the strict occupied-port policy so a
-// foreign listener on the runtime port fails the restart instead of being
-// adopted.
+// (issue #918). A foreign listener on the runtime port fails the restart
+// with ErrForeignListener instead of being adopted.
 func (pm *ProcessManager) Restart(ctx context.Context) error {
-	pm.mu.Lock()
-	if pm.externalMode {
-		pm.mu.Unlock()
-		return fmt.Errorf("cannot restart an externally managed Node-RED instance")
-	}
-	pm.mu.Unlock()
-
 	if err := pm.Stop(ctx); err != nil {
 		return fmt.Errorf("stop failed: %w", err)
 	}
@@ -528,7 +480,7 @@ func (pm *ProcessManager) Restart(ctx context.Context) error {
 	}
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
-	if err := pm.startLocked(true, false); err != nil {
+	if err := pm.startLocked(true); err != nil {
 		return err
 	}
 	pm.restartsExhausted = false
@@ -554,13 +506,6 @@ func (pm *ProcessManager) Status() model.RuntimeStatus {
 		pid = pm.currentCmd.Process.Pid
 		uptime = int64(time.Since(pm.startedAt).Seconds())
 		startedAt = pm.startedAt.UTC().Format(time.RFC3339)
-	} else if pm.externalMode {
-		status = "running (external)"
-		// Try to get PID of external process
-		running, extPid := processRunning("node-red")
-		if running {
-			pid = extPid
-		}
 	}
 
 	return model.RuntimeStatus{
@@ -673,7 +618,7 @@ func (pm *ProcessManager) waitForExit(cmd *exec.Cmd, stopCh, doneCh chan struct{
 
 	pm.mu.Lock()
 	// Re-check under the lock: Stop may have run after the timer fired, or
-	// a user Start may already own a newer child or an attached runtime.
+	// a user Start may already own a newer child.
 	if pm.running || pm.stopCh != stopCh || isClosed(stopCh) {
 		pm.mu.Unlock()
 		return
@@ -684,7 +629,7 @@ func (pm *ProcessManager) waitForExit(cmd *exec.Cmd, stopCh, doneCh chan struct{
 		// Best-effort — a save failure is logged but never fatal.
 		ui.Warnf("restart count store: save failed: %v", saveErr)
 	}
-	if startErr := pm.startLocked(false, true); startErr != nil {
+	if startErr := pm.startLocked(false); startErr != nil {
 		// No watcher runs after a failed launch: Node-RED is down for good.
 		pm.lastError = startErr
 		pm.restartsExhausted = true

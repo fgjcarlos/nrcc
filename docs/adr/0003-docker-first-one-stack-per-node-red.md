@@ -6,10 +6,10 @@ Accepted. Resolves #428.
 
 ## Context
 
-NRCC exposes three deployment paths: an all-in-one Docker image, native
-install via `nrcc install`, and Docker-container discovery (`DOCKER_*`
+NRCC exposes three deployment paths: an all-in-one Docker image, the
+static binary on a host, and Docker-container discovery (`DOCKER_*`
 envs). The runtime code, however, assumes a single process owning a
-single `DATA_DIR` and a single Node-RED lifecycle (`internal/service/process.go`,
+single `DATA_DIR` and a single Node-RED lifecycle (`internal/service/process_linux.go`,
 `main.go`). That ambiguity is what #144 / `docs/architecture/multi-instance-node-red.md`
 called out — there is no explicit instance boundary yet.
 
@@ -31,9 +31,15 @@ deployment contract:
 - The `nrcc` process inside the container manages Node-RED as a child
   process only — it does not reach sibling containers, the host, or a
   remote Node-RED.
-- Native install (`nrcc install`) remains supported as an alternative
-  for single-host, single-instance deployments. It is not the canonical
-  multi-instance model.
+- The static binary on a host remains supported as an alternative for
+  single-host, single-instance deployments (see
+  `docs/production-install-launch-guide.md`). It is not the canonical
+  multi-instance model. There is no `nrcc install` command.
+- NRCC never attaches to a Node-RED it did not start. When it manages
+  Node-RED (`NRCC_MANAGE_NODE_RED=true`, the default) and another process
+  already binds the Node-RED port, start and restart fail with
+  `ErrForeignListener`. To run beside a Node-RED that another supervisor
+  owns, set `NRCC_MANAGE_NODE_RED=false` (#918, #1018).
 - The Compose file at `docker-compose.yml` is the reference shape; the
   image at `ghcr.io/fgjcarlos/nrcc` is the reference binary.
 

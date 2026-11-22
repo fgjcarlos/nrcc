@@ -219,7 +219,7 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 			return false
 		}
 		pm := server.processManager
-		return !pm.IsExternalMode() && pm.Status().Status == "running"
+		return pm.Status().Status == "running"
 	}))
 	dashboardHandler.SetAccessService(service.NewDashboardAccessService(service.NewDashboardService(dataDir), configSvc, applyCoordinator))
 	configHandler.SetApplyCoordinator(applyCoordinator)

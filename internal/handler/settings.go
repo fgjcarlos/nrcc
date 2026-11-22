@@ -186,7 +186,7 @@ func (h *SettingsHandler) saveRawLegacy(w http.ResponseWriter, r *http.Request, 
 		model.RespondError(w, http.StatusInternalServerError, "SETTINGS_WRITE_ERROR", err.Error())
 		return
 	}
-	if h.processManager != nil && !h.processManager.IsExternalMode() {
+	if h.processManager != nil {
 		if status := h.processManager.Status(); status.Status == "running" {
 			if err := h.processManager.Restart(context.WithoutCancel(r.Context())); err != nil {
 				model.RespondError(w, http.StatusInternalServerError, "SETTINGS_SAVED_RESTART_FAILED", "settings.js was saved, but Node-RED could not restart: "+err.Error())

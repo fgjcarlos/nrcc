@@ -153,9 +153,6 @@ func (h *EnvHandler) withManagedNodeRedStopped(change func() error) (bool, error
 	if h.pm == nil {
 		return false, change()
 	}
-	if h.pm.IsExternalMode() {
-		return false, fmt.Errorf("cannot synchronize environment variables for externally managed Node-RED")
-	}
 
 	wasRunning := h.pm.Status().Status == "running"
 	if wasRunning {
@@ -269,7 +266,7 @@ func (h *EnvHandler) ImportFromNodeRedEnv(w http.ResponseWriter, r *http.Request
 	if !DecodeJSONOptional(w, r, &req) {
 		return
 	}
-	if !h.managed || h.pm != nil && h.pm.IsExternalMode() {
+	if !h.managed {
 		model.RespondError(w, http.StatusServiceUnavailable, "NODE_RED_SYNC_UNAVAILABLE", "Node-RED environment synchronization is unavailable for externally managed runtimes")
 		return
 	}

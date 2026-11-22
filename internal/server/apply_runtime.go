@@ -21,7 +21,7 @@ func serverApplyResolver(detect func() model.HostStatus, processManager func() *
 		pm := processManager()
 		var readinessResolver func() (string, error)
 		switch {
-		case pm != nil && !pm.IsExternalMode():
+		case pm != nil:
 			_, err := applyCandidatePort(req)
 			if err != nil {
 				return nil, err
