@@ -15,7 +15,7 @@ import (
 func TestApplyUpdateWithBackup_StartsAgainAfterTerminalState(t *testing.T) {
 	for _, terminal := range []model.UpdateState{model.StateCompleted, model.StateFailed} {
 		t.Run(string(terminal), func(t *testing.T) {
-			svc := newTestUpdateService(t, t.TempDir())
+			svc := updatableService(t)
 			svc.SetBackupCreator(failingBackupCreator{})
 			svc.setFlowState(model.UpdateFlowState{State: terminal, Phase: "done"})
 
@@ -77,7 +77,7 @@ func (b blockingBackupCreator) CreateTyped(model.BackupType, string) (model.Back
 
 // Risk item 4: an update that is actually running must still be rejected.
 func TestApplyUpdateWithBackup_RejectsWhileInProgress(t *testing.T) {
-	svc := newTestUpdateService(t, t.TempDir())
+	svc := updatableService(t)
 	creator := blockingBackupCreator{started: make(chan struct{}), release: make(chan struct{})}
 	svc.SetBackupCreator(creator)
 	// A previous run finished; the new run below must start from it.

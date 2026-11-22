@@ -18,7 +18,7 @@ func (panickingBackupCreator) CreateTyped(model.BackupType, string) (model.Backu
 // (which blocks every later update) nor crash the process: Run recovers,
 // reports Failed, and the next claim succeeds.
 func TestUpdateRun_PanicMarksFlowFailedAndReleasesClaim(t *testing.T) {
-	svc := newTestUpdateService(t, t.TempDir())
+	svc := updatableService(t)
 	svc.SetBackupCreator(panickingBackupCreator{})
 
 	run, err := svc.ClaimUpdate()

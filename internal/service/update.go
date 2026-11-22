@@ -498,7 +498,7 @@ func (s *UpdateService) ClaimUpdate() (*UpdateRun, error) {
 // State returns the flow state set when the run was claimed (BackingUp).
 func (r *UpdateRun) State() model.UpdateFlowState { return r.claimed }
 
-// Run executes the claimed flow: backup, persist to catalog, Applying, npm
+// Run executes the claimed flow: preflight, backup, persist to catalog, Applying, npm
 // install, then Completed or Failed. applyMu is released when Run returns.
 // A panic is recovered and reported as Failed/internal_error: Run runs in a
 // handler goroutine, where an unrecovered panic would stop the process and
@@ -523,6 +523,17 @@ func (r *UpdateRun) Run(ctx context.Context) (err error) {
 	fromVersion := preApplyStatus.CurrentVersion
 	if fromVersion == "" {
 		fromVersion = "unknown"
+	}
+
+	// Refuse an update that cannot run before the backup, whose retention
+	// would otherwise evict the oldest manual backup (#1017).
+	if _, _, err := s.preflight(); err != nil {
+		s.setFlowState(model.UpdateFlowState{
+			State: model.StateFailed,
+			Error: updateFailureReason(err),
+			Phase: "backup",
+		})
+		return err
 	}
 
 	// Create backup
@@ -557,16 +568,9 @@ func (r *UpdateRun) Run(ctx context.Context) (err error) {
 	// async caller uses context.Background().
 	err = s.ApplyUpdate(ctx)
 	if err != nil {
-		reason := "update_failed"
-		switch {
-		case errors.Is(err, ErrUpdateUnsupportedForImage):
-			reason = "image_unsupported"
-		case errors.Is(err, ErrExternalRuntimeUnmanaged):
-			reason = "external_unsupported"
-		}
 		s.setFlowState(model.UpdateFlowState{
 			State:    model.StateFailed,
-			Error:    reason,
+			Error:    updateFailureReason(err),
 			Phase:    "applying",
 			BackupID: backupEntry.ID,
 		})
@@ -592,18 +596,11 @@ func (r *UpdateRun) Run(ctx context.Context) (err error) {
 // request deadline, AND server SIGTERM all abort the install within ~1s.
 // Regression for HIGH-011.
 func (s *UpdateService) ApplyUpdate(ctx context.Context) error {
-	cached := s.GetCachedStatus()
-	if cached.LatestVersion == "" {
-		return fmt.Errorf("no resolved target version — run a version check first")
+	cached, managed, err := s.preflight()
+	if err != nil {
+		return err
 	}
 	target := "node-red@" + cached.LatestVersion
-	managed := s.managedRuntime()
-	switch managed.Strategy {
-	case StrategyImageLocal:
-		return fmt.Errorf("%w (executable: %s)", ErrUpdateUnsupportedForImage, managed.Executable)
-	case StrategyExternal:
-		return fmt.Errorf("%w (executable: %s)", ErrExternalRuntimeUnmanaged, managed.Executable)
-	}
 
 	runCtx, cancel := context.WithTimeout(s.applyContext(), 120*time.Second)
 	defer cancel()
@@ -613,7 +610,7 @@ func (s *UpdateService) ApplyUpdate(ctx context.Context) error {
 		return err
 	}
 
-	_, err := s.runner.Run(runCtx, "npm", "install", "-g", target)
+	_, err = s.runner.Run(runCtx, "npm", "install", "-g", target)
 	if err != nil {
 		sanitized := s.sanitizeErrorMessage(err)
 		return fmt.Errorf("%s", sanitized)
@@ -640,6 +637,34 @@ func (s *UpdateService) ApplyUpdate(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// preflight returns why an update cannot run, without side effects: no
+// resolved target version, or a runtime that cannot be updated in place.
+func (s *UpdateService) preflight() (model.UpdateCacheEntry, ManagedRuntime, error) {
+	cached := s.GetCachedStatus()
+	if cached.LatestVersion == "" {
+		return cached, ManagedRuntime{}, fmt.Errorf("no resolved target version — run a version check first")
+	}
+	managed := s.managedRuntime()
+	switch managed.Strategy {
+	case StrategyImageLocal:
+		return cached, managed, fmt.Errorf("%w (executable: %s)", ErrUpdateUnsupportedForImage, managed.Executable)
+	case StrategyExternal:
+		return cached, managed, fmt.Errorf("%w (executable: %s)", ErrExternalRuntimeUnmanaged, managed.Executable)
+	}
+	return cached, managed, nil
+}
+
+// updateFailureReason maps an update error to the flow-state failure code.
+func updateFailureReason(err error) string {
+	switch {
+	case errors.Is(err, ErrUpdateUnsupportedForImage):
+		return "image_unsupported"
+	case errors.Is(err, ErrExternalRuntimeUnmanaged):
+		return "external_unsupported"
+	}
+	return "update_failed"
 }
 
 // postInstallAudit audits the dependency tree of the freshly-installed Node-RED
