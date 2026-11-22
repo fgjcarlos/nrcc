@@ -164,8 +164,6 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 	flowHandler.SetVersionService(flowVersionSvc)
 	dashboardHandler := handler.NewDashboardHandler(service.NewDashboardService(dataDir))
 	librarySvc := service.NewLibraryService(dataDir)
-	// Install / uninstall activate the library in settings.js.
-	librarySvc.SetSettingsUpdater(configSvc.TransformRawSettings)
 	libraryHandler := handler.NewLibraryHandler(librarySvc)
 	updateSvc := service.NewUpdateService(dataDir)
 	// Wire the backup engine so pre-update backups are real archives, not placeholders.
@@ -214,6 +212,15 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 		}
 		return nil
 	}, service.NewSystemdManager(), dockerSvc))
+	// Install / uninstall activate the library in settings.js through the
+	// apply coordinator while the managed Node-RED runs (#1016).
+	librarySvc.SetSettingsUpdater(service.LibrarySettingsUpdater(applyCoordinator, configSvc, func() bool {
+		if server == nil || server.processManager == nil {
+			return false
+		}
+		pm := server.processManager
+		return !pm.IsExternalMode() && pm.Status().Status == "running"
+	}))
 	dashboardHandler.SetAccessService(service.NewDashboardAccessService(service.NewDashboardService(dataDir), configSvc, applyCoordinator))
 	configHandler.SetApplyCoordinator(applyCoordinator)
 	settingsHandler.SetApplyCoordinator(applyCoordinator)

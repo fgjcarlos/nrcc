@@ -41,7 +41,9 @@ type LibraryService struct {
 	// updateSettings is an optional hook that applies a transform to the
 	// live settings.js. Install / Uninstall use it to activate the library;
 	// nil disables it (tests); the production hook skips read-only configuration.
-	updateSettings func(transform func(string) string) error
+	// It reports restarted=true when it already restarted Node-RED itself
+	// (see LibrarySettingsUpdater).
+	updateSettings func(ctx context.Context, transform func(string) string) (restarted bool, err error)
 }
 
 // NewLibraryService creates a new library service with default npm package manager
@@ -83,7 +85,7 @@ func (s *LibraryService) SetNodeRedRestart(restart func() error) {
 
 // SetSettingsUpdater wires the hook that applies a transform to the live
 // settings.js. Call it once during startup.
-func (s *LibraryService) SetSettingsUpdater(update func(transform func(string) string) error) {
+func (s *LibraryService) SetSettingsUpdater(update func(ctx context.Context, transform func(string) string) (bool, error)) {
 	s.updateSettings = update
 }
 
@@ -101,11 +103,14 @@ func (s *LibraryService) Install(ctx context.Context, pkg, alias string) error {
 		return err
 	}
 	expose := !isNodeRedNodePackage(s.dataDir, libraryModuleName(pkg))
-	settingsErr := s.applySettings(func(content string) string {
+	restarted, settingsErr := s.applySettings(ctx, func(content string) string {
 		return activateLibraryInSettings(content, pkg, alias, expose)
 	})
 	if settingsErr != nil {
 		settingsErr = fmt.Errorf("package installed, but settings.js update failed: %w", settingsErr)
+	}
+	if restarted {
+		return nil
 	}
 	// Restart even when settings.js failed: a new Node-RED node still loads.
 	if err := s.fireRestart(); err != nil {
@@ -115,11 +120,11 @@ func (s *LibraryService) Install(ctx context.Context, pkg, alias string) error {
 }
 
 // applySettings runs the settings.js hook when one is wired.
-func (s *LibraryService) applySettings(transform func(string) string) error {
+func (s *LibraryService) applySettings(ctx context.Context, transform func(string) string) (bool, error) {
 	if s.updateSettings == nil {
-		return nil
+		return false, nil
 	}
-	return s.updateSettings(transform)
+	return s.updateSettings(ctx, transform)
 }
 
 // Uninstall uninstalls a package using npm uninstall and reloads a running
@@ -128,11 +133,14 @@ func (s *LibraryService) Uninstall(ctx context.Context, pkg string) error {
 	if err := s.pm.Uninstall(ctx, pkg); err != nil {
 		return err
 	}
-	settingsErr := s.applySettings(func(content string) string {
+	restarted, settingsErr := s.applySettings(ctx, func(content string) string {
 		return deactivateLibraryInSettings(content, pkg)
 	})
 	if settingsErr != nil {
 		settingsErr = fmt.Errorf("package uninstalled, but settings.js update failed: %w", settingsErr)
+	}
+	if restarted {
+		return nil
 	}
 	if err := s.fireRestart(); err != nil {
 		return errors.Join(settingsErr, fmt.Errorf("package uninstalled, but Node-RED restart failed: %w", err))

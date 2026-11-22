@@ -71,7 +71,9 @@ func (s *backupEventStore) loadLocked() ([]model.BackupEvent, error) {
 
 	var events []model.BackupEvent
 	if err := json.Unmarshal(data, &events); err != nil {
-		return nil, fmt.Errorf("parse backup event log: %w", err)
+		// A torn log must not fail every observability request (#1016): treat it
+		// as empty so the next Append replaces it with a valid file.
+		return []model.BackupEvent{}, nil //nolint:nilerr // a corrupt log is recoverable, not a failure
 	}
 
 	sort.SliceStable(events, func(i, j int) bool {
@@ -96,7 +98,7 @@ func (s *backupEventStore) saveLocked(events []model.BackupEvent) error {
 	}
 
 	path := filepath.Join(s.dataDir, backupEventsFile)
-	if err := os.WriteFile(path, data, 0600); err != nil {
+	if err := atomicWriteFile(path, data); err != nil {
 		return fmt.Errorf("write backup event log: %w", err)
 	}
 

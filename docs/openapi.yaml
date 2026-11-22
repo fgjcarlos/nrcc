@@ -1779,7 +1779,9 @@ paths:
         activates it in settings.js: `functionExternalModules` is set to true and,
         unless the package declares Node-RED nodes, it is exposed in
         `functionGlobalContext` under `alias` (guarded `require`). Node-RED is
-        restarted when it is running.
+        restarted when it is running; while the NRCC-managed process runs, the
+        settings.js change goes through the apply pipeline (snapshot, atomic
+        write, restart, readiness check, rollback on failure).
       security:
         - bearerAuth: []
       requestBody:
