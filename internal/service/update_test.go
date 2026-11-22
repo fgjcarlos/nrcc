@@ -1122,6 +1122,8 @@ func TestApplyUpdateWithBackup_NpmFailure(t *testing.T) {
 func TestApplyUpdateWithBackup_AbortsWhenBackupFails(t *testing.T) {
 	tmpDir := t.TempDir()
 	svc := newTestUpdateService(t, tmpDir)
+	pm, _ := npmGlobalProcessManager(t)
+	svc.SetProcessManager(pm)
 	svc.SetBackupCreator(failingBackupCreator{})
 
 	svc.getInstalledVersionFn = func(ctx context.Context) string { return "4.0.1" }
