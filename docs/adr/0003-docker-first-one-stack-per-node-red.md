@@ -37,8 +37,8 @@ deployment contract:
   multi-instance model. There is no `nrcc install` command.
 - NRCC never attaches to a Node-RED it did not start. When it manages
   Node-RED (`NRCC_MANAGE_NODE_RED=true`, the default) and another process
-  already binds the Node-RED port, start and restart fail with
-  `ErrForeignListener`. To run beside a Node-RED that another supervisor
+  already binds the Node-RED port, start, restart and the automatic
+  restart fail with `ErrForeignListener`. To run beside a Node-RED that another supervisor
   owns, set `NRCC_MANAGE_NODE_RED=false` (#918, #1018).
 - The Compose file at `docker-compose.yml` is the reference shape; the
   image at `ghcr.io/fgjcarlos/nrcc` is the reference binary.

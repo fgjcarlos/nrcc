@@ -104,6 +104,37 @@ func TestProcessManager_StartDuringBackoffRefusesForeignListener(t *testing.T) {
 	_ = pm.Stop(context.Background())
 }
 
+// TestProcessManager_AutoRestartRefusesForeignListenerAndExhausts binds the
+// port during the backoff: the automatic restart refuses it and gives up
+// (issue #1018).
+func TestProcessManager_AutoRestartRefusesForeignListenerAndExhausts(t *testing.T) {
+	pm, starts, port := crashingProcessManager(t)
+	if err := pm.Start(); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	waitForCrash(t, pm)
+
+	ln, err := net.Listen("tcp", "127.0.0.1:"+strconv.Itoa(port))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = ln.Close() }()
+
+	deadline := time.Now().Add(5 * time.Second)
+	for !pm.RestartBudgetExhausted() {
+		if time.Now().After(deadline) {
+			t.Fatal("RestartBudgetExhausted() = false after auto-restart met a foreign listener")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if got := pm.Status().Status; got != "stopped" {
+		t.Fatalf("Status = %q, want stopped", got)
+	}
+	if n := countStarts(t, starts); n != 1 {
+		t.Fatalf("Node-RED started %d times, want 1", n)
+	}
+}
+
 // crashingProcessManager returns a manager whose fake Node-RED records each
 // start in the returned file and exits 1 at once.
 func crashingProcessManager(t *testing.T) (*ProcessManager, string, int) {

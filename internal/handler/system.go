@@ -435,9 +435,6 @@ func (h *SystemHandler) GetSecurityPosture(w http.ResponseWriter, r *http.Reques
 //
 // Each handler:
 //   - 503s when the ProcessManager is not wired (edge mode, tests).
-//   - 409s for restart/stop when Node-RED is externally managed — there
-//     is no process for nrcc to control, and silently no-oping was the
-//     bug we just fixed.
 //   - Completes the requested lifecycle action before reporting success.
 //     Returning before Restart finished caused the dashboard to show another
 //     false-success state whenever the background restart failed.
