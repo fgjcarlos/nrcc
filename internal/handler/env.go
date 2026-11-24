@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/fgjcarlos/nrcc/internal/audit"
+	"github.com/fgjcarlos/nrcc/internal/middleware"
 	"github.com/fgjcarlos/nrcc/internal/model"
 	"github.com/fgjcarlos/nrcc/internal/service"
 	"github.com/go-chi/chi/v5"
@@ -49,6 +50,16 @@ func (h *EnvHandler) GetEnv(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		model.RespondError(w, http.StatusInternalServerError, "ENV_ERROR", err.Error())
 		return
+	}
+
+	// #1022: mask plain values for non-admins, as GET /api/config does.
+	// Missing claims fail closed. Encrypted values are already blank.
+	if claims := middleware.ClaimsFromContext(r); claims == nil || claims.Role != model.RoleAdmin {
+		for i := range envVars {
+			if !envVars[i].Encrypted {
+				envVars[i].Value = "********"
+			}
+		}
 	}
 
 	model.RespondJSON(w, http.StatusOK, envVars)

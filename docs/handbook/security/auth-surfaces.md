@@ -48,6 +48,44 @@ rewriting: `nrcc-access`, `adminauth-node-red-editor`,
 - MFA is opt-in per user; recovery codes are issued once and
   shown only at enrolment time.
 
+### Roles
+
+NRCC has two roles. `admin` can do everything. `viewer` is
+read-only: it watches status and history but cannot change state,
+read secrets, or spend the operator's resources.
+
+A viewer can read:
+
+- Status and history: system info and history, Prometheus
+  `/metrics`, runtime history, bootstrap, Docker, update, backup
+  (including its config and provider name), scheduler and library
+  status, npm library search, and the AI provider settings (never
+  the key).
+- The structured config and env var list, with every non-encrypted
+  value replaced by `********` and every password removed. It can
+  also validate a config draft without saving it.
+- The flow list, single flows, flow metrics, flow versions and
+  version diffs.
+- The uploaded file list and file downloads.
+- Its own session, MFA status, MFA enrolment and disable, and
+  password change.
+
+A viewer cannot (the API answers `403`):
+
+- Write or apply anything: config, `settings.js`, env vars, flows
+  snapshots and reverts, backups, restores, libraries, updates,
+  uploads, Dashboard access, runtime start/stop/restart.
+- Read raw sources that carry secrets: `settings.js`, `.env`,
+  presets, backup archives, remote snapshot lists, the security
+  posture, or the raw `flows.json` export.
+- Run AI flow analysis, which spends the operator's provider key.
+- Manage users.
+
+The authoritative per-route allow list is the `routeAuthz` table in
+`internal/server/authz_walk_test.go`. The test walks every route in
+the live router as a viewer and fails if a route is missing from the
+table or the router does not enforce the declared level.
+
 ### Default
 
 No users exist at first boot. The setup screen demands an admin

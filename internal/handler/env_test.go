@@ -348,8 +348,8 @@ func TestPostEnvHandlerRoundTrip(t *testing.T) {
 		t.Fatalf("Failed to POST env var: %d — %s", w.Code, w.Body.String())
 	}
 
-	// GET the environment variables
-	req = httptest.NewRequest(http.MethodGet, "/api/env", nil)
+	// GET the environment variables as admin (#1022 masks them for viewers)
+	req = envGetAs(t, &model.Claims{Username: "admin", Role: model.RoleAdmin})
 	w = httptest.NewRecorder()
 	handler.GetEnv(w, req)
 
