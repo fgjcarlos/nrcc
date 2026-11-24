@@ -35,9 +35,9 @@ func TestAuthUserKey_NormalizesCaseAndSpace(t *testing.T) {
 
 	rl := NewRateLimiter(t.TempDir())
 	for i := 0; i < maxAttempts; i++ {
-		rl.Record(AuthUserKey("admin"))
+		rl.RecordAuthUser("admin", "203.0.113.9")
 	}
-	if blocked, _ := rl.Check(AuthUserKey("ADMIN")); !blocked {
+	if blocked, _ := rl.CheckAuthUser("ADMIN", "203.0.113.9"); !blocked {
 		t.Fatal("case variant escaped the lockout")
 	}
 }

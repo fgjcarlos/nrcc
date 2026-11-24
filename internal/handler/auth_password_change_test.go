@@ -106,8 +106,8 @@ func TestChangePassword_SelfWrongCurrentPassword_FeedsLoginRateLimit(t *testing.
 	for i := 0; i < 10; i++ {
 		_ = changePassword(t, h, adminClaims(user), user.ID, map[string]string{"password": pwChangeNew, "currentPassword": "nope"})
 	}
-	if blocked, _ := limiter.Check(middleware.AuthUserKey(user.Username)); !blocked {
-		t.Fatal("repeated wrong current passwords must lock the per-user auth bucket")
+	if blocked, _ := limiter.CheckAuthUser(user.Username, "192.0.2.1"); !blocked { // httptest default peer
+		t.Fatal("repeated wrong current passwords must lock the user for this address")
 	}
 	rec := changePassword(t, h, adminClaims(user), user.ID, map[string]string{"password": pwChangeNew, "currentPassword": pwChangeOld})
 	if rec.Code != http.StatusTooManyRequests {

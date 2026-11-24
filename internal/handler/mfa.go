@@ -217,7 +217,7 @@ func (h *MfaHandler) Verify(w http.ResponseWriter, r *http.Request) {
 	// Look up the username for rate-limiting per-user and audit.
 	username := h.mfaSvc.LookupUsernameByMfaToken(req.MfaToken)
 	if username != "" && h.limiter != nil {
-		if blocked, retry := h.limiter.Check(mw.AuthUserKey(username)); blocked {
+		if blocked, retry := h.limiter.CheckAuthUser(username, ip); blocked {
 			mw.RespondTooManyRequests(w, retry)
 			return
 		}
@@ -238,7 +238,7 @@ func (h *MfaHandler) Verify(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, service.ErrMfaInvalidCode):
 			if h.limiter != nil {
 				if username != "" {
-					h.limiter.Record(mw.AuthUserKey(username))
+					h.limiter.RecordAuthUser(username, ip)
 				}
 				h.limiter.Record(mw.AuthIPKey(ip))
 			}
@@ -256,7 +256,7 @@ func (h *MfaHandler) Verify(w http.ResponseWriter, r *http.Request) {
 	if h.limiter != nil {
 		h.limiter.Reset(mw.AuthIPKey(ip))
 		if username != "" {
-			h.limiter.Reset(mw.AuthUserKey(username))
+			h.limiter.ResetAuthUser(username, ip)
 		}
 	}
 
