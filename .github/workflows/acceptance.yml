@@ -85,9 +85,18 @@ jobs:
         id: default-stack-e2e
         working-directory: frontend
         env:
+          NRCC_ENCRYPTION_KEY: acceptance-fixture-encryption-key-not-a-secret
           E2E_BASE_URL: http://127.0.0.1:3001
           E2E_NODE_RED_URL: http://127.0.0.1:1880
-        run: pnpm exec playwright test --config playwright.stack.config.ts --grep-invert "FlowFuse policy protects deployed HTTP and Socket.IO endpoints"
+        run: |
+          set -Eeuo pipefail
+          setup_token=$(docker compose -f ../docker-compose.yml logs --no-color nrcc | sed -nE 's/.*auth setup token: ([0-9a-f]{64}).*/\1/p' | tail -n 1)
+          if [[ ! "$setup_token" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "Could not read the first-run setup token from the default stack logs" >&2
+            exit 1
+          fi
+          echo "::add-mask::$setup_token"
+          E2E_SETUP_TOKEN="$setup_token" pnpm exec playwright test --config playwright.stack.config.ts --grep-invert "FlowFuse policy protects deployed HTTP and Socket.IO endpoints"
 
       # Issue #887: keep the real-runtime evidence (HTML report, traces of
       # failed tests, skip annotations) of the default stack run before the
@@ -124,7 +133,15 @@ jobs:
         env:
           E2E_BASE_URL: http://127.0.0.1:3301
           E2E_NODE_RED_URL: http://127.0.0.1:31880
-        run: pnpm exec playwright test --config playwright.stack.config.ts --grep "FlowFuse policy protects deployed HTTP and Socket.IO endpoints"
+        run: |
+          set -Eeuo pipefail
+          setup_token=$(docker compose -p nrcc-flowfuse-e2e -f ../docker-compose.e2e.yml logs --no-color nrcc | sed -nE 's/.*auth setup token: ([0-9a-f]{64}).*/\1/p' | tail -n 1)
+          if [[ ! "$setup_token" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "Could not read the first-run setup token from the FlowFuse stack logs" >&2
+            exit 1
+          fi
+          echo "::add-mask::$setup_token"
+          E2E_SETUP_TOKEN="$setup_token" pnpm exec playwright test --config playwright.stack.config.ts --grep "FlowFuse policy protects deployed HTTP and Socket.IO endpoints"
 
       - name: Upload FlowFuse stack acceptance report and traces
         if: always() && steps.flowfuse-stack-e2e.outcome != 'skipped'
@@ -139,7 +156,9 @@ jobs:
 
       - name: Upload FlowFuse compose logs on failure
         if: failure()
-        run: docker compose -p nrcc-flowfuse-e2e -f docker-compose.e2e.yml logs --no-color --tail=200 || true
+        run: |
+          docker compose -p nrcc-flowfuse-e2e -f docker-compose.e2e.yml logs --no-color --tail=200 \
+            | sed -E 's/(auth setup token: )[0-9a-f]{64}/\1[REDACTED]/g' || true
 
       - name: Stop isolated FlowFuse E2E stack
         if: always()
@@ -165,7 +184,7 @@ jobs:
           for project in nrcc-acc-a nrcc-acc-b nrcc-acc-c; do
             echo "=== logs for ${project} ==="
             docker compose -p "$project" -f docker-compose.yml logs \
-              --no-color --tail=200 || true
+              --no-color --tail=200 | sed -E 's/(auth setup token: )[0-9a-f]{64}/\1[REDACTED]/g' || true
             docker compose -p "$project" -f docker-compose.yml down -v \
               --remove-orphans || true
           done
