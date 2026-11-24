@@ -57,6 +57,8 @@
   "signedInAs": "Conectado como",
   "openUserMenu": "Abrir menú de usuario",
   "profile": "Perfil",
+  "currentPasswordLabel": "Contraseña actual",
+  "currentPasswordRequired": "Introduce tu contraseña actual.",
   "signingOut": "Cerrando sesión…",
   "signOut": "Cerrar sesión",
   "commandPalette": "Paleta de comandos",

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
 
 // Mock the navigation bridge so the 401 fallback in the response
 // interceptor does not try to navigate during tests.
@@ -174,5 +175,27 @@ describe('API response contract', () => {
     (api.defaults as { adapter?: unknown }).adapter = adapter;
 
     await expect(api.post('/runtime/restart')).rejects.toThrow('unexpected text/html');
+  });
+
+  it('does not refresh and retry when a 401 rejects a current-password check', async () => {
+    const seen: string[] = [];
+    const adapter = vi.fn(async (config: InternalAxiosRequestConfig) => {
+      seen.push(config.url ?? '');
+      const response = {
+        data: { success: false, error: { code: 'INVALID_PASSWORD', message: 'Current password is incorrect' } },
+        status: 401,
+        statusText: 'Unauthorized',
+        headers: { 'content-type': 'application/json' },
+        config,
+      };
+      throw new AxiosError('Request failed with status code 401', 'ERR_BAD_REQUEST', config, null, response as AxiosResponse);
+    });
+    (api.defaults as { adapter?: unknown }).adapter = adapter;
+
+    await expect(api.patch('/auth/users/u1/password', { password: 'new-password-123', currentPassword: 'wrong' })).rejects.toMatchObject({
+      response: { status: 401 },
+    });
+    // One attempt only: a retry would count a second wrong guess toward the login lockout.
+    expect(seen).toEqual(['/auth/users/u1/password']);
   });
 });

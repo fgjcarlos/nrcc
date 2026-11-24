@@ -57,6 +57,8 @@
   "signedInAs": "Signed in as",
   "openUserMenu": "Open user menu",
   "profile": "Profile",
+  "currentPasswordLabel": "Current password",
+  "currentPasswordRequired": "Enter your current password.",
   "signingOut": "Signing out…",
   "signOut": "Sign out",
   "commandPalette": "Command palette",

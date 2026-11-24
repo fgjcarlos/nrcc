@@ -100,8 +100,9 @@ export const authService = {
     await api.delete(`/auth/users/${id}`);
   },
 
-  changePassword: async (id: string, password: string): Promise<void> => {
-    await api.patch(`/auth/users/${id}/password`, { password });
+  // currentPassword is required by the backend when users change their own password.
+  changePassword: async (id: string, password: string, currentPassword?: string): Promise<void> => {
+    await api.patch(`/auth/users/${id}/password`, currentPassword ? { password, currentPassword } : { password });
   },
 
   updateUserRole: async (id: string, role: 'admin' | 'viewer'): Promise<User> => {

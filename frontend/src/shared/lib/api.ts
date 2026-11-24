@@ -149,7 +149,14 @@ api.interceptors.response.use(
 
     if (error.response?.status === 401 && !originalRequest._retry) {
       const url = originalRequest.url ?? '';
-      if (url.includes('/auth/login') || url.includes('/auth/setup') || url.includes('/auth/refresh')) {
+      // INVALID_PASSWORD is a failed current-password check, not an expired
+      // token; a refresh-and-retry would count a second guess toward lockout.
+      if (
+        url.includes('/auth/login') ||
+        url.includes('/auth/setup') ||
+        url.includes('/auth/refresh') ||
+        error.response.data?.error?.code === 'INVALID_PASSWORD'
+      ) {
         return Promise.reject(error);
       }
 

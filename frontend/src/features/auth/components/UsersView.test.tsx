@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { UsersView } from './UsersView'
 import { authService, type User } from '../services/authService'
@@ -72,10 +73,12 @@ const createQueryClient = () =>
 const renderWithProviders = (component: React.ReactElement) => {
   const queryClient = createQueryClient()
   return render(
-    <QueryClientProvider client={queryClient}>
-      {component}
-      <Toaster />
-    </QueryClientProvider>
+    <MemoryRouter>
+      <QueryClientProvider client={queryClient}>
+        {component}
+        <Toaster />
+      </QueryClientProvider>
+    </MemoryRouter>
   )
 }
 
@@ -311,12 +314,21 @@ describe('UsersView', () => {
       })
     })
 
+    it('sends the signed-in admin to the profile page to change their own password', () => {
+      renderWithProviders(<UsersView />)
+
+      const links = screen.getAllByRole('link', { name: i18n.t('auth:changePassword') })
+      expect(links).toHaveLength(1)
+      expect(links[0]).toHaveAttribute('href', '/profile')
+      expect(screen.getAllByRole('button', { name: i18n.t('auth:changePassword') })).toHaveLength(1)
+    })
+
     it('opens modal in edit_password mode', async () => {
       const user = userEvent.setup()
       renderWithProviders(<UsersView />)
 
       const changePasswordButtons = screen.getAllByRole('button', { name: i18n.t('auth:changePassword') })
-      await user.click(changePasswordButtons[1])
+      await user.click(changePasswordButtons[0])
 
       expect(screen.getByRole('heading', { name: i18n.t('auth:changePassword') })).toBeInTheDocument()
     })
@@ -326,7 +338,7 @@ describe('UsersView', () => {
       renderWithProviders(<UsersView />)
 
       const changePasswordButtons = screen.getAllByRole('button', { name: i18n.t('auth:changePassword') })
-      await user.click(changePasswordButtons[1])
+      await user.click(changePasswordButtons[0])
 
       // Password label should be visible
       const passwordLabels = screen.queryAllByText(i18n.t('auth:newPasswordLabel'))
@@ -338,7 +350,7 @@ describe('UsersView', () => {
       renderWithProviders(<UsersView />)
 
       const changePasswordButtons = screen.getAllByRole('button', { name: i18n.t('auth:changePassword') })
-      await user.click(changePasswordButtons[1])
+      await user.click(changePasswordButtons[0])
 
       const confirmButton = screen.getByRole('button', { name: i18n.t('common:confirm') }) as HTMLButtonElement
       expect(confirmButton).toBeDisabled()
@@ -349,7 +361,7 @@ describe('UsersView', () => {
       renderWithProviders(<UsersView />)
 
       const changePasswordButtons = screen.getAllByRole('button', { name: i18n.t('auth:changePassword') })
-      await user.click(changePasswordButtons[1])
+      await user.click(changePasswordButtons[0])
 
       const passwordInputs = screen.getAllByDisplayValue('')
       const passwordInput = passwordInputs.find(
@@ -612,8 +624,10 @@ describe('UsersView', () => {
       const editButtons = screen.getAllByRole('button', { name: i18n.t('auth:editUser') })
       expect(editButtons.length).toBeGreaterThanOrEqual(2)
 
+      // The signed-in admin's own row links to the profile page instead.
       const changePasswordButtons = screen.getAllByRole('button', { name: i18n.t('auth:changePassword') })
-      expect(changePasswordButtons.length).toBeGreaterThanOrEqual(2)
+      expect(changePasswordButtons.length).toBeGreaterThanOrEqual(1)
+      expect(screen.getAllByRole('link', { name: i18n.t('auth:changePassword') }).length).toBeGreaterThanOrEqual(1)
 
       const deleteButtons = screen.getAllByRole('button', { name: i18n.t('common:delete') })
       expect(deleteButtons.length).toBeGreaterThanOrEqual(2)
@@ -727,7 +741,7 @@ describe('UsersView', () => {
       renderWithProviders(<UsersView />)
 
       const changePasswordButtons = screen.getAllByRole('button', { name: i18n.t('auth:changePassword') })
-      await user.click(changePasswordButtons[1])
+      await user.click(changePasswordButtons[0])
 
       const passwordInputs = screen.getAllByDisplayValue('')
       const passwordInput = passwordInputs.find(
@@ -762,7 +776,7 @@ describe('UsersView', () => {
       renderWithProviders(<UsersView />)
 
       const changePasswordButtons = screen.getAllByRole('button', { name: i18n.t('auth:changePassword') })
-      await user.click(changePasswordButtons[1])
+      await user.click(changePasswordButtons[0])
 
       const passwordInputs = screen.getAllByDisplayValue('')
       const passwordInput = passwordInputs.find(
