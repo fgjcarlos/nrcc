@@ -8,6 +8,7 @@ import { initReactI18next } from 'react-i18next';
 
 import enCommon from '@/locales/en/common.json';
 import enAuth from '@/locales/en/auth.json';
+import enSetup from '@/locales/en/setup.json';
 import enBackups from '@/locales/en/backups.json';
 import enBootstrap from '@/locales/en/bootstrap.json';
 import enConfig from '@/locales/en/configuration.json';
@@ -19,6 +20,7 @@ import enUpdates from '@/locales/en/updates.json';
 
 import esCommon from '@/locales/es/common.json';
 import esAuth from '@/locales/es/auth.json';
+import esSetup from '@/locales/es/setup.json';
 import esBackups from '@/locales/es/backups.json';
 import esBootstrap from '@/locales/es/bootstrap.json';
 import esConfig from '@/locales/es/configuration.json';
@@ -32,6 +34,7 @@ const resources = {
   en: {
     common: enCommon,
     auth: enAuth,
+    setup: enSetup,
     backups: enBackups,
     bootstrap: enBootstrap,
     configuration: enConfig,
@@ -44,6 +47,7 @@ const resources = {
   es: {
     common: esCommon,
     auth: esAuth,
+    setup: esSetup,
     backups: esBackups,
     bootstrap: esBootstrap,
     configuration: esConfig,
@@ -68,7 +72,7 @@ if (!w.__nrccI18nInitOnce) {
       fallbackLng: 'en',
       defaultNS: 'common',
       ns: [
-        'common', 'auth', 'backups', 'bootstrap', 'configuration',
+        'common', 'auth', 'setup', 'backups', 'bootstrap', 'configuration',
         'dashboard', 'env-vars', 'libraries', 'security', 'updates',
       ],
       resources,
