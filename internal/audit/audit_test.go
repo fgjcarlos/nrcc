@@ -613,10 +613,11 @@ func TestAudit_Log_IPExtraction_NoTrustedProxy(t *testing.T) {
 func TestAudit_Log_IPExtraction_TrustedProxy(t *testing.T) {
 	runAuditIPExtractionCase(t, "127.0.0.1/32", []auditIPCase{
 		{
-			name:       "first forwarded IP is recorded",
+			// The proxy appends the real client; the leftmost entry is client-written (#1021).
+			name:       "rightmost untrusted forwarded IP is recorded",
 			remoteAddr: "127.0.0.1:1234",
 			xff:        " 1.2.3.4, 172.16.0.1",
-			want:       "1.2.3.4",
+			want:       "172.16.0.1",
 		},
 	})
 }

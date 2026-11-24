@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **Security — behavior change:** failed logins no longer lock an account
+  everywhere. Six failures lock that username only for the address that sent
+  them; a slower limit of 30 failures per username in 15 minutes still stops
+  guessing from many addresses. MFA verify and the current-password check of
+  a password change use the same buckets. Behind a trusted proxy, the client
+  address is now the rightmost `X-Forwarded-For` entry that is not a trusted
+  proxy, so a client can no longer pick its own rate-limit bucket. The server
+  logs one warning when `X-Forwarded-For` arrives and `NRCC_TRUSTED_PROXIES`
+  is empty (#1021).
 - **Security — behavior change:** changing your own password
   (`PATCH /api/auth/users/{id}/password`) now requires `currentPassword`; a
   missing or wrong value returns 401 `INVALID_PASSWORD`, and wrong values count

@@ -3,6 +3,7 @@ package middleware
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -16,7 +17,22 @@ const (
 	maxAttempts    = 6
 	windowDuration = 15 * time.Minute
 	lockoutFile    = "ratelimit.json"
+
+	// UserGlobalMaxAttempts is the slower per-username limit summed over all
+	// addresses. It stops guessing from many addresses while one address can
+	// only spend its own 6 tries, so it cannot lock the account out (#1021).
+	UserGlobalMaxAttempts = 30
+
+	authUserPrefix = "auth-user:"
 )
+
+// limitFor returns the failure budget of a bucket.
+func limitFor(key string) int {
+	if strings.HasPrefix(key, authUserPrefix) {
+		return UserGlobalMaxAttempts
+	}
+	return maxAttempts
+}
 
 type attempt struct {
 	Count       int       `json:"count"`
@@ -45,11 +61,39 @@ func NewRateLimiter(dataDir string) *RateLimiter {
 // tries per 15-minute window from a single IP (#585 HIGH-001).
 func AuthIPKey(ip string) string { return "auth-ip:" + ip }
 
-// AuthUserKey normalizes the username so case variants (Admin, ADMIN, aDmin)
-// collapse into one bucket. Lookup is exact-match, so without this an attacker
-// got a fresh 6-try budget per spelling (#585 HIGH-010).
+// AuthUserKey is the global per-user bucket (UserGlobalMaxAttempts). It
+// normalizes the username so case variants (Admin, ADMIN, aDmin) collapse into
+// one bucket. Lookup is exact-match, so without this an attacker got a fresh
+// budget per spelling (#585 HIGH-010).
 func AuthUserKey(username string) string {
-	return "auth-user:" + strings.ToLower(strings.TrimSpace(username))
+	return authUserPrefix + NormalizeUsername(username)
+}
+
+// AuthUserIPKey is the per-user bucket of one address. Keying the 6-try
+// lockout on the username alone let any caller lock the account out (#1021).
+func AuthUserIPKey(username, ip string) string {
+	return "auth-user-ip:" + NormalizeUsername(username) + "|" + ip
+}
+
+// CheckAuthUser reports whether username is locked for ip, either by that
+// address's bucket or by the global per-user bucket.
+func (rl *RateLimiter) CheckAuthUser(username, ip string) (blocked bool, retryAfter time.Duration) {
+	if blocked, retry := rl.Check(AuthUserIPKey(username, ip)); blocked {
+		return true, retry
+	}
+	return rl.Check(AuthUserKey(username))
+}
+
+// RecordAuthUser counts a failed credential for username from ip.
+func (rl *RateLimiter) RecordAuthUser(username, ip string) {
+	rl.Record(AuthUserIPKey(username, ip))
+	rl.Record(AuthUserKey(username))
+}
+
+// ResetAuthUser clears the address bucket after a success. The global bucket
+// keeps its count so a distributed attacker gains nothing when the user logs in.
+func (rl *RateLimiter) ResetAuthUser(username, ip string) {
+	rl.Reset(AuthUserIPKey(username, ip))
 }
 
 func NormalizeUsername(username string) string {
@@ -80,7 +124,7 @@ func (rl *RateLimiter) Check(key string) (blocked bool, retryAfter time.Duration
 		return false, 0
 	}
 
-	if a.Count >= maxAttempts {
+	if a.Count >= limitFor(key) {
 		a.LockedUntil = a.FirstAt.Add(windowDuration)
 		rl.persist()
 		return true, time.Until(a.LockedUntil)
@@ -102,7 +146,7 @@ func (rl *RateLimiter) Record(key string) {
 	}
 
 	a.Count++
-	if a.Count >= maxAttempts {
+	if a.Count >= limitFor(key) {
 		a.LockedUntil = a.FirstAt.Add(windowDuration)
 	}
 	rl.persist()
@@ -142,25 +186,45 @@ func (rl *RateLimiter) load() {
 // empty by default, which means X-Forwarded-For is ignored entirely.
 var trustedProxies = parseTrustedProxies(os.Getenv("NRCC_TRUSTED_PROXIES"))
 
+// warnIgnoredXFF logs once that forwarded headers arrive without any trusted
+// proxy: behind a reverse proxy every client then shares the proxy's bucket.
+var warnIgnoredXFF sync.Once
+
 // ExtractIP returns the client IP used to key rate limiting. It only honors
 // X-Forwarded-For when the immediate peer (RemoteAddr) is a configured trusted
 // proxy; otherwise the peer address is authoritative. This stops a direct
 // client from spoofing X-Forwarded-For to rotate rate-limit buckets and bypass
 // login throttling.
 func ExtractIP(r *http.Request) string {
+	if len(trustedProxies) == 0 && r.Header.Get("X-Forwarded-For") != "" {
+		warnIgnoredXFF.Do(func() {
+			log.Printf("WARN: X-Forwarded-For received but NRCC_TRUSTED_PROXIES is empty; rate limits and audit use the peer address, so behind a reverse proxy all clients share one bucket. Set NRCC_TRUSTED_PROXIES to the proxy address.")
+		})
+	}
 	return extractIP(r, trustedProxies)
 }
 
+// extractIP walks X-Forwarded-For from the right and returns the first entry
+// that is not a trusted proxy. Proxies append, so entries left of that one are
+// client-written and must not pick the bucket (#1021).
 func extractIP(r *http.Request, trusted []*net.IPNet) string {
-	peer := peerHost(r.RemoteAddr)
-	if len(trusted) > 0 && ipInNets(peer, trusted) {
-		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-			if first := strings.TrimSpace(strings.SplitN(xff, ",", 2)[0]); first != "" {
-				return first
-			}
+	client := peerHost(r.RemoteAddr)
+	if len(trusted) == 0 || !ipInNets(client, trusted) {
+		return client
+	}
+	// A proxy may append to the client's header or add its own line.
+	hops := strings.Split(strings.Join(r.Header.Values("X-Forwarded-For"), ","), ",")
+	for i := len(hops) - 1; i >= 0; i-- {
+		hop := strings.TrimSpace(hops[i])
+		if net.ParseIP(hop) == nil {
+			break // malformed: keep the last address a trusted hop vouched for
+		}
+		client = hop
+		if !ipInNets(hop, trusted) {
+			break
 		}
 	}
-	return peer
+	return client
 }
 
 func peerHost(remoteAddr string) string {

@@ -283,7 +283,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if h.limiter != nil {
-		if blocked, retry := h.limiter.Check(mw.AuthUserKey(req.Username)); blocked {
+		if blocked, retry := h.limiter.CheckAuthUser(req.Username, ip); blocked {
 			mw.RespondTooManyRequests(w, retry)
 			return
 		}
@@ -294,7 +294,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if user == nil {
 		if h.limiter != nil {
 			h.limiter.Record(mw.AuthIPKey(ip))
-			h.limiter.Record(mw.AuthUserKey(req.Username))
+			h.limiter.RecordAuthUser(req.Username, ip)
 		}
 		if h.loginMetrics != nil {
 			h.loginMetrics.RecordLoginAttempt(false)
@@ -308,7 +308,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if !h.authSvc.VerifyPassword(user.PasswordHash, req.Password) {
 		if h.limiter != nil {
 			h.limiter.Record(mw.AuthIPKey(ip))
-			h.limiter.Record(mw.AuthUserKey(req.Username))
+			h.limiter.RecordAuthUser(req.Username, ip)
 		}
 		if h.loginMetrics != nil {
 			h.loginMetrics.RecordLoginAttempt(false)
@@ -321,7 +321,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	// Successful login — reset rate limit counters
 	if h.limiter != nil {
 		h.limiter.Reset(mw.AuthIPKey(ip))
-		h.limiter.Reset(mw.AuthUserKey(req.Username))
+		h.limiter.ResetAuthUser(req.Username, ip)
 	}
 
 	// Rehash if stored with lower bcrypt cost
@@ -650,23 +650,23 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 
 // verifyCurrentPassword checks the caller's current password and writes the
 // error response when it fails. Wrong guesses share the login per-user rate
-// limit bucket so this endpoint cannot be used to brute-force the password.
+// limit buckets so this endpoint cannot be used to brute-force the password.
 func (h *AuthHandler) verifyCurrentPassword(w http.ResponseWriter, r *http.Request, claims *model.Claims, current string) bool {
 	user := h.authSvc.GetUserByID(claims.UserID)
 	if user == nil {
 		model.RespondError(w, http.StatusNotFound, "NOT_FOUND", "User not found")
 		return false
 	}
-	key := mw.AuthUserKey(user.Username)
+	ip := mw.ExtractIP(r)
 	if h.limiter != nil {
-		if blocked, retry := h.limiter.Check(key); blocked {
+		if blocked, retry := h.limiter.CheckAuthUser(user.Username, ip); blocked {
 			mw.RespondTooManyRequests(w, retry)
 			return false
 		}
 	}
 	if current == "" || !h.authSvc.VerifyPassword(user.PasswordHash, current) {
 		if h.limiter != nil && current != "" {
-			h.limiter.Record(key)
+			h.limiter.RecordAuthUser(user.Username, ip)
 		}
 		h.audit.Log(r, claims.Username, "PASSWORD_CHANGE", user.Username, "fail", map[string]string{"reason": "bad_current_password"})
 		model.RespondError(w, http.StatusUnauthorized, "INVALID_PASSWORD", "Current password is incorrect")

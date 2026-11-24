@@ -100,7 +100,7 @@ does not apply the change.
 | `NRCC_ENCRYPTION_KEY` | none | **Required by the canonical Compose stack**, which refuses to start without it (#664). Encrypts the persisted env/secret store. A bare binary started without it boots, logs a warning, and returns 503 for writes that request encryption. | yes |
 | `NRCC_CORS_ORIGINS` | empty (deny all cross-origin requests) | Comma-separated allowed origins | yes |
 | `NRCC_CORS_UNSAFE_WILDCARD` | `false` | Exactly `true` answers every origin with `*`, even when origins are set (dev only) | yes |
-| `NRCC_TRUSTED_PROXIES` | empty | Comma-separated CIDRs/IPs trusted for forwarded headers | yes |
+| `NRCC_TRUSTED_PROXIES` | empty | Comma-separated CIDRs/IPs trusted for forwarded headers; the client is the rightmost `X-Forwarded-For` entry outside this list | yes |
 | `NRCC_TLS` | `false` | Mark setup refresh cookies Secure when TLS terminates outside the request path | yes |
 | `EDGE_MODE` | `false` | Resource-safe defaults for Pi/NAS (ADR 0002) | yes |
 | `NRCC_MANAGE_NODE_RED` | `true` | If `false`, NRCC never starts, stops or restarts Node-RED; use it beside a Node-RED another supervisor owns. If `true`, NRCC refuses to start when another process already binds `NODE_RED_PORT` | yes |
