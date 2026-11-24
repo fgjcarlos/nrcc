@@ -95,8 +95,11 @@ export interface paths {
         put?: never;
         /**
          * Initial admin setup
-         * @description Creates the first admin user. Only works when no users exist yet.
-         *     Sets an httpOnly refresh cookie on success.
+         * @description Creates the first admin using the one-time `X-Setup-Reset-Token` from
+         *     the NRCC startup log. On an already-configured instance, only a new
+         *     recovery token provisioned on the host authorizes this operation.
+         *     NRCC consumes the token before creating the account and sets an
+         *     httpOnly refresh cookie on success.
          */
         post: operations["postAuthSetup"];
         delete?: never;
@@ -1186,7 +1189,7 @@ export interface paths {
         put?: never;
         /**
          * Install a library
-         * @description Installs an npm package into the Node-RED user directory via npm, then activates it in settings.js: `functionExternalModules` is set to true and, unless the package declares Node-RED nodes, it is exposed in `functionGlobalContext` under `alias` (guarded `require`). Node-RED is restarted when it is running.
+         * @description Installs an npm package into the Node-RED user directory via npm, then activates it in settings.js: `functionExternalModules` is set to true and, unless the package declares Node-RED nodes, it is exposed in `functionGlobalContext` under `alias` (guarded `require`). Node-RED is restarted when it is running; while the NRCC-managed process runs, the settings.js change goes through the apply pipeline (snapshot, atomic write, restart, readiness check, rollback on failure).
          */
         post: operations["installLibrary"];
         delete?: never;
@@ -1316,6 +1319,9 @@ export interface paths {
          *     the run (state is already `BackingUp`); no other request can start one
          *     until it finishes. Poll `GET /api/updates/state` every 500 ms to track
          *     progress. A new update can start from `Idle`, `Completed` or `Failed`.
+         *     An update that cannot run (no resolved target version, or a runtime
+         *     that cannot be updated in place) fails before the backup is taken, so
+         *     no backup is created or evicted.
          */
         post: operations["postUpdatesApply"];
         delete?: never;
@@ -3361,7 +3367,10 @@ export interface operations {
     postAuthSetup: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description One-time token from the startup log or provisioned on the host for recovery. */
+                "X-Setup-Reset-Token": string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -3383,6 +3392,7 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
             409: components["responses"]["Conflict"];
             429: components["responses"]["TooManyRequests"];
         };

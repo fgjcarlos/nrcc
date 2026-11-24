@@ -4,6 +4,7 @@ const nrccURL = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:3001'
 const nodeRedURL = process.env.E2E_NODE_RED_URL ?? 'http://127.0.0.1:1880'
 const username = 'admin'
 const password = 'acceptance-fixture-pw-not-a-secret'
+const setupToken = process.env.E2E_SETUP_TOKEN ?? ''
 // Issue #881 fixtures: two Node-RED editor accounts, one read-only and one
 // full-access. They are deliberately-fake credentials for a loopback-only
 // container.
@@ -21,7 +22,11 @@ async function ensureAdmin(): Promise<void> {
   await expect(status).toBeOK()
   const payload = await status.json() as { data?: { initialized?: boolean } }
   if (payload.data?.initialized === false) {
-    const setup = await nrcc.post('/api/auth/setup', { data: { username, password } })
+    expect(/^[0-9a-f]{64}$/.test(setupToken), 'Set E2E_SETUP_TOKEN from the stack startup log before first-run e2e setup').toBe(true)
+    const setup = await nrcc.post('/api/auth/setup', {
+      headers: { 'X-Setup-Reset-Token': setupToken },
+      data: { username, password },
+    })
     await expect(setup).toBeOK()
   }
 }

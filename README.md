@@ -91,6 +91,8 @@ docker compose up -d --build
 
 Open <http://localhost:3001> for the NRCC UI and <http://localhost:1880> for the Node-RED editor. The compose binds to `127.0.0.1`; reach those ports over Tailscale Serve (`sudo tailscale serve --bg --https=3001 http://localhost:3001`) or change the binding to `0.0.0.0` for LAN access.
 
+On first boot, create the initial administrator with the one-time setup token from `docker compose logs nrcc`. The setup request requires `X-Setup-Reset-Token`; the token is consumed by successful setup and cannot be reused. Keep the setup token private and follow [setup recovery](docs/setup-recovery.md) for deliberate host-side recovery. If this is a pre-fix install that is already configured, stop NRCC and remove any stale setup token from its data volume unless you intentionally authorize recovery.
+
 The full env contract (every variable, defaults, restart requirements, per-stack guarantees) lives in [docs/configuration/env-contract.md](docs/configuration/env-contract.md). For day-to-day operations, see [docs/operations/docker-stack.md](docs/operations/docker-stack.md).
 
 ### 2. Add a second instance
