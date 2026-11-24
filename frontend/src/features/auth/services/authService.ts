@@ -46,11 +46,13 @@ export const authService = {
     return response.data.data;
   },
 
-  setup: async (username: string, password: string): Promise<AuthResponse> => {
+  setup: async (username: string, password: string, setupToken: string): Promise<AuthResponse> => {
     const response = await api.post<{ data: AuthResponse }>('/auth/setup', {
       username,
       password,
       confirmPassword: password,
+    }, {
+      headers: { 'X-Setup-Reset-Token': setupToken },
     });
     const { token, user } = response.data.data;
     setToken(token);

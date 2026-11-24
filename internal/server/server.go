@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
+	iofs "io/fs"
 	"log"
 	"log/slog"
 	"net/http"
@@ -95,10 +97,16 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 	// Initialize handlers
 	authHandler := handler.NewAuthHandler(authSvc)
 	setupTokenPath := filepath.Join(dataDir, setupstate.SetupTokenFileName)
-	users, _ := authSvc.GetAllUsers()
-	_, err := setupstate.EnsureTokenFile(setupTokenPath, len(users) > 0)
-	if err != nil {
-		log.Printf("auth setup token unavailable: %v", err)
+	users, usersErr := authSvc.GetAllUsers()
+	if usersErr != nil && !errors.Is(usersErr, iofs.ErrNotExist) {
+		log.Printf("auth setup token unavailable: failed to inspect user configuration: %v", usersErr)
+	} else {
+		token, err := setupstate.EnsureTokenFile(setupTokenPath, len(users) > 0)
+		if err != nil {
+			log.Printf("auth setup token unavailable: %v", err)
+		} else if len(users) == 0 && token.Raw != "" {
+			log.Printf("auth setup token: %s", token.Raw)
+		}
 	}
 	authHandler.SetSetupTokenPath(setupTokenPath)
 	hostSvc := service.NewHostService(dataDir)

@@ -46,16 +46,30 @@ describe('SetupView', () => {
 
     renderSetup()
 
-    await user.type(await screen.findByLabelText(/^username$/i), 'admin')
+    await user.type(await screen.findByLabelText(/setup token/i), 'host-token')
+    await user.type(screen.getByLabelText(/^username$/i), 'admin')
     await user.type(screen.getByLabelText(/^password$/i), 'super-secret')
     await user.type(screen.getByLabelText(/confirm password/i), 'super-secret')
     await user.click(screen.getByRole('button', { name: /create account and continue/i }))
 
     await waitFor(() => {
-      expect(mockAuthService.setup).toHaveBeenCalledWith('admin', 'super-secret')
+      expect(mockAuthService.setup).toHaveBeenCalledWith('admin', 'super-secret', 'host-token')
     })
 
     expect(await screen.findByText('Dashboard route')).toBeInTheDocument()
+  })
+
+  it('requires a setup token before calling the setup API', async () => {
+    const user = userEvent.setup()
+    renderSetup()
+
+    await user.type(await screen.findByLabelText(/^username$/i), 'admin')
+    await user.type(screen.getByLabelText(/^password$/i), 'super-secret')
+    await user.type(screen.getByLabelText(/confirm password/i), 'super-secret')
+    await user.click(screen.getByRole('button', { name: /create account and continue/i }))
+
+    expect(await screen.findByText('Enter the setup token from the NRCC startup log.')).toBeInTheDocument()
+    expect(mockAuthService.setup).not.toHaveBeenCalled()
   })
 
   it('redirects to login when the system is already initialized', async () => {
@@ -73,7 +87,8 @@ const RAW_KEY = /\b(?:auth|common):|\b(?:login|setup)\.[a-zA-Z]/
 async function fillAndSubmit() {
   const user = userEvent.setup()
   renderSetup()
-  await user.type(await screen.findByLabelText(/^username$/i), 'admin')
+  await user.type(await screen.findByLabelText(/setup token/i), 'host-token')
+  await user.type(screen.getByLabelText(/^username$/i), 'admin')
   await user.type(screen.getByLabelText(/^password$/i), 'super-secret')
   await user.type(screen.getByLabelText(/confirm password/i), 'super-secret')
   await user.click(screen.getByRole('button', { name: /create account and continue/i }))
@@ -132,6 +147,7 @@ describe('SetupView copy, states and controls', () => {
     expect(password).toHaveAttribute('autocomplete', 'new-password')
     expect(confirm).toHaveAttribute('autocomplete', 'new-password')
 
+    await user.type(await screen.findByLabelText(/setup token/i), 'host-token')
     await user.type(username, 'ab')
     await user.type(password, 'short')
     await user.type(confirm, 'other')
@@ -170,6 +186,7 @@ describe('SetupView copy, states and controls', () => {
   })
 
   it.each([
+    ['invalid setup token', { response: { status: 401, data: {} } }, 'The setup token is missing or invalid. Check the NRCC startup log and try again.'],
     ['weak password', { response: { status: 400, data: { error: { code: 'WEAK_PASSWORD', message: 'password is too common' } } } }, 'The server refused this password: it is too common or longer than 72 characters. Choose another one.'],
     ['rate limit', { response: { status: 429, data: {} } }, 'Too many setup attempts. Wait a few minutes, then try again.'],
     ['network failure', new Error('Network Error'), 'Cannot reach the NRCC server. Check that it is running, then try again.'],
@@ -189,6 +206,7 @@ describe('SetupView copy, states and controls', () => {
     const user = userEvent.setup()
     renderSetup()
 
+    await user.type(await screen.findByLabelText(/token de configuración/i), 'host-token')
     await user.type(await screen.findByLabelText('Usuario'), 'admin')
     await user.type(screen.getByLabelText('Contraseña'), 'super-secret')
     await user.type(screen.getByLabelText('Confirmar contraseña'), 'super-secret')

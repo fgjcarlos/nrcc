@@ -136,9 +136,20 @@ paths:
       operationId: postAuthSetup
       summary: Initial admin setup
       description: |
-        Creates the first admin user. Only works when no users exist yet.
-        Sets an httpOnly refresh cookie on success.
+        Creates the first admin using the one-time `X-Setup-Reset-Token` from
+        the NRCC startup log. On an already-configured instance, only a new
+        recovery token provisioned on the host authorizes this operation.
+        NRCC consumes the token before creating the account and sets an
+        httpOnly refresh cookie on success.
       security: []
+      parameters:
+        - name: X-Setup-Reset-Token
+          in: header
+          required: true
+          description: One-time token from the startup log or provisioned on the host for recovery.
+          schema:
+            type: string
+            pattern: '^[0-9a-f]{64}$'
       requestBody:
         required: true
         content:
@@ -159,6 +170,8 @@ paths:
                 $ref: "#/components/schemas/SuccessEnvelope_AuthResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "409":
           $ref: "#/components/responses/Conflict"
         "429":

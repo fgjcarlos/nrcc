@@ -18,13 +18,69 @@ import (
 	"github.com/fgjcarlos/nrcc/internal/store"
 )
 
-func TestSetup_NoUserFirstBoot(t *testing.T)         { runSetupCase(t, "first-boot") }
+func TestSetup_NoUserFirstBoot(t *testing.T) { runSetupCase(t, "first-boot") }
+
+func TestSetup_FirstBootRequiresToken(t *testing.T) {
+	for _, supplied := range []string{"", strings.Repeat("0", 64)} {
+		t.Run(map[string]string{"": "missing", strings.Repeat("0", 64): "incorrect"}[supplied], func(t *testing.T) {
+			h, authSvc, tokenPath, token := newFirstBootSetupHandler(t)
+			response := performSetupRequest(h, "admin@example.com", supplied)
+			if response.Code != http.StatusUnauthorized {
+				t.Fatalf("setup status=%d want=%d body=%s", response.Code, http.StatusUnauthorized, response.Body.String())
+			}
+			if authSvc.GetUserByUsername("admin@example.com") != nil {
+				t.Fatal("setup without the valid token created an administrator")
+			}
+			if got, err := setupstate.ReadTokenFile(tokenPath); err != nil || got.Raw != token.Raw {
+				t.Fatalf("rejected setup changed token: token=%q err=%v", got.Raw, err)
+			}
+		})
+	}
+}
+
+func TestSetup_FirstBootConsumesTokenBeforeBootstrapMutation(t *testing.T) {
+	h, authSvc, tokenPath, token := newFirstBootSetupHandler(t)
+	response := performSetupRequest(h, "admin@example.com", token.Raw)
+	if response.Code != http.StatusCreated {
+		t.Fatalf("setup status=%d want=%d body=%s", response.Code, http.StatusCreated, response.Body.String())
+	}
+	if _, err := os.Stat(tokenPath); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("token file remains after setup: %v", err)
+	}
+	replay := performSetupRequest(h, "replayed@example.com", token.Raw)
+	if replay.Code != http.StatusConflict {
+		t.Fatalf("replay status=%d want=%d body=%s", replay.Code, http.StatusConflict, replay.Body.String())
+	}
+	users, err := authSvc.GetAllUsers()
+	if err != nil || len(users) != 1 {
+		t.Fatalf("users after replay=%d want=1 err=%v", len(users), err)
+	}
+}
+
+func newFirstBootSetupHandler(t *testing.T) (*AuthHandler, *service.AuthService, string, setupstate.SetupToken) {
+	t.Helper()
+	dir := t.TempDir()
+	authSvc := service.NewAuthService("test-secret",
+		store.NewJSONStore[model.CCUsers](filepath.Join(dir, "cc-users.json")),
+		store.NewJSONStore[model.RefreshSessions](filepath.Join(dir, "sessions.json")))
+	token, err := setupstate.GenerateToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tokenPath := filepath.Join(dir, setupstate.SetupTokenFileName)
+	if err := setupstate.WriteTokenFile(tokenPath, token); err != nil {
+		t.Fatal(err)
+	}
+	h := NewAuthHandler(authSvc)
+	h.SetSetupTokenPath(tokenPath)
+	return h, authSvc, tokenPath, token
+}
 func TestSetup_UserExists_ValidToken(t *testing.T)   { runSetupCase(t, "valid-token") }
 func TestSetup_UserExists_InvalidToken(t *testing.T) { runSetupCase(t, "invalid-token") }
 func TestSetup_UserExists_NoHeader(t *testing.T)     { runSetupCase(t, "no-header") }
 func TestSetup_NormalizesUsername(t *testing.T)      { runSetupCase(t, "normalize") }
 
-func TestSetup_TokenNotConsumedOnUserCreationFailure(t *testing.T) {
+func TestSetup_TokenConsumedBeforeUserCreationFailure(t *testing.T) {
 	h, authSvc, tokenPath, token := newRecoverySetupHandler(t)
 	consumeCalls := 0
 	h.consumeSetupToken = func(path string) error {
@@ -36,32 +92,24 @@ func TestSetup_TokenNotConsumedOnUserCreationFailure(t *testing.T) {
 	if failed.Code != http.StatusInternalServerError {
 		t.Fatalf("failed setup status=%d want=%d body=%s", failed.Code, http.StatusInternalServerError, failed.Body.String())
 	}
-	if consumeCalls != 0 {
-		t.Fatalf("token consumed before user creation completed: calls=%d", consumeCalls)
-	}
-	if _, err := os.Stat(tokenPath); err != nil {
-		t.Fatalf("token missing after user creation failure: %v", err)
-	}
-
-	retry := performSetupRequest(h, "recovery@example.com", token.Raw)
-	if retry.Code != http.StatusCreated {
-		t.Fatalf("retry status=%d want=%d body=%s", retry.Code, http.StatusCreated, retry.Body.String())
-	}
 	if consumeCalls != 1 {
-		t.Fatalf("successful retry consume calls=%d want=1", consumeCalls)
+		t.Fatalf("consume calls=%d want=1", consumeCalls)
 	}
-	if authSvc.GetUserByUsername("recovery@example.com") == nil {
-		t.Fatal("successful retry did not create the recovery user")
+	if _, err := os.Stat(tokenPath); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("token remains after failed user creation: %v", err)
+	}
+	if authSvc.GetUserByUsername("recovery@example.com") != nil {
+		t.Fatal("failed user creation unexpectedly created the recovery user")
 	}
 }
 
-func TestSetup_TokenConsumedOnlyAfterUserSuccess(t *testing.T) {
+func TestSetup_TokenConsumedBeforeUserCreation(t *testing.T) {
 	h, authSvc, tokenPath, token := newRecoverySetupHandler(t)
 	consumeCalls := 0
 	h.consumeSetupToken = func(path string) error {
 		consumeCalls++
-		if authSvc.GetUserByUsername("recovery@example.com") == nil {
-			t.Fatal("token consumed before recovery user was persisted")
+		if authSvc.GetUserByUsername("recovery@example.com") != nil {
+			t.Fatal("token consumed after recovery user was persisted")
 		}
 		return setupstate.ConsumeTokenFile(path)
 	}
@@ -78,7 +126,7 @@ func TestSetup_TokenConsumedOnlyAfterUserSuccess(t *testing.T) {
 	}
 }
 
-func TestSetup_TokenNotConsumedOnRefreshSessionFailure(t *testing.T) {
+func TestSetup_TokenConsumedOnRefreshSessionFailure(t *testing.T) {
 	h, _, tokenPath, token := newRecoverySetupHandler(t)
 	h.createRefreshSession = func(string) (string, error) {
 		return "", errors.New("forced refresh-session failure")
@@ -88,21 +136,21 @@ func TestSetup_TokenNotConsumedOnRefreshSessionFailure(t *testing.T) {
 	if response.Code != http.StatusInternalServerError {
 		t.Fatalf("setup status=%d want=%d body=%s", response.Code, http.StatusInternalServerError, response.Body.String())
 	}
-	if _, err := os.Stat(tokenPath); err != nil {
-		t.Fatalf("token missing after refresh-session failure: %v", err)
+	if _, err := os.Stat(tokenPath); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("token remains after refresh-session failure: %v", err)
 	}
 }
 
-func TestSetup_TokenConsumeFailureDoesNotFailSuccessfulSetup(t *testing.T) {
+func TestSetup_TokenConsumeFailurePreventsUserMutation(t *testing.T) {
 	h, authSvc, tokenPath, token := newRecoverySetupHandler(t)
 	h.consumeSetupToken = func(string) error { return errors.New("forced consume failure") }
 
 	response := performSetupRequest(h, "recovery@example.com", token.Raw)
-	if response.Code != http.StatusCreated {
-		t.Fatalf("setup status=%d want=%d body=%s", response.Code, http.StatusCreated, response.Body.String())
+	if response.Code != http.StatusInternalServerError {
+		t.Fatalf("setup status=%d want=%d body=%s", response.Code, http.StatusInternalServerError, response.Body.String())
 	}
-	if authSvc.GetUserByUsername("recovery@example.com") == nil {
-		t.Fatal("recovery user was not persisted")
+	if authSvc.GetUserByUsername("recovery@example.com") != nil {
+		t.Fatal("recovery user was persisted despite token-consumption failure")
 	}
 	if _, err := os.Stat(tokenPath); err != nil {
 		t.Fatalf("failed consume unexpectedly removed token: %v", err)
@@ -203,7 +251,7 @@ func runSetupCase(t *testing.T, scenario string) {
 	}
 	path := filepath.Join(dir, setupstate.SetupTokenFileName)
 	var token setupstate.SetupToken
-	if configured {
+	if configured || scenario == "first-boot" || scenario == "normalize" {
 		var err error
 		token, err = setupstate.GenerateToken()
 		if err != nil {
@@ -219,7 +267,7 @@ func runSetupCase(t *testing.T, scenario string) {
 	if username == "" {
 		username = "recovery@example.com"
 	}
-	header := map[string]string{"valid-token": token.Raw, "invalid-token": strings.Repeat("0", 64)}[scenario]
+	header := map[string]string{"first-boot": token.Raw, "normalize": token.Raw, "valid-token": token.Raw, "invalid-token": strings.Repeat("0", 64)}[scenario]
 	body := `{"username":"` + username + `","password":"correct-horse-battery-staple"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/setup", strings.NewReader(body))
 	req.Header.Set("X-Setup-Reset-Token", header)
@@ -244,7 +292,7 @@ func runSetupCase(t *testing.T, scenario string) {
 		t.Fatal("username was not normalized")
 	}
 	_, statErr := os.Stat(path)
-	if scenario == "valid-token" && !errors.Is(statErr, fs.ErrNotExist) {
+	if (scenario == "first-boot" || scenario == "valid-token") && !errors.Is(statErr, fs.ErrNotExist) {
 		t.Fatalf("token not consumed: %v", statErr)
 	}
 	if (scenario == "invalid-token" || scenario == "no-header") && statErr != nil {

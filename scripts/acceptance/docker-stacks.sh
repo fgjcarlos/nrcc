@@ -206,6 +206,31 @@ http_post_json() {
     -d "$body" "$url"
 }
 
+# Read only this Compose project's startup log and keep the credential out of output.
+setup_token() {
+  local project="$1" api_port="$2" nr_port="$3" logs token
+  if [[ "$DRY_RUN" == "1" ]]; then
+    printf 'dry-run-setup-token'
+    return 0
+  fi
+  logs="$(set_compose_env "$project" "$api_port" "$nr_port"; docker compose -p "$project" -f "$COMPOSE_FILE" logs --no-color nrcc 2>/dev/null)" || return 1
+  token="$(printf '%s\n' "$logs" | sed -n 's/.*auth setup token: \([0-9a-f]\{64\}\).*/\1/p' | tail -1)"
+  [[ "$token" =~ ^[0-9a-f]{64}$ ]] || return 1
+  printf '%s' "$token"
+}
+
+setup_stack() {
+  local project="$1" api_port="$2" nr_port="$3" body="$4" token
+  token="$(setup_token "$project" "$api_port" "$nr_port")" || return 1
+  if [[ "$DRY_RUN" == "1" ]]; then
+    http_post_json "http://localhost:${api_port}/api/auth/setup" "$body"
+  else
+    curl -fsS --max-time 60 -H 'Content-Type: application/json' \
+      -H "X-Setup-Reset-Token: ${token}" -d "$body" \
+      "http://localhost:${api_port}/api/auth/setup"
+  fi
+}
+
 # login_api returns a bearer token for the bootstrap user. The token is
 # written to stdout so callers can capture it with $(...). Used by
 # scenarios that hit admin endpoints (backup create/restore).
@@ -362,7 +387,7 @@ scenario_1_single_stack() {
 
   # First-boot bootstrap — completes the setup wizard so we have a session.
   local bootstrap
-  bootstrap="$(http_post_json "http://localhost:${HOST_API_A}/api/auth/setup" \
+  bootstrap="$(setup_stack "$PROJECT_A" "$HOST_API_A" "$HOST_NR_A" \
     "{\"username\":\"${BOOTSTRAP_USER}\",\"password\":\"${BOOTSTRAP_PASS}\"}")" \
     || fail "scenario 1: bootstrap failed"
   assert_contains "$bootstrap" "success" "bootstrap response"
@@ -541,7 +566,7 @@ scenario_4_backup_restore() {
   # and its admin user (if we bootstrapped with the same creds) is
   # separate from A's user store.
   local bootstrap_c
-  bootstrap_c="$(http_post_json "http://localhost:${HOST_API_C}/api/auth/setup" \
+  bootstrap_c="$(setup_stack "$PROJECT_C" "$HOST_API_C" "$HOST_NR_C" \
     "{\"username\":\"${BOOTSTRAP_USER}\",\"password\":\"${BOOTSTRAP_PASS}\"}")" \
     || fail "scenario 4: bootstrap C failed"
   assert_contains "$bootstrap_c" "success" "stack C bootstrap response"
@@ -943,7 +968,7 @@ scenario_8_operational_settings() {
     || fail "scenario 8: stack B /healthz did not respond after recreate"
 
   local bootstrap_b token_b info_b
-  bootstrap_b="$(http_post_json "http://localhost:${HOST_API_B}/api/auth/setup" \
+  bootstrap_b="$(setup_stack "$PROJECT_B" "$HOST_API_B" "$HOST_NR_B" \
     "{\"username\":\"${BOOTSTRAP_USER}\",\"password\":\"${BOOTSTRAP_PASS}\"}")" \
     || fail "scenario 8: bootstrap B failed"
   assert_contains "$bootstrap_b" "success" "stack B bootstrap response"
