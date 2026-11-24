@@ -68,13 +68,27 @@ describe('ProfileView', () => {
     mockAuthService.changePassword.mockResolvedValue(undefined)
     render(<ProfileView />)
 
+    await user.type(screen.getByLabelText(i18n.t('common:currentPasswordLabel')), 'old-password-123')
     await user.type(screen.getByLabelText(/^new password$/i), 'new-password-123')
     await user.type(screen.getByLabelText(/confirm new password/i), 'new-password-123')
     await user.click(screen.getByRole('button', { name: /update password/i }))
 
     await waitFor(() => {
-      expect(mockAuthService.changePassword).toHaveBeenCalledWith(mockUser.id, 'new-password-123')
+      expect(mockAuthService.changePassword).toHaveBeenCalledWith(mockUser.id, 'new-password-123', 'old-password-123')
     })
+    expect(screen.getByLabelText(i18n.t('common:currentPasswordLabel'))).toHaveValue('')
+  })
+
+  it('requires the current password before calling the API', async () => {
+    const user = userEvent.setup()
+    render(<ProfileView />)
+
+    await user.type(screen.getByLabelText(/^new password$/i), 'new-password-123')
+    await user.type(screen.getByLabelText(/confirm new password/i), 'new-password-123')
+    await user.click(screen.getByRole('button', { name: /update password/i }))
+
+    expect((await screen.findByRole('alert')).textContent).toBe(i18n.t('common:currentPasswordRequired'))
+    expect(mockAuthService.changePassword).not.toHaveBeenCalled()
   })
 
   it('renders the user id as a mono designator that breaks only after hyphens', () => {
@@ -95,6 +109,7 @@ describe('ProfileView', () => {
     const newPassword = screen.getByLabelText(/^new password$/i)
     expect(newPassword).toHaveAccessibleDescription(i18n.t('auth:setup.passwordHint'))
 
+    await user.type(screen.getByLabelText(i18n.t('common:currentPasswordLabel')), 'old-password-123')
     await user.type(newPassword, 'short')
     await user.type(screen.getByLabelText(/confirm new password/i), 'short')
     await user.click(screen.getByRole('button', { name: /update password/i }))

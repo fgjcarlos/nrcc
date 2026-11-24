@@ -156,6 +156,20 @@ func (h *MfaHandler) Disable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Removing a factor is a credential change: end every existing session of
+	// the target, then keep the calling device signed in on a self-disable.
+	if err := h.authSvc.RevokeUserSessions(target); err != nil {
+		h.audit.Log(r, claims.Username, "MFA_DISABLE", target, "fail", map[string]string{"reason": "session_revoke"})
+		model.RespondError(w, http.StatusInternalServerError, "SESSION_REVOKE_ERROR", "MFA disabled but existing sessions could not be revoked")
+		return
+	}
+	if target == claims.UserID {
+		if err := h.setRefreshCookieFor(w, r, target); err != nil {
+			model.RespondError(w, http.StatusInternalServerError, "REFRESH_SESSION_ERROR", "Failed to create refresh session")
+			return
+		}
+	}
+
 	h.audit.Log(r, claims.Username, "MFA_DISABLE", target, "ok", nil)
 	model.RespondJSON(w, http.StatusOK, map[string]bool{"success": true})
 }

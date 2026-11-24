@@ -265,6 +265,12 @@ export interface paths {
          * Change a user's password
          * @description Changes the password for the specified user.
          *     Admins can change any user's password; non-admins can only change their own.
+         *     Changing your own password requires `currentPassword`; a missing or wrong
+         *     value returns 401 `INVALID_PASSWORD`, and wrong values count toward the
+         *     same per-user lockout as failed logins (429 while locked).
+         *     Every successful change revokes all refresh sessions of the target user.
+         *     A self-service change then sets a fresh `nrcc_refresh` cookie so the
+         *     calling device stays signed in; an admin reset of another user sets none.
          */
         patch: operations["patchAuthUserPassword"];
         trace?: never;
@@ -330,6 +336,8 @@ export interface paths {
          * @description Disables TOTP enrollment. The calling user's current password is
          *     always required. Admins can target any user via `userId`; non-admins
          *     can only disable themselves (the `userId` field is silently ignored).
+         *     A successful disable revokes all refresh sessions of the target user;
+         *     a self-disable then sets a fresh `nrcc_refresh` cookie for the caller.
          */
         post: operations["postMfaDisable"];
         delete?: never;
@@ -1916,6 +1924,8 @@ export interface components {
         };
         PasswordChangeRequest: {
             password: string;
+            /** @description Caller's current password. Required when changing your own password; ignored for an admin reset of another user. */
+            currentPassword?: string;
         };
         HealthStatus: {
             /** @example ok */
@@ -3635,6 +3645,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
         };
     };
     postMfaEnroll: {

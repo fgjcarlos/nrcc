@@ -124,6 +124,27 @@ describe('authService setup token contract', () => {
   })
 })
 
+describe('authService password change contract', () => {
+  it('sends the current password with a self-service change and omits it for an admin reset', async () => {
+    const bodies: unknown[] = []
+    server.use(
+      http.patch('/api/auth/users/:id/password', async ({ request }) => {
+        bodies.push(await request.json())
+        return ok({ success: true })
+      }),
+    )
+
+    const { authService } = await import('./authService')
+    await authService.changePassword('u1', 'new-password-123', 'old-password-123')
+    await authService.changePassword('u2', 'reset-password-123')
+
+    expect(bodies).toEqual([
+      { password: 'new-password-123', currentPassword: 'old-password-123' },
+      { password: 'reset-password-123' },
+    ])
+  })
+})
+
 describe('authService users contract', () => {
   it('decodes the backend users envelope', async () => {
     server.use(

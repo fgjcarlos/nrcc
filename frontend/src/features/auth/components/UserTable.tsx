@@ -1,4 +1,5 @@
 import { type User } from '@/features/auth/services/authService';
+import { Link } from 'react-router-dom';
 import { useT } from '@/i18n';
 import { StatusChip, Table } from '@/shared/components/ui';
 
@@ -60,9 +61,16 @@ export function UserTable({
                     <button onClick={() => onEdit(user)} className={`${linkButton} text-ds-on-tint-primary`}>
                       {t('auth:editUser')}
                     </button>
-                    <button onClick={() => onChangePassword(user)} className={`${linkButton} text-ds-on-tint-primary`}>
-                      {t('auth:changePassword')}
-                    </button>
+                    {/* Changing your own password needs the current one, which the profile form collects. */}
+                    {user.id === currentUserId ? (
+                      <Link to="/profile" className={`${linkButton} inline-block text-ds-on-tint-primary`}>
+                        {t('auth:changePassword')}
+                      </Link>
+                    ) : (
+                      <button onClick={() => onChangePassword(user)} className={`${linkButton} text-ds-on-tint-primary`}>
+                        {t('auth:changePassword')}
+                      </button>
+                    )}
                     <button
                       onClick={() => onDelete(user)}
                       disabled={user.id === currentUserId || (user.role === 'admin' && adminCount === 1)}

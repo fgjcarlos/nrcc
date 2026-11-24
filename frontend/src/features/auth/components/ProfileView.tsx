@@ -33,6 +33,7 @@ function BreakAtHyphens({ value }: { value: string }) {
 export function ProfileView() {
   const { user } = useAuth();
   const { t } = useT();
+  const [currentPassword, setCurrentPassword] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -61,9 +62,15 @@ export function ProfileView() {
       return;
     }
 
+    if (!currentPassword) {
+      setError(t('common:currentPasswordRequired'));
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      await authService.changePassword(user.id, password);
+      await authService.changePassword(user.id, password, currentPassword);
+      setCurrentPassword('');
       setPassword('');
       setConfirmPassword('');
       toast.success(t('auth:profile.passwordUpdated'));
@@ -123,6 +130,16 @@ export function ProfileView() {
 
           {/* noValidate: the same length and match checks run in handleSubmit and answer inline. */}
           <form onSubmit={handleSubmit} noValidate className="max-w-lg space-y-4">
+            <Input
+              id="current-password"
+              type="password"
+              label={t('common:currentPasswordLabel')}
+              value={currentPassword}
+              onChange={(event) => setCurrentPassword(event.target.value)}
+              autoComplete="current-password"
+              required
+            />
+
             <div className="space-y-1">
               <Input
                 id="new-password"

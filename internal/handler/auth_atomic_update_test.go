@@ -186,7 +186,8 @@ func TestAuthHandler_ChangePassword_Concurrent(t *testing.T) {
 	}
 	passwords := []string{"password-one", "password-two", "password-three"}
 	statuses := make([]int, len(passwords))
-	claims := &model.Claims{UserID: "u1", Username: "admin", Role: model.RoleAdmin}
+	// An admin resets another user's password, so no current password is needed.
+	claims := &model.Claims{UserID: "u0", Username: "other-admin", Role: model.RoleAdmin}
 	runConcurrentHandler(t, len(passwords), func(i int) {
 		// #nosec G117 -- test fixture; marshaling is asserted by the handler.
 		body, _ := json.Marshal(PasswordChangeRequest{Password: passwords[i]})
