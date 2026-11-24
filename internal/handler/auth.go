@@ -162,18 +162,23 @@ func (h *AuthHandler) Setup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	configured := len(users) > 0
-	var recoveryToken *setupstate.SetupToken
-	if configured {
-		if h.setupTokenPath == "" {
+	if h.setupTokenPath == "" {
+		if configured {
 			h.respondAlreadyConfigured(w, r, req.Username)
-			return
+		} else {
+			model.RespondError(w, http.StatusUnauthorized, "SETUP_TOKEN_REQUIRED", "Valid setup token required")
 		}
-		token, err := setupstate.ReadTokenFile(h.setupTokenPath)
-		if err != nil || subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Setup-Reset-Token")), []byte(token.Raw)) != 1 {
+		return
+	}
+	setupToken, tokenErr := setupstate.ReadTokenFile(h.setupTokenPath)
+	validToken := tokenErr == nil && subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Setup-Reset-Token")), []byte(setupToken.Raw)) == 1
+	if !validToken {
+		if configured {
 			h.respondAlreadyConfigured(w, r, req.Username)
-			return
+		} else {
+			model.RespondError(w, http.StatusUnauthorized, "SETUP_TOKEN_REQUIRED", "Valid setup token required")
 		}
-		recoveryToken = &token
+		return
 	}
 
 	// Create the requested administrator.
@@ -191,6 +196,13 @@ func (h *AuthHandler) Setup(w http.ResponseWriter, r *http.Request) {
 		Role:         model.RoleAdmin,
 		CreatedAt:    now,
 		UpdatedAt:    now,
+	}
+
+	// Consume before mutating user state so a successful bootstrap or recovery
+	// can never leave its authorization token reusable.
+	if err := h.consumeSetupToken(h.setupTokenPath); err != nil {
+		model.RespondError(w, http.StatusInternalServerError, "SETUP_TOKEN_ERROR", "Failed to consume setup token")
+		return
 	}
 
 	createUser := h.authSvc.BootstrapFirstAdmin
@@ -218,11 +230,6 @@ func (h *AuthHandler) Setup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if recoveryToken != nil {
-		if err := h.consumeSetupToken(h.setupTokenPath); err != nil {
-			log.Printf("auth setup: failed to consume recovery token after successful setup: %v", err)
-		}
-	}
 	if h.limiter != nil {
 		h.limiter.Reset("setup-ip:" + mw.ExtractIP(r))
 		h.limiter.Reset(mw.SetupUserKey(req.Username))

@@ -54,14 +54,16 @@ func requestWithClaims(method, path string, body []byte, claims *model.Claims) *
 }
 
 func TestAuthHandler_Setup_Concurrent(t *testing.T) {
-	h, authSvc := newEmptyAtomicAuthHandler(t)
+	h, authSvc, _, token := newFirstBootSetupHandler(t)
 	statuses := make([]int, 3)
 	runConcurrentHandler(t, len(statuses), func(i int) {
 		// #nosec G101 -- test fixture; the password string is a sentinel literal that the setup handler rejects, no real credential.
 		// #nosec G117 -- test fixture; marshaling is asserted by the handler.
 		body, _ := json.Marshal(SetupRequest{Username: fmt.Sprintf("admin-%d", i), Password: "Unique-Setup-Password-42"}) //nolint:gosec // G101 test fixture; G117 test fixture
 		rec := httptest.NewRecorder()
-		h.Setup(rec, requestWithClaims(http.MethodPost, "/api/auth/setup", body, nil))
+		req := requestWithClaims(http.MethodPost, "/api/auth/setup", body, nil)
+		req.Header.Set("X-Setup-Reset-Token", token.Raw)
+		h.Setup(rec, req)
 		statuses[i] = rec.Code
 	})
 	created, conflicts := 0, 0
