@@ -11,7 +11,7 @@ Branch `fix/1021-login-lockout` from `origin/main` (0dfe2d2). Security fix (high
 
 ## Tasks
 
-- T1 [S1-S4] inline: limiter keys (`auth-user-ip:` 6/15 min, global `auth-user:` 30/15 min), rightmost-untrusted `ExtractIP`, one-time XFF warning; Login, MFA verify and password change use the new keys; Go tests, docs, changelog. Commit: pending.
+- T1 [S1-S4] inline: limiter keys (`auth-user-ip:` 6/15 min, global `auth-user:` 30/15 min), rightmost-untrusted `ExtractIP`, one-time XFF warning; Login, MFA verify and password change use the new keys; Go tests, docs, changelog. Commit: 6aa4e04.
 - T2 [S1-S4] verify: independent `gentle-ai-verify` (Risk item 2): S1, S3, S4 pass; S2 passed in code, blocked by the stale audit test (B1), fixed in T1. Commit: n/a.
 
 ## Log
