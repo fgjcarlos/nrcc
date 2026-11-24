@@ -439,7 +439,8 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 		// Flow routes
 		r.Route("/api/flows", func(r chi.Router) {
 			r.Get("/", flowHandler.GetFlows)
-			r.Get("/export", flowHandler.ExportFlows)
+			// #1022: the export is the raw flows.json; admin-only.
+			r.With(middleware.RequireAdmin).Get("/export", flowHandler.ExportFlows)
 			r.Get("/versions", flowHandler.GetVersions)
 			r.With(middleware.RequireAdmin).Post("/versions", flowHandler.PostSnapshot)
 			r.Get("/versions/{from}/diff/{to}", flowHandler.GetVersionDiff)
@@ -493,7 +494,8 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 			r.With(middleware.RequireAdmin).Put("/config", aiHandler.PutConfig)
 			r.With(middleware.RequireAdmin).Post("/config/test", aiHandler.TestConfig)
 			r.Get("/status", aiHandler.GetStatus)
-			r.With(middleware.RateLimitIP(20, time.Hour)).Post("/analyze/flow", aiHandler.PostAnalyzeFlow)
+			// #1022: analysis spends the operator's AI provider key; admin-only.
+			r.With(middleware.RateLimitIP(20, time.Hour), middleware.RequireAdmin).Post("/analyze/flow", aiHandler.PostAnalyzeFlow)
 		})
 	})
 

@@ -69,7 +69,6 @@ var routeAuthz = map[string]authzLevel{
 	"GET /api/scheduler/history":            authzAuthenticated,
 	"GET /api/env/":                         authzAuthenticated,
 	"GET /api/flows/":                       authzAuthenticated,
-	"GET /api/flows/export":                 authzAuthenticated,
 	"GET /api/flows/versions":               authzAuthenticated,
 	"GET /api/flows/versions/{from}/diff/{to}": authzAuthenticated,
 	"GET /api/flows/{id}":                   authzAuthenticated,
@@ -88,7 +87,6 @@ var routeAuthz = map[string]authzLevel{
 	"POST /api/auth/mfa/enroll":             authzAuthenticated,
 	"POST /api/auth/mfa/enroll/confirm":     authzAuthenticated,
 	"POST /api/libraries/search":            authzAuthenticated,
-	"POST /api/ai/analyze/flow":             authzAuthenticated,
 	"GET /api/ai/config":                    authzAuthenticated,
 	"GET /api/ai/status":                    authzAuthenticated,
 	"GET /api/auth/mfa/status":              authzAuthenticated,
@@ -116,6 +114,10 @@ var routeAuthz = map[string]authzLevel{
 	"POST /api/env/import-from-node-red":         authzAdmin,
 	"PUT /api/ai/config":                         authzAdmin,
 	"POST /api/ai/config/test":                   authzAdmin,
+	// #1022: raw flows.json export and the AI analysis that spends the
+	// operator's provider key are admin-only.
+	"GET /api/flows/export":                      authzAdmin,
+	"POST /api/ai/analyze/flow":                  authzAdmin,
 	"DELETE /api/env/{key}":                      authzAdmin,
 	"POST /api/runtime/restart":                  authzAdmin,
 	"POST /api/runtime/start":                    authzAdmin,

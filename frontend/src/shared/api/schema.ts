@@ -932,7 +932,7 @@ export interface paths {
         };
         /**
          * List environment variables
-         * @description Returns all defined environment variables including their type and metadata.
+         * @description Returns all defined environment variables including their type and metadata. Non-admin callers receive every non-encrypted value as `********`, matching `GET /api/config`; encrypted values are always blank.
          */
         get: operations["getEnv"];
         put?: never;
@@ -1053,7 +1053,7 @@ export interface paths {
         };
         /**
          * Export flows as JSON file
-         * @description Downloads the Node-RED `flows.json` as an attachment.
+         * @description **Admin only.** Downloads the raw Node-RED `flows.json` as an attachment.
          */
         get: operations["exportFlows"];
         put?: never;
@@ -1617,7 +1617,7 @@ export interface paths {
         put?: never;
         /**
          * Analyze a flow with AI
-         * @description Uses the active configured provider to analyze a flow. Generated output is review-only.
+         * @description **Admin only.** Uses the active configured provider to analyze a flow; each call spends the operator's provider quota. Generated output is review-only.
          */
         post: operations["aiAnalyzeFlow"];
         delete?: never;
@@ -4772,6 +4772,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     getFlowVersions: {
@@ -5404,6 +5405,7 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             /** @description AI provider is disabled or not configured */
             503: {
                 headers: {

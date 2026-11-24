@@ -1415,7 +1415,7 @@ paths:
       tags: [Environment]
       operationId: getEnv
       summary: List environment variables
-      description: Returns all defined environment variables including their type and metadata.
+      description: "Returns all defined environment variables including their type and metadata. Non-admin callers receive every non-encrypted value as `********`, matching `GET /api/config`; encrypted values are always blank."
       security:
         - bearerAuth: []
       responses:
@@ -1600,7 +1600,7 @@ paths:
       tags: [Flows]
       operationId: exportFlows
       summary: Export flows as JSON file
-      description: Downloads the Node-RED `flows.json` as an attachment.
+      description: "**Admin only.** Downloads the raw Node-RED `flows.json` as an attachment."
       security:
         - bearerAuth: []
       responses:
@@ -1618,6 +1618,8 @@ paths:
                 items: {}
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
 
   /api/flows/versions:
     get:
@@ -2295,7 +2297,7 @@ paths:
       tags: [AI]
       operationId: aiAnalyzeFlow
       summary: Analyze a flow with AI
-      description: Uses the active configured provider to analyze a flow. Generated output is review-only.
+      description: "**Admin only.** Uses the active configured provider to analyze a flow; each call spends the operator's provider quota. Generated output is review-only."
       security:
         - bearerAuth: []
       responses:
@@ -2309,6 +2311,8 @@ paths:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
 
   /api/ai/config:
     get:
