@@ -101,6 +101,29 @@ describe('authService in-memory token lifecycle', () => {
   });
 });
 
+describe('authService setup token contract', () => {
+  it('sends the setup token only in X-Setup-Reset-Token', async () => {
+    let receivedToken: string | null = null
+    let receivedUrl = ''
+    let receivedBody: unknown
+    server.use(
+      http.post('/api/auth/setup', async ({ request }) => {
+        receivedToken = request.headers.get('X-Setup-Reset-Token')
+        receivedUrl = request.url
+        receivedBody = await request.json()
+        return ok({ token: 'access-token', user: mockUser })
+      }),
+    )
+
+    const { authService } = await import('./authService')
+    await authService.setup('admin', 'password123', 'host-secret')
+
+    expect(receivedToken).toBe('host-secret')
+    expect(receivedUrl).not.toContain('host-secret')
+    expect(receivedBody).not.toHaveProperty('setupToken')
+  })
+})
+
 describe('authService users contract', () => {
   it('decodes the backend users envelope', async () => {
     server.use(

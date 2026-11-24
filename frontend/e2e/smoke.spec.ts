@@ -7,6 +7,7 @@ test.describe('NRCC smoke E2E flows with fixture API', () => {
     await installApiMocks(page, 'setup-required')
     await page.goto('/setup')
     await page.getByLabel('Username').fill('admin')
+    await page.getByLabel('Setup token').fill('0'.repeat(64))
     await page.getByLabel('Password', { exact: true }).fill('password123')
     await page.getByLabel('Confirm Password').fill('password123')
     await page.getByRole('button', { name: 'Create account and continue' }).click()

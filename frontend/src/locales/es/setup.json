@@ -1,0 +1,5 @@
+{
+  "tokenLabel": "Token de configuración",
+  "tokenRequired": "Introduce el token de configuración del registro de inicio de NRCC.",
+  "invalidToken": "El token de configuración falta o no es válido. Comprueba el registro de inicio de NRCC e inténtalo de nuevo."
+}

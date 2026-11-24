@@ -11,6 +11,7 @@ import { AuthAlert, AuthPage } from './LoginView';
 
 // Messages are catalog keys; the view translates them at render.
 const setupSchema = z.object({
+  setupToken: z.string().trim().min(1, 'setup:tokenRequired'),
   username: z
     .string()
     .min(3, 'auth:setup.errors.usernameLength')
@@ -58,7 +59,7 @@ export function SetupView() {
 
   const onSubmit = async (data: SetupFormData) => {
     try {
-      await authService.setup(data.username, data.password);
+      await authService.setup(data.username, data.password, data.setupToken);
       toast.success(t('auth:setup.success'));
       navigate('/dashboard', { replace: true });
     } catch (error: unknown) {
@@ -77,7 +78,8 @@ export function SetupView() {
         return;
       }
       const message =
-        status === undefined ? t('auth:setup.errors.network')
+        status === 401 ? t('setup:invalidToken')
+        : status === undefined ? t('auth:setup.errors.network')
         : code === 'WEAK_PASSWORD' ? t('auth:setup.errors.weakPassword')
         : status === 429 ? t('auth:setup.errors.rateLimited')
         : t('auth:setup.errors.unexpected', { status });
@@ -102,6 +104,16 @@ export function SetupView() {
             )}
           </AuthAlert>
         )}
+
+        <Input
+          id="setupToken"
+          type="password"
+          label={t('setup:tokenLabel')}
+          autoComplete="off"
+          className="min-h-11"
+          error={errors.setupToken?.message && t(errors.setupToken.message)}
+          {...register('setupToken')}
+        />
 
         <div className="space-y-1">
           <Input

@@ -1,0 +1,5 @@
+{
+  "tokenLabel": "Setup token",
+  "tokenRequired": "Enter the setup token from the NRCC startup log.",
+  "invalidToken": "The setup token is missing or invalid. Check the NRCC startup log and try again."
+}
