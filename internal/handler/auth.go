@@ -113,6 +113,8 @@ type CreateUserRequest struct {
 // PasswordChangeRequest represents password change request
 type PasswordChangeRequest struct {
 	Password string `json:"password"`
+	// CurrentPassword is required when users change their own password.
+	CurrentPassword string `json:"currentPassword,omitempty"`
 }
 
 // UpdateUserRequest represents update user request (role only)
@@ -574,7 +576,10 @@ func (h *AuthHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 
 // ChangePassword handles PATCH /api/auth/users/:id/password - protected, admin or self.
 // Self-or-admin authorization is enforced by middleware.RequireSelfOrAdmin on
-// the route. Claims are read from the context solely for audit logging.
+// the route. A self-service change must prove the current password, so a
+// stolen access token alone cannot take over the account. Every successful
+// change revokes the target's refresh sessions; a self-service change then
+// issues a fresh refresh cookie so the calling device stays signed in.
 func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	claims := mw.ClaimsFromContext(r)
 
@@ -596,6 +601,11 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 
 	if err := service.ValidatePassword(req.Password); err != nil {
 		model.RespondError(w, http.StatusBadRequest, "WEAK_PASSWORD", err.Error())
+		return
+	}
+
+	isSelf := userID == claims.UserID
+	if isSelf && !h.verifyCurrentPassword(w, r, claims, req.CurrentPassword) {
 		return
 	}
 
@@ -622,8 +632,47 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := h.authSvc.RevokeUserSessions(userID); err != nil {
+		h.audit.Log(r, claims.Username, "PASSWORD_CHANGE", username, "fail", map[string]string{"reason": "session_revoke"})
+		model.RespondError(w, http.StatusInternalServerError, "SESSION_REVOKE_ERROR", "Password changed but existing sessions could not be revoked")
+		return
+	}
+	if isSelf {
+		if err := h.setRefreshCookie(w, r, userID); err != nil {
+			model.RespondError(w, http.StatusInternalServerError, "REFRESH_SESSION_ERROR", "Failed to create refresh session")
+			return
+		}
+	}
+
 	h.audit.Log(r, claims.Username, "PASSWORD_CHANGE", username, "ok", nil)
 	model.RespondJSON(w, http.StatusOK, map[string]bool{"success": true})
+}
+
+// verifyCurrentPassword checks the caller's current password and writes the
+// error response when it fails. Wrong guesses share the login per-user rate
+// limit bucket so this endpoint cannot be used to brute-force the password.
+func (h *AuthHandler) verifyCurrentPassword(w http.ResponseWriter, r *http.Request, claims *model.Claims, current string) bool {
+	user := h.authSvc.GetUserByID(claims.UserID)
+	if user == nil {
+		model.RespondError(w, http.StatusNotFound, "NOT_FOUND", "User not found")
+		return false
+	}
+	key := mw.AuthUserKey(user.Username)
+	if h.limiter != nil {
+		if blocked, retry := h.limiter.Check(key); blocked {
+			mw.RespondTooManyRequests(w, retry)
+			return false
+		}
+	}
+	if current == "" || !h.authSvc.VerifyPassword(user.PasswordHash, current) {
+		if h.limiter != nil && current != "" {
+			h.limiter.Record(key)
+		}
+		h.audit.Log(r, claims.Username, "PASSWORD_CHANGE", user.Username, "fail", map[string]string{"reason": "bad_current_password"})
+		model.RespondError(w, http.StatusUnauthorized, "INVALID_PASSWORD", "Current password is incorrect")
+		return false
+	}
+	return true
 }
 
 // UpdateUser handles PATCH /api/auth/users/:id - protected, admin only.
@@ -693,8 +742,8 @@ func (h *AuthHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 // Reads the httpOnly refresh cookie, validates the session, rotates
 // the refresh token, and returns a new short-lived access token.
 // Rate limiting mitigates brute-force attempts and amplification; it does not
-// prevent replay of a stolen bearer token. Proactive compromise response uses
-// /api/auth/logout-everywhere or AuthService.RevokeUserSessions. Refresh-token
+// prevent replay of a stolen bearer token. Changing the password or disabling
+// MFA revokes every refresh session of the user (AuthService.RevokeUserSessions). Refresh-token
 // comparison is not constant-time; that is accepted here for random 256-bit tokens.
 func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	ip := mw.ExtractIP(r)

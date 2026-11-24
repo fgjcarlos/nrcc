@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **Security — behavior change:** changing your own password
+  (`PATCH /api/auth/users/{id}/password`) now requires `currentPassword`; a
+  missing or wrong value returns 401 `INVALID_PASSWORD`, and wrong values count
+  toward the per-user login lockout. Every password change and every MFA
+  disable now revokes all refresh sessions of the affected user, so a stolen
+  refresh cookie stops working; the device that made a self-service change gets
+  a fresh session. The profile page asks for the current password, and the
+  Users table sends admins to their profile to change their own password (#1020).
 - **Behavior change:** NRCC no longer attaches to a Node-RED it did not
   start. With `NRCC_MANAGE_NODE_RED=true` (the default), start now fails with
   "node-red port is already bound by a foreign process" when another process
