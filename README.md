@@ -147,6 +147,14 @@ data/
 
 Mount the `backups/` subdirectory on a separate volume (or copy to S3/NFS) so snapshots survive a stack recreation.
 
+Each archive carries the Node-RED payload (flows, users, config, `settings.js`, credentials,
+`package.json`) plus everything else NRCC owns: `.env`, the MFA store (`mfa.json`), the
+`uploads/` directory and the runtime config. A restore replaces them as a unit — it runs
+alone (no restore, scheduled backup or apply overlaps), reinstalls `node_modules` when the
+archive replaced `package.json`, waits for Node-RED to answer before reporting success, and
+rolls back to the previous set at next boot when a crash interrupts it. Archives written
+before this safeguard (manifest version 1) remain restorable.
+
 ## Operations
 
 - [docs/operations/docker-stack.md](docs/operations/docker-stack.md) — bring-up, multi-instance, backup, upgrade, uninstall
