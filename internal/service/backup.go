@@ -521,7 +521,12 @@ func (s *BackupService) Restore(id string) error {
 	}
 
 	if err := s.swapStagingIntoDataDir(stagingDir, manifest); err != nil {
-		_ = os.RemoveAll(stagingDir)
+		// The journal is still on disk, so the previous set is recoverable.
+		// Undo the partial swap now; if even that fails, the journal stays
+		// and RecoverInterruptedRestore finishes the rollback at next boot.
+		if rollbackErr := rollbackRestoreStaging(s.dataDir, stagingDir); rollbackErr != nil {
+			return fmt.Errorf("%w (rollback pending at next boot: %w)", err, rollbackErr)
+		}
 		return err
 	}
 	return nil
@@ -1306,39 +1311,6 @@ func (s *BackupService) stageRestore(zipReader *zip.Reader, manifest backupMetad
 	}
 
 	return stagingDir, nil
-}
-
-// swapStagingIntoDataDir atomically moves every file extracted under
-// stagingDir into s.dataDir. The set of files moved is derived from the
-// verified manifest (not from os.ReadDir of stagingDir) so nested paths
-// cannot collide with siblings and extra residue in staging can never be
-// published. Staging lives on the same filesystem as dataDir by
-// construction (os.MkdirTemp on s.dataDir), so os.Rename is atomic per file.
-func (s *BackupService) swapStagingIntoDataDir(stagingDir string, manifest backupMetadata) error {
-	if stagingDir == "" {
-		return nil
-	}
-	for _, entry := range manifest.Files {
-		rel := entry.Path
-		if rel == "" || strings.ContainsRune(rel, 0) {
-			return fmt.Errorf("manifest entry has invalid path: %q", rel)
-		}
-		srcPath := filepath.Join(stagingDir, filepath.FromSlash(rel))
-		dstPath := filepath.Join(s.dataDir, filepath.FromSlash(rel))
-		if _, err := os.Stat(srcPath); err != nil {
-			return fmt.Errorf("swap %s: missing in staging: %w", rel, err)
-		}
-		if err := os.MkdirAll(filepath.Dir(dstPath), 0750); err != nil {
-			return fmt.Errorf("swap %s: mkdir: %w", rel, err)
-		}
-		if err := os.Rename(srcPath, dstPath); err != nil {
-			return fmt.Errorf("swap %s: %w", rel, err)
-		}
-	}
-	// Cleanup is unconditional: if swap left residue we still want the
-	// staging directory gone so the next MkdirTemp pass can't collide.
-	_ = os.RemoveAll(stagingDir)
-	return nil
 }
 
 // maxBackupEntrySize caps the uncompressed size of a single backup entry to
