@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -21,9 +22,14 @@ import (
 )
 
 const (
-	backupConfigFile       = "backup_config.json"
-	defaultChecksumAlgo    = "sha256"
-	currentManifestVersion = 1
+	backupConfigFile    = "backup_config.json"
+	defaultChecksumAlgo = "sha256"
+	// currentManifestVersion 2 adds .env, the MFA store, uploads and the
+	// runtime config to the payload (issue #1024). Version 1 archives stay
+	// restorable; only the writer moved on.
+	currentManifestVersion = 2
+	// oldestManifestVersion is the oldest archive this build restores.
+	oldestManifestVersion = 1
 )
 
 var defaultBackupConfig = model.BackupConfig{
@@ -68,13 +74,13 @@ type createBackupOptions struct {
 // shape is model.BackupManifestV1; this struct mirrors only the creator-side
 // fields and is converted when written into the zip.
 type backupMetadata struct {
-	ID          string              `json:"id"`
-	Name        string              `json:"name"`
-	Type        model.BackupType    `json:"type"`
-	CreatedAt   string              `json:"createdAt"`
-	TriggeredBy string              `json:"triggeredBy"`
-	Algorithm   string              `json:"algorithm"`
-	Version     int                 `json:"version"`
+	ID          string                  `json:"id"`
+	Name        string                  `json:"name"`
+	Type        model.BackupType        `json:"type"`
+	CreatedAt   string                  `json:"createdAt"`
+	TriggeredBy string                  `json:"triggeredBy"`
+	Algorithm   string                  `json:"algorithm"`
+	Version     int                     `json:"version"`
 	Files       []model.BackupFileEntry `json:"files"`
 }
 
@@ -764,7 +770,10 @@ func (s *BackupService) createBackup(options createBackupOptions) (model.Backup,
 		}
 	}
 
-	filesToBackup := s.filesForBackup(config)
+	filesToBackup, err := s.filesForBackup(config)
+	if err != nil {
+		return model.Backup{}, err
+	}
 	manifest := backupMetadata{
 		ID:          backupID,
 		Name:        name,
@@ -991,44 +1000,71 @@ func (s *BackupService) patchManifestChecksums(zipPath string, manifest backupMe
 	return os.Rename(tmpOut, zipPath)
 }
 
-func (s *BackupService) filesForBackup(cfg model.BackupConfig) []struct {
+// backupFile is one payload entry: where it lives in dataDir and where it goes
+// into the archive.
+type backupFile struct {
 	src string
 	dst string
-} {
-	files := []struct {
-		src string
-		dst string
-	}{
+}
+
+// filesForBackup lists everything NRCC owns (issue #1024). Files that do not
+// exist are skipped when the archive is written, so optional artefacts cost
+// nothing.
+//
+// The Node-RED payload honours the per-type Include* switches; the files that
+// NRCC itself manages — the environment file, the MFA store, uploads and the
+// runtime config — are always included, because a restore onto a clean volume
+// would otherwise lose logins, MFA enrolment and editor assets.
+func (s *BackupService) filesForBackup(cfg model.BackupConfig) ([]backupFile, error) {
+	files := []backupFile{
 		{filepath.Join(s.dataDir, "flows.json"), "flows.json"},
 		{filepath.Join(s.dataDir, "cc-users.json"), "cc-users.json"},
+		{filepath.Join(s.dataDir, ".env"), ".env"},
+		{filepath.Join(s.dataDir, "mfa.json"), "mfa.json"},
+		{filepath.Join(s.dataDir, ".config.runtime.json"), ".config.runtime.json"},
 	}
 
 	if cfg.IncludeConfig {
-		files = append(files, struct {
-			src string
-			dst string
-		}{filepath.Join(s.dataDir, "config.json"), "config.json"})
+		files = append(files, backupFile{filepath.Join(s.dataDir, "config.json"), "config.json"})
 	}
 	if cfg.IncludeSettings {
-		files = append(files, struct {
-			src string
-			dst string
-		}{filepath.Join(s.dataDir, "settings.js"), "settings.js"})
+		files = append(files, backupFile{filepath.Join(s.dataDir, "settings.js"), "settings.js"})
 	}
 	if cfg.IncludeFlowsCred {
-		files = append(files, struct {
-			src string
-			dst string
-		}{filepath.Join(s.dataDir, "flows_cred.json"), "flows_cred.json"})
+		files = append(files, backupFile{filepath.Join(s.dataDir, "flows_cred.json"), "flows_cred.json"})
 	}
 	if cfg.IncludePackageJSON {
-		files = append(files, struct {
-			src string
-			dst string
-		}{filepath.Join(s.dataDir, "package.json"), "package.json"})
+		files = append(files, backupFile{filepath.Join(s.dataDir, "package.json"), "package.json"})
 	}
 
-	return files
+	return s.appendUploadFiles(files)
+}
+
+// appendUploadFiles adds every regular file under <dataDir>/uploads with its
+// directory-relative archive path, so editor images survive a restore.
+func (s *BackupService) appendUploadFiles(files []backupFile) ([]backupFile, error) {
+	root := filepath.Join(s.dataDir, "uploads")
+	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			if errors.Is(walkErr, os.ErrNotExist) {
+				return nil
+			}
+			return walkErr
+		}
+		if entry.IsDir() || !entry.Type().IsRegular() {
+			return nil
+		}
+		rel, relErr := filepath.Rel(root, path)
+		if relErr != nil {
+			return relErr
+		}
+		files = append(files, backupFile{src: path, dst: "uploads/" + filepath.ToSlash(rel)})
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list uploads: %w", err)
+	}
+	return files, nil
 }
 
 func (s *BackupService) pruneBackups(cfg model.BackupConfig, backupType model.BackupType, keepID string) ([]string, error) {
@@ -1304,7 +1340,7 @@ func verifyArchiveManifest(zipReader *zip.Reader) (backupMetadata, error) {
 	if !manifestSeen {
 		return backupMetadata{}, errors.New("missing backup-metadata.json")
 	}
-	if manifest.Version != currentManifestVersion {
+	if manifest.Version < oldestManifestVersion || manifest.Version > currentManifestVersion {
 		return backupMetadata{}, fmt.Errorf("unsupported manifest version %d", manifest.Version)
 	}
 	if manifest.Algorithm != defaultChecksumAlgo {
@@ -1723,9 +1759,9 @@ func IsValidCron(cronExpr string) bool {
 
 // atomicRemove unlinks path through a 3-phase sequence so a crash mid-op
 // never leaves a half-deleted file observable to the next List/Stat:
-//   1. Rename path → path+".deleted" (atomic on POSIX, same filesystem).
-//   2. Open the parent dir and fsync it so the rename is durable.
-//   3. Unlink the .deleted marker.
+//  1. Rename path → path+".deleted" (atomic on POSIX, same filesystem).
+//  2. Open the parent dir and fsync it so the rename is durable.
+//  3. Unlink the .deleted marker.
 //
 // The marker is only observable between steps 1 and 3; an interrupted run
 // that skips step 3 leaves it for the next Delete or pruneBackups sweep to
