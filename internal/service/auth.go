@@ -443,7 +443,10 @@ func (s *AuthService) RevokeRefreshSession(token string) error {
 			if subtle.ConstantTimeCompare([]byte(sessions.Sessions[i].ID), []byte(tokenHash)) != 1 {
 				continue
 			}
-			sessions.Sessions[i].Revoked = true
+			if !sessions.Sessions[i].Revoked {
+				sessions.Sessions[i].Revoked = true
+				sessions.Sessions[i].RevokedAt = time.Now().Unix()
+			}
 			return nil
 		}
 
@@ -454,26 +457,27 @@ func (s *AuthService) RevokeRefreshSession(token string) error {
 // RevokeUserSessions revokes all refresh sessions for a user.
 func (s *AuthService) RevokeUserSessions(userID string) error {
 	return s.sessionStore.Update(func(sessions *model.RefreshSessions) error {
+		revokedAt := time.Now().Unix()
 		for i := range sessions.Sessions {
-			if sessions.Sessions[i].UserID == userID {
-				sessions.Sessions[i].Revoked = true
+			session := &sessions.Sessions[i]
+			if session.UserID == userID && !session.Revoked {
+				session.Revoked = true
+				session.RevokedAt = revokedAt
 			}
 		}
 		return nil
 	})
 }
 
-// PruneSessions removes expired and revoked sessions older than 24h.
+// PruneSessions removes sessions expired or revoked more than 24h ago.
 func (s *AuthService) PruneSessions() error {
-	now := time.Now()
 	cutoff := time.Now().Add(-24 * time.Hour).Unix()
 	return s.sessionStore.Update(func(sessions *model.RefreshSessions) error {
 		kept := make([]model.RefreshSession, 0, len(sessions.Sessions))
 		for _, session := range sessions.Sessions {
-			if session.Revoked && session.ExpiresAt < cutoff {
-				continue
-			}
-			if !session.Revoked && now.Unix() > session.ExpiresAt && session.ExpiresAt < cutoff {
+			// Legacy revocations have no timestamp and are already invalid.
+			oldRevocation := session.Revoked && (session.RevokedAt == 0 || session.RevokedAt < cutoff)
+			if session.ExpiresAt < cutoff || oldRevocation {
 				continue
 			}
 			kept = append(kept, session)
