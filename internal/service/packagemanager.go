@@ -152,6 +152,29 @@ func (p *NpmPackageManager) Install(ctx context.Context, pkg string) error {
 	return nil
 }
 
+// InstallDependencies reinstalls the modules package.json declares. A restore
+// replaces package.json, so node_modules must be rebuilt from the restored
+// manifest before Node-RED loads it (issue #1024).
+func (p *NpmPackageManager) InstallDependencies(ctx context.Context) error {
+	if err := ensureNpm(p.Bin); err != nil {
+		return err
+	}
+
+	runCtx, cancel := context.WithTimeout(ctx, installTimeout)
+	defer cancel()
+
+	// #nosec G204 -- p.Bin is operator-supplied via configuration; the arguments are constant.
+	cmd := exec.CommandContext(runCtx, p.Bin, "install", "--no-fund", "--no-audit")
+	cmd.Dir = p.WorkDir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to install dependencies with npm (%s): %w", p.Bin, err)
+	}
+	return nil
+}
+
 // Uninstall uninstalls a package using npm uninstall. Mirror of Install —
 // bounded by uninstallTimeout and respects the caller's context cancellation.
 func (p *NpmPackageManager) Uninstall(ctx context.Context, pkg string) error {

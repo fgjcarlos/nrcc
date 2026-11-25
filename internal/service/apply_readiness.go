@@ -331,3 +331,11 @@ func readAndDiscard(r interface {
 	}
 	return total, nil
 }
+// ProbeNodeRedReady is the readiness probe apply uses (issue #1011), exported
+// for the backup restore path (issue #1024): a restore only reports success
+// once the restarted Node-RED answers on its admin endpoint. It waits until
+// the deadline from ReadinessTimeoutFromEnv and returns ErrReadinessNotReady
+// when the endpoint answers but is not alive.
+func ProbeNodeRedReady(ctx context.Context) error {
+	return probeAdminReady(ctx, nativeDefaultAdminURL())
+}
