@@ -98,6 +98,15 @@ func runServer() {
 		ui.Error(fmt.Sprintf("Interrupted apply recovery: %v", err))
 	}
 
+	// Roll back a restore that died while publishing its staged tree
+	// (issue #1024), for the same reason: dataDir must never be read as a
+	// mix of the old and the new set.
+	if rolledBack, err := service.RecoverInterruptedRestore(dataDir); rolledBack != "" {
+		ui.Warn("Interrupted backup restore rolled back: " + rolledBack)
+	} else if err != nil {
+		ui.Error(fmt.Sprintf("Interrupted restore recovery: %v", err))
+	}
+
 	// Node-RED managed mode is ON by default.
 	// Set NRCC_MANAGE_NODE_RED=false to disable.
 	ui.SectionHeader("Node-RED Startup")

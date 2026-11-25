@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -21,9 +22,14 @@ import (
 )
 
 const (
-	backupConfigFile       = "backup_config.json"
-	defaultChecksumAlgo    = "sha256"
-	currentManifestVersion = 1
+	backupConfigFile    = "backup_config.json"
+	defaultChecksumAlgo = "sha256"
+	// currentManifestVersion 2 adds .env, the MFA store, uploads and the
+	// runtime config to the payload (issue #1024). Version 1 archives stay
+	// restorable; only the writer moved on.
+	currentManifestVersion = 2
+	// oldestManifestVersion is the oldest archive this build restores.
+	oldestManifestVersion = 1
 )
 
 var defaultBackupConfig = model.BackupConfig{
@@ -55,6 +61,8 @@ type BackupService struct {
 	mu           sync.Mutex
 	quiesceFunc  func() error
 	restartFunc  func() error
+	depsSyncFunc func(context.Context) error
+	readyFunc    func(context.Context) error
 }
 
 type createBackupOptions struct {
@@ -66,13 +74,13 @@ type createBackupOptions struct {
 // shape is model.BackupManifestV1; this struct mirrors only the creator-side
 // fields and is converted when written into the zip.
 type backupMetadata struct {
-	ID          string              `json:"id"`
-	Name        string              `json:"name"`
-	Type        model.BackupType    `json:"type"`
-	CreatedAt   string              `json:"createdAt"`
-	TriggeredBy string              `json:"triggeredBy"`
-	Algorithm   string              `json:"algorithm"`
-	Version     int                 `json:"version"`
+	ID          string                  `json:"id"`
+	Name        string                  `json:"name"`
+	Type        model.BackupType        `json:"type"`
+	CreatedAt   string                  `json:"createdAt"`
+	TriggeredBy string                  `json:"triggeredBy"`
+	Algorithm   string                  `json:"algorithm"`
+	Version     int                     `json:"version"`
 	Files       []model.BackupFileEntry `json:"files"`
 }
 
@@ -104,6 +112,17 @@ func (s *BackupService) SetRestoreHooks(quiesce, restart func() error) {
 	defer s.mu.Unlock()
 	s.quiesceFunc = quiesce
 	s.restartFunc = restart
+}
+
+// SetRestoreRecoveryHooks wires the steps a restore runs after the files are
+// in place (issue #1024): dependencySync reinstalls node_modules when the
+// archive replaced package.json, and ready waits for Node-RED to answer after
+// the restart. Both may be nil.
+func (s *BackupService) SetRestoreRecoveryHooks(dependencySync, ready func(context.Context) error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.depsSyncFunc = dependencySync
+	s.readyFunc = ready
 }
 
 // SetBackupProvider installs the optional off-host provider. nil disables
@@ -297,11 +316,23 @@ func (s *BackupService) ListPaginated(opts model.PaginationOpts) (model.Paginate
 
 // Create creates a new backup using the default manual type.
 func (s *BackupService) Create(name string) (model.Backup, error) {
+	release, err := acquireDataDirLock(s.dataDir)
+	if err != nil {
+		return model.Backup{}, err
+	}
+	defer release()
 	return s.createBackup(createBackupOptions{Type: model.BackupTypeManual, Name: name})
 }
 
-// CreateTyped creates a new backup with an explicit type.
+// CreateTyped creates a new backup with an explicit type. It takes the
+// data-dir lock, so a scheduled backup cannot run during a restore or apply
+// (issue #1024).
 func (s *BackupService) CreateTyped(backupType model.BackupType, name string) (model.Backup, error) {
+	release, err := acquireDataDirLock(s.dataDir)
+	if err != nil {
+		return model.Backup{}, err
+	}
+	defer release()
 	return s.createBackup(createBackupOptions{Type: normalizeBackupType(string(backupType)), Name: name})
 }
 
@@ -488,47 +519,76 @@ func (s *BackupService) SaveConfig(cfg model.BackupConfig) (model.BackupConfig, 
 // not by the full archive size — closing HIGH-006 (memory DoS) and
 // HIGH-008 (fail-fast on checksum mismatch) at the same time.
 func (s *BackupService) Restore(id string) error {
-	if err := ValidateBackupID(id); err != nil {
+	release, err := acquireDataDirLock(s.dataDir)
+	if err != nil {
 		return err
+	}
+	defer release()
+	_, err = s.restore(id)
+	return err
+}
+
+// restore is Restore without the data-dir lock, so RestoreWithSafetyBackup can
+// create its snapshot and swap the files under one acquisition. It returns the
+// verified manifest so callers know which files the swap replaced.
+func (s *BackupService) restore(id string) (backupMetadata, error) {
+	if err := ValidateBackupID(id); err != nil {
+		return backupMetadata{}, err
 	}
 	backupPath := filepath.Join(s.backupDir, id+".zip")
 
 	info, err := os.Stat(backupPath)
 	if err != nil {
-		return fmt.Errorf("backup not found: %w", err)
+		return backupMetadata{}, fmt.Errorf("backup not found: %w", err)
 	}
 
 	// #nosec G304 -- backupPath is built from operator-supplied dataDir + a constant filename; not request-derived.
 	file, err := os.Open(backupPath)
 	if err != nil {
-		return fmt.Errorf("failed to open backup: %w", err)
+		return backupMetadata{}, fmt.Errorf("failed to open backup: %w", err)
 	}
 	defer func() { _ = file.Close() }()
 
 	zipReader, err := zip.NewReader(file, info.Size())
 	if err != nil {
-		return fmt.Errorf("failed to parse backup: %w", err)
+		return backupMetadata{}, fmt.Errorf("failed to parse backup: %w", err)
 	}
 
 	manifest, err := verifyArchiveManifest(zipReader)
 	if err != nil {
-		return fmt.Errorf("%w: %w", ErrBackupCorrupt, err)
+		return backupMetadata{}, fmt.Errorf("%w: %w", ErrBackupCorrupt, err)
 	}
 
 	stagingDir, err := s.stageRestore(zipReader, manifest)
 	if err != nil {
-		return err
+		return backupMetadata{}, err
 	}
 
 	if err := s.swapStagingIntoDataDir(stagingDir, manifest); err != nil {
-		_ = os.RemoveAll(stagingDir)
-		return err
+		// The journal is still on disk, so the previous set is recoverable.
+		// Undo the partial swap now; if even that fails, the journal stays
+		// and RecoverInterruptedRestore finishes the rollback at next boot.
+		if rollbackErr := rollbackRestoreStaging(s.dataDir, stagingDir); rollbackErr != nil {
+			return manifest, fmt.Errorf("%w (rollback pending at next boot: %w)", err, rollbackErr)
+		}
+		return manifest, err
 	}
-	return nil
+	return manifest, nil
 }
 
 // RestoreWithSafetyBackup creates a pre-restore snapshot before restoring.
+// The whole sequence holds the data-dir lock once, so no other restore,
+// scheduled backup or apply can interleave with it (issue #1024).
 func (s *BackupService) RestoreWithSafetyBackup(id string) (string, error) {
+	release, err := acquireDataDirLock(s.dataDir)
+	if err != nil {
+		return "", err
+	}
+	defer release()
+	return s.restoreWithSafetyBackup(id)
+}
+
+func (s *BackupService) restoreWithSafetyBackup(id string) (preRestoreID string, restoreErr error) {
 	if err := ValidateBackupID(id); err != nil {
 		return "", err
 	}
@@ -541,6 +601,8 @@ func (s *BackupService) RestoreWithSafetyBackup(id string) (string, error) {
 	s.mu.Lock()
 	quiesce := s.quiesceFunc
 	restart := s.restartFunc
+	depsSync := s.depsSyncFunc
+	ready := s.readyFunc
 	s.mu.Unlock()
 
 	// Quiesce Node-RED before touching its files so we never observe a
@@ -563,9 +625,25 @@ func (s *BackupService) RestoreWithSafetyBackup(id string) (string, error) {
 			return "", fmt.Errorf("quiesce before restore: %w", err)
 		}
 	}
+	// packageRestored is only known after the swap, so the deferred recovery
+	// reads it from this closure variable (issue #1024).
+	packageRestored := false
 	defer func() {
 		if restart == nil {
 			return
+		}
+		ctx := context.Background()
+		if packageRestored && depsSync != nil {
+			if derr := depsSync(ctx); derr != nil {
+				s.recordEvent(model.BackupEvent{
+					Type:    model.BackupEventTypeRestore,
+					Status:  "error",
+					Message: "Failed to reinstall node_modules after restore",
+					Trigger: "restore",
+					Error:   derr.Error(),
+				})
+				restoreErr = errors.Join(restoreErr, fmt.Errorf("reinstall node_modules after restore: %w", derr))
+			}
 		}
 		if rerr := restart(); rerr != nil {
 			s.recordEvent(model.BackupEvent{
@@ -575,15 +653,31 @@ func (s *BackupService) RestoreWithSafetyBackup(id string) (string, error) {
 				Trigger: "restore",
 				Error:   rerr.Error(),
 			})
+			restoreErr = errors.Join(restoreErr, fmt.Errorf("restart Node-RED after restore: %w", rerr))
+			return
+		}
+		if ready == nil {
+			return
+		}
+		if rerr := ready(ctx); rerr != nil {
+			s.recordEvent(model.BackupEvent{
+				Type:    model.BackupEventTypeRestore,
+				Status:  "error",
+				Message: "Node-RED did not become ready after restore",
+				Trigger: "restore",
+				Error:   rerr.Error(),
+			})
+			restoreErr = errors.Join(restoreErr, fmt.Errorf("Node-RED did not become ready after restore: %w", rerr))
 		}
 	}()
 
-	preRestore, err := s.CreateTyped(model.BackupTypePreRestore, "pre-restore")
+	preRestore, err := s.createBackup(createBackupOptions{Type: model.BackupTypePreRestore, Name: "pre-restore"})
 	if err != nil {
 		return "", err
 	}
 
-	if err := s.Restore(id); err != nil {
+	manifest, err := s.restore(id)
+	if err != nil {
 		s.recordEvent(model.BackupEvent{
 			Type:       model.BackupEventTypeRestore,
 			Status:     "error",
@@ -596,6 +690,7 @@ func (s *BackupService) RestoreWithSafetyBackup(id string) (string, error) {
 		})
 		return preRestore.ID, err
 	}
+	packageRestored = manifestRestoresFile(manifest, "package.json")
 
 	s.recordEvent(model.BackupEvent{
 		Type:       model.BackupEventTypeRestore,
@@ -675,7 +770,10 @@ func (s *BackupService) createBackup(options createBackupOptions) (model.Backup,
 		}
 	}
 
-	filesToBackup := s.filesForBackup(config)
+	filesToBackup, err := s.filesForBackup(config)
+	if err != nil {
+		return model.Backup{}, err
+	}
 	manifest := backupMetadata{
 		ID:          backupID,
 		Name:        name,
@@ -902,44 +1000,71 @@ func (s *BackupService) patchManifestChecksums(zipPath string, manifest backupMe
 	return os.Rename(tmpOut, zipPath)
 }
 
-func (s *BackupService) filesForBackup(cfg model.BackupConfig) []struct {
+// backupFile is one payload entry: where it lives in dataDir and where it goes
+// into the archive.
+type backupFile struct {
 	src string
 	dst string
-} {
-	files := []struct {
-		src string
-		dst string
-	}{
+}
+
+// filesForBackup lists everything NRCC owns (issue #1024). Files that do not
+// exist are skipped when the archive is written, so optional artefacts cost
+// nothing.
+//
+// The Node-RED payload honours the per-type Include* switches; the files that
+// NRCC itself manages — the environment file, the MFA store, uploads and the
+// runtime config — are always included, because a restore onto a clean volume
+// would otherwise lose logins, MFA enrolment and editor assets.
+func (s *BackupService) filesForBackup(cfg model.BackupConfig) ([]backupFile, error) {
+	files := []backupFile{
 		{filepath.Join(s.dataDir, "flows.json"), "flows.json"},
 		{filepath.Join(s.dataDir, "cc-users.json"), "cc-users.json"},
+		{filepath.Join(s.dataDir, ".env"), ".env"},
+		{filepath.Join(s.dataDir, "mfa.json"), "mfa.json"},
+		{filepath.Join(s.dataDir, ".config.runtime.json"), ".config.runtime.json"},
 	}
 
 	if cfg.IncludeConfig {
-		files = append(files, struct {
-			src string
-			dst string
-		}{filepath.Join(s.dataDir, "config.json"), "config.json"})
+		files = append(files, backupFile{filepath.Join(s.dataDir, "config.json"), "config.json"})
 	}
 	if cfg.IncludeSettings {
-		files = append(files, struct {
-			src string
-			dst string
-		}{filepath.Join(s.dataDir, "settings.js"), "settings.js"})
+		files = append(files, backupFile{filepath.Join(s.dataDir, "settings.js"), "settings.js"})
 	}
 	if cfg.IncludeFlowsCred {
-		files = append(files, struct {
-			src string
-			dst string
-		}{filepath.Join(s.dataDir, "flows_cred.json"), "flows_cred.json"})
+		files = append(files, backupFile{filepath.Join(s.dataDir, "flows_cred.json"), "flows_cred.json"})
 	}
 	if cfg.IncludePackageJSON {
-		files = append(files, struct {
-			src string
-			dst string
-		}{filepath.Join(s.dataDir, "package.json"), "package.json"})
+		files = append(files, backupFile{filepath.Join(s.dataDir, "package.json"), "package.json"})
 	}
 
-	return files
+	return s.appendUploadFiles(files)
+}
+
+// appendUploadFiles adds every regular file under <dataDir>/uploads with its
+// directory-relative archive path, so editor images survive a restore.
+func (s *BackupService) appendUploadFiles(files []backupFile) ([]backupFile, error) {
+	root := filepath.Join(s.dataDir, "uploads")
+	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			if errors.Is(walkErr, os.ErrNotExist) {
+				return nil
+			}
+			return walkErr
+		}
+		if entry.IsDir() || !entry.Type().IsRegular() {
+			return nil
+		}
+		rel, relErr := filepath.Rel(root, path)
+		if relErr != nil {
+			return relErr
+		}
+		files = append(files, backupFile{src: path, dst: "uploads/" + filepath.ToSlash(rel)})
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list uploads: %w", err)
+	}
+	return files, nil
 }
 
 func (s *BackupService) pruneBackups(cfg model.BackupConfig, backupType model.BackupType, keepID string) ([]string, error) {
@@ -1215,7 +1340,7 @@ func verifyArchiveManifest(zipReader *zip.Reader) (backupMetadata, error) {
 	if !manifestSeen {
 		return backupMetadata{}, errors.New("missing backup-metadata.json")
 	}
-	if manifest.Version != currentManifestVersion {
+	if manifest.Version < oldestManifestVersion || manifest.Version > currentManifestVersion {
 		return backupMetadata{}, fmt.Errorf("unsupported manifest version %d", manifest.Version)
 	}
 	if manifest.Algorithm != defaultChecksumAlgo {
@@ -1306,39 +1431,6 @@ func (s *BackupService) stageRestore(zipReader *zip.Reader, manifest backupMetad
 	}
 
 	return stagingDir, nil
-}
-
-// swapStagingIntoDataDir atomically moves every file extracted under
-// stagingDir into s.dataDir. The set of files moved is derived from the
-// verified manifest (not from os.ReadDir of stagingDir) so nested paths
-// cannot collide with siblings and extra residue in staging can never be
-// published. Staging lives on the same filesystem as dataDir by
-// construction (os.MkdirTemp on s.dataDir), so os.Rename is atomic per file.
-func (s *BackupService) swapStagingIntoDataDir(stagingDir string, manifest backupMetadata) error {
-	if stagingDir == "" {
-		return nil
-	}
-	for _, entry := range manifest.Files {
-		rel := entry.Path
-		if rel == "" || strings.ContainsRune(rel, 0) {
-			return fmt.Errorf("manifest entry has invalid path: %q", rel)
-		}
-		srcPath := filepath.Join(stagingDir, filepath.FromSlash(rel))
-		dstPath := filepath.Join(s.dataDir, filepath.FromSlash(rel))
-		if _, err := os.Stat(srcPath); err != nil {
-			return fmt.Errorf("swap %s: missing in staging: %w", rel, err)
-		}
-		if err := os.MkdirAll(filepath.Dir(dstPath), 0750); err != nil {
-			return fmt.Errorf("swap %s: mkdir: %w", rel, err)
-		}
-		if err := os.Rename(srcPath, dstPath); err != nil {
-			return fmt.Errorf("swap %s: %w", rel, err)
-		}
-	}
-	// Cleanup is unconditional: if swap left residue we still want the
-	// staging directory gone so the next MkdirTemp pass can't collide.
-	_ = os.RemoveAll(stagingDir)
-	return nil
 }
 
 // maxBackupEntrySize caps the uncompressed size of a single backup entry to
@@ -1667,9 +1759,9 @@ func IsValidCron(cronExpr string) bool {
 
 // atomicRemove unlinks path through a 3-phase sequence so a crash mid-op
 // never leaves a half-deleted file observable to the next List/Stat:
-//   1. Rename path → path+".deleted" (atomic on POSIX, same filesystem).
-//   2. Open the parent dir and fsync it so the rename is durable.
-//   3. Unlink the .deleted marker.
+//  1. Rename path → path+".deleted" (atomic on POSIX, same filesystem).
+//  2. Open the parent dir and fsync it so the rename is durable.
+//  3. Unlink the .deleted marker.
 //
 // The marker is only observable between steps 1 and 3; an interrupted run
 // that skips step 3 leaves it for the next Delete or pruneBackups sweep to
