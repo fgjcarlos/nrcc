@@ -297,11 +297,23 @@ func (s *BackupService) ListPaginated(opts model.PaginationOpts) (model.Paginate
 
 // Create creates a new backup using the default manual type.
 func (s *BackupService) Create(name string) (model.Backup, error) {
+	release, err := acquireDataDirLock(s.dataDir)
+	if err != nil {
+		return model.Backup{}, err
+	}
+	defer release()
 	return s.createBackup(createBackupOptions{Type: model.BackupTypeManual, Name: name})
 }
 
-// CreateTyped creates a new backup with an explicit type.
+// CreateTyped creates a new backup with an explicit type. It takes the
+// data-dir lock, so a scheduled backup cannot run during a restore or apply
+// (issue #1024).
 func (s *BackupService) CreateTyped(backupType model.BackupType, name string) (model.Backup, error) {
+	release, err := acquireDataDirLock(s.dataDir)
+	if err != nil {
+		return model.Backup{}, err
+	}
+	defer release()
 	return s.createBackup(createBackupOptions{Type: normalizeBackupType(string(backupType)), Name: name})
 }
 
@@ -488,6 +500,17 @@ func (s *BackupService) SaveConfig(cfg model.BackupConfig) (model.BackupConfig, 
 // not by the full archive size — closing HIGH-006 (memory DoS) and
 // HIGH-008 (fail-fast on checksum mismatch) at the same time.
 func (s *BackupService) Restore(id string) error {
+	release, err := acquireDataDirLock(s.dataDir)
+	if err != nil {
+		return err
+	}
+	defer release()
+	return s.restore(id)
+}
+
+// restore is Restore without the data-dir lock, so RestoreWithSafetyBackup can
+// create its snapshot and swap the files under one acquisition.
+func (s *BackupService) restore(id string) error {
 	if err := ValidateBackupID(id); err != nil {
 		return err
 	}
@@ -533,7 +556,18 @@ func (s *BackupService) Restore(id string) error {
 }
 
 // RestoreWithSafetyBackup creates a pre-restore snapshot before restoring.
+// The whole sequence holds the data-dir lock once, so no other restore,
+// scheduled backup or apply can interleave with it (issue #1024).
 func (s *BackupService) RestoreWithSafetyBackup(id string) (string, error) {
+	release, err := acquireDataDirLock(s.dataDir)
+	if err != nil {
+		return "", err
+	}
+	defer release()
+	return s.restoreWithSafetyBackup(id)
+}
+
+func (s *BackupService) restoreWithSafetyBackup(id string) (string, error) {
 	if err := ValidateBackupID(id); err != nil {
 		return "", err
 	}
@@ -583,12 +617,12 @@ func (s *BackupService) RestoreWithSafetyBackup(id string) (string, error) {
 		}
 	}()
 
-	preRestore, err := s.CreateTyped(model.BackupTypePreRestore, "pre-restore")
+	preRestore, err := s.createBackup(createBackupOptions{Type: model.BackupTypePreRestore, Name: "pre-restore"})
 	if err != nil {
 		return "", err
 	}
 
-	if err := s.Restore(id); err != nil {
+	if err := s.restore(id); err != nil {
 		s.recordEvent(model.BackupEvent{
 			Type:       model.BackupEventTypeRestore,
 			Status:     "error",

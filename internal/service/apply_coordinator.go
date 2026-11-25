@@ -137,6 +137,22 @@ func (c *ApplyCoordinator) Apply(ctx context.Context, req ApplyRequest) (ApplyRe
 		return ApplyResult{}, err
 	}
 
+	// Issue #1024: one data directory runs one destructive operation at a
+	// time. Take the data-dir lock before the per-path slot so a restore,
+	// a scheduled backup and an apply can never overlap. A held lock
+	// surfaces as the existing ErrApplyInFlight 409 contract.
+	if c.apply.configSvc != nil {
+		release, lockErr := acquireDataDirLock(c.apply.configSvc.dataDir)
+		if lockErr != nil {
+			c.emitFailure(req, "start", lockErr)
+			if errors.Is(lockErr, ErrDataDirBusy) {
+				return ApplyResult{}, ErrApplyInFlight
+			}
+			return ApplyResult{}, &ApplyError{Stage: ApplyStageValidate, Cause: lockErr, Path: req.Path, Request: req}
+		}
+		defer release()
+	}
+
 	// Capture the slot BEFORE running the revision check so two
 	// simultaneous calls with different Expected revisions still
 	// serialise — the second's GetRawSettings would otherwise see
