@@ -606,6 +606,16 @@ func (s *Server) SetProcessManager(pm *service.ProcessManager) {
 			}
 			return nil
 		})
+		// A restore replaces package.json and everything NRCC owns, so
+		// node_modules is rebuilt from the restored manifest and the restore
+		// only reports success once Node-RED answers again (issue #1024).
+		backupDir := s.backupSvc.DataDir()
+		s.backupSvc.SetRestoreRecoveryHooks(
+			func(ctx context.Context) error {
+				return service.NewNpmPackageManager(backupDir).InstallDependencies(ctx)
+			},
+			service.ProbeNodeRedReady,
+		)
 	}
 	// Wire the library service so npm install/uninstall reloads a running
 	// Node-RED process. Restart failures propagate to the caller; otherwise

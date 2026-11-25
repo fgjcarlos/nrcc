@@ -252,3 +252,14 @@ func rollbackRestoreStaging(dataDir, stagingDir string) error {
 	}
 	return os.RemoveAll(stagingDir)
 }
+
+// manifestRestoresFile reports whether the archive replaces rel, which decides
+// whether a restore has to reinstall node_modules (issue #1024).
+func manifestRestoresFile(manifest backupMetadata, rel string) bool {
+	for _, entry := range manifest.Files {
+		if entry.Path == rel {
+			return true
+		}
+	}
+	return false
+}
