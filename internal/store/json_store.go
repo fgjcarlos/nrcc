@@ -12,13 +12,19 @@ import (
 // JSONStore is a generic JSON file store protected by a per-instance lock.
 // It is not safe across processes or multiple instances using the same path.
 type JSONStore[T any] struct {
-	path string
-	mu   sync.RWMutex
+	path      string
+	mu        sync.RWMutex
+	versioned bool
 }
 
 // NewJSONStore creates a new JSON store for the given path
 func NewJSONStore[T any](path string) *JSONStore[T] {
 	return &JSONStore[T]{path: path}
+}
+
+// NewVersionedJSONStore creates a store for a versioned JSON object.
+func NewVersionedJSONStore[T any](path string) *JSONStore[T] {
+	return &JSONStore[T]{path: path, versioned: true}
 }
 
 // Read reads and unmarshals the JSON file. If the file does not exist, Read
@@ -38,6 +44,11 @@ func (s *JSONStore[T]) readUnlocked() (T, error) {
 		return val, err
 	}
 
+	if s.versioned {
+		if err := CheckSchemaVersion(s.path, data); err != nil {
+			return val, err
+		}
+	}
 	err = json.Unmarshal(data, &val)
 	return val, err
 }
@@ -56,11 +67,20 @@ func (s *JSONStore[T]) Write(val T) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if s.versioned {
+		if err := CheckSchemaFile(s.path); err != nil {
+			return err
+		}
+	}
 	return s.writeUnlocked(val)
 }
 
 func (s *JSONStore[T]) writeUnlocked(val T) error {
-	data, err := json.MarshalIndent(val, "", "  ")
+	marshal := func(value any) ([]byte, error) { return json.MarshalIndent(value, "", "  ") }
+	if s.versioned {
+		marshal = MarshalVersionedJSON
+	}
+	data, err := marshal(val)
 	if err != nil {
 		return err
 	}

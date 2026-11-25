@@ -50,6 +50,11 @@ func runServer() {
 		log.Fatalf("Invalid configuration: %v", err)
 	}
 
+	// Refuse incompatible data before startup creates or recovers any files.
+	if err := store.CheckSchemaVersions(dataDir); err != nil {
+		log.Fatalf("Cannot start: %v", err)
+	}
+
 	jwtSecret, err := resolveJWTSecret(dataDir)
 	if err != nil {
 		log.Fatalf("JWT secret error: %v", err)
@@ -66,7 +71,7 @@ func runServer() {
 
 	// Initialize JSON stores
 	usersPath := filepath.Join(dataDir, "cc-users.json")
-	usersStore := store.NewJSONStore[model.CCUsers](usersPath)
+	usersStore := store.NewVersionedJSONStore[model.CCUsers](usersPath)
 	sessionsPath := filepath.Join(dataDir, "refresh_sessions.json")
 	sessionStore := store.NewJSONStore[model.RefreshSessions](sessionsPath)
 
@@ -105,6 +110,11 @@ func runServer() {
 		ui.Warn("Interrupted backup restore rolled back: " + rolledBack)
 	} else if err != nil {
 		ui.Error(fmt.Sprintf("Interrupted restore recovery: %v", err))
+	}
+
+	// Recovery can replace live files with a previous snapshot.
+	if err := store.CheckSchemaVersions(dataDir); err != nil {
+		log.Fatalf("Cannot start after recovery: %v", err)
 	}
 
 	// Node-RED managed mode is ON by default.
