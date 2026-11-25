@@ -186,7 +186,8 @@ func TestAuthService_PruneSessions_Concurrent(t *testing.T) {
 	initial := model.RefreshSessions{Sessions: []model.RefreshSession{
 		{ID: "old-revoked", UserID: "u1", Revoked: true, ExpiresAt: now.Add(-48 * time.Hour).Unix()},
 		{ID: "old-expired", UserID: "u1", ExpiresAt: now.Add(-48 * time.Hour).Unix()},
-		{ID: "recent-revoked", UserID: "u1", Revoked: true, ExpiresAt: now.Add(-time.Hour).Unix()},
+		{ID: "legacy-revoked", UserID: "u1", Revoked: true, ExpiresAt: now.Add(time.Hour).Unix()},
+		{ID: "recent-revoked", UserID: "u1", Revoked: true, RevokedAt: now.Add(-time.Hour).Unix(), ExpiresAt: now.Add(time.Hour).Unix()},
 		{ID: "live", UserID: "u2", ExpiresAt: now.Add(time.Hour).Unix()},
 	}}
 	if err := sessionStore.Write(initial); err != nil {
