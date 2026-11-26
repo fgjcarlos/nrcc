@@ -14,9 +14,18 @@ import (
 // after the settings write and before readiness. runtime.Goexit runs only
 // deferred calls, like a process killed at that point runs none of the
 // remaining apply steps.
-type killAfterWriteAdapter struct{ *fakeAdapter }
+type killAfterWriteAdapter struct {
+	*fakeAdapter
+	path   string
+	loaded *string
+}
 
-func (killAfterWriteAdapter) Restart(context.Context) error {
+func (a killAfterWriteAdapter) Restart(context.Context) error {
+	data, err := os.ReadFile(a.path)
+	if err != nil {
+		panic(err)
+	}
+	*a.loaded = string(data)
 	runtime.Goexit()
 	return nil
 }
@@ -41,8 +50,9 @@ func TestInterruptedApplyIsRolledBackAtNextBoot(t *testing.T) {
 	f := newApplyCoordinatorFixture(t)
 	previous := validSettingsJS(t)
 	candidate := strings.Replace(previous, "uiPort: 1880", "uiPort: 4601", 1)
+	candidateLoaded := ""
 	coordinator := NewRuntimeApplyCoordinator(f.apply, func(ApplyRequest) (ApplyAdapter, error) {
-		return killAfterWriteAdapter{&fakeAdapter{name: "killed"}}, nil
+		return killAfterWriteAdapter{fakeAdapter: &fakeAdapter{name: "killed"}, path: f.settingsPath, loaded: &candidateLoaded}, nil
 	})
 
 	done := make(chan struct{})
@@ -53,6 +63,9 @@ func TestInterruptedApplyIsRolledBackAtNextBoot(t *testing.T) {
 	<-done
 	if got := readFile(t, f.settingsPath); got != candidate {
 		t.Fatal("precondition: the candidate must be on disk when the process stops")
+	}
+	if candidateLoaded != candidate {
+		t.Fatalf("precondition: interrupted runtime loaded %q, want candidate", candidateLoaded)
 	}
 
 	// Next start: a fresh service over the same data directory.
@@ -66,7 +79,42 @@ func TestInterruptedApplyIsRolledBackAtNextBoot(t *testing.T) {
 	if got := readFile(t, f.settingsPath); got != previous {
 		t.Fatalf("settings.js after recovery is not the previous file:\n%s", got)
 	}
+	loaded := ""
+	adapter := &recoveryFileAdapter{path: f.settingsPath, loaded: &loaded, want: previous}
+	if err := RecoverExternalApplyRuntime(context.Background(), RollbackRequest{
+		ActivePath: f.settingsPath, Stage: RollbackStageRestart, Adapter: adapter,
+	}); err != nil {
+		t.Fatalf("RecoverExternalApplyRuntime: %v", err)
+	}
+	if loaded != previous || strings.Join(adapter.calls, ",") != "restart,ready" {
+		t.Fatalf("loaded=%q calls=%v; want restored settings and [restart ready]", loaded, adapter.calls)
+	}
 	assertNoPendingMarker(t, f.settingsPath)
+}
+
+type recoveryFileAdapter struct {
+	path   string
+	loaded *string
+	want   string
+	calls  []string
+}
+
+func (*recoveryFileAdapter) Name() string { return AdapterNameNativeSystemd }
+func (a *recoveryFileAdapter) Restart(context.Context) error {
+	a.calls = append(a.calls, "restart")
+	data, err := os.ReadFile(a.path)
+	if err != nil {
+		return err
+	}
+	*a.loaded = string(data)
+	return nil
+}
+func (a *recoveryFileAdapter) Ready(context.Context) error {
+	a.calls = append(a.calls, "ready")
+	if *a.loaded != a.want {
+		return errors.New("runtime did not load restored settings")
+	}
+	return nil
 }
 
 func TestRecoverInterruptedApplyWithoutMarkerChangesNothing(t *testing.T) {
