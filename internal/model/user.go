@@ -47,6 +47,7 @@ type RefreshSession struct {
 	UserID    string `json:"userId"`
 	ExpiresAt int64  `json:"expiresAt"`
 	Revoked   bool   `json:"revoked"`
+	RevokedAt int64  `json:"revokedAt,omitempty"`
 	CreatedAt int64  `json:"createdAt"`
 }
 

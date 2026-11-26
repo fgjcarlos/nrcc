@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -33,6 +34,18 @@ func newBackupScheduler(svc *BackupService) *backupScheduler {
 			Schedule: defaultBackupConfig.Schedule,
 		},
 	}
+}
+
+// ScheduleRefreshSessionPruning runs prune immediately and registers a daily
+// run independent of automatic backups. Call once before Start.
+func (s *BackupService) ScheduleRefreshSessionPruning(prune func() error) {
+	run := func() {
+		if err := prune(); err != nil {
+			slog.Warn("refresh session pruning failed", "error", err)
+		}
+	}
+	run()
+	s.scheduler.engine.Schedule(cron.Every(24*time.Hour), cron.FuncJob(run))
 }
 
 func (s *backupScheduler) Start(ctx context.Context) {

@@ -527,7 +527,8 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 	// Initialize shutdown channel (buffered to prevent goroutine leak)
 	server.shutdownCh = make(chan struct{}, 1)
 
-	// Start the backup scheduler using persisted config.
+	// Start the scheduler for session maintenance and automatic backups.
+	backupSvc.ScheduleRefreshSessionPruning(authSvc.PruneSessions)
 	backupSvc.Start(server.ctx)
 
 	// Start the update service polling goroutine
