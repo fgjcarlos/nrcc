@@ -58,11 +58,11 @@ func (s *AuthService) stageCredentialSession(user *model.CCUser, self bool) (Cre
 	}
 	access, err := s.GenerateToken(user)
 	if err != nil {
-		return CredentialChangeSession{}, fmt.Errorf("%w: %v", ErrReplacementSession, err)
+		return CredentialChangeSession{}, fmt.Errorf("%w: %w", ErrReplacementSession, err)
 	}
 	refresh, err := s.CreateRefreshSessionForUser(user)
 	if err != nil {
-		return CredentialChangeSession{}, fmt.Errorf("%w: %v", ErrReplacementSession, err)
+		return CredentialChangeSession{}, fmt.Errorf("%w: %w", ErrReplacementSession, err)
 	}
 	return CredentialChangeSession{AccessToken: access, RefreshToken: refresh}, nil
 }

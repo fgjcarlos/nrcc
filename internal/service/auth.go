@@ -440,7 +440,7 @@ func (s *AuthService) replaceRefreshSession(user *model.CCUser, old *model.Refre
 		if old != nil {
 			current, err := findValidRefreshSession(sessions.Sessions, old.ID)
 			if err != nil {
-				return fmt.Errorf("%w: %v", ErrInvalidRefresh, err)
+				return fmt.Errorf("%w: %w", ErrInvalidRefresh, err)
 			}
 			current.Revoked, current.RevokedAt = true, time.Now().Unix()
 		}
@@ -465,7 +465,7 @@ func (s *AuthService) RotateRefreshSession(token string) (*model.CCUser, string,
 		return nil, "", err
 	}
 	if err != nil {
-		return nil, "", fmt.Errorf("%w: %v", ErrInvalidRefresh, err)
+		return nil, "", fmt.Errorf("%w: %w", ErrInvalidRefresh, err)
 	}
 	replacement, err := s.replaceRefreshSession(user, session)
 	return user, replacement, err
