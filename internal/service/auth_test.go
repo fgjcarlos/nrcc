@@ -13,7 +13,13 @@ func newTestAuthService(t *testing.T) *AuthService {
 	dir := t.TempDir()
 	userStore := store.NewJSONStore[model.CCUsers](dir + "/users.json")
 	sessionStore := store.NewJSONStore[model.RefreshSessions](dir + "/sessions.json")
-	return NewAuthService("test-secret", userStore, sessionStore)
+	svc := NewAuthService("test-secret", userStore, sessionStore)
+	for _, id := range []string{"u1", "u2"} {
+		if err := svc.CreateUser(&model.CCUser{ID: id, Username: id}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return svc
 }
 
 func TestGenerateToken_ShortLived(t *testing.T) {

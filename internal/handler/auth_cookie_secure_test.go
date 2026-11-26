@@ -105,13 +105,12 @@ func TestSetRefreshCookie_SecureAttribute(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h, _ := setupAuthTest(t)
 			r := tt.setupRequest()
 			w := httptest.NewRecorder()
 
 			// Call the method under test: setRefreshCookie must accept *http.Request
 			// to determine the Secure flag.
-			_ = h.setRefreshCookie(w, r, "test-user-id")
+			emitRefreshCookie(w, r, "test-token")
 
 			// Parse the Set-Cookie header to inspect the Secure attribute.
 			resp := w.Result()
@@ -204,7 +203,7 @@ func TestSetup_CookieNonTLS_LogsWarning(t *testing.T)       { runSetupCookieCase
 func runSetupCookieCase(t *testing.T, scenario string) {
 	t.Helper()
 	t.Setenv("NRCC_TLS", "false")
-	h, _ := setupAuthTest(t)
+	h, svc := setupAuthTest(t)
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/setup", nil)
 	if scenario == "tls" {
 		req.TLS = &tls.ConnectionState{}
@@ -220,7 +219,7 @@ func runSetupCookieCase(t *testing.T, scenario string) {
 	warnInsecureSetupCookie = func() { warnings++ }
 	t.Cleanup(func() { warnInsecureSetupCookie = previousWarning })
 	rec := httptest.NewRecorder()
-	if err := h.setSetupRefreshCookie(rec, req, "test-user-id"); err != nil {
+	if err := h.setSetupRefreshCookie(rec, req, svc.GetUserByUsername("admin").ID); err != nil {
 		t.Fatal(err)
 	}
 	cookies := rec.Result().Cookies()

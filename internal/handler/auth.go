@@ -48,6 +48,7 @@ type AuthHandler struct {
 	loginMetrics         loginMetricsRecorder
 	verifyLoginPassword  func(string, string) bool
 	createRefreshSession func(string) (string, error)
+	rotateRefreshSession func(string) (*model.CCUser, string, error)
 	consumeSetupToken    func(string) error
 	refreshLocks         [refreshLockStripes]sync.Mutex
 	setupMu              sync.Mutex
@@ -60,6 +61,7 @@ func NewAuthHandler(authSvc *service.AuthService) *AuthHandler {
 		authSvc:              authSvc,
 		verifyLoginPassword:  authSvc.VerifyPassword,
 		createRefreshSession: authSvc.CreateRefreshSession,
+		rotateRefreshSession: authSvc.RotateRefreshSession,
 		consumeSetupToken:    setupstate.ConsumeTokenFile,
 	}
 }
@@ -335,6 +337,9 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		if newHash, err := h.authSvc.HashPassword(req.Password); err == nil {
 			now := model.NowISO8601()
 			if err := h.authSvc.UpdateUser(user.ID, func(current *model.CCUser) error {
+				if current.PasswordHash != user.PasswordHash || current.PasswordVersion != user.PasswordVersion {
+					return service.ErrCredentialsChanged
+				}
 				current.PasswordHash = newHash
 				current.UpdatedAt = now
 				return nil
@@ -349,7 +354,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	// session yet — return mfaRequired + a short-lived mfaToken
 	// and let the client call /api/auth/mfa/verify.
 	if h.mfaSvc != nil && h.mfaSvc.IsEnrolled(user.ID) {
-		mfaToken, err := h.mfaSvc.IssueMfaToken(user.ID)
+		mfaToken, err := h.mfaSvc.IssueMfaTokenForUser(user)
 		if err != nil {
 			model.RespondError(w, http.StatusInternalServerError, "MFA_TOKEN_ERROR", "Failed to issue MFA challenge")
 			return
@@ -372,10 +377,13 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Issue refresh cookie
-	if err := h.setRefreshCookie(w, r, user.ID); err != nil {
+	refreshToken, err := h.authSvc.CreateRefreshSessionForUser(user)
+	if err != nil {
 		model.RespondError(w, http.StatusInternalServerError, "REFRESH_SESSION_ERROR", "Failed to create refresh session")
 		return
 	}
+
+	emitRefreshCookie(w, r, refreshToken)
 
 	resp := AuthResponse{
 		Token: token,
@@ -610,64 +618,61 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	isSelf := userID == claims.UserID
-	if isSelf && !h.verifyCurrentPassword(w, r, claims, req.CurrentPassword) {
-		return
+	var verified *model.CCUser
+	if userID == claims.UserID {
+		verified = h.verifyCurrentPassword(w, r, claims, req.CurrentPassword)
+		if verified == nil {
+			return
+		}
 	}
-
-	// Hash new password
 	hash, err := h.authSvc.HashPassword(req.Password)
 	if err != nil {
 		model.RespondError(w, http.StatusInternalServerError, "HASH_ERROR", "Failed to hash password")
 		return
 	}
-
-	updatedAt := model.NowISO8601()
-	username := ""
-	if err := h.authSvc.UpdateUser(userID, func(user *model.CCUser) error {
-		user.PasswordHash = hash
-		user.UpdatedAt = updatedAt
-		username = user.Username
-		return nil
-	}); err != nil {
-		if errors.Is(err, service.ErrUserNotFound) {
+	username, replacement, err := h.authSvc.ChangePassword(userID, hash, verified)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrUserNotFound):
 			model.RespondError(w, http.StatusNotFound, "NOT_FOUND", "User not found")
-			return
+		case errors.Is(err, service.ErrCredentialsChanged):
+			model.RespondError(w, http.StatusUnauthorized, "INVALID_PASSWORD", "Current password is incorrect")
+		case errors.Is(err, service.ErrReplacementSession):
+			h.audit.Log(r, claims.Username, "PASSWORD_CHANGE", username, "fail", map[string]string{"reason": "session_revoke"})
+			model.RespondError(w, http.StatusInternalServerError, "SESSION_REVOKE_ERROR", "Password was not changed because a replacement session could not be created")
+		default:
+			model.RespondError(w, http.StatusInternalServerError, "UPDATE_ERROR", "Failed to update user")
 		}
-		model.RespondError(w, http.StatusInternalServerError, "UPDATE_ERROR", "Failed to update user")
 		return
 	}
-
-	if err := h.authSvc.RevokeUserSessions(userID); err != nil {
-		h.audit.Log(r, claims.Username, "PASSWORD_CHANGE", username, "fail", map[string]string{"reason": "session_revoke"})
-		model.RespondError(w, http.StatusInternalServerError, "SESSION_REVOKE_ERROR", "Password changed but existing sessions could not be revoked")
-		return
-	}
-	if isSelf {
-		if err := h.setRefreshCookie(w, r, userID); err != nil {
-			model.RespondError(w, http.StatusInternalServerError, "REFRESH_SESSION_ERROR", "Failed to create refresh session")
-			return
-		}
-	}
-
 	h.audit.Log(r, claims.Username, "PASSWORD_CHANGE", username, "ok", nil)
-	model.RespondJSON(w, http.StatusOK, map[string]bool{"success": true})
+	respondCredentialChange(w, r, replacement)
+}
+
+func respondCredentialChange(w http.ResponseWriter, r *http.Request, replacement service.CredentialChangeSession) {
+	if replacement.RefreshToken != "" {
+		emitRefreshCookie(w, r, replacement.RefreshToken)
+	}
+	model.RespondJSON(w, http.StatusOK, struct {
+		Success bool   `json:"success"`
+		Token   string `json:"token,omitempty"`
+	}{true, replacement.AccessToken})
 }
 
 // verifyCurrentPassword checks the caller's current password and writes the
 // error response when it fails. Wrong guesses share the login per-user rate
 // limit buckets so this endpoint cannot be used to brute-force the password.
-func (h *AuthHandler) verifyCurrentPassword(w http.ResponseWriter, r *http.Request, claims *model.Claims, current string) bool {
+func (h *AuthHandler) verifyCurrentPassword(w http.ResponseWriter, r *http.Request, claims *model.Claims, current string) *model.CCUser {
 	user := h.authSvc.GetUserByID(claims.UserID)
 	if user == nil {
 		model.RespondError(w, http.StatusNotFound, "NOT_FOUND", "User not found")
-		return false
+		return nil
 	}
 	ip := mw.ExtractIP(r)
 	if h.limiter != nil {
 		if blocked, retry := h.limiter.CheckAuthUser(user.Username, ip); blocked {
 			mw.RespondTooManyRequests(w, retry)
-			return false
+			return nil
 		}
 	}
 	if current == "" || !h.authSvc.VerifyPassword(user.PasswordHash, current) {
@@ -676,9 +681,9 @@ func (h *AuthHandler) verifyCurrentPassword(w http.ResponseWriter, r *http.Reque
 		}
 		h.audit.Log(r, claims.Username, "PASSWORD_CHANGE", user.Username, "fail", map[string]string{"reason": "bad_current_password"})
 		model.RespondError(w, http.StatusUnauthorized, "INVALID_PASSWORD", "Current password is incorrect")
-		return false
+		return nil
 	}
-	return true
+	return user
 }
 
 // UpdateUser handles PATCH /api/auth/users/:id - protected, admin only.
@@ -749,8 +754,7 @@ func (h *AuthHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 // the refresh token, and returns a new short-lived access token.
 // Rate limiting mitigates brute-force attempts and amplification; it does not
 // prevent replay of a stolen bearer token. Changing the password or disabling
-// MFA revokes every refresh session of the user (AuthService.RevokeUserSessions). Refresh-token
-// comparison is not constant-time; that is accepted here for random 256-bit tokens.
+// MFA invalidates the old credential version, including all refresh sessions.
 func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	ip := mw.ExtractIP(r)
 	refreshLock := &h.refreshLocks[refreshLockIndex(ip)]
@@ -778,26 +782,21 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sess, err := h.authSvc.ValidateRefreshSession(cookie.Value)
+	user, refreshToken, err := h.rotateRefreshSession(cookie.Value)
 	if err != nil {
-		if h.limiter != nil {
-			h.limiter.Record(key)
+		switch {
+		case errors.Is(err, service.ErrUserNotFound):
+			clearRefreshCookie(w, r)
+			model.RespondError(w, http.StatusUnauthorized, "USER_NOT_FOUND", "User no longer exists")
+		case errors.Is(err, service.ErrInvalidRefresh):
+			if h.limiter != nil {
+				h.limiter.Record(key)
+			}
+			clearRefreshCookie(w, r)
+			model.RespondError(w, http.StatusUnauthorized, "INVALID_REFRESH", "Refresh token invalid or expired")
+		default:
+			model.RespondError(w, http.StatusInternalServerError, "REFRESH_REVOKE_ERROR", "Failed to revoke refresh session")
 		}
-		clearRefreshCookie(w, r)
-		model.RespondError(w, http.StatusUnauthorized, "INVALID_REFRESH", "Refresh token invalid or expired")
-		return
-	}
-
-	// Rotate: revoke old, issue new.
-	if err := h.authSvc.RevokeRefreshSession(cookie.Value); err != nil {
-		model.RespondError(w, http.StatusInternalServerError, "REFRESH_REVOKE_ERROR", "Failed to revoke refresh session")
-		return
-	}
-
-	user := h.authSvc.GetUserByID(sess.UserID)
-	if user == nil {
-		clearRefreshCookie(w, r)
-		model.RespondError(w, http.StatusUnauthorized, "USER_NOT_FOUND", "User no longer exists")
 		return
 	}
 
@@ -807,10 +806,7 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.setRefreshCookie(w, r, user.ID); err != nil {
-		model.RespondError(w, http.StatusInternalServerError, "REFRESH_SESSION_ERROR", "Failed to create refresh session")
-		return
-	}
+	emitRefreshCookie(w, r, refreshToken)
 
 	response := AuthResponse{
 		Token: token,
@@ -859,25 +855,18 @@ func (h *AuthHandler) setSetupRefreshCookie(w http.ResponseWriter, r *http.Reque
 	if !secure {
 		warnInsecureSetupCookie()
 	}
-	return h.setRefreshCookieWithSecure(w, userID, secure)
-}
-
-func (h *AuthHandler) setRefreshCookie(w http.ResponseWriter, r *http.Request, userID string) error {
-	secure := isSecureRequest(r)
-	if err := h.setRefreshCookieWithSecure(w, userID, secure); err != nil {
-		return err
-	}
-	clearLegacyRefreshCookie(w, secure)
-	return nil
-}
-
-func (h *AuthHandler) setRefreshCookieWithSecure(w http.ResponseWriter, userID string, secure bool) error {
-	refreshToken, err := h.createRefreshSession(userID)
+	token, err := h.createRefreshSession(userID)
 	if err != nil {
 		return err
 	}
-	writeRefreshCookie(w, refreshToken, secure, int(service.RefreshTokenLifetime/time.Second))
+	writeRefreshCookie(w, token, secure, int(service.RefreshTokenLifetime/time.Second))
 	return nil
+}
+
+func emitRefreshCookie(w http.ResponseWriter, r *http.Request, token string) {
+	secure := isSecureRequest(r)
+	writeRefreshCookie(w, token, secure, int(service.RefreshTokenLifetime/time.Second))
+	clearLegacyRefreshCookie(w, secure)
 }
 
 func clearRefreshCookie(w http.ResponseWriter, r *http.Request) {

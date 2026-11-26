@@ -38,14 +38,18 @@ func newAuthzGateTestServer(t *testing.T) (*Server, *service.AuthService) {
 func tokenForRole(t *testing.T, authSvc *service.AuthService, id string, role model.UserRole) string {
 	t.Helper()
 	now := time.Now().Format(time.RFC3339)
-	token, err := authSvc.GenerateToken(&model.CCUser{
+	user := &model.CCUser{
 		ID:           id,
 		Username:     id,
 		PasswordHash: "hash",
 		Role:         role,
 		CreatedAt:    now,
 		UpdatedAt:    now,
-	})
+	}
+	if err := authSvc.CreateUser(user); err != nil {
+		t.Fatal(err)
+	}
+	token, err := authSvc.GenerateToken(user)
 	if err != nil {
 		t.Fatalf("GenerateToken(%s): %v", role, err)
 	}

@@ -120,6 +120,9 @@ func TestAuth_ValidToken(t *testing.T) {
 		UpdatedAt:    time.Now().Format(time.RFC3339),
 	}
 
+	if err := authSvc.CreateUser(user); err != nil {
+		t.Fatal(err)
+	}
 	token, err := authSvc.GenerateToken(user)
 	if err != nil {
 		t.Fatalf("GenerateToken failed: %v", err)
@@ -227,6 +230,9 @@ func TestAuth_InjectsClaimsIntoContext(t *testing.T) {
 		UpdatedAt:    time.Now().Format(time.RFC3339),
 	}
 
+	if err := authSvc.CreateUser(user); err != nil {
+		t.Fatal(err)
+	}
 	token, err := authSvc.GenerateToken(user)
 	if err != nil {
 		t.Fatalf("GenerateToken failed: %v", err)
@@ -279,6 +285,11 @@ func TestAuth_MultipleRequests_IndependentContexts(t *testing.T) {
 		UpdatedAt:    time.Now().Format(time.RFC3339),
 	}
 
+	for _, user := range []*model.CCUser{user1, user2} {
+		if err := authSvc.CreateUser(user); err != nil {
+			t.Fatal(err)
+		}
+	}
 	token1, _ := authSvc.GenerateToken(user1)
 	token2, _ := authSvc.GenerateToken(user2)
 

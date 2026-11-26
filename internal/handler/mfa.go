@@ -4,7 +4,6 @@ import (
 	"errors"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/fgjcarlos/nrcc/internal/audit"
 	mw "github.com/fgjcarlos/nrcc/internal/middleware"
@@ -135,12 +134,15 @@ func (h *MfaHandler) Disable(w http.ResponseWriter, r *http.Request) {
 	}
 
 	isAdmin := claims.Role == model.RoleAdmin
-	err := h.mfaSvc.Disable(claims.UserID, target, req.Password, isAdmin)
+	replacement, err := h.mfaSvc.DisableWithSession(claims.UserID, target, req.Password, isAdmin)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrMfaInvalidPassword):
 			h.audit.Log(r, claims.Username, "MFA_DISABLE", target, "fail", map[string]string{"reason": "bad_password"})
 			model.RespondError(w, http.StatusUnauthorized, "INVALID_PASSWORD", "Current password is incorrect")
+		case errors.Is(err, service.ErrReplacementSession):
+			h.audit.Log(r, claims.Username, "MFA_DISABLE", target, "fail", map[string]string{"reason": "session_revoke"})
+			model.RespondError(w, http.StatusInternalServerError, "SESSION_REVOKE_ERROR", "MFA was not disabled because a replacement session could not be created")
 		case errors.Is(err, service.ErrMfaNotEnrolled):
 			model.RespondError(w, http.StatusConflict, "MFA_NOT_ENROLLED", "Target user is not enrolled in MFA")
 		case errors.Is(err, service.ErrMfaUserNotFound):
@@ -156,22 +158,8 @@ func (h *MfaHandler) Disable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Removing a factor is a credential change: end every existing session of
-	// the target, then keep the calling device signed in on a self-disable.
-	if err := h.authSvc.RevokeUserSessions(target); err != nil {
-		h.audit.Log(r, claims.Username, "MFA_DISABLE", target, "fail", map[string]string{"reason": "session_revoke"})
-		model.RespondError(w, http.StatusInternalServerError, "SESSION_REVOKE_ERROR", "MFA disabled but existing sessions could not be revoked")
-		return
-	}
-	if target == claims.UserID {
-		if err := h.setRefreshCookieFor(w, r, target); err != nil {
-			model.RespondError(w, http.StatusInternalServerError, "REFRESH_SESSION_ERROR", "Failed to create refresh session")
-			return
-		}
-	}
-
 	h.audit.Log(r, claims.Username, "MFA_DISABLE", target, "ok", nil)
-	model.RespondJSON(w, http.StatusOK, map[string]bool{"success": true})
+	respondCredentialChange(w, r, replacement)
 }
 
 // Status handles GET /api/auth/mfa/status — auth required.
@@ -266,11 +254,13 @@ func (h *MfaHandler) Verify(w http.ResponseWriter, r *http.Request) {
 		model.RespondError(w, http.StatusInternalServerError, "TOKEN_ERROR", "Failed to generate token")
 		return
 	}
-	if err := h.setRefreshCookieFor(w, r, user.ID); err != nil {
+	refreshToken, err := h.authSvc.CreateRefreshSessionForUser(user)
+	if err != nil {
 		model.RespondError(w, http.StatusInternalServerError, "REFRESH_SESSION_ERROR", "Failed to create refresh session")
 		return
 	}
 
+	emitRefreshCookie(w, r, refreshToken)
 	h.audit.Log(r, user.Username, "MFA_VERIFY", user.Username, "ok", map[string]string{"method": method})
 	if method == "recovery" {
 		h.audit.Log(r, user.Username, "MFA_RECOVERY_USE", user.Username, "ok", nil)
@@ -286,16 +276,4 @@ func (h *MfaHandler) Verify(w http.ResponseWriter, r *http.Request) {
 			UpdatedAt: user.UpdatedAt,
 		},
 	})
-}
-
-// setRefreshCookieFor issues a normal refresh cookie after an MFA operation.
-func (h *MfaHandler) setRefreshCookieFor(w http.ResponseWriter, r *http.Request, userID string) error {
-	refreshToken, err := h.authSvc.CreateRefreshSession(userID)
-	if err != nil {
-		return err
-	}
-	secure := isSecureRequest(r)
-	writeRefreshCookie(w, refreshToken, secure, int(service.RefreshTokenLifetime/time.Second))
-	clearLegacyRefreshCookie(w, secure)
-	return nil
 }

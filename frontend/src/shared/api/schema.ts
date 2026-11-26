@@ -268,9 +268,10 @@ export interface paths {
          *     Changing your own password requires `currentPassword`; a missing or wrong
          *     value returns 401 `INVALID_PASSWORD`, and wrong values count toward the
          *     same per-user lockout as failed logins (429 while locked).
-         *     Every successful change revokes all refresh sessions of the target user.
-         *     A self-service change then sets a fresh `nrcc_refresh` cookie so the
-         *     calling device stays signed in; an admin reset of another user sets none.
+         *     Every successful change invalidates all earlier access and refresh tokens of the target user.
+         *     A self-service change returns a replacement access token and sets a fresh
+         *     `nrcc_refresh` cookie so the calling device stays signed in. An admin reset
+         *     of another user issues neither.
          */
         patch: operations["patchAuthUserPassword"];
         trace?: never;
@@ -338,8 +339,9 @@ export interface paths {
          * @description Disables TOTP enrollment. The calling user's current password is
          *     always required. Admins can target any user via `userId`; non-admins
          *     can only disable themselves (the `userId` field is silently ignored).
-         *     A successful disable revokes all refresh sessions of the target user;
-         *     a self-disable then sets a fresh `nrcc_refresh` cookie for the caller.
+         *     A successful disable invalidates all earlier access and refresh tokens of the
+         *     target user. A self-disable returns a replacement access token and sets a
+         *     fresh `nrcc_refresh` cookie; disabling another user issues neither.
          */
         post: operations["postMfaDisable"];
         delete?: never;
@@ -2702,6 +2704,16 @@ export interface components {
         } & {
             data?: components["schemas"]["UserListResponse"];
         };
+        SuccessEnvelope_CredentialChange: {
+            success: boolean;
+            data: {
+                success: boolean;
+                /** @description Replacement access token, returned for self-service changes only. */
+                token?: string;
+            };
+            /** Format: date-time */
+            timestamp?: string;
+        };
         SuccessEnvelope_BoolSuccess: {
             /** @enum {boolean} */
             success: true;
@@ -3640,7 +3652,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SuccessEnvelope_BoolSuccess"];
+                    "application/json": components["schemas"]["SuccessEnvelope_CredentialChange"];
                 };
             };
             400: components["responses"]["BadRequest"];
@@ -3730,7 +3742,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SuccessEnvelope_GenericSuccess"];
+                    "application/json": components["schemas"]["SuccessEnvelope_CredentialChange"];
                 };
             };
             400: components["responses"]["BadRequest"];

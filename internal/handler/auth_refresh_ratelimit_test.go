@@ -4,7 +4,10 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+
+	"github.com/fgjcarlos/nrcc/internal/model"
 
 	"github.com/fgjcarlos/nrcc/internal/service"
 )
@@ -102,13 +105,16 @@ func TestAuthHandler_Refresh_NoRateLimit_OnRotationFailure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateRefreshSession: %v", err)
 	}
-	h.createRefreshSession = func(string) (string, error) {
-		return "", errors.New("forced refresh-session creation failure")
+	h.rotateRefreshSession = func(token string) (*model.CCUser, string, error) {
+		if token != refreshToken {
+			return authSvc.RotateRefreshSession(token)
+		}
+		return nil, "", errors.New("forced refresh-session rotation failure")
 	}
 
 	failedRotation := httptest.NewRecorder()
 	h.Refresh(failedRotation, refreshRequest(refreshToken))
-	if failedRotation.Code != http.StatusInternalServerError {
+	if failedRotation.Code != http.StatusInternalServerError || !strings.Contains(failedRotation.Body.String(), `"code":"REFRESH_REVOKE_ERROR","message":"Failed to revoke refresh session"`) {
 		t.Fatalf("failed rotation status = %d; want 500: %s", failedRotation.Code, failedRotation.Body.String())
 	}
 

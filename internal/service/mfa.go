@@ -14,6 +14,7 @@ import (
 
 	"github.com/fgjcarlos/nrcc/internal/model"
 	"github.com/fgjcarlos/nrcc/internal/store"
+	"github.com/google/uuid"
 	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
 	"golang.org/x/crypto/bcrypt"
@@ -86,6 +87,7 @@ type MfaService struct {
 type pendingMfa struct {
 	userID    string
 	username  string
+	version   string
 	expiresAt time.Time
 	used      bool
 }
@@ -93,9 +95,11 @@ type pendingMfa struct {
 // NewMfaService wires the JSON store at dataDir/mfa.json.
 func NewMfaService(dataDir string, authSvc *AuthService) *MfaService {
 	path := dataDir + string('/') + "mfa.json"
+	mfaStore := store.NewJSONStore[model.MfaStore](path)
+	authSvc.mfaStore = mfaStore
 	return &MfaService{
 		authSvc:       authSvc,
-		store:         store.NewJSONStore[model.MfaStore](path),
+		store:         mfaStore,
 		pendingTokens: make(map[string]pendingMfa),
 	}
 }
@@ -203,40 +207,68 @@ func (s *MfaService) ConfirmEnrollment(userID, code string) ([]string, error) {
 // bcrypt hash on the caller (NOT the target) so an admin cannot
 // silently nuke another admin's MFA without re-authenticating.
 func (s *MfaService) Disable(actingID, targetUserID, password string, actingIsAdmin bool) error {
+	_, err := s.disable(actingID, targetUserID, password, actingIsAdmin, false)
+	return err
+}
+
+func (s *MfaService) DisableWithSession(actingID, targetUserID, password string, actingIsAdmin bool) (CredentialChangeSession, error) {
+	return s.disable(actingID, targetUserID, password, actingIsAdmin, actingID == targetUserID)
+}
+
+func (s *MfaService) disable(actingID, targetUserID, password string, actingIsAdmin, self bool) (CredentialChangeSession, error) {
 	actor := s.authSvc.GetUserByID(actingID)
 	if actor == nil {
-		return ErrMfaUserNotFound
+		return CredentialChangeSession{}, ErrMfaUserNotFound
 	}
 	if !s.authSvc.VerifyPassword(actor.PasswordHash, password) {
-		return ErrMfaInvalidPassword
+		return CredentialChangeSession{}, ErrMfaInvalidPassword
 	}
-
 	if actingID != targetUserID && !actingIsAdmin {
-		return fmt.Errorf("forbidden: only admin can disable another user's MFA")
+		return CredentialChangeSession{}, fmt.Errorf("forbidden: only admin can disable another user's MFA")
 	}
-
-	err := s.store.Update(func(data *model.MfaStore) error {
-		index := -1
-		for i := range data.Enrollments {
-			if data.Enrollments[i].UserID == targetUserID {
-				index = i
-				break
-			}
-		}
-		if index == -1 {
-			return ErrMfaNotEnrolled
-		}
-
-		data.Enrollments = append(data.Enrollments[:index], data.Enrollments[index+1:]...)
-		return nil
-	})
-	if errors.Is(err, ErrMfaNotEnrolled) {
-		return ErrMfaNotEnrolled
+	s.authSvc.credentialMu.Lock()
+	defer s.authSvc.credentialMu.Unlock()
+	current := s.authSvc.GetUserByID(actingID)
+	if current == nil {
+		return CredentialChangeSession{}, ErrMfaUserNotFound
+	}
+	if current.PasswordVersion != actor.PasswordVersion {
+		return CredentialChangeSession{}, ErrMfaInvalidPassword
+	}
+	target := actor
+	if actingID != targetUserID {
+		target = s.authSvc.GetUserByID(targetUserID)
+	}
+	if target == nil {
+		return CredentialChangeSession{}, ErrMfaUserNotFound
+	}
+	state, err := s.store.Read()
+	if errors.Is(err, fs.ErrNotExist) || (err == nil && findEnrollment(state, targetUserID) == nil) {
+		return CredentialChangeSession{}, ErrMfaNotEnrolled
 	}
 	if err != nil {
-		return fmt.Errorf("persist disabled enrollment: %w", err)
+		return CredentialChangeSession{}, err
 	}
-	return nil
+	target.MfaVersion = uuid.NewString()
+	replacement, err := s.authSvc.stageCredentialSession(target, self)
+	if err != nil {
+		return CredentialChangeSession{}, err
+	}
+	err = s.store.Update(func(data *model.MfaStore) error {
+		for i := range data.Enrollments {
+			if data.Enrollments[i].UserID != targetUserID {
+				continue
+			}
+			data.Enrollments = append(data.Enrollments[:i], data.Enrollments[i+1:]...)
+			if data.CredentialVersions == nil {
+				data.CredentialVersions = make(map[string]string)
+			}
+			data.CredentialVersions[targetUserID] = target.MfaVersion
+			return nil
+		}
+		return ErrMfaNotEnrolled
+	})
+	return replacement, err
 }
 
 // Status reports enrollment state for a user. enabled is true only
@@ -282,6 +314,11 @@ func (s *MfaService) IssueMfaToken(userID string) (string, error) {
 		return "", ErrMfaUserNotFound
 	}
 
+	return s.IssueMfaTokenForUser(user)
+}
+
+// IssueMfaTokenForUser binds the challenge to the password-verified snapshot.
+func (s *MfaService) IssueMfaTokenForUser(user *model.CCUser) (string, error) {
 	raw := make([]byte, 32)
 	if _, err := rand.Read(raw); err != nil {
 		return "", fmt.Errorf("generate mfa token: %w", err)
@@ -291,8 +328,9 @@ func (s *MfaService) IssueMfaToken(userID string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.pendingTokens[token] = pendingMfa{
-		userID:    userID,
+		userID:    user.ID,
 		username:  user.Username,
+		version:   credentialVersion(user),
 		expiresAt: time.Now().Add(MfaTokenTTL),
 	}
 	return token, nil
@@ -334,6 +372,9 @@ func (s *MfaService) VerifyAndIssueSession(token, code string) (*model.CCUser, s
 		return nil, "", ErrMfaUserNotFound
 	}
 
+	if credentialVersion(user) != p.version {
+		return nil, "", ErrMfaTokenInvalid
+	}
 	method, err := s.verifyCodeForUser(p.userID, code)
 	if err != nil {
 		return nil, "", err
