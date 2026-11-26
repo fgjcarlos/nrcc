@@ -7,15 +7,13 @@
     docs/assets/nrcc-mark.svg and NrccMark.tsx.
   -->
   <style>
-    .tile { fill: #15171c; }
-    .cut { stroke: #f6f5f0; }
     @media (prefers-color-scheme: dark) {
       .tile { fill: #e9e7df; }
       .cut { stroke: #15171c; }
     }
   </style>
-  <rect class="tile" width="32" height="32"/>
-  <g class="cut" fill="none">
+  <rect class="tile" width="32" height="32" fill="#15171c"/>
+  <g class="cut" fill="none" stroke="#f6f5f0">
     <line x1="2" y1="16" x2="30" y2="16" stroke-width="1.5"/>
     <line x1="16" y1="2" x2="16" y2="30" stroke-width="1.5"/>
     <g stroke-width="2.25" stroke-linejoin="miter">

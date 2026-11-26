@@ -5,8 +5,8 @@
     are stroke paths (no font). Colours are the app tokens: ink #15171c,
     drawing white #f6f5f0 (frontend/src/index.css).
   -->
-  <rect width="32" height="32" fill="#15171c"/>
-  <g fill="none" stroke="#f6f5f0">
+  <rect class="tile" width="32" height="32" fill="#15171c"/>
+  <g class="cut" fill="none" stroke="#f6f5f0">
     <line x1="2" y1="16" x2="30" y2="16" stroke-width="1.5"/>
     <line x1="16" y1="2" x2="16" y2="30" stroke-width="1.5"/>
     <g stroke-width="2.25" stroke-linejoin="miter">

@@ -9,9 +9,10 @@
 //      frontend/src/index.css, so the public site and the application
 //      share one visual identity. No legacy Signal Prime colours remain.
 //   4. The mark, the docs favicon and the app favicon share one glyph:
-//      the closed IEC contact (two open terminal rings, conductor into
-//      each, a flat blade between them heavier than the conductor) on a
-//      16-unit grid, with strokes >= 1.5 so it reads at 16px.
+//      the drawing title block (a solid ink tile split into a 2x2 grid
+//      that spells N R / C C in drawing white) on a 32-unit grid, with
+//      letters drawn as stroke paths (no font) and strokes >= 1.5.
+//   5. Both favicons invert under prefers-color-scheme: dark.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -71,42 +72,43 @@ for (const legacy of ['#07090d', '#0089b4']) {
 assert(!/signal prime/i.test(mark) && !/signal prime/i.test(favicon), 'no Signal Prime reference remains in the SVG assets');
 
 // The glyphs must share the same geometry so the mark and both
-// favicons look identical. We compare the <g> body after stripping
-// comments so a future prose tweak doesn't drift the visuals.
+// favicons look identical. We compare the tile plus the knockout group
+// after stripping comments so a future prose tweak doesn't drift the
+// visuals.
 function extractGlyphBody(svg) {
-  const noComments = svg.replace(/<!--[\s\S]*?-->/g, '');
-  return noComments.match(/<g [^>]*>[\s\S]*?<\/g>/)?.[0] ?? '';
+  const body = stripComments(svg);
+  const from = body.indexOf('<rect class="tile"');
+  const to = body.lastIndexOf('</g>');
+  return from >= 0 && to > from ? body.slice(from, to + 4) : '';
 }
 const markGlyph = extractGlyphBody(mark);
 const faviconGlyph = extractGlyphBody(favicon);
+const appFavicon = fs.readFileSync(appFaviconPath, 'utf8');
 assert(markGlyph.length > 0 && markGlyph === faviconGlyph, 'nrcc-mark.svg and favicon.svg share the same glyph body');
-const appFaviconGlyph = extractGlyphBody(fs.readFileSync(appFaviconPath, 'utf8'));
-assert(markGlyph === appFaviconGlyph, 'frontend/public/favicon.svg shares the same glyph body');
+assert(markGlyph === extractGlyphBody(appFavicon), 'frontend/public/favicon.svg shares the same glyph body');
 
-// Closed contact geometry on a 16-unit square grid.
+// Title-block geometry on a 32-unit square grid.
 for (const [name, body] of [['nrcc-mark.svg', markBody], ['favicon.svg', faviconBody]]) {
-  assert(/viewBox="0 0 16 16"/.test(body), `${name} draws on a 16-unit square grid`);
+  assert(/viewBox="0 0 32 32"/.test(body), `${name} draws on a 32-unit square grid`);
 }
-const attrs = (tag) => Object.fromEntries([...tag.matchAll(/([\w-]+)="([^"]*)"/g)].map(([, k, v]) => [k, v]));
-const groupAttrs = attrs(markGlyph.match(/<g [^>]*>/)?.[0] ?? '');
-const shapes = (name) => [...markGlyph.matchAll(new RegExp(`<${name} [^>]*>`, 'g'))].map(([tag]) => {
-  const a = attrs(tag);
-  return Object.fromEntries(Object.entries({ ...groupAttrs, ...a }).map(([k, v]) => [k, Number.isNaN(Number(v)) ? v : Number(v)]));
-});
-const rings = shapes('circle').sort((a, b) => a.cx - b.cx);
-const lines = shapes('line');
-assert(groupAttrs.fill === 'none', 'the glyph is unfilled, so the terminal rings stay open on any ground');
-assert(!/<rect /.test(markGlyph), 'the glyph carries no square indicator');
-assert(rings.length === 2 && rings.every((r) => r.cy === 8 && r.r === rings[0].r), 'two equal terminal rings sit on the centre line (y=8)');
-assert(lines.length === 3 && lines.every((l) => l.y1 === 8 && l.y2 === 8), 'three horizontal pieces on the centre line: two conductor runs and the blade');
-assert([...rings, ...lines].every((s) => s['stroke-width'] >= 1.5), 'every stroke is >= 1.5 units, legible at 16px');
-const [left, right] = rings;
-const leftWire = lines.find((l) => l.x1 === 0);
-const rightWire = lines.find((l) => l.x2 === 16);
-const blade = lines.find((l) => left && l.x1 === left.cx + left.r);
-assert(leftWire?.x2 === left?.cx - left?.r && rightWire?.x1 === right?.cx + right?.r, 'the conductor runs in from each edge and ends under a terminal ring');
-assert(blade?.x2 === right?.cx - right?.r, 'the blade lies flat on the line, bridging the two terminals');
-assert(blade !== undefined && leftWire !== undefined && blade['stroke-width'] > leftWire['stroke-width'], 'the blade is drawn heavier than the conductor');
+const attrs = (tag) => Object.fromEntries([...tag.matchAll(/([\w-]+)="([^"]*)"/g)].map(([, k, v]) => [k, Number.isNaN(Number(v)) ? v : Number(v)]));
+const tile = attrs(markGlyph.match(/<rect [^>]*>/)?.[0] ?? '');
+const cut = attrs(markGlyph.match(/<g [^>]*>/)?.[0] ?? '');
+const rules = [...markGlyph.matchAll(/<line [^>]*>/g)].map(([tag]) => attrs(tag));
+const letters = [...markGlyph.matchAll(/<path [^>]*>/g)].map(([tag]) => attrs(tag));
+const letterStroke = attrs(markGlyph.match(/<g [^>]*>[\s\S]*?(<g [^>]*>)/)?.[1] ?? '');
+assert(tile.width === 32 && tile.height === 32 && tile.fill === '#15171c', 'a solid ink tile fills the whole grid');
+assert(cut.fill === 'none' && cut.stroke === '#f6f5f0', 'letters and rules are drawn-white strokes cut into the tile');
+const horizontal = rules.find((l) => l.y1 === l.y2);
+const vertical = rules.find((l) => l.x1 === l.x2);
+assert(rules.length === 2 && horizontal?.y1 === 16 && vertical?.x1 === 16, 'two rules cross at the centre, splitting the tile into a 2x2 grid');
+assert(letters.length === 4, 'four letter paths, one per cell: N R / C C');
+assert(!/<text[\s>]/.test(markGlyph), 'letters are stroke paths, never text, so the mark needs no font');
+assert(rules.every((l) => l['stroke-width'] >= 1.5) && letterStroke['stroke-width'] >= 1.5, 'every stroke is >= 1.5 units');
+assert(!/<circle /.test(markGlyph), 'no terminal rings from the retired contact mark remain');
+for (const [name, svg] of [['favicon.svg', favicon], ['frontend/public/favicon.svg', appFavicon]]) {
+  assert(/@media \(prefers-color-scheme: dark\)/.test(stripComments(svg)), `${name} inverts on dark browser tabs`);
+}
 
 // docs/index.html references both assets at the expected paths.
 const index = fs.readFileSync(indexPath, 'utf8');
