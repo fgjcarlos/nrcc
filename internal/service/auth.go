@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/fgjcarlos/nrcc/internal/model"
@@ -44,6 +45,8 @@ type AuthService struct {
 	jwtSecret    string
 	store        *store.JSONStore[model.CCUsers]
 	sessionStore *store.JSONStore[model.RefreshSessions]
+	mfaStore     *store.JSONStore[model.MfaStore]
+	credentialMu sync.Mutex
 }
 
 // NewAuthService creates a new auth service
@@ -69,11 +72,12 @@ func (s *AuthService) GenerateToken(user *model.CCUser) (string, error) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"userId":   claims.UserID,
-		"username": claims.Username,
-		"role":     claims.Role,
-		"exp":      claims.ExpiresAt,
-		"iat":      claims.IssuedAt,
+		"userId":            claims.UserID,
+		"username":          claims.Username,
+		"role":              claims.Role,
+		"exp":               claims.ExpiresAt,
+		"iat":               claims.IssuedAt,
+		"credentialVersion": credentialVersion(user),
 	})
 
 	return token.SignedString([]byte(s.jwtSecret))
@@ -124,6 +128,15 @@ func (s *AuthService) VerifyToken(tokenStr string) (*model.Claims, error) {
 		return nil, fmt.Errorf("invalid token claims: iat")
 	}
 
+	version, ok := claims["credentialVersion"].(string)
+	if _, present := claims["credentialVersion"]; present && !ok {
+		return nil, ErrCredentialsChanged
+	}
+	user := s.GetUserByID(userID)
+	if user == nil || credentialVersion(user) != version {
+		return nil, ErrCredentialsChanged
+	}
+
 	return &model.Claims{
 		UserID:    userID,
 		Username:  username,
@@ -142,7 +155,8 @@ func (s *AuthService) GetUserByUsername(username string) *model.CCUser {
 
 	for _, u := range users.Users {
 		if u.Username == username {
-			return &u
+			user, _ := s.withMfaVersion(u)
+			return user
 		}
 	}
 
@@ -162,18 +176,21 @@ func (s *AuthService) HashPassword(password string) (string, error) {
 
 // GetUserByID retrieves a user by ID
 func (s *AuthService) GetUserByID(id string) *model.CCUser {
+	user, _ := s.getUserByID(id)
+	return user
+}
+
+func (s *AuthService) getUserByID(id string) (*model.CCUser, error) {
 	users, err := s.store.Read()
 	if err != nil {
-		return nil
+		return nil, err
 	}
-
 	for _, u := range users.Users {
 		if u.ID == id {
-			return &u
+			return s.withMfaVersion(u)
 		}
 	}
-
-	return nil
+	return nil, ErrUserNotFound
 }
 
 // GetAllUsers retrieves all users
@@ -206,7 +223,7 @@ func (s *AuthService) CountAdmins() int {
 }
 
 // CountActiveRefreshSessions returns the number of refresh sessions
-// that are neither revoked nor past their expiry timestamp. Used by
+// that are unrevoked, unexpired and match current credentials. Used by
 // the security posture endpoint (issue #676 item 2). Same swallow-
 // on-error pattern as CountAdmins.
 func (s *AuthService) CountActiveRefreshSessions() int {
@@ -215,6 +232,19 @@ func (s *AuthService) CountActiveRefreshSessions() int {
 		return 0
 	}
 	now := time.Now().Unix()
+	users, err := s.store.Read()
+	if err != nil {
+		return 0
+	}
+	mfaVersions, err := s.mfaVersions()
+	if err != nil {
+		return 0
+	}
+	versions := make(map[string]string, len(users.Users))
+	for _, user := range users.Users {
+		user.MfaVersion = mfaVersions[user.ID]
+		versions[user.ID] = credentialVersion(&user)
+	}
 	n := 0
 	for _, sess := range sessions.Sessions {
 		if sess.Revoked {
@@ -223,7 +253,9 @@ func (s *AuthService) CountActiveRefreshSessions() int {
 		if sess.ExpiresAt <= now {
 			continue
 		}
-		n++
+		if version, ok := versions[sess.UserID]; ok && version == sess.CredentialVersion {
+			n++
+		}
 	}
 	return n
 }
@@ -372,28 +404,71 @@ func (s *AuthService) UpdateUserRole(id string, role model.UserRole, updatedAt s
 // itself (#669), so a leaked sessions.json does not yield usable bearer
 // credentials.
 func (s *AuthService) CreateRefreshSession(userID string) (string, error) {
+	user := s.GetUserByID(userID)
+	if user == nil {
+		return "", ErrUserNotFound
+	}
+	return s.CreateRefreshSessionForUser(user)
+}
+
+// CreateRefreshSessionForUser binds the session to the credential snapshot
+// that was authenticated, not to whatever credentials exist at issuance time.
+func (s *AuthService) CreateRefreshSessionForUser(user *model.CCUser) (string, error) {
+	return s.replaceRefreshSession(user, nil)
+}
+
+func newRefreshSession(user *model.CCUser) (string, model.RefreshSession, error) {
 	tokenBytes := make([]byte, 32)
 	if _, err := rand.Read(tokenBytes); err != nil {
-		return "", fmt.Errorf("generate refresh token: %w", err)
+		return "", model.RefreshSession{}, fmt.Errorf("generate refresh token: %w", err)
 	}
 	token := hex.EncodeToString(tokenBytes)
-
 	now := time.Now()
-	session := model.RefreshSession{
-		ID:        hashRefreshToken(token),
-		UserID:    userID,
-		ExpiresAt: now.Add(RefreshTokenLifetime).Unix(),
-		CreatedAt: now.Unix(),
-	}
+	return token, model.RefreshSession{
+		ID: hashRefreshToken(token), UserID: user.ID,
+		ExpiresAt: now.Add(RefreshTokenLifetime).Unix(), CreatedAt: now.Unix(),
+		CredentialVersion: credentialVersion(user),
+	}, nil
+}
 
-	if err := s.sessionStore.Update(func(sessions *model.RefreshSessions) error {
+func (s *AuthService) replaceRefreshSession(user *model.CCUser, old *model.RefreshSession) (string, error) {
+	token, session, err := newRefreshSession(user)
+	if err != nil {
+		return "", err
+	}
+	err = s.sessionStore.Update(func(sessions *model.RefreshSessions) error {
+		if old != nil {
+			current, err := findValidRefreshSession(sessions.Sessions, old.ID)
+			if err != nil {
+				return fmt.Errorf("%w: %w", ErrInvalidRefresh, err)
+			}
+			current.Revoked, current.RevokedAt = true, time.Now().Unix()
+		}
 		sessions.Sessions = append(sessions.Sessions, session)
 		return nil
-	}); err != nil {
-		return "", fmt.Errorf("persist refresh session: %w", err)
-	}
+	})
+	return token, err
+}
 
-	return token, nil
+// RotateRefreshSession keeps the credential snapshot fixed until the ledger
+// update commits. Validation is repeated inside Update for logout and replay.
+func (s *AuthService) RotateRefreshSession(token string) (*model.CCUser, string, error) {
+	s.credentialMu.Lock()
+	defer s.credentialMu.Unlock()
+	session, user, err := s.validateRefreshSession(token)
+	if errors.Is(err, ErrUserNotFound) {
+		// Keep the first deleted-user response, but retire the cookie so
+		// subsequent attempts take the normal invalid-token rate-limit path.
+		if revokeErr := s.RevokeRefreshSession(token); revokeErr != nil {
+			return nil, "", revokeErr
+		}
+		return nil, "", err
+	}
+	if err != nil {
+		return nil, "", fmt.Errorf("%w: %w", ErrInvalidRefresh, err)
+	}
+	replacement, err := s.replaceRefreshSession(user, session)
+	return user, replacement, err
 }
 
 // CreateRefreshSessionForTest writes a caller-supplied RefreshSession
@@ -409,17 +484,32 @@ func (s *AuthService) CreateRefreshSessionForTest(session model.RefreshSession) 
 
 // ValidateRefreshSession checks that a refresh token is valid, not expired, and not revoked.
 func (s *AuthService) ValidateRefreshSession(token string) (*model.RefreshSession, error) {
+	session, _, err := s.validateRefreshSession(token)
+	return session, err
+}
+
+func (s *AuthService) validateRefreshSession(token string) (*model.RefreshSession, *model.CCUser, error) {
 	sessions, err := s.sessionStore.Read()
 	if err != nil {
-		return nil, fmt.Errorf("read sessions: %w", err)
+		return nil, nil, fmt.Errorf("read sessions: %w", err)
 	}
+	session, err := findValidRefreshSession(sessions.Sessions, hashRefreshToken(token))
+	if err != nil {
+		return nil, nil, err
+	}
+	user, err := s.getUserByID(session.UserID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if credentialVersion(user) != session.CredentialVersion {
+		return nil, nil, ErrCredentialsChanged
+	}
+	return session, user, nil
+}
 
-	// Hash once and compare against every stored id in constant time
-	// (subtle.ConstantTimeCompare on equal-length hex strings). The
-	// raw token is never written to disk, so a stolen sessions.json is
-	// useless without the matching plaintext bearer (#669).
-	tokenHash := hashRefreshToken(token)
-	for _, sess := range sessions.Sessions {
+func findValidRefreshSession(sessions []model.RefreshSession, tokenHash string) (*model.RefreshSession, error) {
+	for i := range sessions {
+		sess := &sessions[i]
 		if subtle.ConstantTimeCompare([]byte(sess.ID), []byte(tokenHash)) != 1 {
 			continue
 		}
@@ -429,9 +519,8 @@ func (s *AuthService) ValidateRefreshSession(token string) (*model.RefreshSessio
 		if time.Now().Unix() > sess.ExpiresAt {
 			return nil, fmt.Errorf("refresh token expired")
 		}
-		return &sess, nil
+		return sess, nil
 	}
-
 	return nil, fmt.Errorf("refresh token not found")
 }
 

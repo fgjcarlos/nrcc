@@ -10,12 +10,14 @@ const (
 
 // CCUser represents a control center user
 type CCUser struct {
-	ID           string   `json:"id"`
-	Username     string   `json:"username"`
-	PasswordHash string   `json:"passwordHash"`
-	Role         UserRole `json:"role"`
-	CreatedAt    string   `json:"createdAt"`
-	UpdatedAt    string   `json:"updatedAt"`
+	ID              string   `json:"id"`
+	Username        string   `json:"username"`
+	PasswordHash    string   `json:"passwordHash"`
+	PasswordVersion string   `json:"passwordVersion,omitempty"`
+	MfaVersion      string   `json:"-"`
+	Role            UserRole `json:"role"`
+	CreatedAt       string   `json:"createdAt"`
+	UpdatedAt       string   `json:"updatedAt"`
 }
 
 // CCUserPublic is the public representation of a user (no password hash)
@@ -43,12 +45,13 @@ type Claims struct {
 
 // RefreshSession represents a server-side refresh session.
 type RefreshSession struct {
-	ID        string `json:"id"`
-	UserID    string `json:"userId"`
-	ExpiresAt int64  `json:"expiresAt"`
-	Revoked   bool   `json:"revoked"`
-	RevokedAt int64  `json:"revokedAt,omitempty"`
-	CreatedAt int64  `json:"createdAt"`
+	ID                string `json:"id"`
+	UserID            string `json:"userId"`
+	ExpiresAt         int64  `json:"expiresAt"`
+	Revoked           bool   `json:"revoked"`
+	RevokedAt         int64  `json:"revokedAt,omitempty"`
+	CreatedAt         int64  `json:"createdAt"`
+	CredentialVersion string `json:"credentialVersion,omitempty"`
 }
 
 // RefreshSessions is the root structure for refresh_sessions.json.

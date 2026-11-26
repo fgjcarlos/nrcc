@@ -5,12 +5,15 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/fgjcarlos/nrcc/internal/middleware"
 	"github.com/fgjcarlos/nrcc/internal/model"
 	"github.com/fgjcarlos/nrcc/internal/service"
+	"github.com/fgjcarlos/nrcc/internal/store"
 	"github.com/google/uuid"
 	"github.com/pquerna/otp/totp"
 )
@@ -122,6 +125,7 @@ func TestChangePassword_SelfWithCurrentPassword_RevokesOldSessionsAndKeepsCaller
 	h, authSvc := setupAuthTest(t)
 	user := authSvc.GetUserByUsername("admin")
 	oldSession, _ := authSvc.CreateRefreshSession(user.ID)
+	oldAccess, _ := authSvc.GenerateToken(user)
 
 	rec := changePassword(t, h, adminClaims(user), user.ID, map[string]string{"password": pwChangeNew, "currentPassword": pwChangeOld})
 	if rec.Code != http.StatusOK {
@@ -133,6 +137,7 @@ func TestChangePassword_SelfWithCurrentPassword_RevokesOldSessionsAndKeepsCaller
 	if code := refreshWith(h, oldSession); code != http.StatusUnauthorized {
 		t.Fatalf("refresh token issued before the change must be rejected; got %d", code)
 	}
+	assertCredentialChangeAccess(t, authSvc, oldAccess, rec)
 	fresh := responseRefreshCookie(rec)
 	if fresh == "" {
 		t.Fatal("self-service change must issue a fresh refresh cookie for the calling device")
@@ -189,6 +194,7 @@ func TestMfaHandler_DisableRevokesTargetSessions(t *testing.T) {
 		t.Fatalf("ConfirmEnrollment: %v", err)
 	}
 	session, _ := h.authSvc.CreateRefreshSession(uid)
+	oldAccess, _ := h.authSvc.GenerateToken(h.authSvc.GetUserByID(uid))
 
 	body, _ := json.Marshal(map[string]string{"password": pwChangeOld})
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/mfa/disable", bytes.NewReader(body))
@@ -201,6 +207,7 @@ func TestMfaHandler_DisableRevokesTargetSessions(t *testing.T) {
 	if got := refreshWith(authHandler, session); got != http.StatusUnauthorized {
 		t.Fatalf("refresh token issued before MFA disable must be rejected; got %d", got)
 	}
+	assertCredentialChangeAccess(t, h.authSvc, oldAccess, rec)
 	fresh := responseRefreshCookie(rec)
 	if fresh == "" || refreshWith(authHandler, fresh) != http.StatusOK {
 		t.Fatal("self-disable must issue a working fresh refresh cookie")
@@ -235,4 +242,112 @@ func TestMfaHandler_AdminDisablesOtherUser_RevokesTargetOnly(t *testing.T) {
 	if got := refreshWith(authHandler, adminSession); got != http.StatusOK {
 		t.Fatalf("admin's own session must survive; got %d", got)
 	}
+}
+
+func assertCredentialChangeAccess(t *testing.T, svc *service.AuthService, old string, response *httptest.ResponseRecorder) {
+	t.Helper()
+	var body model.ApiResponse[struct {
+		Token string `json:"token"`
+	}]
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	protected := middleware.Auth(svc)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) }))
+	for _, tt := range []struct {
+		token string
+		want  int
+	}{{old, http.StatusUnauthorized}, {body.Data.Token, http.StatusNoContent}} {
+		req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+		req.Header.Set("Authorization", "Bearer "+tt.token)
+		rec := httptest.NewRecorder()
+		protected.ServeHTTP(rec, req)
+		if rec.Code != tt.want {
+			t.Errorf("protected route status = %d, want %d: %s", rec.Code, tt.want, rec.Body)
+		}
+	}
+}
+
+func TestChangePassword_SessionWriteFailureKeepsOldCredentials(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sessions.json")
+	svc := service.NewAuthService("test-secret", store.NewJSONStore[model.CCUsers](filepath.Join(dir, "users.json")), store.NewJSONStore[model.RefreshSessions](path))
+	user := addViewer(t, svc)
+	h := NewAuthHandler(svc)
+	old, err := svc.CreateRefreshSession(user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	access, _ := svc.GenerateToken(user)
+	// Fail the session write but keep the existing ledger readable.
+	if err := os.Mkdir(path+".tmp", 0700); err != nil {
+		t.Fatal(err)
+	}
+	rec := changePassword(t, h, adminClaims(user), user.ID, map[string]string{"password": pwChangeNew, "currentPassword": pwChangeOld})
+	if rec.Code != http.StatusInternalServerError || responseRefreshCookie(rec) != "" {
+		t.Fatalf("want 500 without a replacement cookie, got %d: %s", rec.Code, rec.Body)
+	}
+	hash := svc.GetUserByID(user.ID).PasswordHash
+	if !svc.VerifyPassword(hash, pwChangeOld) || svc.VerifyPassword(hash, pwChangeNew) {
+		t.Error("password was changed despite failed session write")
+	}
+	if _, err := svc.VerifyToken(access); err != nil {
+		t.Errorf("old access token should still work: %v", err)
+	}
+	if err := os.Remove(path + ".tmp"); err != nil {
+		t.Fatal(err)
+	}
+	if got := refreshWith(h, old); got != http.StatusOK {
+		t.Errorf("old refresh got %d, want 200", got)
+	}
+}
+
+// Hold the response after rotation commits to model a refresh that started
+// before a credential change but reaches its client after the change.
+func TestChangePassword_ConcurrentRefreshCannotCarrySessionAcrossChange(t *testing.T) {
+	h, svc := setupAuthTest(t)
+	user := svc.GetUserByUsername("admin")
+	old, err := svc.CreateRefreshSession(user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rotated, resume := make(chan struct{}), make(chan struct{})
+	h.rotateRefreshSession = func(token string) (*model.CCUser, string, error) {
+		u, next, err := svc.RotateRefreshSession(token)
+		if token == old && err == nil {
+			close(rotated)
+			<-resume
+		}
+		return u, next, err
+	}
+	response := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		rec := httptest.NewRecorder()
+		req := refreshRequest(old)
+		req.RemoteAddr = "192.0.2.2:1234"
+		h.Refresh(rec, req)
+		response <- rec
+	}()
+	select {
+	case <-rotated:
+	case rec := <-response:
+		t.Fatalf("refresh failed before the change: %d %s", rec.Code, rec.Body)
+	}
+	changed := changePassword(t, h, adminClaims(user), user.ID, map[string]string{"password": pwChangeNew, "currentPassword": pwChangeOld})
+	close(resume)
+	rec := <-response
+	if changed.Code != http.StatusOK || rec.Code != http.StatusOK {
+		t.Fatalf("want successful change and rotation: change=%d refresh=%d", changed.Code, rec.Code)
+	}
+	replacement := responseRefreshCookie(rec)
+	if replacement == "" {
+		t.Fatal("rotation returned no cookie")
+	}
+	if got := refreshWith(h, replacement); got != http.StatusUnauthorized {
+		t.Fatalf("concurrent rotation left a valid session: %d", got)
+	}
+	var body model.ApiResponse[AuthResponse]
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil || body.Data.Token == "" {
+		t.Fatalf("expected a rotation access token: %v", err)
+	}
+	assertCredentialChangeAccess(t, svc, body.Data.Token, changed)
 }

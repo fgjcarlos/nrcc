@@ -25,7 +25,8 @@ type RecoveryCode struct {
 
 // MfaStore is the on-disk JSON root for the MFA store.
 type MfaStore struct {
-	Enrollments []MfaEnrollment `json:"enrollments"`
+	Enrollments        []MfaEnrollment   `json:"enrollments"`
+	CredentialVersions map[string]string `json:"credentialVersions,omitempty"`
 }
 
 // MfaStatusResponse is the public MFA status payload returned to

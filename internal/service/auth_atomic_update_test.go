@@ -94,7 +94,7 @@ func TestAuthService_CreateRefreshSession_Concurrent(t *testing.T) {
 	tokens := make([]string, n)
 	errs := runConcurrent(t, n, func(i int) error {
 		var err error
-		tokens[i], err = svc.CreateRefreshSession(fmt.Sprintf("user-%d", i))
+		tokens[i], err = svc.CreateRefreshSessionForUser(&model.CCUser{ID: fmt.Sprintf("user-%d", i)})
 		return err
 	})
 	assertNoError(t, errs)
@@ -134,7 +134,7 @@ func TestAuthService_CreateRefreshSession_Concurrent(t *testing.T) {
 			t.Fatalf("WriteFile: %v", err)
 		}
 		broken := NewAuthService("secret", store.NewJSONStore[model.CCUsers](dir+"/users.json"), store.NewJSONStore[model.RefreshSessions](path))
-		if _, err := broken.CreateRefreshSession("u1"); err == nil {
+		if _, err := broken.CreateRefreshSessionForUser(&model.CCUser{ID: "u1"}); err == nil {
 			t.Fatal("expected malformed session store error")
 		}
 	})
@@ -142,6 +142,9 @@ func TestAuthService_CreateRefreshSession_Concurrent(t *testing.T) {
 
 func TestAuthService_RevokeRefreshSession_Concurrent(t *testing.T) {
 	svc, _, _ := newAtomicAuthService(t)
+	if err := svc.CreateUser(&model.CCUser{ID: "u1", Username: "test"}); err != nil {
+		t.Fatal(err)
+	}
 	token, err := svc.CreateRefreshSession("u1")
 	if err != nil {
 		t.Fatalf("CreateRefreshSession: %v", err)
@@ -156,11 +159,11 @@ func TestAuthService_RevokeRefreshSession_Concurrent(t *testing.T) {
 func TestAuthService_RevokeUserSessions_Concurrent(t *testing.T) {
 	svc, _, sessionStore := newAtomicAuthService(t)
 	for i := 0; i < 20; i++ {
-		if _, err := svc.CreateRefreshSession("u1"); err != nil {
+		if _, err := svc.CreateRefreshSessionForUser(&model.CCUser{ID: "u1"}); err != nil {
 			t.Fatalf("CreateRefreshSession: %v", err)
 		}
 	}
-	other, err := svc.CreateRefreshSession("u2")
+	other, err := svc.CreateRefreshSessionForUser(&model.CCUser{ID: "u2"})
 	if err != nil {
 		t.Fatalf("CreateRefreshSession(other): %v", err)
 	}

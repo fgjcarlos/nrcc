@@ -4,12 +4,17 @@ import (
 	"testing"
 	"testing/synctest"
 	"time"
+
+	"github.com/fgjcarlos/nrcc/internal/model"
 )
 
 func TestPruneSessionsUsesFirstRevocationTime(t *testing.T) {
 	for _, method := range []string{"single session", "all user sessions"} {
 		t.Run(method, func(t *testing.T) {
 			svc, _, _ := newAtomicAuthService(t)
+			if err := svc.CreateUser(&model.CCUser{ID: "user", Username: "test"}); err != nil {
+				t.Fatal(err)
+			}
 			synctest.Test(t, func(t *testing.T) {
 				token, err := svc.CreateRefreshSession("user")
 				if err != nil {

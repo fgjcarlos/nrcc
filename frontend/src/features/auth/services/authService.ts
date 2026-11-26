@@ -102,7 +102,11 @@ export const authService = {
 
   // currentPassword is required by the backend when users change their own password.
   changePassword: async (id: string, password: string, currentPassword?: string): Promise<void> => {
-    await api.patch(`/auth/users/${id}/password`, currentPassword ? { password, currentPassword } : { password });
+    const response = await api.patch<Schemas['SuccessEnvelope_CredentialChange']>(
+      `/auth/users/${id}/password`, currentPassword ? { password, currentPassword } : { password },
+    );
+    const token = response.data.data?.token;
+    if (token) setToken(token);
   },
 
   updateUserRole: async (id: string, role: 'admin' | 'viewer'): Promise<User> => {

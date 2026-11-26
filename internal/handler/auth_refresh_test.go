@@ -248,3 +248,49 @@ func TestLogin_RefreshSessionCreateFailureReturnsServerError(t *testing.T) {
 		}
 	}
 }
+
+func TestRefresh_DeletedUserPreservesUnauthorizedResponse(t *testing.T) {
+	h, svc := setupAuthTest(t)
+	user := svc.GetUserByUsername("admin")
+	token, err := svc.CreateRefreshSession(user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.DeleteUser(user.ID); err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	h.Refresh(rec, refreshRequest(token))
+	var resp model.ApiResponse[any]
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
+	if rec.Code != http.StatusUnauthorized || resp.Error == nil || resp.Error.Code != "USER_NOT_FOUND" || resp.Error.Message != "User no longer exists" {
+		t.Fatalf("unexpected response %d: %s", rec.Code, rec.Body)
+	}
+	found := false
+	for _, cookie := range rec.Result().Cookies() {
+		if cookie.Name == refreshCookieName && cookie.Path == "/" && cookie.MaxAge == -1 && cookie.Value == "" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("refresh cookie was not cleared")
+	}
+	if blocked, _ := h.limiter.Check("refresh-ip:192.0.2.1"); blocked {
+		t.Fatal("deleted user should not trigger a rate limit")
+	}
+	for i := 0; i < 6; i++ {
+		retry := httptest.NewRecorder()
+		h.Refresh(retry, refreshRequest(token))
+		if retry.Code != http.StatusUnauthorized || !strings.Contains(retry.Body.String(), `"code":"INVALID_REFRESH"`) {
+			t.Fatalf("attempt %d: expected 401 INVALID_REFRESH, got %d %s", i, retry.Code, retry.Body)
+		}
+	}
+	retry := httptest.NewRecorder()
+	h.Refresh(retry, refreshRequest(token))
+	if retry.Code != http.StatusTooManyRequests || retry.Header().Get("Retry-After") == "" {
+		t.Fatalf("expected replay rate limiting, got %d %s", retry.Code, retry.Body)
+	}
+
+}
