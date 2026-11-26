@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -100,9 +101,36 @@ func (s *FlowVersionService) captureIfChanged() {
 	if hash == s.lastHash {
 		return
 	}
+	startup := s.lastHash == ""
 	s.lastHash = hash
-
+	if startup && s.matchesLatestVersion(data) {
+		return
+	}
 	_ = s.saveVersion(data, hash)
+}
+
+func (s *FlowVersionService) matchesLatestVersion(data []byte) bool {
+	dir := filepath.Join(s.dataDir, versionDir)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return false
+	}
+	for i := len(entries) - 1; i >= 0; i-- {
+		entry := entries[i]
+		if !entry.Type().IsRegular() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		timestamp, hash, ok := strings.Cut(strings.TrimSuffix(entry.Name(), ".json"), "_")
+		if !ok || len(hash) != 8 {
+			continue
+		}
+		if _, err := time.Parse("20060102-150405", timestamp); err != nil {
+			continue
+		}
+		previous, err := s.GetVersion(entry.Name())
+		return err == nil && bytes.Equal(previous, data)
+	}
+	return false
 }
 
 func (s *FlowVersionService) CaptureNow() error {

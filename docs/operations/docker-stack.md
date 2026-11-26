@@ -244,6 +244,10 @@ directly.
 
 ## Uninstall
 
+The default Compose configuration allows 15 seconds for shutdown. NRCC gives
+active HTTP requests up to 5 seconds to finish before stopping its services
+and managed Node-RED process. Keep the grace period when copying the stack.
+
 Preserve volumes (e.g. to inspect data later):
 
 ```bash

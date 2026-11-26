@@ -106,7 +106,7 @@ func TestRefresh_ValidFlow(t *testing.T) {
 	cookies := rec.Result().Cookies()
 	var newCookie *http.Cookie
 	for _, c := range cookies {
-		if c.Name == "nrcc_refresh" {
+		if c.Name == "nrcc_refresh" && c.MaxAge > 0 {
 			newCookie = c
 		}
 	}
