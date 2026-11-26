@@ -25,8 +25,8 @@ describe('NrccMark', () => {
     const mark = screen.getByTestId('nrcc-mark');
     expect(mark.className).toMatch(/h-9/);
     expect(mark.className).toMatch(/w-9/);
-    // Glyph at a whole multiple of the 16-unit grid.
-    expect(mark.className).toContain('[&_svg]:h-4');
+    // The glyph is the tile: it fills the container.
+    expect(mark.className).toContain('[&_svg]:h-full');
   });
 
   it('applies size="md" utility classes (default)', () => {
@@ -34,7 +34,6 @@ describe('NrccMark', () => {
     const mark = screen.getByTestId('nrcc-mark');
     expect(mark.className).toMatch(/h-11/);
     expect(mark.className).toMatch(/w-11/);
-    expect(mark.className).toContain('[&_svg]:h-6');
   });
 
   it('applies size="lg" utility classes', () => {
@@ -42,7 +41,6 @@ describe('NrccMark', () => {
     const mark = screen.getByTestId('nrcc-mark');
     expect(mark.className).toMatch(/h-14/);
     expect(mark.className).toMatch(/w-14/);
-    expect(mark.className).toContain('[&_svg]:h-8');
   });
 
   it('applies the accent tone (Header default)', () => {
@@ -57,12 +55,12 @@ describe('NrccMark', () => {
     expect(mark.className).toMatch(/text-ds-brand-primary/);
   });
 
-  it('draws an opaque tile on the 4px box radius (T6)', () => {
+  it('is the tile itself: no container border, ground or radius', () => {
     render(<NrccMark />);
     const mark = screen.getByTestId('nrcc-mark');
-    expect(mark).toHaveClass('rounded-box');
-    expect(mark).not.toHaveClass('rounded-xl');
-    expect(mark.className).not.toMatch(/bg-[^\s]+\/\d+/);
+    expect(mark.className).not.toMatch(/(^|\s)border(\s|-)/);
+    expect(mark.className).not.toMatch(/(^|\s)bg-/);
+    expect(mark.className).not.toMatch(/(^|\s)rounded/);
   });
 
   it('applies the rail tone on the ink navigation rail', () => {
@@ -86,70 +84,55 @@ describe('NrccMark', () => {
     expect(handler).toHaveBeenCalledOnce();
   });
 
-  it('draws the closed contact as a decorative square-grid glyph', () => {
-    render(<NrccMark />);
-    const svg = screen.getByTestId('nrcc-mark').querySelector('svg');
-    expect(svg).not.toBeNull();
-    // The container carries the accessible name; the glyph stays silent.
-    expect(svg).toHaveAttribute('aria-hidden', 'true');
-    expect(svg).toHaveAttribute('focusable', 'false');
-    expect(svg).toHaveAttribute('viewBox', '0 0 16 16');
-  });
-
-  // Reads a numeric attribute from the element or its nearest ancestor.
-  const num = (el: Element, attr: string) =>
-    Number((el.closest(`[${attr}]`) ?? el).getAttribute(attr));
   const glyph = () => {
     render(<NrccMark />);
     const svg = screen.getByTestId('nrcc-mark').querySelector('svg')!;
-    const [left, right] = [...svg.querySelectorAll('circle')].sort(
-      (a, b) => num(a, 'cx') - num(b, 'cx'),
-    );
-    return { svg, left, right, lines: [...svg.querySelectorAll('line')] };
+    return { svg, mask: svg.querySelector('mask')! };
   };
 
-  it('draws two open terminal rings on the centre line, legible at 16px', () => {
-    const { svg, left, right } = glyph();
-    expect(svg.querySelectorAll('circle')).toHaveLength(2);
-    for (const ring of [left, right]) {
-      expect(num(ring, 'cy')).toBe(8);
-      expect(ring.closest('[stroke]')).toHaveAttribute('stroke', 'currentColor');
-      // Open ring: the ground shows through the contact point.
-      expect(ring.closest('[fill]')).toHaveAttribute('fill', 'none');
-      expect(num(ring, 'stroke-width')).toBeGreaterThanOrEqual(1.5);
-    }
-    // No verified square any more: the accent was dropped from the mark.
-    expect(svg.querySelector('rect')).toBeNull();
+  it('draws a decorative glyph on a 32-unit grid', () => {
+    const { svg } = glyph();
+    // The container carries the accessible name; the glyph stays silent.
+    expect(svg).toHaveAttribute('aria-hidden', 'true');
+    expect(svg).toHaveAttribute('focusable', 'false');
+    expect(svg).toHaveAttribute('viewBox', '0 0 32 32');
   });
 
-  it('runs the conductor from each edge into a terminal ring', () => {
-    const { left, right, lines } = glyph();
-    const r = num(left, 'r');
-    const leftWire = lines.find((l) => num(l, 'x1') === 0)!;
-    const rightWire = lines.find((l) => num(l, 'x2') === 16)!;
-    expect(leftWire).toBeDefined();
-    expect(rightWire).toBeDefined();
-    for (const wire of [leftWire, rightWire]) {
-      expect(num(wire, 'y1')).toBe(8);
-      expect(num(wire, 'y2')).toBe(8);
-      expect(num(wire, 'stroke-width')).toBeGreaterThanOrEqual(1.5);
-    }
-    // Each piece ends under its ring's stroke, never inside the ring.
-    expect(num(leftWire, 'x2')).toBe(num(left, 'cx') - r);
-    expect(num(rightWire, 'x1')).toBe(num(right, 'cx') + r);
+  it('fills the whole tile with the tone colour through the knockout mask', () => {
+    const { svg, mask } = glyph();
+    const tile = svg.querySelector(':scope > rect')!;
+    expect(tile).toHaveAttribute('width', '32');
+    expect(tile).toHaveAttribute('height', '32');
+    expect(tile).toHaveAttribute('fill', 'currentColor');
+    expect(tile).toHaveAttribute('mask', `url(#${mask.id})`);
   });
 
-  it('lays the closed blade flat between the terminals, heavier than the conductor', () => {
-    const { left, right, lines } = glyph();
-    expect(lines).toHaveLength(3);
-    const r = num(left, 'r');
-    const blade = lines.find((l) => num(l, 'x1') === num(left, 'cx') + r)!;
-    expect(blade).toBeDefined();
-    expect(num(blade, 'x2')).toBe(num(right, 'cx') - r);
-    expect(num(blade, 'y1')).toBe(8);
-    expect(num(blade, 'y2')).toBe(8);
-    const conductor = lines.find((l) => num(l, 'x1') === 0)!;
-    expect(num(blade, 'stroke-width')).toBeGreaterThan(num(conductor, 'stroke-width'));
+  it('knocks out a 2x2 grid that crosses at the centre', () => {
+    const { mask } = glyph();
+    const rules = [...mask.querySelectorAll('line')];
+    expect(rules).toHaveLength(2);
+    const horizontal = rules.find((l) => l.getAttribute('y1') === l.getAttribute('y2'))!;
+    const vertical = rules.find((l) => l.getAttribute('x1') === l.getAttribute('x2'))!;
+    expect(horizontal).toHaveAttribute('y1', '16');
+    expect(vertical).toHaveAttribute('x1', '16');
+  });
+
+  it('spells N R / C C as stroke paths, one per cell, with no font dependency', () => {
+    const { svg, mask } = glyph();
+    expect(svg.querySelector('text')).toBeNull();
+    const letters = [...mask.querySelectorAll('path')].map((p) => p.getAttribute('data-letter'));
+    expect(letters).toEqual(['N', 'R', 'C1', 'C2']);
+  });
+
+  it('gives every instance its own mask id', () => {
+    render(
+      <>
+        <NrccMark />
+        <NrccMark />
+      </>,
+    );
+    const ids = screen.getAllByTestId('nrcc-mark').map((m) => m.querySelector('mask')!.id);
+    expect(new Set(ids).size).toBe(2);
   });
 
   it('accepts a custom icon override', () => {

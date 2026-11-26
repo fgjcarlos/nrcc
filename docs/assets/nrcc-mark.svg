@@ -1,17 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" role="img" aria-label="NRCC mark">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="NRCC mark">
   <!--
-    NRCC mark: the IEC normally-open contact in its closed state. The
-    conductor runs in from each edge and ends in an open terminal ring
-    (the contact points); the blade lies flat on the line between them,
-    drawn heavier than the conductor. Colours are the app tokens: ink
-    #15171c on drawing white #f6f5f0 (frontend/src/index.css).
+    NRCC mark: the drawing title block. A solid ink tile split into a
+    2x2 grid that spells N R / C C, knocked out in drawing white. Letters
+    are stroke paths (no font). Colours are the app tokens: ink #15171c,
+    drawing white #f6f5f0 (frontend/src/index.css).
   -->
-  <rect width="16" height="16" rx="2" fill="#f6f5f0"/>
-  <g fill="none" stroke="#15171c">
-    <line x1="0" y1="8" x2="2.25" y2="8" stroke-width="1.5"/>
-    <line x1="13.75" y1="8" x2="16" y2="8" stroke-width="1.5"/>
-    <line x1="5.75" y1="8" x2="10.25" y2="8" stroke-width="2.5"/>
-    <circle cx="4" cy="8" r="1.75" stroke-width="1.5"/>
-    <circle cx="12" cy="8" r="1.75" stroke-width="1.5"/>
+  <rect class="tile" width="32" height="32" fill="#15171c"/>
+  <g class="cut" fill="none" stroke="#f6f5f0">
+    <line x1="2" y1="16" x2="30" y2="16" stroke-width="1.5"/>
+    <line x1="16" y1="2" x2="16" y2="30" stroke-width="1.5"/>
+    <g stroke-width="2.25" stroke-linejoin="miter">
+      <path d="M4.5 12.5V3.5L11.5 12.5V3.5"/>
+      <path d="M20.5 12.5V3.5H24.75A2.25 2.25 0 0 1 24.75 8H20.5M24 8L27.5 12.5"/>
+      <path d="M11.2 20.8A4.5 4.5 0 1 0 11.2 27.2"/>
+      <path d="M27.2 20.8A4.5 4.5 0 1 0 27.2 27.2"/>
+    </g>
   </g>
 </svg>
