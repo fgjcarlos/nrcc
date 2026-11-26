@@ -26,7 +26,7 @@ func serverApplyResolver(detect func() model.HostStatus, processManager func() *
 			// A managed runtime with a known launch port needs no uiPort in settings.
 			// Keep rejecting ambiguous declarations or invalid JavaScript.
 			port := pm.EffectiveRuntimePort()
-			if err != nil && !(errors.Is(err, errSettingsPortMissing) && port >= 1 && port <= 65535) {
+			if err != nil && (!errors.Is(err, errSettingsPortMissing) || port < 1 || port > 65535) {
 				return nil, err
 			}
 			// Authority remains pinned to this ProcessManager; each Ready call
