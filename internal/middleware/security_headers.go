@@ -12,7 +12,7 @@ func SecurityHeaders(next http.Handler) http.Handler {
 		h.Set("X-Permitted-Cross-Domain-Policies", "none")
 		h.Set("Content-Security-Policy",
 			"default-src 'self'; "+
-				"script-src 'self' 'unsafe-inline'; "+
+				"script-src 'self'; "+
 				"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "+
 				"style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; "+
 				"font-src 'self' data: https://fonts.gstatic.com; "+

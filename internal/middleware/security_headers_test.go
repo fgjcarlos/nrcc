@@ -18,10 +18,10 @@ func TestSecurityHeaders_SetsAllExpectedHeaders(t *testing.T) {
 	handler.ServeHTTP(w, req)
 
 	expected := map[string]string{
-		"X-Frame-Options":                "DENY",
-		"X-Content-Type-Options":         "nosniff",
-		"Referrer-Policy":                "strict-origin-when-cross-origin",
-		"X-Dns-Prefetch-Control":         "off",
+		"X-Frame-Options":                   "DENY",
+		"X-Content-Type-Options":            "nosniff",
+		"Referrer-Policy":                   "strict-origin-when-cross-origin",
+		"X-Dns-Prefetch-Control":            "off",
 		"X-Permitted-Cross-Domain-Policies": "none",
 	}
 	for header, want := range expected {
@@ -108,7 +108,7 @@ func TestSecurityHeaders_CSP_AllowsGoogleFonts(t *testing.T) {
 	csp := w.Header().Get("Content-Security-Policy")
 	for _, want := range []string{
 		"default-src 'self'",
-		"script-src 'self' 'unsafe-inline'",
+		"script-src 'self';",
 		"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
 		"style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com",
 		"font-src 'self' data: https://fonts.gstatic.com",
