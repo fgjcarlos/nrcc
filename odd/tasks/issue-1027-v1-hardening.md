@@ -31,9 +31,9 @@ S20. Each boot stores a duplicate flow version (`internal/service/flow_version.g
 - T2 (S20): Deduplicate unchanged flow versions across boots. Route: inline. Commit: `6f1f398` (verified).
 - T3 (S9, S13–S16): Verify restic guard and address bounded runtime/lifecycle findings. Route: inline + independent verification. Commits: `8b6a7ff` (managed port); `51eb212` (shutdown). Both verified.
 - T4 (S3–S8, S10–S11): Harden login, script CSP, and npm selectors; document policy/state follow-ups. Route: inline + independent verification. Commits: `8035d01` (bcrypt), `6974b1c` (CSP); `b20baed` (npm). Remaining findings: [separate follow-ups](issue-1027-follow-ups.md).
-- T5 (S12, S17–S19): Skip hashing for backup summaries and document apply, upload, and retention follow-ups. Route: inline + independent verification. Status: verified; commit recorded in verification close.
+- T5 (S12, S17–S19): Skip hashing for backup summaries and document apply, upload, and retention follow-ups. Route: inline + independent verification. Commit: `8d51e61` (verified).
 
-- T6 (S1–S20): Run the full Go suite in an isolated runtime environment and the frontend unit suite. Route: inline. Commit: n/a.
+- T6 (S1–S20): Run the full Go suite in an isolated runtime environment and the frontend unit suite. Route: inline. Status: verified against code at `8d51e61`.
 
 ## Log
 
@@ -50,3 +50,5 @@ S20. Each boot stores a duplicate flow version (`internal/service/flow_version.g
 - L11: S6 passed a deterministic regression for cost-12 dummy bcrypt and unchanged failure responses (not a promise of identical timing for legacy hashes). S7 passed the backend CSP test, Vite build, and a Chromium smoke with the built SPA and the new policy. S8 rejects non-registry selectors and local archives, including npm’s case-insensitive archive syntax. Existing valid library cases matched the baseline after normalizing Go test elapsed time. Independent verification passed S6, S7, and the validation half of S8. Risk: items 2 and 3 (authentication, script policy, shared npm validation).
 - L12: T5 RED: List opened a ZIP payload only to compute a checksum absent from its response. GREEN: List returns the same metadata without opening the payload; Detail still hashes it. Existing create, manifest, and restore cases matched the baseline. The independent check passed S19. Risk: item 3 (inspection is shared with backup Detail).
 - L13: Larger or policy-dependent remainder: S3–S5, S8 (lifecycle scripts only), S10–S12, S17–S18. See [the separate follow-up register](issue-1027-follow-ups.md). Do not close the source issue on the strength of these patches alone.
+- L14: The full Go suite passed with the host Docker daemon isolated on the candidate before the backup summary change. The final candidate including `8d51e61` also passed the full Go suite with host Docker isolated (exit 0). Frontend: 92 suites passed, 743 tests passed, one skipped.
+- L15: Verification close: production frontend build, Chromium smoke, Compose config check and `git diff --check` passed. Full Playwright e2e and golangci-lint were not run. Work remains local; the source issue stays open for the follow-ups.
