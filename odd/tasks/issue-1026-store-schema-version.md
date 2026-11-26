@@ -61,3 +61,5 @@ Backend (Go services / API)
 - L3: RED: baseline starts with each future-version file and creates additional data-dir files; unversioned writes omit the marker; restore publishes future-version payloads. Focused checks GREEN for startup (exit, exact stderr, byte preservation), legacy writes, and restore rejection.
 - L4: Independent verifier: S1–S3 met. Unversioned store differential: identical stdout, stderr, and exit. Build and changed-file language scan passed.
 - L5: The default full suite failed only at `TestSaveConfig_WritesExplicitRuntimeSettingsAndRestarts`. The baseline fails identically because the host Docker Node-RED is 5.0.10 (fixture expects 5.0.6). The same test passed with Docker isolated. The complete `go test ./...` run also passed with `DOCKER_HOST` pointed at a nonexistent socket in a temporary directory.
+
+- L6: PR #1066 initially failed hosted lint. Added narrowly scoped annotations for test-only fixture paths and the test subprocess; documented why malformed JSON stays with the existing reader or recovery. Local golangci-lint v2.14.0 reported zero issues; focused tests passed. No behavior change.

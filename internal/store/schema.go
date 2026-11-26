@@ -41,6 +41,7 @@ func CheckSchemaVersion(path string, data []byte) error {
 	var header struct {
 		Version json.RawMessage `json:"schemaVersion"`
 	}
+	//nolint:nilerr // This probe checks only the version; the normal reader or recovery handles malformed JSON.
 	if err := json.Unmarshal(data, &header); err != nil || header.Version == nil {
 		return nil
 	}

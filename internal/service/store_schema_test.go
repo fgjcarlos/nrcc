@@ -26,6 +26,7 @@ func TestLegacyUsersWriteSchemaVersion(t *testing.T) {
 	if err := auth.CreateUser(&model.CCUser{Username: "new"}); err != nil {
 		t.Fatal(err)
 	}
+	// #nosec G304 -- path is a fixed fixture inside t.TempDir().
 	body, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -74,6 +75,7 @@ func TestLegacyConfigWritesSchemaVersion(t *testing.T) {
 		configPath: {"port": 1886, "schemaVersion": 1},
 		backupPath: {"retentionManual": 6, "schemaVersion": 1},
 	} {
+		// #nosec G304 -- path is a fixed fixture inside t.TempDir().
 		body, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatal(err)
@@ -106,6 +108,7 @@ func TestRestoreRejectsFutureStoreSchema(t *testing.T) {
 			if err == nil || !strings.Contains(err.Error(), name+" has schemaVersion 2") {
 				t.Errorf("restore error = %v; want unsupported schema for %s", err, name)
 			}
+			// #nosec G304 -- path is a fixed fixture inside t.TempDir().
 			if body, err := os.ReadFile(path); err != nil || string(body) != original {
 				t.Errorf("existing file changed: %q, %v", body, err)
 			}
