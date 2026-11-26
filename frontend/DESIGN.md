@@ -243,7 +243,7 @@ Drafting geometry: near-square corners, straight 1px conductors, and IEC symbols
 
 ### The mark
 
-The NRCC mark is the closed IEC normally-open contact: a conductor entering two terminal rings bridged by a heavier blade, on a 16-unit grid. Keep one terminal-ring diameter (4 units, a quarter of the glyph) clear on every side, and never draw the glyph below 16px, where the rings fill in. The favicon sets it in ink on a drawing-white tile.
+The NRCC mark is the drawing title block (cajetín): a solid tile split into a 2×2 grid that spells N R / C C, on a 32-unit grid. Letters (2.25-unit strokes) and grid rules (1.5 units) are knocked out of the tile, so the ground shows through them; the tile takes the tone colour. Letters are stroke paths, never text, so the mark never depends on a font. Keep 8 units (a quarter of the tile) clear on every side. Below 24px the letters merge and only the tile and its cross read; 16px is the favicon floor. The favicon sets it as an ink tile with drawing-white letters, inverted under `prefers-color-scheme: dark`. Source: `NrccMark.tsx`, `public/favicon.svg`, `docs/assets/nrcc-mark.svg`.
 
 ## Components
 
