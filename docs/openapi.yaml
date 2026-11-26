@@ -3947,7 +3947,7 @@ components:
       properties:
         name:
           type: string
-          description: npm package name to install
+          description: npm registry package name to install, optionally with a tag or version selector. URLs, aliases, and file paths are not accepted.
         alias:
           type: string
           pattern: "^[A-Za-z0-9_$@./-]{1,214}$"

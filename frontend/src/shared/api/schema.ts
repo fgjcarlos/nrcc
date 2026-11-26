@@ -2497,7 +2497,7 @@ export interface components {
             repository?: string;
         };
         InstallLibraryRequest: {
-            /** @description npm package name to install */
+            /** @description npm registry package name to install, optionally with a tag or version selector. URLs, aliases, and file paths are not accepted. */
             name: string;
             /** @description functionGlobalContext key for the library (`global.get(alias)`). Defaults to the package name without version. */
             alias?: string;

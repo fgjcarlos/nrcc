@@ -94,8 +94,9 @@ func resolveNpmBin() string {
 var (
 	ErrInvalidPackageName = errors.New("invalid package name")
 
-	// Matches: pkg, @scope/pkg, pkg@version, @scope/pkg@^1.2.3
-	validPackageRe = regexp.MustCompile(`^(@[a-z0-9][\w.\-]*/)?[a-z0-9][\w.\-]*(@[^\s]+)?$`)
+	// Match registry names with optional tags or version ranges, not aliases, paths, or repositories.
+	validPackageRe = regexp.MustCompile(`^(@[a-z0-9][\w.\-]*/)?[a-z0-9][\w.\-]*(@[[:alnum:]~^*<>=][[:alnum:]_.~^*<>=+-]*)?$`)
+	archiveSpecRe  = regexp.MustCompile(`(?i)\.(?:tar(?:\.gz)?|tgz)$`)
 )
 
 // ValidatePackageName checks that a string is a safe npm package specifier.
@@ -117,6 +118,10 @@ func ValidatePackageName(pkg string) error {
 	}
 	if strings.ContainsAny(pkg, " \t\n\r") {
 		return fmt.Errorf("%w: contains whitespace", ErrInvalidPackageName)
+	}
+	// npm treats archive suffixes as local files, except on bare scoped names.
+	if strings.LastIndexByte(pkg, '@') != 0 && archiveSpecRe.MatchString(pkg) {
+		return fmt.Errorf("%w: archive specifier not allowed", ErrInvalidPackageName)
 	}
 	if !validPackageRe.MatchString(pkg) {
 		return fmt.Errorf("%w: %q does not match npm naming rules", ErrInvalidPackageName, pkg)
