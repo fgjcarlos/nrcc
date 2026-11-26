@@ -25,6 +25,9 @@ const (
 	refreshLockStripes = 64
 )
 
+// A non-credential bcrypt hash at ProductionBcryptCost for unknown-account logins.
+const loginDummyHash = "$2a$12$G3YktUC1tJ9kQ9HWsjuwCOEHSot19I.AguhwEUYbmVzrtbaPBQYpu"
+
 var warnInsecureSetupCookie = func() {
 	log.Print("refresh cookie emitted without TLS for setup; verify NRCC_TLS or reverse proxy")
 }
@@ -43,6 +46,7 @@ type AuthHandler struct {
 	audit                *audit.Service
 	limiter              *mw.RateLimiter
 	loginMetrics         loginMetricsRecorder
+	verifyLoginPassword  func(string, string) bool
 	createRefreshSession func(string) (string, error)
 	consumeSetupToken    func(string) error
 	refreshLocks         [refreshLockStripes]sync.Mutex
@@ -54,6 +58,7 @@ type AuthHandler struct {
 func NewAuthHandler(authSvc *service.AuthService) *AuthHandler {
 	return &AuthHandler{
 		authSvc:              authSvc,
+		verifyLoginPassword:  authSvc.VerifyPassword,
 		createRefreshSession: authSvc.CreateRefreshSession,
 		consumeSetupToken:    setupstate.ConsumeTokenFile,
 	}
@@ -292,6 +297,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	// Find user
 	user := h.authSvc.GetUserByUsername(req.Username)
 	if user == nil {
+		_ = h.verifyLoginPassword(loginDummyHash, req.Password)
 		if h.limiter != nil {
 			h.limiter.Record(mw.AuthIPKey(ip))
 			h.limiter.RecordAuthUser(req.Username, ip)
@@ -305,7 +311,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verify password
-	if !h.authSvc.VerifyPassword(user.PasswordHash, req.Password) {
+	if !h.verifyLoginPassword(user.PasswordHash, req.Password) {
 		if h.limiter != nil {
 			h.limiter.Record(mw.AuthIPKey(ip))
 			h.limiter.RecordAuthUser(req.Username, ip)
