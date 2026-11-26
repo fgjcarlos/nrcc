@@ -128,15 +128,17 @@ describe('authService password change contract', () => {
   it('sends the current password with a self-service change and omits it for an admin reset', async () => {
     const bodies: unknown[] = []
     server.use(
-      http.patch('/api/auth/users/:id/password', async ({ request }) => {
+      http.patch('/api/auth/users/:id/password', async ({ params, request }) => {
         bodies.push(await request.json())
-        return ok({ success: true })
+        return ok(params.id === 'u1' ? { success: true, token: 'replacement' } : { success: true })
       }),
     )
 
     const { authService } = await import('./authService')
     await authService.changePassword('u1', 'new-password-123', 'old-password-123')
+    expect(authService.getToken()).toBe('replacement')
     await authService.changePassword('u2', 'reset-password-123')
+    expect(authService.getToken()).toBe('replacement')
 
     expect(bodies).toEqual([
       { password: 'new-password-123', currentPassword: 'old-password-123' },
