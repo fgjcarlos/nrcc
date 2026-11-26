@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"testing/synctest"
+	"time"
 )
 
 func writeTestFlows(t *testing.T, dir, content string) {
@@ -52,6 +54,37 @@ func TestFlowVersion_DuplicateCaptureSkipped(t *testing.T) {
 	if len(versions) != 1 {
 		t.Errorf("duplicate captures should be skipped, got %d versions", len(versions))
 	}
+}
+
+func TestFlowVersion_RestartSkipsUnchangedFlows(t *testing.T) {
+	dir := t.TempDir()
+	writeTestFlows(t, dir, `[{"id":"flow1","type":"tab"}]`)
+	synctest.Test(t, func(t *testing.T) {
+		boot := func() []FlowVersion {
+			t.Helper()
+			svc := NewFlowVersionService(dir)
+			svc.StartPolling()
+			defer svc.Stop()
+			synctest.Wait()
+			versions, err := svc.ListVersions()
+			if err != nil {
+				t.Fatal(err)
+			}
+			return versions
+		}
+		first := boot()
+		if len(first) != 1 {
+			t.Fatalf("first boot captured %d versions, want 1", len(first))
+		}
+		time.Sleep(time.Second)
+		if unchanged := boot(); len(unchanged) != 1 || unchanged[0].ID != first[0].ID {
+			t.Fatalf("unchanged restart captured a new version: %+v", unchanged)
+		}
+		writeTestFlows(t, dir, `[{"id":"flow2","type":"tab"}]`)
+		if changed := boot(); len(changed) != 2 || changed[0].Hash == first[0].Hash {
+			t.Fatalf("restart after a change did not capture a new version: %+v", changed)
+		}
+	})
 }
 
 func TestFlowVersion_NewCaptureOnChange(t *testing.T) {

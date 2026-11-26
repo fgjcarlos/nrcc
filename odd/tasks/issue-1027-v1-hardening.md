@@ -27,8 +27,8 @@ S20. Each boot stores a duplicate flow version (`internal/service/flow_version.g
 
 ## Tasks
 
-- T1 (S1–S2): Restore MFA enrollment and refresh consistency. Route: inline + independent verification. Status: verified; commit recorded in the next unit.
-- T2 (S20): Deduplicate unchanged flow versions across boots. Route: inline. Commit: pending.
+- T1 (S1–S2): Restore MFA enrollment and refresh consistency. Route: inline + independent verification. Commit: `5bf1eb9` (verified).
+- T2 (S20): Deduplicate unchanged flow versions across boots. Route: inline. Status: verified; commit recorded in the next unit.
 - T3 (S9, S13–S16): Verify restic guard and address bounded runtime/lifecycle findings. Route: pending. Commit: pending.
 - T4 (S3–S8, S10–S11): Review remaining security findings; separate larger changes. Route: pending. Commit: pending.
 - T5 (S12, S17–S19): Review apply cancellation, uploads, retention and backup listing; separate larger changes. Route: pending. Commit: pending.
@@ -42,3 +42,5 @@ S20. Each boot stores a duplicate flow version (`internal/service/flow_version.g
 - L3: Based on origin/main at `699c475`; existing untracked audit and Pi files are out of scope.
 - L4: T1: the pending-enrollment, MFA refresh rotation and legacy-session migration tests failed before their fixes and passed after. Independent verification passed S1 and S2 after correction. The broad auth/setup checks and OpenAPI regeneration passed. Risk: item 2 (MFA enrollment and session cookies).
 - L5: `go test ./...` failed on `TestSaveConfig_WritesExplicitRuntimeSettingsAndRestarts` with host Node-RED 5.0.10 instead of the test stub 5.0.6. Targeted baseline/candidate comparison reproduced the same failure and exit 1 on both. T6 tracks the full-suite environment separately.
+- L6: T2 RED: two real polling startups under a fake clock captured two identical versions. GREEN: the same test preserves the latest version on unchanged restart and captures again after an edit; all FlowVersion tests and the service suite passed. Risk: none.
+- L7: T6 setup: overriding Docker with an unused Unix socket let the failing handler test pass; the host Docker runtime was overriding its native Node-RED stub.
