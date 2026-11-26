@@ -8,7 +8,7 @@
 
 A trustworthy visual control plane for **one Node-RED 5.x instance at a time**. NRCC discovers the deployment, imports `settings.js` losslessly, walks you through edits with a diff, validates the result, snapshots a backup, applies the change, and rolls back on readiness failure — without you hand-editing JSON or shelling into the container.
 
-> **Status: Beta · hardening phase.** nrcc is feature-complete for the Node-RED 5 scope but is not 1.0. There is no SLA, no promised compatibility between minor versions, and no external security audit. Run it behind a firewall and read [`SECURITY.md`](SECURITY.md) before exposing it publicly. Tag releases are published from `main`; see the [Releases page](https://github.com/fgjcarlos/nrcc/releases).
+> **Status: Beta · hardening phase.** nrcc is feature-complete for the Node-RED 5 scope but is not 1.0. There is no SLA or external security audit. Starting with 1.0, persistent data written by a 1.x release is readable by any later 1.y release; downgrades are not guaranteed. Run it behind a firewall and read [`SECURITY.md`](SECURITY.md) before exposing it publicly. Tag releases are published from `main`; see the [Releases page](https://github.com/fgjcarlos/nrcc/releases).
 
 ## Why NRCC
 

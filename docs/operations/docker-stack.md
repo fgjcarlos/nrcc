@@ -211,9 +211,14 @@ the tag before pulling, or re-run the installer with the new version.
 A stack built from source upgrades with `git pull` and
 `docker compose up -d --build`.
 
-After the upgrade the database schema may have changed. The release
-notes call out any required migrations; most upgrades are
-non-breaking.
+Starting with 1.0, persistent data written by a 1.x release is readable
+by any later 1.y release. Check the release notes for upgrade steps.
+
+Downgrades are not guaranteed. If `config.json`, `cc-users.json`, or
+`backup_config.json` has a schema version the binary does not support,
+NRCC refuses to start without rewriting the file. Keep running the newer
+image, or restore a volume snapshot from before the upgrade before starting
+the older image.
 
 ## Health check
 

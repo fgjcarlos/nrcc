@@ -42,7 +42,7 @@ func NewIsolatedConfigService(dataDir string) *ConfigService {
 // NewConfigServiceWithHost creates a config service with shared host detection.
 func NewConfigServiceWithHost(dataDir string, hostSvc *HostService) *ConfigService {
 	configPath := filepath.Join(dataDir, "config.json")
-	jsonStore := store.NewJSONStore[model.NodeRedConfig](configPath)
+	jsonStore := store.NewVersionedJSONStore[model.NodeRedConfig](configPath)
 
 	return &ConfigService{
 		store:   jsonStore,

@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/fgjcarlos/nrcc/internal/model"
+	"github.com/fgjcarlos/nrcc/internal/store"
 	"github.com/google/uuid"
 )
 
@@ -449,6 +450,9 @@ func (s *BackupService) GetConfig() (model.BackupConfig, error) {
 		return model.BackupConfig{}, fmt.Errorf("failed to read backup config: %w", err)
 	}
 
+	if err := store.CheckSchemaVersion(path, data); err != nil {
+		return model.BackupConfig{}, err
+	}
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return model.BackupConfig{}, fmt.Errorf("failed to parse backup config: %w", err)
@@ -479,12 +483,15 @@ func (s *BackupService) SaveConfig(cfg model.BackupConfig) (model.BackupConfig, 
 		return model.BackupConfig{}, fmt.Errorf("failed to create data directory: %w", err)
 	}
 
-	data, err := json.MarshalIndent(normalized, "", "  ")
+	path := filepath.Join(s.dataDir, backupConfigFile)
+	if err := store.CheckSchemaFile(path); err != nil {
+		return model.BackupConfig{}, err
+	}
+	data, err := store.MarshalVersionedJSON(normalized)
 	if err != nil {
 		return model.BackupConfig{}, fmt.Errorf("failed to encode backup config: %w", err)
 	}
 
-	path := filepath.Join(s.dataDir, backupConfigFile)
 	if err := atomicWriteFile(path, data); err != nil {
 		return model.BackupConfig{}, fmt.Errorf("failed to save backup config: %w", err)
 	}
@@ -1430,6 +1437,10 @@ func (s *BackupService) stageRestore(zipReader *zip.Reader, manifest backupMetad
 		return "", nil
 	}
 
+	if err := store.CheckSchemaVersions(stagingDir); err != nil {
+		_ = os.RemoveAll(stagingDir)
+		return "", fmt.Errorf("restore data: %w", err)
+	}
 	return stagingDir, nil
 }
 
