@@ -29,8 +29,8 @@ S20. Each boot stores a duplicate flow version (`internal/service/flow_version.g
 
 - T1 (S1–S2): Restore MFA enrollment and refresh consistency. Route: inline + independent verification. Commit: `5bf1eb9` (verified).
 - T2 (S20): Deduplicate unchanged flow versions across boots. Route: inline. Commit: `6f1f398` (verified).
-- T3 (S9, S13–S16): Verify restic guard and address bounded runtime/lifecycle findings. Route: inline + independent verification. Commits: `8b6a7ff` (managed port); shutdown commit recorded in the next unit.
-- T4 (S3–S8, S10–S11): Review remaining security findings; separate larger changes. Route: pending. Commit: pending.
+- T3 (S9, S13–S16): Verify restic guard and address bounded runtime/lifecycle findings. Route: inline + independent verification. Commits: `8b6a7ff` (managed port); `51eb212` (shutdown). Both verified.
+- T4 (S3–S8, S10–S11): Harden login, script CSP, and npm selectors; document policy/state follow-ups. Route: inline + independent verification. Commits: `8035d01` (bcrypt), `6974b1c` (CSP); npm commit recorded in the next unit.
 - T5 (S12, S17–S19): Review apply cancellation, uploads, retention and backup listing; separate larger changes. Route: pending. Commit: pending.
 
 - T6 (S1–S20): Run the full Go suite in an isolated runtime environment. Route: inline. Commit: n/a.
@@ -46,3 +46,5 @@ S20. Each boot stores a duplicate flow version (`internal/service/flow_version.g
 - L7: T6 setup: overriding Docker with an unused Unix socket let the failing handler test pass; the host Docker runtime was overriding its native Node-RED stub.
 - L8: S9 already validates the snapshot ID before invoking restic; the existing guard test passed. S13 was reproduced with a managed runtime and portless settings. Only the missing-property case now uses the known launch port; invalid or ambiguous settings still fail. Risk: item 2 (readiness validation).
 - L9: S14–S16 passed focused and independent checks; Compose resolves a 15-second grace period, and an active HTTP request completes before server services and Node-RED stop. Risk: items 4 and 5 (shutdown order and Compose configuration).
+- L10: Review slice boundary after `51eb212` (T1–T3). T4 onward are a separate review slice.
+- L11: S6 passed a deterministic regression for cost-12 dummy bcrypt and unchanged failure responses (not a promise of identical timing for legacy hashes). S7 passed the backend CSP test, Vite build, and a Chromium smoke with the built SPA and the new policy. S8 rejects non-registry selectors and local archives, including npm’s case-insensitive archive syntax. Existing valid library cases matched the baseline after normalizing Go test elapsed time. Independent verification passed S6, S7, and the validation half of S8. Risk: items 2 and 3 (authentication, script policy, shared npm validation).

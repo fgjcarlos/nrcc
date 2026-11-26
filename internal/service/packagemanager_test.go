@@ -11,6 +11,9 @@ func TestValidatePackageNameAcceptsValid(t *testing.T) {
 		"@scope/package",
 		"@flowfuse/node-red-dashboard",
 		"node-red-contrib-mqtt@2.1.0",
+		"pkg@next",
+		"@scope/fixture.tar",
+		"pkg@~2.1.0-beta.1",
 		"@scope/pkg@^1.2.3",
 		"my-package",
 		"pkg123",
@@ -32,6 +35,12 @@ func TestValidatePackageNameRejectsInvalid(t *testing.T) {
 		input string
 	}{
 		{"empty", ""},
+		{"local version spec", "pkg@file:fixture"},
+		{"bare archive", "fixture.tgz"},
+		{"archive version spec", "pkg@fixture.tar"},
+		{"case-insensitive archive version spec", "@scope/pkg@fixture.TAR.GZ"},
+		{"URL version spec", "pkg@git:fixture"},
+		{"repository version spec", "pkg@sample/fixture"},
 		{"dot-dot traversal", "../../x"},
 		{"absolute path", "/tmp/pkg"},
 		{"relative path", "./local-pkg"},
