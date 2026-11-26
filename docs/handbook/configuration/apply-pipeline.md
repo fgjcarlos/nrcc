@@ -271,12 +271,22 @@ structured fields from it, removes the marker, and logs
 `Interrupted settings apply rolled back: restored <snapshot>`. A first
 write with no previous `settings.js` has no snapshot and no marker.
 
-Two limits apply. Boot recovery rewrites the file only: a Node-RED
-that NRCC does not start itself (systemd, a separate container) keeps
-the settings it loaded until its next restart. And a marker kept after
-a failed recovery also reverts any `settings.js` change saved outside
-the apply pipeline before the next boot; remove the marker by hand
-once you have repaired `settings.js`.
+Boot recovery restarts a detected external runtime after restoring the
+snapshot, then probes readiness against the restored settings. This applies
+to supported systemd and Docker targets, including Compose-managed Docker
+projects; NRCC-managed native startup is not selected when managed startup is
+disabled. If the runtime cannot be resolved, its settings path changed, or
+restart/readiness fails, startup continues with a warning that names the
+target (or explicitly says the runtime is unknown) and notes it may still be
+running the candidate. The warning contains no settings content. A boot with
+no pending marker does not restart a runtime.
+
+A marker kept after a failed apply recovery also reverts any `settings.js`
+change saved outside the apply pipeline before the next boot; remove the
+marker by hand once you have repaired `settings.js`. A crash after the boot
+snapshot is restored but before the external runtime restart completes leaves
+no marker to retry the restart automatically; inspect the warning and restart
+the named runtime manually if needed.
 
 The referenced TLS key/certificate paths are not part of the apply
 write-set. NRCC stores their paths and Node-RED reads the files at

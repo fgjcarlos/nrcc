@@ -6,6 +6,27 @@ import (
 	"testing"
 )
 
+func TestRecoverInterruptedExternalApplyGuard(t *testing.T) {
+	called := 0
+	recoverFn := func() { called++ }
+	for _, tc := range []struct {
+		name     string
+		restored string
+		managed  bool
+		want     int
+	}{
+		{name: "no marker"}, {name: "managed", restored: "snapshot", managed: true}, {name: "external pending", restored: "snapshot", want: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			called = 0
+			recoverInterruptedExternalApply(tc.restored, tc.managed, recoverFn)
+			if called != tc.want {
+				t.Fatalf("calls=%d want %d", called, tc.want)
+			}
+		})
+	}
+}
+
 func TestResolveJWTSecret_UsesEnvVar(t *testing.T) {
 	t.Setenv("JWT_SECRET", "my-real-production-secret-that-is-long-enough")
 	secret, err := resolveJWTSecret(t.TempDir())

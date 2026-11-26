@@ -95,7 +95,8 @@ func runServer() {
 
 	// Roll back an apply a previous run never confirmed ready (issue #1012),
 	// before any Node-RED instance loads the unverified settings.js.
-	restored, err := configSvc.RecoverInterruptedApply(context.Background(), hostSvc.Detect().Settings.Path)
+	settingsPath := hostSvc.Detect().Settings.Path
+	restored, err := configSvc.RecoverInterruptedApply(context.Background(), settingsPath)
 	if restored != "" {
 		ui.Warn("Interrupted settings apply rolled back: restored " + restored)
 	}
@@ -121,6 +122,11 @@ func runServer() {
 	// Set NRCC_MANAGE_NODE_RED=false to disable.
 	ui.SectionHeader("Node-RED Startup")
 	manageRuntime := os.Getenv("NRCC_MANAGE_NODE_RED") != "false"
+	recoverInterruptedExternalApply(restored, manageRuntime, func() {
+		if err := server.RecoverExternalApplyRuntime(context.Background(), hostSvc, configSvc, dataDir, settingsPath, restored); err != nil {
+			ui.Warn("Interrupted apply restored " + restored + "; " + err.Error())
+		}
+	})
 	if manageRuntime {
 		spinner := ui.StartSpinner("Starting Node-RED…")
 		if err := pm.Start(); err != nil {
@@ -201,6 +207,12 @@ func runServer() {
 	}
 
 	ui.Info("Shutdown complete")
+}
+
+func recoverInterruptedExternalApply(restored string, manageRuntime bool, recover func()) {
+	if restored != "" && !manageRuntime && recover != nil {
+		recover()
+	}
 }
 
 func resolveJWTSecret(dataDir string) (string, error) {
