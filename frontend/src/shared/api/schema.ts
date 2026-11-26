@@ -291,6 +291,8 @@ export interface paths {
          *     1Password, Bitwarden, etc.). The secret is NOT yet committed — the
          *     client must follow up with `POST /api/auth/mfa/enroll/confirm` to
          *     commit the enrollment and receive recovery codes.
+         *     Starting again replaces an unconfirmed candidate. An already confirmed
+         *     enrollment must be disabled before another one can be started.
          */
         post: operations["postMfaEnroll"];
         delete?: never;
@@ -2495,7 +2497,7 @@ export interface components {
             repository?: string;
         };
         InstallLibraryRequest: {
-            /** @description npm package name to install */
+            /** @description npm registry package name to install, optionally with a tag or version selector. URLs, aliases, and file paths are not accepted. */
             name: string;
             /** @description functionGlobalContext key for the library (`global.get(alias)`). Defaults to the package name without version. */
             alias?: string;

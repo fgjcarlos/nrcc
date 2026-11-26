@@ -189,8 +189,10 @@ func runServer() {
 
 	ui.SectionHeader("Shutting Down")
 
-	// Stop Node-RED process first
-	if manageRuntime {
+	stopRuntime := func() {
+		if !manageRuntime {
+			return
+		}
 		if err := pm.Stop(context.Background()); err != nil {
 			ui.Error(fmt.Sprintf("Node-RED shutdown error: %v", err))
 		} else {
@@ -198,14 +200,11 @@ func runServer() {
 		}
 	}
 
-	// Shutdown HTTP server with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-
-	if err := httpSrv.Shutdown(ctx); err != nil {
+	if err := shutdownServer(ctx, httpSrv, srv.Shutdown, stopRuntime); err != nil {
 		ui.Error(fmt.Sprintf("Server shutdown error: %v", err))
 	}
-
 	ui.Info("Shutdown complete")
 }
 
@@ -213,6 +212,13 @@ func recoverInterruptedExternalApply(restored string, manageRuntime bool, recove
 	if restored != "" && !manageRuntime && recover != nil {
 		recover()
 	}
+}
+
+func shutdownServer(ctx context.Context, httpSrv *http.Server, stopServices, stopRuntime func()) error {
+	err := httpSrv.Shutdown(ctx)
+	stopServices()
+	stopRuntime()
+	return err
 }
 
 func resolveJWTSecret(dataDir string) (string, error) {

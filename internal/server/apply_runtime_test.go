@@ -165,6 +165,16 @@ func TestManagedReadinessUsesLaunchPortWithoutProcAccess(t *testing.T) {
 		t.Fatalf("expected hardened child environment to be unreadable, got error %v", err)
 	}
 
+	resolve := serverApplyResolver(func() model.HostStatus { return model.HostStatus{} }, func() *service.ProcessManager { return pm }, nil, nil)
+	adapter, err := resolve(service.ApplyRequest{
+		Capabilities: model.ConfigurationCapabilities{Adapter: "nodered-5"},
+		Path:         settingsPath,
+		Content:      "module.exports = { editorTheme: {} };",
+	})
+	if err != nil || adapter == nil {
+		t.Fatalf("resolve managed candidate using the known launch port: adapter=%v, err=%v", adapter, err)
+	}
+
 	for _, source := range []string{
 		fmt.Sprintf("module.exports = { uiPort: %d };\n", dotenvPort),
 		fmt.Sprintf("module.exports = { uiPort: %d };\n", osPort),

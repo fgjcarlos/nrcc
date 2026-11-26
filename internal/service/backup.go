@@ -405,7 +405,7 @@ func (s *BackupService) Detail(id string) (model.BackupManifest, error) {
 		return model.BackupManifest{}, err
 	}
 	backupPath := filepath.Join(s.backupDir, id+".zip")
-	manifest, err := s.inspectBackup(backupPath)
+	manifest, err := s.inspectBackup(backupPath, true)
 	if err != nil {
 		return model.BackupManifest{}, err
 	}
@@ -1170,7 +1170,8 @@ func (s *BackupService) recordEvent(event model.BackupEvent) {
 }
 
 func (s *BackupService) describeBackup(backupPath string) (model.Backup, error) {
-	manifest, err := s.inspectBackup(backupPath)
+	// Summaries return metadata, not checksums; do not decompress payloads here.
+	manifest, err := s.inspectBackup(backupPath, false)
 	if err != nil {
 		return model.Backup{}, err
 	}
@@ -1187,7 +1188,7 @@ func (s *BackupService) describeBackup(backupPath string) (model.Backup, error) 
 	}, nil
 }
 
-func (s *BackupService) inspectBackup(backupPath string) (model.BackupManifest, error) {
+func (s *BackupService) inspectBackup(backupPath string, includeChecksums bool) (model.BackupManifest, error) {
 	info, err := os.Stat(backupPath)
 	if err != nil {
 		return model.BackupManifest{}, fmt.Errorf("backup not found: %w", err)
@@ -1232,9 +1233,9 @@ func (s *BackupService) inspectBackup(backupPath string) (model.BackupManifest, 
 			continue
 		}
 
-		checksum, err := checksumZipFile(zippedFile)
-		if err != nil {
-			checksum = ""
+		var checksum string
+		if includeChecksums {
+			checksum, _ = checksumZipFile(zippedFile)
 		}
 
 		manifest.Files = append(manifest.Files, model.BackupFileEntry{

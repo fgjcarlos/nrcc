@@ -549,6 +549,7 @@ func (s *Server) Shutdown() {
 		s.cancel()
 	}
 	if s.updateSvc != nil {
+		_ = s.updateSvc.Shutdown(context.Background())
 		s.updateSvc.Stop()
 	}
 	if s.flowVersionSvc != nil {

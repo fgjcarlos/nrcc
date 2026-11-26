@@ -288,23 +288,14 @@ func (h *MfaHandler) Verify(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// setRefreshCookieFor is a thin wrapper that lets the MFA handler
-// emit the same shape of refresh cookie the auth handler does,
-// without duplicating the cookie definition.
+// setRefreshCookieFor issues a normal refresh cookie after an MFA operation.
 func (h *MfaHandler) setRefreshCookieFor(w http.ResponseWriter, r *http.Request, userID string) error {
 	refreshToken, err := h.authSvc.CreateRefreshSession(userID)
 	if err != nil {
 		return err
 	}
-	// #nosec G124 -- Secure is computed via isSecureRequest which inspects r.TLS and X-Forwarded-Proto; cosmetically insecure over plain HTTP only.
-	http.SetCookie(w, &http.Cookie{
-		Name:     refreshCookieName,
-		Value:    refreshToken,
-		Path:     "/api/auth",
-		HttpOnly: true,
-		Secure:   isSecureRequest(r),
-		SameSite: http.SameSiteStrictMode,
-		MaxAge:   int(service.RefreshTokenLifetime / time.Second),
-	})
+	secure := isSecureRequest(r)
+	writeRefreshCookie(w, refreshToken, secure, int(service.RefreshTokenLifetime/time.Second))
+	clearLegacyRefreshCookie(w, secure)
 	return nil
 }

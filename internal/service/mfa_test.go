@@ -119,12 +119,20 @@ func TestMfaService_BeginEnrollmentReturnsSecret(t *testing.T) {
 	}
 }
 
-func TestMfaService_BeginEnrollmentRejectsSecondAttempt(t *testing.T) {
+func TestMfaService_BeginEnrollmentRejectsConfirmedEnrollment(t *testing.T) {
 	svc, _ := newMfaTestSetup(t)
 	uid := svc.authSvc.GetUserByUsername("admin").ID
 
-	if _, _, err := svc.BeginEnrollment(uid); err != nil {
+	secret, _, err := svc.BeginEnrollment(uid)
+	if err != nil {
 		t.Fatalf("first enroll: %v", err)
+	}
+	code, err := totp.GenerateCode(secret, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.ConfirmEnrollment(uid, code); err != nil {
+		t.Fatal(err)
 	}
 	if _, _, err := svc.BeginEnrollment(uid); !errors.Is(err, ErrMfaAlreadyEnrolled) {
 		t.Fatalf("want ErrMfaAlreadyEnrolled, got %v", err)

@@ -457,6 +457,8 @@ paths:
         1Password, Bitwarden, etc.). The secret is NOT yet committed — the
         client must follow up with `POST /api/auth/mfa/enroll/confirm` to
         commit the enrollment and receive recovery codes.
+        Starting again replaces an unconfirmed candidate. An already confirmed
+        enrollment must be disabled before another one can be started.
       security:
         - bearerAuth: []
       responses:
@@ -3945,7 +3947,7 @@ components:
       properties:
         name:
           type: string
-          description: npm package name to install
+          description: npm registry package name to install, optionally with a tag or version selector. URLs, aliases, and file paths are not accepted.
         alias:
           type: string
           pattern: "^[A-Za-z0-9_$@./-]{1,214}$"

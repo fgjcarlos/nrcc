@@ -105,6 +105,7 @@ func NewMfaService(dataDir string, authSvc *AuthService) *MfaService {
 // returned along with the otpauth:// URL the user can paste into any
 // RFC 6238 authenticator.
 //
+// Starting again replaces any unconfirmed candidate.
 // If the user already has an active enrollment this returns
 // ErrMfaAlreadyEnrolled. To re-enroll, disable the existing one first.
 func (s *MfaService) BeginEnrollment(userID string) (secret, otpauthURL string, err error) {
@@ -444,7 +445,7 @@ func (s *MfaService) AuthService() *AuthService { return s.authSvc }
 
 func hasActiveEnrollment(data model.MfaStore, userID string) bool {
 	row := findEnrollment(data, userID)
-	return row != nil
+	return row != nil && !row.Pending
 }
 
 func findEnrollment(data model.MfaStore, userID string) *model.MfaEnrollment {
