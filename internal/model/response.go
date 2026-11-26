@@ -3,6 +3,7 @@ package model
 import (
 	"encoding/json"
 	"net/http"
+	"reflect"
 	"time"
 )
 
@@ -30,7 +31,16 @@ type ApiErrorResponse struct {
 
 // RespondJSON writes a success response as JSON
 func RespondJSON[T any](w http.ResponseWriter, status int, data T) {
-	resp := ApiResponse[T]{
+	// ApiResponse's omitempty would drop an empty list, and clients treat a
+	// missing data field as a failed request: always emit data, nil slice as [].
+	if v := reflect.ValueOf(&data).Elem(); v.Kind() == reflect.Slice && v.IsNil() {
+		v.Set(reflect.MakeSlice(v.Type(), 0, 0))
+	}
+	resp := struct {
+		Success   bool   `json:"success"`
+		Data      T      `json:"data"`
+		Timestamp string `json:"timestamp"`
+	}{
 		Success:   true,
 		Data:      data,
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
