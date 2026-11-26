@@ -208,9 +208,9 @@ func runServer() {
 	ui.Info("Shutdown complete")
 }
 
-func recoverInterruptedExternalApply(restored string, manageRuntime bool, recover func()) {
-	if restored != "" && !manageRuntime && recover != nil {
-		recover()
+func recoverInterruptedExternalApply(restored string, manageRuntime bool, run func()) {
+	if restored != "" && !manageRuntime && run != nil {
+		run()
 	}
 }
 

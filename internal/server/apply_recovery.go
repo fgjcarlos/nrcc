@@ -18,7 +18,7 @@ func RecoverExternalApplyRuntime(ctx context.Context, host *service.HostService,
 	if status.Settings.Path != settingsPath {
 		return fmt.Errorf("runtime %s settings path changed to %q; runtime may still run candidate settings", identity, status.Settings.Path)
 	}
-	content, err := os.ReadFile(settingsPath)
+	content, err := os.ReadFile(settingsPath) // #nosec G304 -- operator-supplied settings path detected at boot.
 	if err != nil {
 		return fmt.Errorf("runtime %s may still run candidate settings: read restored settings: %w", identity, err)
 	}
