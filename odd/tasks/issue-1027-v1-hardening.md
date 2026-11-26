@@ -28,8 +28,8 @@ S20. Each boot stores a duplicate flow version (`internal/service/flow_version.g
 ## Tasks
 
 - T1 (S1–S2): Restore MFA enrollment and refresh consistency. Route: inline + independent verification. Commit: `5bf1eb9` (verified).
-- T2 (S20): Deduplicate unchanged flow versions across boots. Route: inline. Status: verified; commit recorded in the next unit.
-- T3 (S9, S13–S16): Verify restic guard and address bounded runtime/lifecycle findings. Route: pending. Commit: pending.
+- T2 (S20): Deduplicate unchanged flow versions across boots. Route: inline. Commit: `6f1f398` (verified).
+- T3 (S9, S13–S16): Verify restic guard and address bounded runtime/lifecycle findings. Route: inline + independent verification. Commits: `8b6a7ff` (managed port); shutdown commit recorded in the next unit.
 - T4 (S3–S8, S10–S11): Review remaining security findings; separate larger changes. Route: pending. Commit: pending.
 - T5 (S12, S17–S19): Review apply cancellation, uploads, retention and backup listing; separate larger changes. Route: pending. Commit: pending.
 
@@ -44,3 +44,5 @@ S20. Each boot stores a duplicate flow version (`internal/service/flow_version.g
 - L5: `go test ./...` failed on `TestSaveConfig_WritesExplicitRuntimeSettingsAndRestarts` with host Node-RED 5.0.10 instead of the test stub 5.0.6. Targeted baseline/candidate comparison reproduced the same failure and exit 1 on both. T6 tracks the full-suite environment separately.
 - L6: T2 RED: two real polling startups under a fake clock captured two identical versions. GREEN: the same test preserves the latest version on unchanged restart and captures again after an edit; all FlowVersion tests and the service suite passed. Risk: none.
 - L7: T6 setup: overriding Docker with an unused Unix socket let the failing handler test pass; the host Docker runtime was overriding its native Node-RED stub.
+- L8: S9 already validates the snapshot ID before invoking restic; the existing guard test passed. S13 was reproduced with a managed runtime and portless settings. Only the missing-property case now uses the known launch port; invalid or ambiguous settings still fail. Risk: item 2 (readiness validation).
+- L9: S14–S16 passed focused and independent checks; Compose resolves a 15-second grace period, and an active HTTP request completes before server services and Node-RED stop. Risk: items 4 and 5 (shutdown order and Compose configuration).

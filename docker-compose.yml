@@ -35,6 +35,8 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
+    # Leave headroom for the HTTP drain and the managed Node-RED stop.
+    stop_grace_period: 15s
     ports:
       - "127.0.0.1:${NRCC_HOST_PORT:-3001}:3001"   # nrcc web UI + API (Tailscale-reachable)
       - "127.0.0.1:${NODE_RED_HOST_PORT:-1880}:1880"   # Node-RED editor (Tailscale-reachable)
