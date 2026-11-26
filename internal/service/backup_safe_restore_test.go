@@ -8,10 +8,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/crc32"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/fgjcarlos/nrcc/internal/model"
@@ -132,6 +135,55 @@ func TestBackupServiceManifestIncludesChecksums(t *testing.T) {
 		if len(entry.Checksum) != 64 {
 			t.Fatalf("entry %s checksum not sha256 hex: %q", entry.Path, entry.Checksum)
 		}
+	}
+}
+
+var (
+	registerCountingZIPMethod sync.Once
+	countingZIPOpens          atomic.Int32
+)
+
+func TestBackupListDoesNotOpenArchivePayloads(t *testing.T) {
+	const method = 0xf301
+	registerCountingZIPMethod.Do(func() {
+		zip.RegisterDecompressor(method, func(r io.Reader) io.ReadCloser {
+			countingZIPOpens.Add(1)
+			return io.NopCloser(r)
+		})
+	})
+	countingZIPOpens.Store(0)
+
+	payload := []byte(`[{"id":"1"}]`)
+	var data bytes.Buffer
+	zw := zip.NewWriter(&data)
+	entry, err := zw.CreateRaw(&zip.FileHeader{
+		Name: "flows.json", Method: method, CRC32: crc32.ChecksumIEEE(payload),
+		CompressedSize64: uint64(len(payload)), UncompressedSize64: uint64(len(payload)),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = entry.Write(payload); err != nil {
+		t.Fatal(err)
+	}
+	if err = zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	backupDir := t.TempDir()
+	if err = os.WriteFile(filepath.Join(backupDir, "counted.zip"), data.Bytes(), 0600); err != nil {
+		t.Fatal(err)
+	}
+	svc := NewBackupServiceWithBackupDir(t.TempDir(), backupDir)
+	list, err := svc.List()
+	if err != nil || len(list) != 1 || list[0].ID != "counted" || list[0].FileCount != 1 || list[0].SizeBytes != int64(data.Len()) {
+		t.Fatalf("unexpected backup list: %+v, %v", list, err)
+	}
+	if opens := countingZIPOpens.Load(); opens != 0 {
+		t.Fatalf("list opened %d payload entries; want 0", opens)
+	}
+	detail, err := svc.Detail("counted")
+	if err != nil || len(detail.Files) != 1 || detail.Files[0].Checksum != fmt.Sprintf("%x", sha256.Sum256(payload)) || countingZIPOpens.Load() != 1 {
+		t.Fatalf("detail did not hash the file once: %+v, %v", detail, err)
 	}
 }
 
