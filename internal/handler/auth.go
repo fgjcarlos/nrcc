@@ -881,7 +881,8 @@ func clearRefreshCookie(w http.ResponseWriter, r *http.Request) {
 }
 
 func writeRefreshCookie(w http.ResponseWriter, token string, secure bool, maxAge int) {
-	cookie := http.Cookie{
+	// #nosec G124 -- Secure is computed from the transport or proxy configuration.
+	http.SetCookie(w, &http.Cookie{
 		Name:  refreshCookieName,
 		Value: token,
 		// Keep the established root scope across login, refresh, and logout.
@@ -890,9 +891,7 @@ func writeRefreshCookie(w http.ResponseWriter, token string, secure bool, maxAge
 		Secure:   secure,
 		SameSite: http.SameSiteStrictMode,
 		MaxAge:   maxAge,
-	}
-	// #nosec G124 -- Secure is computed from the transport or proxy configuration.
-	http.SetCookie(w, &cookie)
+	})
 }
 
 // An older MFA cookie would otherwise take precedence over the root cookie.
