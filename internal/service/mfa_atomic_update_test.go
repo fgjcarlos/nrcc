@@ -22,21 +22,10 @@ func TestMfaService_BeginEnrollment_Concurrent(t *testing.T) {
 		return err
 	})
 
-	winners := 0
 	for i, err := range errs {
-		if err == nil {
-			winners++
-			if secrets[i] == "" || !strings.HasPrefix(urls[i], "otpauth://totp/") {
-				t.Errorf("winner %d returned invalid enrollment material", i)
-			}
-			continue
+		if err != nil || secrets[i] == "" || !strings.HasPrefix(urls[i], "otpauth://totp/") {
+			t.Errorf("caller %d failed to start an enrollment: %v", i, err)
 		}
-		if !errors.Is(err, ErrMfaAlreadyEnrolled) {
-			t.Errorf("caller %d: got %v, want ErrMfaAlreadyEnrolled", i, err)
-		}
-	}
-	if winners != 1 {
-		t.Fatalf("successful enrollments = %d, want 1", winners)
 	}
 
 	data, err := svc.store.Read()

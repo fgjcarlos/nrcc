@@ -291,6 +291,8 @@ export interface paths {
          *     1Password, Bitwarden, etc.). The secret is NOT yet committed — the
          *     client must follow up with `POST /api/auth/mfa/enroll/confirm` to
          *     commit the enrollment and receive recovery codes.
+         *     Starting again replaces an unconfirmed candidate. An already confirmed
+         *     enrollment must be disabled before another one can be started.
          */
         post: operations["postMfaEnroll"];
         delete?: never;

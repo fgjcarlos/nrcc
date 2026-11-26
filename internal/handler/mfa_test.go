@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/http/cookiejar"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -93,21 +94,47 @@ func TestMfaHandler_EnrollReturnsSecretAndOtpauthURL(t *testing.T) {
 	}
 }
 
-func TestMfaHandler_EnrollTwiceReturns409(t *testing.T) {
+func TestMfaHandler_EnrollCanRestartUntilConfirmed(t *testing.T) {
 	h, _, _, uid := setupMfaHandlerTest(t)
-
-	for i := 0; i < 2; i++ {
-		req := httptest.NewRequest(http.MethodPost, "/api/auth/mfa/enroll", nil)
-		req = req.WithContext(authedContext(uid, "admin", model.RoleAdmin))
+	ctx := authedContext(uid, "admin", model.RoleAdmin)
+	enroll := func(want int) model.ApiResponse[model.MfaEnrollBeginResponse] {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodPost, "/api/auth/mfa/enroll", nil).WithContext(ctx)
 		rec := httptest.NewRecorder()
 		h.Enroll(rec, req)
-		if i == 0 && rec.Code != http.StatusOK {
-			t.Fatalf("first enroll: want 200, got %d", rec.Code)
+		if rec.Code != want {
+			t.Fatalf("enroll: want %d, got %d (%s)", want, rec.Code, rec.Body.String())
 		}
-		if i == 1 && rec.Code != http.StatusConflict {
-			t.Fatalf("second enroll: want 409, got %d (%s)", rec.Code, rec.Body.String())
+		var env model.ApiResponse[model.MfaEnrollBeginResponse]
+		if err := json.NewDecoder(rec.Body).Decode(&env); err != nil {
+			t.Fatal(err)
 		}
+		return env
 	}
+	first := enroll(http.StatusOK).Data
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/mfa/status", nil).WithContext(ctx)
+	rec := httptest.NewRecorder()
+	h.Status(rec, req)
+	var status model.ApiResponse[model.MfaStatusResponse]
+	if err := json.NewDecoder(rec.Body).Decode(&status); err != nil || rec.Code != http.StatusOK || status.Data.Enabled || status.Data.RecoveryCodesRemaining != 0 {
+		t.Fatalf("pending status: HTTP %d, %+v, decode error %v", rec.Code, status.Data, err)
+	}
+	second := enroll(http.StatusOK).Data
+	if second.Secret == "" || second.Secret == first.Secret || !strings.HasPrefix(second.OtpauthURL, "otpauth://totp/") {
+		t.Fatal("retry did not return a fresh candidate")
+	}
+	code, err := totp.GenerateCode(second.Secret, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := json.Marshal(map[string]string{"code": code})
+	req = httptest.NewRequest(http.MethodPost, "/api/auth/mfa/enroll/confirm", bytes.NewReader(body)).WithContext(ctx)
+	rec = httptest.NewRecorder()
+	h.EnrollConfirm(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("confirm retry: HTTP %d (%s)", rec.Code, rec.Body.String())
+	}
+	enroll(http.StatusConflict)
 }
 
 func TestMfaHandler_EnrollConfirmWrongCodeReturns400(t *testing.T) {
@@ -220,7 +247,7 @@ func TestMfaHandler_VerifyRejectsInvalidToken(t *testing.T) {
 }
 
 func TestMfaHandler_VerifyHappyPath(t *testing.T) {
-	h, _, mfaSvc, uid := setupMfaHandlerTest(t)
+	h, authHandler, mfaSvc, uid := setupMfaHandlerTest(t)
 	secret, _, _ := mfaSvc.BeginEnrollment(uid)
 	totpCode, _ := totp.GenerateCode(secret, time.Now())
 	if _, err := mfaSvc.ConfirmEnrollment(uid, totpCode); err != nil {
@@ -230,14 +257,65 @@ func TestMfaHandler_VerifyHappyPath(t *testing.T) {
 
 	fresh, _ := totp.GenerateCode(secret, time.Now())
 	body, _ := json.Marshal(model.MfaVerifyRequest{MfaToken: tok, Code: fresh})
-	req := httptest.NewRequest(http.MethodPost, "/api/auth/mfa/verify", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "https://nrcc.example/api/auth/mfa/verify", bytes.NewReader(body))
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jar.SetCookies(req.URL, []*http.Cookie{{Name: refreshCookieName, Value: "old", Path: "/api/auth", Secure: true, HttpOnly: true, SameSite: http.SameSiteStrictMode}})
+	for _, cookie := range jar.Cookies(req.URL) {
+		req.AddCookie(cookie)
+	}
 	rec := httptest.NewRecorder()
 	h.Verify(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("want 200, got %d (%s)", rec.Code, rec.Body.String())
 	}
-	if got := rec.Header().Get("Set-Cookie"); !strings.Contains(got, "nrcc_refresh=") {
-		t.Errorf("expected refresh cookie to be set, got %q", got)
+	jar.SetCookies(req.URL, rec.Result().Cookies())
+	assertRefreshCookieLifecycle(t, authHandler, jar)
+}
+
+func TestRefresh_MigratesLegacyMFACookie(t *testing.T) {
+	h, svc := setupAuthTest(t)
+	legacy, err := svc.CreateRefreshSession(svc.GetUserByUsername("admin").ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "https://nrcc.example/api/auth/refresh", nil)
+	jar.SetCookies(req.URL, []*http.Cookie{{Name: refreshCookieName, Value: legacy, Path: "/api/auth", Secure: true, HttpOnly: true, SameSite: http.SameSiteStrictMode}})
+	assertRefreshCookieLifecycle(t, h, jar)
+}
+
+func assertRefreshCookieLifecycle(t *testing.T, authHandler *AuthHandler, jar http.CookieJar) {
+	t.Helper()
+	var req *http.Request
+	for i, step := range []struct {
+		path    string
+		handler http.HandlerFunc
+		want    int
+	}{
+		{"/api/auth/refresh", authHandler.Refresh, http.StatusOK},
+		{"/api/auth/refresh", authHandler.Refresh, http.StatusOK},
+		{"/api/auth/logout", authHandler.Logout, http.StatusOK},
+		{"/api/auth/refresh", authHandler.Refresh, http.StatusUnauthorized},
+	} {
+		req = httptest.NewRequest(http.MethodPost, "https://nrcc.example"+step.path, nil)
+		for _, cookie := range jar.Cookies(req.URL) {
+			req.AddCookie(cookie)
+		}
+		rec := httptest.NewRecorder()
+		step.handler(rec, req)
+		if rec.Code != step.want {
+			t.Fatalf("step %d %s: want HTTP %d, got %d (%s)", i+1, step.path, step.want, rec.Code, rec.Body.String())
+		}
+		jar.SetCookies(req.URL, rec.Result().Cookies())
+	}
+	if remaining := jar.Cookies(req.URL); len(remaining) != 0 {
+		t.Fatalf("logout left %d cookies", len(remaining))
 	}
 }
 
