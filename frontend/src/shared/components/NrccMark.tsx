@@ -1,50 +1,64 @@
-import { type ReactNode } from 'react';
+import { type ReactNode, useId } from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/shared/lib/utils';
 
 /**
  * NrccMark: single source of truth for the NRCC brand mark (Header,
- * Sidebar). The glyph is the IEC normally-open contact, closed: the
- * conductor runs in from each edge and ends in an open terminal ring,
- * and the blade lies flat on the line between the rings, drawn heavier
- * than the conductor so it reads as a part, not as wire. Every piece
- * ends under a ring's stroke, so the rings stay open on any ground.
- * Drawn on a 16-unit grid; the glyph sizes below are 1x, 1.5x and 2x.
+ * Sidebar, Login). The glyph is a drawing title block: a solid tile
+ * split into a 2x2 grid that spells N R / C C. Letters and grid rules
+ * are knocked out of the tile with a mask, so the ground shows through
+ * them on any surface and the tile takes the tone's text colour.
+ * Letters are stroke paths, not text, so the mark never depends on a
+ * font. Drawn on a 32-unit grid; each cell is 16 units.
  */
-function ClosedContact() {
+const MARK_LETTERS = {
+  N: 'M4.5 12.5V3.5L11.5 12.5V3.5',
+  R: 'M20.5 12.5V3.5H24.75A2.25 2.25 0 0 1 24.75 8H20.5M24 8L27.5 12.5',
+  C1: 'M11.2 20.8A4.5 4.5 0 1 0 11.2 27.2',
+  C2: 'M27.2 20.8A4.5 4.5 0 1 0 27.2 27.2',
+} as const;
+
+function TitleBlock() {
+  const maskId = `nrcc-mark-${useId().replace(/:/g, '')}`;
   return (
-    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">
-      <g stroke="currentColor">
-        <line x1="0" y1="8" x2="2.25" y2="8" strokeWidth="1.5" />
-        <line x1="13.75" y1="8" x2="16" y2="8" strokeWidth="1.5" />
-        <line x1="5.75" y1="8" x2="10.25" y2="8" strokeWidth="2.5" />
-        <circle cx="4" cy="8" r="1.75" strokeWidth="1.5" />
-        <circle cx="12" cy="8" r="1.75" strokeWidth="1.5" />
-      </g>
+    <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+      <mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width="32" height="32">
+        <rect width="32" height="32" fill="white" />
+        <g fill="none" stroke="black">
+          <line x1="2" y1="16" x2="30" y2="16" strokeWidth="1.5" />
+          <line x1="16" y1="2" x2="16" y2="30" strokeWidth="1.5" />
+          <g strokeWidth="2.25" strokeLinejoin="miter">
+            {Object.entries(MARK_LETTERS).map(([key, d]) => (
+              <path key={key} d={d} data-letter={key} />
+            ))}
+          </g>
+        </g>
+      </mask>
+      <rect width="32" height="32" fill="currentColor" mask={`url(#${maskId})`} />
     </svg>
   );
 }
 
 const nrccMarkVariants = cva(
-  'inline-flex shrink-0 items-center justify-center rounded-box border ' +
+  'inline-flex shrink-0 items-center justify-center ' +
     'transition-colors focus-visible:outline-none focus-visible:ring-2 ' +
     'focus-visible:ring-offset-2 focus-visible:ring-offset-base-100 ' +
-    'focus-visible:ring-ds-accent-primary',
+    'focus-visible:ring-ds-accent-primary [&_svg]:h-full [&_svg]:w-full',
   {
     variants: {
       tone: {
         // Used by the Header topbar mark.
-        accent: 'border-ds-border-default text-ds-accent-primary bg-ds-bg-elevated',
-        primary: 'border-ds-border-default text-ds-brand-primary bg-ds-bg-elevated',
+        accent: 'text-ds-accent-primary',
+        primary: 'text-ds-brand-primary',
         // Subdued mark used inside dense rows.
-        muted: 'border-ds-border-default text-base-content/70 bg-base-300',
-        // Used by the ink navigation rail (Sidebar).
-        rail: 'border-[var(--ds-rail-hairline)] text-[var(--ds-rail-text)] bg-transparent',
+        muted: 'text-base-content/70',
+        // Used by the ink navigation rail (Sidebar): a light tile.
+        rail: 'text-[var(--ds-rail-text)]',
       },
       size: {
-        sm: 'h-9 w-9 [&_svg]:h-4 [&_svg]:w-4',
-        md: 'h-11 w-11 [&_svg]:h-6 [&_svg]:w-6',
-        lg: 'h-14 w-14 [&_svg]:h-8 [&_svg]:w-8',
+        sm: 'h-9 w-9',
+        md: 'h-11 w-11',
+        lg: 'h-14 w-14',
       },
     },
     defaultVariants: {
@@ -66,7 +80,7 @@ export interface NrccMarkProps
   onClick?: () => void;
   /** Extra className for layout positioning (margins, etc.). */
   className?: string;
-  /** Optional override of the inner glyph (defaults to the closed contact). */
+  /** Optional override of the inner glyph (defaults to the title block). */
   icon?: ReactNode;
 }
 
@@ -83,7 +97,7 @@ export function NrccMark({
   className,
   icon,
 }: NrccMarkProps) {
-  const inner = icon ?? <ClosedContact />;
+  const inner = icon ?? <TitleBlock />;
 
   const classes = cn(nrccMarkVariants({ tone, size }), className);
 

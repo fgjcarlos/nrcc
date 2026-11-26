@@ -344,9 +344,9 @@ export function VoiceSection() {
 
 const TONES = ['accent', 'primary', 'muted'] as const;
 const SIZES = [
-  { size: 'sm', glyph: 16 },
-  { size: 'md', glyph: 24 },
-  { size: 'lg', glyph: 32 },
+  { size: 'sm', glyph: 36 },
+  { size: 'md', glyph: 44 },
+  { size: 'lg', glyph: 56 },
 ] as const;
 const FAVICON = `${import.meta.env.BASE_URL}favicon.svg`;
 
@@ -354,9 +354,9 @@ export function LogoSection() {
   return (
     <Section
       title="Logo"
-      intro="The closed IEC normally-open contact: two terminal rings with the blade lying on the line, drawn on a 16-unit grid. Wordmark: NRCC in Overpass."
+      intro="The drawing title block: a solid tile split into a 2×2 grid that spells N R / C C, letters and rules knocked out so the ground shows through. Drawn on a 32-unit grid. Wordmark: NRCC in Overpass."
     >
-      <Specimen name="NrccMark tones and sizes" caption="accent in the header, primary in the sidebar, muted inside dense rows. Glyph sizes are 1×, 1.5× and 2× the grid; 128px is the presentation size.">
+      <Specimen name="NrccMark tones and sizes" caption="accent in the header, rail in the sidebar, primary on the sign-in sheet, muted inside dense rows. The glyph is the tile and fills its box; 128px is the presentation size.">
         <div className="space-y-4">
           {TONES.map((tone) => (
             <div key={tone} className="flex flex-wrap items-center gap-4">
@@ -371,12 +371,12 @@ export function LogoSection() {
           ))}
           <div className="flex flex-wrap items-center gap-4">
             <span className="w-16"><Tag>128px</Tag></span>
-            <NrccMark tone="primary" size="lg" className="h-40 w-40 [&_svg]:h-32 [&_svg]:w-32" />
+            <NrccMark tone="primary" size="lg" className="h-32 w-32" />
             <span className="text-xl font-bold text-ds-text-primary">NRCC</span>
           </div>
         </div>
       </Specimen>
-      <Specimen name="Favicon tile" caption="Ink on a drawing-white tile, so it reads on light and dark browser tabs. Same glyph as docs/assets/nrcc-mark.svg.">
+      <Specimen name="Favicon tile" caption="Ink tile with drawing-white letters on light tabs, inverted on dark tabs (prefers-color-scheme). Same glyph as docs/assets/nrcc-mark.svg.">
         <div className="flex flex-wrap items-end gap-6">
           {[16, 32, 128].map((px) => (
             <div key={px} className="space-y-1">
@@ -388,7 +388,7 @@ export function LogoSection() {
       </Specimen>
       <Specimen
         name="Clear space and minimum size"
-        caption="Keep one terminal-ring diameter (4 units, a quarter of the glyph) clear on every side, and never draw the glyph below 16px (1×), where the rings fill in."
+        caption="Keep a quarter of the tile (8 units) clear on every side. Below 24px the letters merge and only the tile and its cross read; 16px is the favicon floor."
       >
         <div className="flex flex-wrap items-center gap-8">
           <div className="border border-ds-border-strong p-8">
