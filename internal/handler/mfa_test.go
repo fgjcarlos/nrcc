@@ -257,12 +257,12 @@ func TestMfaHandler_VerifyHappyPath(t *testing.T) {
 
 	fresh, _ := totp.GenerateCode(secret, time.Now())
 	body, _ := json.Marshal(model.MfaVerifyRequest{MfaToken: tok, Code: fresh})
-	req := httptest.NewRequest(http.MethodPost, "http://nrcc.example/api/auth/mfa/verify", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "https://nrcc.example/api/auth/mfa/verify", bytes.NewReader(body))
 	jar, err := cookiejar.New(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	jar.SetCookies(req.URL, []*http.Cookie{{Name: refreshCookieName, Value: "old", Path: "/api/auth"}})
+	jar.SetCookies(req.URL, []*http.Cookie{{Name: refreshCookieName, Value: "old", Path: "/api/auth", Secure: true, HttpOnly: true, SameSite: http.SameSiteStrictMode}})
 	for _, cookie := range jar.Cookies(req.URL) {
 		req.AddCookie(cookie)
 	}
@@ -285,8 +285,8 @@ func TestRefresh_MigratesLegacyMFACookie(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	req := httptest.NewRequest(http.MethodPost, "http://nrcc.example/api/auth/refresh", nil)
-	jar.SetCookies(req.URL, []*http.Cookie{{Name: refreshCookieName, Value: legacy, Path: "/api/auth"}})
+	req := httptest.NewRequest(http.MethodPost, "https://nrcc.example/api/auth/refresh", nil)
+	jar.SetCookies(req.URL, []*http.Cookie{{Name: refreshCookieName, Value: legacy, Path: "/api/auth", Secure: true, HttpOnly: true, SameSite: http.SameSiteStrictMode}})
 	assertRefreshCookieLifecycle(t, h, jar)
 }
 
@@ -303,7 +303,7 @@ func assertRefreshCookieLifecycle(t *testing.T, authHandler *AuthHandler, jar ht
 		{"/api/auth/logout", authHandler.Logout, http.StatusOK},
 		{"/api/auth/refresh", authHandler.Refresh, http.StatusUnauthorized},
 	} {
-		req = httptest.NewRequest(http.MethodPost, "http://nrcc.example"+step.path, nil)
+		req = httptest.NewRequest(http.MethodPost, "https://nrcc.example"+step.path, nil)
 		for _, cookie := range jar.Cookies(req.URL) {
 			req.AddCookie(cookie)
 		}
