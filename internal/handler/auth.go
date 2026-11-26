@@ -857,7 +857,12 @@ func (h *AuthHandler) setSetupRefreshCookie(w http.ResponseWriter, r *http.Reque
 }
 
 func (h *AuthHandler) setRefreshCookie(w http.ResponseWriter, r *http.Request, userID string) error {
-	return h.setRefreshCookieWithSecure(w, userID, isSecureRequest(r))
+	secure := isSecureRequest(r)
+	if err := h.setRefreshCookieWithSecure(w, userID, secure); err != nil {
+		return err
+	}
+	clearLegacyRefreshCookie(w, secure)
+	return nil
 }
 
 func (h *AuthHandler) setRefreshCookieWithSecure(w http.ResponseWriter, userID string, secure bool) error {
@@ -865,33 +870,39 @@ func (h *AuthHandler) setRefreshCookieWithSecure(w http.ResponseWriter, userID s
 	if err != nil {
 		return err
 	}
-	// #nosec G124 -- Secure is computed via isSecureRequest which inspects r.TLS and X-Forwarded-Proto; cosmetically insecure over plain HTTP only.
-	http.SetCookie(w, &http.Cookie{
-		Name:  refreshCookieName,
-		Value: refreshToken,
-		// Path is "/" so the cookie rides every request, not just
-		// /api/auth/*. Required when the backend is behind a reverse
-		// proxy (e.g. Tailscale Serve, Portless) that may rewrite the
-		// Host header upstream — a narrower Path combined with a
-		// rewritten Host made the cookie's effective host mismatch
-		// the browser's origin and dropped the cookie on F5.
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   secure,
-		SameSite: http.SameSiteStrictMode,
-		MaxAge:   int(service.RefreshTokenLifetime / time.Second),
-	})
+	writeRefreshCookie(w, refreshToken, secure, int(service.RefreshTokenLifetime/time.Second))
 	return nil
 }
 
 func clearRefreshCookie(w http.ResponseWriter, r *http.Request) {
-	// #nosec G124 -- Secure is computed via isSecureRequest which inspects r.TLS and X-Forwarded-Proto; cosmetically insecure over plain HTTP only.
-	http.SetCookie(w, &http.Cookie{
-		Name:     refreshCookieName,
-		Value:    "",
+	secure := isSecureRequest(r)
+	writeRefreshCookie(w, "", secure, -1)
+	clearLegacyRefreshCookie(w, secure)
+}
+
+func writeRefreshCookie(w http.ResponseWriter, token string, secure bool, maxAge int) {
+	cookie := http.Cookie{
+		Name:  refreshCookieName,
+		Value: token,
+		// Keep the established root scope across login, refresh, and logout.
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   isSecureRequest(r),
+		Secure:   secure,
+		SameSite: http.SameSiteStrictMode,
+		MaxAge:   maxAge,
+	}
+	// #nosec G124 -- Secure is computed from the transport or proxy configuration.
+	http.SetCookie(w, &cookie)
+}
+
+// An older MFA cookie would otherwise take precedence over the root cookie.
+func clearLegacyRefreshCookie(w http.ResponseWriter, secure bool) {
+	// #nosec G124 -- Match the transport security of the root cookie.
+	http.SetCookie(w, &http.Cookie{
+		Name:     refreshCookieName,
+		Path:     "/api/auth",
+		HttpOnly: true,
+		Secure:   secure,
 		SameSite: http.SameSiteStrictMode,
 		MaxAge:   -1,
 	})
