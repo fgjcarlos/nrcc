@@ -89,6 +89,7 @@ func TestProcessManagerCapturesLevelFromResolvedSettingsPath(t *testing.T) {
 	t.Setenv("NODE_RED_SETTINGS", settingsPath)
 	t.Setenv("NODE_RED_PORT", strconv.Itoa(unusedRuntimePortForTest(t)))
 	launcher := filepath.Join(t.TempDir(), "node-red-fixture")
+	// #nosec G306 -- this launcher is an executable fixture in the test temporary directory.
 	if err := os.WriteFile(launcher, []byte("#!/bin/sh\nexec /bin/sleep 60\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}

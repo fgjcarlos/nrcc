@@ -196,6 +196,7 @@ func (pm *ProcessManager) RuntimeConsoleLoggingStatus() model.RuntimeConsoleLogg
 // readConsoleLoggingLevel reads only a literal string from the console
 // handler in settings.js. It never evaluates the JavaScript source.
 func readConsoleLoggingLevel(path string) *string {
+	// #nosec G304 -- path is the operator-configured settings path resolved for this managed launch.
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return nil
