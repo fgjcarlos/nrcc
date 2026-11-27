@@ -1633,7 +1633,7 @@ export interface paths {
         /**
          * Save AI provider configuration
          * @description **Admin only.** Saves enabled state, provider, endpoint, model, and an optional write-only API key.
-         *     Existing keys are preserved when `apiKey` is omitted or empty.
+         *     When `apiKey` is omitted or empty, a saved key is retained only if the provider and endpoint origin are unchanged. `timeoutSeconds` defaults to 30 when omitted or zero and must be an integer from 1 through 300 when nonzero. It applies only to flow analysis; connection tests retain a five-second timeout.
          */
         put: operations["putAIConfig"];
         post?: never;
@@ -1675,66 +1675,6 @@ export interface paths {
          * @description Returns the non-secret provider capability contract without initiating a connection test.
          */
         get: operations["getAIStatus"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/ai/analyze/patterns": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Analyze flow patterns with AI
-         * @description AI-powered pattern analysis. Not yet implemented.
-         */
-        post: operations["aiAnalyzePatterns"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/ai/patterns/{id}/readme": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get pattern documentation
-         * @description Returns documentation for an AI-detected pattern. Not yet implemented.
-         */
-        get: operations["aiGetPatternReadme"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/ai/patterns/{id}/download": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Download a pattern
-         * @description Downloads an AI-detected pattern. Not yet implemented.
-         */
-        get: operations["aiDownloadPattern"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1785,34 +1725,86 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
-        AIConfigInput: {
+        AIFlowRequest: {
+            /** @enum {string} */
+            action?: "explain" | "suggest" | "audit" | "generate";
+            flow: {
+                [key: string]: unknown;
+            };
+            prompt?: string;
+            /** @description Build a preview without contacting the provider. */
+            previewOnly?: boolean;
+            /** @description Reject execution with 409 if the rebuilt preview differs. */
+            previewToken?: string;
+        };
+        AIFlowResponse: {
             enabled: boolean;
             /** @enum {string} */
-            provider: "offline" | "openai";
+            provider: "offline" | "openai" | "anthropic" | "ollama";
+            action: string;
+            reviewOnly: boolean;
+            redacted: boolean;
+            summary: string;
+            suggestions?: string[];
+            auditFindings?: string[];
+            candidateFlow?: {
+                nodes: {
+                    [key: string]: unknown;
+                }[];
+            };
+            previewToken?: string;
+            request?: {
+                /** @enum {string} */
+                provider?: "offline" | "openai" | "anthropic" | "ollama";
+                endpoint?: string;
+                model?: string;
+                body?: {
+                    [key: string]: unknown;
+                };
+                messages?: {
+                    role?: string;
+                    content?: string;
+                }[];
+                meta?: {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        AIConfigInput: {
+            enabled: boolean;
+            /** @description Explicit opt-in for native Ollama on private/loopback HTTP. */
+            allowPrivateHTTP?: boolean;
+            /** @enum {string} */
+            provider: "offline" | "openai" | "anthropic" | "ollama";
             /**
              * Format: uri
-             * @description HTTPS provider endpoint. Not required for the offline provider.
+             * @description HTTPS endpoint, except native Ollama may use literal private or loopback HTTP when allowPrivateHTTP is enabled. Not required for offline mode.
              */
             endpoint?: string;
             model?: string;
             /** @description Optional write-only provider secret. Never returned by NRCC. */
             apiKey?: string;
+            /** @description Flow analysis timeout in seconds. Omitted or zero uses 30; nonzero values below 1 are invalid. Connection tests are always limited to five seconds. */
+            timeoutSeconds?: number;
         };
         AIConfig: {
             enabled: boolean;
+            allowPrivateHTTP?: boolean;
             /** @enum {string} */
-            provider: "offline" | "openai";
+            provider: "offline" | "openai" | "anthropic" | "ollama";
             /** Format: uri */
             endpoint?: string;
             model?: string;
             /** @description Indicates only whether a write-only key is configured. */
             apiKeyConfigured: boolean;
+            /** @description Effective flow analysis timeout in seconds. */
+            timeoutSeconds: number;
         };
         AIProviderStatus: {
             /** @enum {string} */
             status: "disabled" | "incomplete" | "testing" | "unreachable" | "ready";
             /** @enum {string} */
-            provider: "offline" | "openai";
+            provider: "offline" | "openai" | "anthropic" | "ollama";
             /** Format: uri */
             endpoint?: string;
             model?: string;
@@ -2674,6 +2666,14 @@ export interface components {
             timestamp: string;
         } & {
             data?: components["schemas"]["HealthStatus"];
+        };
+        SuccessEnvelope_AIFlowResponse: {
+            /** @enum {boolean} */
+            success: true;
+            /** Format: date-time */
+            timestamp: string;
+        } & {
+            data?: components["schemas"]["AIFlowResponse"];
         };
         SuccessEnvelope_AIConfig: {
             /** @enum {boolean} */
@@ -5462,19 +5462,53 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AIFlowRequest"];
+            };
+        };
         responses: {
-            /** @description Flow analysis result */
+            /** @description Parsed, review-only flow analysis */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope_AIFlowResponse"];
+                };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            /** @description Preview no longer matches the request (AI_PREVIEW_CHANGED) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Provider failure or credentials rejected by the provider (AI_PROVIDER_ERROR or AI_PROVIDER_AUTH_FAILED) */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
             /** @description AI provider is disabled or not configured */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Provider analysis timed out (AI_PROVIDER_TIMEOUT) */
+            504: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5527,7 +5561,7 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_AIConfig"];
                 };
             };
-            /** @description Invalid provider or endpoint */
+            /** @description Invalid provider, endpoint, or timeout (`AI_INVALID_TIMEOUT` for timeout values outside 1–300) */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -5599,73 +5633,6 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
-        };
-    };
-    aiAnalyzePatterns: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            401: components["responses"]["Unauthorized"];
-            /** @description Not implemented */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    aiGetPatternReadme: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            401: components["responses"]["Unauthorized"];
-            /** @description Not implemented */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    aiDownloadPattern: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            401: components["responses"]["Unauthorized"];
-            /** @description Not implemented */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
         };
     };
 }

@@ -92,6 +92,27 @@ func (h *AIHandler) TestConfig(w http.ResponseWriter, r *http.Request) {
 	model.RespondJSON(w, http.StatusOK, status)
 }
 
+// analysisError maps an analysis failure to its HTTP status. Upstream
+// outages must never look like a client mistake (issue #1077).
+func analysisError(err error) (int, string) {
+	switch {
+	case errors.Is(err, http.ErrHandlerTimeout), errors.Is(err, service.ErrAITimeout):
+		return http.StatusGatewayTimeout, "AI_PROVIDER_TIMEOUT"
+	case errors.Is(err, service.ErrAIProviderServer):
+		return http.StatusBadGateway, "AI_PROVIDER_ERROR"
+	case errors.Is(err, service.ErrAIProviderAuth):
+		return http.StatusBadGateway, "AI_PROVIDER_AUTH_FAILED"
+	case errors.Is(err, service.ErrAIPreviewChanged):
+		return http.StatusConflict, "AI_PREVIEW_CHANGED"
+	case errors.Is(err, service.ErrAIDisabled):
+		return http.StatusServiceUnavailable, "AI_DISABLED"
+	case errors.Is(err, service.ErrAIKeyRequired), errors.Is(err, service.ErrAIEndpointReqd):
+		return http.StatusServiceUnavailable, "AI_NOT_CONFIGURED"
+	default:
+		return http.StatusBadRequest, "AI_REQUEST_ERROR"
+	}
+}
+
 func (h *AIHandler) respondConfigError(w http.ResponseWriter, err error) {
 	status, code := http.StatusInternalServerError, "AI_CONFIG_ERROR"
 	switch {
@@ -99,6 +120,8 @@ func (h *AIHandler) respondConfigError(w http.ResponseWriter, err error) {
 		status, code = http.StatusBadRequest, "AI_INVALID_PROVIDER"
 	case errors.Is(err, service.ErrAIInvalidEndpoint):
 		status, code = http.StatusBadRequest, "AI_INVALID_ENDPOINT"
+	case errors.Is(err, service.ErrAIInvalidTimeout):
+		status, code = http.StatusBadRequest, "AI_INVALID_TIMEOUT"
 	case errors.Is(err, service.ErrAIEncryptionKeyRequired):
 		status, code = http.StatusServiceUnavailable, "AI_ENCRYPTION_KEY_REQUIRED"
 	case errors.Is(err, service.ErrAIConfigIncomplete), errors.Is(err, service.ErrAIKeyRequired):
@@ -107,17 +130,28 @@ func (h *AIHandler) respondConfigError(w http.ResponseWriter, err error) {
 		status, code = http.StatusServiceUnavailable, "AI_DISABLED"
 	case errors.Is(err, service.ErrAIProbeTimeout):
 		status, code = http.StatusGatewayTimeout, "AI_PROBE_TIMEOUT"
+	case errors.Is(err, service.ErrAIProviderAuth):
+		status, code = http.StatusBadGateway, "AI_PROVIDER_AUTH_FAILED"
 	case errors.Is(err, service.ErrAIProbeUnreachable):
 		status, code = http.StatusBadGateway, "AI_PROBE_UNREACHABLE"
 	}
-	model.RespondError(w, status, code, err.Error())
+	message := err.Error()
+	if errors.Is(err, service.ErrAIProbeTimeout) {
+		message = "AI provider connection test timed out"
+	} else if errors.Is(err, service.ErrAIProbeUnreachable) {
+		message = "AI provider could not be reached"
+	}
+	model.RespondError(w, status, code, message)
 }
 
 // PostAnalyzeFlow analyzes a flow with explicit, review-first AI assistance.
 // POST /api/ai/analyze/flow
 func (h *AIHandler) PostAnalyzeFlow(w http.ResponseWriter, r *http.Request) {
+	var cfg service.AIConfig
 	if h.configSvc != nil {
-		providerStatus, err := h.configSvc.Status()
+		var providerStatus service.AIProviderStatus
+		var err error
+		cfg, providerStatus, err = h.configSvc.LoadWithStatus()
 		if err != nil {
 			h.respondConfigError(w, err)
 			return
@@ -138,27 +172,11 @@ func (h *AIHandler) PostAnalyzeFlow(w http.ResponseWriter, r *http.Request) {
 
 	aiSvc := h.svc
 	if h.configSvc != nil {
-		cfg, err := h.configSvc.Load()
-		if err != nil {
-			h.respondConfigError(w, err)
-			return
-		}
 		aiSvc = service.NewAIService(cfg)
 	}
 	resp, err := aiSvc.AssistFlow(r.Context(), req)
 	if err != nil {
-		status := http.StatusBadRequest
-		code := "AI_REQUEST_ERROR"
-		if errors.Is(err, http.ErrHandlerTimeout) {
-			status = http.StatusGatewayTimeout
-		}
-		if errors.Is(err, service.ErrAIDisabled) {
-			status = http.StatusServiceUnavailable
-			code = "AI_DISABLED"
-		} else if errors.Is(err, service.ErrAIKeyRequired) || errors.Is(err, service.ErrAIEndpointReqd) {
-			status = http.StatusServiceUnavailable
-			code = "AI_NOT_CONFIGURED"
-		}
+		status, code := analysisError(err)
 		model.RespondError(w, status, code, err.Error())
 		return
 	}

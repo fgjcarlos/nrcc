@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -76,6 +78,49 @@ func TestAIConfigServicePersistsEncryptedSecretAndReturnsRedactedView(t *testing
 	}
 }
 
+func TestAIConfigServicePersistsAnalysisTimeout(t *testing.T) {
+	svc := NewAIConfigService(t.TempDir(), "encryption-key")
+	saveAIConfig(t, svc, AIConfig{Enabled: true, Provider: "offline", TimeoutSeconds: 42})
+
+	cfg := loadAIConfig(t, svc)
+	if cfg.TimeoutSeconds != 42 {
+		t.Fatalf("Load().TimeoutSeconds = %d, want 42", cfg.TimeoutSeconds)
+	}
+	view, err := svc.View()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if view.TimeoutSeconds != 42 {
+		t.Fatalf("View().TimeoutSeconds = %d, want 42", view.TimeoutSeconds)
+	}
+}
+
+func TestAIConfigServiceDefaultsAndValidatesAnalysisTimeout(t *testing.T) {
+	svc := NewAIConfigService(t.TempDir(), "encryption-key")
+	for _, timeout := range []int{0, 1, 300} {
+		cfg := AIConfig{Enabled: true, Provider: "offline", TimeoutSeconds: timeout}
+		if err := svc.Validate(cfg); err != nil {
+			t.Fatalf("Validate(timeout=%d): %v", timeout, err)
+		}
+		if err := svc.Save(cfg); err != nil {
+			t.Fatalf("Save(timeout=%d): %v", timeout, err)
+		}
+		loaded := loadAIConfig(t, svc)
+		want := timeout
+		if want == 0 {
+			want = 30
+		}
+		if loaded.TimeoutSeconds != want {
+			t.Fatalf("timeout=%d loaded=%d want=%d", timeout, loaded.TimeoutSeconds, want)
+		}
+	}
+	for _, timeout := range []int{-1, 301} {
+		if err := svc.Validate(AIConfig{Provider: "offline", TimeoutSeconds: timeout}); !errors.Is(err, ErrAIInvalidTimeout) {
+			t.Errorf("Validate(timeout=%d) = %v, want ErrAIInvalidTimeout", timeout, err)
+		}
+	}
+}
+
 func TestAIConfigServiceUsesEnvironmentOnlyWithoutPersistedConfig(t *testing.T) {
 	t.Setenv("NRCC_AI_ENABLED", "true")
 	t.Setenv("NRCC_AI_PROVIDER", "openai")
@@ -85,7 +130,7 @@ func TestAIConfigServiceUsesEnvironmentOnlyWithoutPersistedConfig(t *testing.T) 
 
 	svc := NewAIConfigService(t.TempDir(), "encryption-key")
 	cfg := loadAIConfig(t, svc)
-	if cfg.Endpoint != "https://env.example.test/v1" || cfg.APIKey != "env-key" {
+	if cfg.Endpoint != "https://env.example.test/v1" || cfg.APIKey != "env-key" || cfg.TimeoutSeconds != 30 {
 		t.Fatalf("Load() did not use environment fallback: %#v", cfg)
 	}
 }
@@ -246,6 +291,27 @@ func TestAIConfigServiceSaveInvalidatesChangedRemoteConnectionAndPreservesExisti
 	}
 }
 
+func TestAIConfigServiceTestDoesNotMarkChangedConfigurationReady(t *testing.T) {
+	started, release := make(chan struct{}), make(chan struct{})
+	svc := NewAIConfigService(t.TempDir(), "encryption-key", WithAIProviderProbe(func(context.Context, AIConfig) error { close(started); <-release; return nil }))
+	saveAIConfig(t, svc, AIConfig{Enabled: true, Provider: "openai", Endpoint: "https://old.example.test/v1/chat/completions", Model: "m", APIKey: "synthetic-key"})
+	done := make(chan error, 1)
+	go func() { _, err := svc.Test(context.Background()); done <- err }()
+	<-started
+	saveAIConfig(t, svc, AIConfig{Enabled: true, Provider: "openai", Endpoint: "https://new.example.test/v1/chat/completions", Model: "m"})
+	close(release)
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	status, err := svc.Status()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.Status != "incomplete" {
+		t.Fatalf("stale probe marked changed config %q ready", status.Status)
+	}
+}
+
 func TestAIConfigServiceTestRecordsSafeConnectionStatus(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -285,6 +351,35 @@ func TestAIConfigServiceTestRecordsSafeConnectionStatus(t *testing.T) {
 			}
 			if persisted != got {
 				t.Errorf("Status() = %#v, want persisted result %#v", persisted, got)
+			}
+		})
+	}
+}
+
+func TestAIProviderProbeUsesProviderRequestBuilder(t *testing.T) {
+	for _, provider := range []string{"openai", "anthropic", "ollama"} {
+		t.Run(provider, func(t *testing.T) {
+			path := map[string]string{"openai": "/v1/chat/completions", "anthropic": "/v1/messages", "ollama": "/api/chat"}[provider]
+			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != path {
+					t.Errorf("path=%s want %s", r.URL.Path, path)
+				}
+				if provider == "ollama" && r.Header.Get("Authorization") != "" {
+					t.Error("Ollama probe sent authorization")
+				}
+				if provider == "anthropic" && r.Header.Get("anthropic-version") == "" {
+					t.Error("missing Anthropic version")
+				}
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer server.Close()
+			cfg := AIConfig{Enabled: true, Provider: provider, Endpoint: server.URL, Model: "probe-model", APIKey: "synthetic-key"}
+			svc := NewAIConfigService(t.TempDir(), "synthetic-encryption-key", WithAIProviderProbe(func(ctx context.Context, cfg AIConfig) error { return probeAIProvider(ctx, cfg, server.Client()) }))
+			if err := svc.Save(cfg); err != nil {
+				t.Fatal(err)
+			}
+			if err := svc.Probe(context.Background()); err != nil {
+				t.Fatal(err)
 			}
 		})
 	}

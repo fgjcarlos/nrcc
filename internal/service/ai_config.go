@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -22,6 +21,7 @@ var (
 	ErrAIConfigIncomplete      = errors.New("AI provider configuration is incomplete")
 	ErrAIInvalidProvider       = errors.New("AI provider is not supported")
 	ErrAIInvalidEndpoint       = errors.New("AI provider endpoint is invalid")
+	ErrAIInvalidTimeout        = ErrAITimeoutInvalid
 	ErrAIProbeTimeout          = errors.New("AI provider connection probe timed out")
 	ErrAIProbeUnreachable      = errors.New("AI provider connection probe failed")
 )
@@ -29,13 +29,15 @@ var (
 const defaultAIProbeTimeout = 5 * time.Second
 
 type persistedAIConfig struct {
-	Enabled        bool   `json:"enabled"`
-	Provider       string `json:"provider"`
-	Endpoint       string `json:"endpoint,omitempty"`
-	Model          string `json:"model,omitempty"`
-	APIKey         string `json:"apiKey,omitempty"`
-	Connection     string `json:"connection,omitempty"`
-	ConnectionNote string `json:"connectionNote,omitempty"`
+	Enabled          bool   `json:"enabled"`
+	Provider         string `json:"provider"`
+	Endpoint         string `json:"endpoint,omitempty"`
+	Model            string `json:"model,omitempty"`
+	APIKey           string `json:"apiKey,omitempty"`
+	AllowPrivateHTTP bool   `json:"allowPrivateHTTP,omitempty"`
+	Connection       string `json:"connection,omitempty"`
+	ConnectionNote   string `json:"connectionNote,omitempty"`
+	TimeoutSeconds   int    `json:"timeoutSeconds,omitempty"`
 }
 
 // AIConfigView is the safe configuration representation for API consumers.
@@ -45,6 +47,8 @@ type AIConfigView struct {
 	Endpoint         string `json:"endpoint,omitempty"`
 	Model            string `json:"model,omitempty"`
 	APIKeyConfigured bool   `json:"apiKeyConfigured"`
+	AllowPrivateHTTP bool   `json:"allowPrivateHTTP"`
+	TimeoutSeconds   int    `json:"timeoutSeconds"`
 }
 
 // AIProviderStatus is the safe capability contract consumed by UI clients.
@@ -102,16 +106,22 @@ func NewAIConfigService(dataDir, encryptionKey string, opts ...AIConfigServiceOp
 }
 
 // Save updates the persisted provider configuration. A supplied API key is
-// always AES-GCM encrypted; an omitted key preserves the existing write-only
-// secret. JSONStore atomically writes the resulting 0600 file.
+// always AES-GCM encrypted. Omitting it preserves the existing write-only key
+// only for the same provider and origin. JSONStore atomically writes a 0600 file.
 func (s *AIConfigService) Save(cfg AIConfig) error {
 	cfg = normalizeAIConfig(cfg)
+	if cfg.TimeoutSeconds < 1 || cfg.TimeoutSeconds > 300 {
+		return ErrAIInvalidTimeout
+	}
 	if !isSupportedAIProvider(cfg.Provider) {
 		return fmt.Errorf("%w: %s", ErrAIInvalidProvider, cfg.Provider)
 	}
 
 	if err := s.store.Update(func(persisted *persistedAIConfig) error {
 		apiKey := persisted.APIKey
+		if (cfg.Provider != persisted.Provider || endpointOrigin(cfg.Endpoint) != endpointOrigin(persisted.Endpoint)) && cfg.APIKey == "" {
+			apiKey = ""
+		}
 		connection := persisted.Connection
 		connectionNote := persisted.ConnectionNote
 		if cfg.APIKey != "" {
@@ -127,17 +137,19 @@ func (s *AIConfigService) Save(cfg AIConfig) error {
 		// A successful remote probe applies only to the exact saved settings. Keep
 		// an existing result for an unchanged configuration, but require a new
 		// bounded probe after any setting that can affect connectivity changes.
-		if cfg.Enabled != persisted.Enabled || cfg.Provider != persisted.Provider || cfg.Endpoint != persisted.Endpoint || cfg.Model != persisted.Model || cfg.APIKey != "" {
+		if cfg.Enabled != persisted.Enabled || cfg.Provider != persisted.Provider || cfg.Endpoint != persisted.Endpoint || cfg.Model != persisted.Model || cfg.AllowPrivateHTTP != persisted.AllowPrivateHTTP || cfg.APIKey != "" {
 			connection, connectionNote = "", ""
 		}
 		*persisted = persistedAIConfig{
-			Enabled:        cfg.Enabled,
-			Provider:       cfg.Provider,
-			Endpoint:       cfg.Endpoint,
-			Model:          cfg.Model,
-			APIKey:         apiKey,
-			Connection:     connection,
-			ConnectionNote: connectionNote,
+			Enabled:          cfg.Enabled,
+			Provider:         cfg.Provider,
+			Endpoint:         cfg.Endpoint,
+			Model:            cfg.Model,
+			APIKey:           apiKey,
+			AllowPrivateHTTP: cfg.AllowPrivateHTTP,
+			TimeoutSeconds:   cfg.TimeoutSeconds,
+			Connection:       connection,
+			ConnectionNote:   connectionNote,
 		}
 		return nil
 	}); err != nil {
@@ -151,10 +163,13 @@ func (s *AIConfigService) Save(cfg AIConfig) error {
 // can save a draft, but rejects malformed endpoints.
 func (s *AIConfigService) Validate(cfg AIConfig) error {
 	cfg = normalizeAIConfig(cfg)
+	if cfg.TimeoutSeconds < 1 || cfg.TimeoutSeconds > 300 {
+		return ErrAIInvalidTimeout
+	}
 	if !isSupportedAIProvider(cfg.Provider) {
 		return fmt.Errorf("%w: %s", ErrAIInvalidProvider, cfg.Provider)
 	}
-	if cfg.Endpoint != "" && !validAIEndpoint(cfg.Endpoint) {
+	if cfg.Endpoint != "" && !validAIEndpointFor(cfg) {
 		return ErrAIInvalidEndpoint
 	}
 	return nil
@@ -177,7 +192,11 @@ func (s *AIConfigService) Load() (AIConfig, error) {
 	if !isSupportedAIProvider(persisted.Provider) {
 		return AIConfig{}, fmt.Errorf("%w: %s", ErrAIInvalidProvider, persisted.Provider)
 	}
-	cfg := AIConfig{Enabled: persisted.Enabled, Provider: persisted.Provider, Endpoint: persisted.Endpoint, Model: persisted.Model}
+	return s.configFromPersisted(persisted)
+}
+
+func (s *AIConfigService) configFromPersisted(persisted persistedAIConfig) (AIConfig, error) {
+	cfg := normalizeAIConfig(AIConfig{Enabled: persisted.Enabled, Provider: persisted.Provider, Endpoint: persisted.Endpoint, Model: persisted.Model, AllowPrivateHTTP: persisted.AllowPrivateHTTP, TimeoutSeconds: persisted.TimeoutSeconds})
 	if persisted.APIKey == "" {
 		return cfg, nil
 	}
@@ -197,29 +216,33 @@ func (s *AIConfigService) View() (AIConfigView, error) {
 	if err != nil {
 		return AIConfigView{}, err
 	}
-	return AIConfigView{Enabled: cfg.Enabled, Provider: cfg.Provider, Endpoint: cfg.Endpoint, Model: cfg.Model, APIKeyConfigured: cfg.APIKey != ""}, nil
+	return AIConfigView{Enabled: cfg.Enabled, Provider: cfg.Provider, Endpoint: cfg.Endpoint, Model: cfg.Model, APIKeyConfigured: cfg.APIKey != "", AllowPrivateHTTP: cfg.AllowPrivateHTTP, TimeoutSeconds: cfg.TimeoutSeconds}, nil
 }
 
-// Status returns the provider capability without contacting the provider.
-// The last connection result is persisted by Test so callers can distinguish a
-// complete configuration from a recently unreachable provider.
-func (s *AIConfigService) Status() (AIProviderStatus, error) {
+// LoadWithStatus returns configuration and capability status from one persisted snapshot.
+func (s *AIConfigService) LoadWithStatus() (AIConfig, AIProviderStatus, error) {
 	persisted, err := s.store.Read()
 	if errors.Is(err, os.ErrNotExist) {
 		cfg := normalizeAIConfig(LoadAIConfigFromEnv())
 		if !isSupportedAIProvider(cfg.Provider) {
-			return AIProviderStatus{}, fmt.Errorf("%w: %s", ErrAIInvalidProvider, cfg.Provider)
+			return AIConfig{}, AIProviderStatus{}, fmt.Errorf("%w: %s", ErrAIInvalidProvider, cfg.Provider)
 		}
-		return aiProviderStatus(cfg, "", ""), nil
+		return cfg, aiProviderStatus(cfg, "", ""), nil
 	}
 	if err != nil {
-		return AIProviderStatus{}, fmt.Errorf("read AI provider configuration: %w", err)
+		return AIConfig{}, AIProviderStatus{}, fmt.Errorf("read AI provider configuration: %w", err)
 	}
-	cfg, err := s.Load()
+	cfg, err := s.configFromPersisted(persisted)
 	if err != nil {
-		return AIProviderStatus{}, err
+		return AIConfig{}, AIProviderStatus{}, err
 	}
-	return aiProviderStatus(cfg, persisted.Connection, persisted.ConnectionNote), nil
+	return cfg, aiProviderStatus(cfg, persisted.Connection, persisted.ConnectionNote), nil
+}
+
+// Status returns provider capability without contacting the provider.
+func (s *AIConfigService) Status() (AIProviderStatus, error) {
+	_, status, err := s.LoadWithStatus()
+	return status, err
 }
 
 func aiProviderStatus(cfg AIConfig, connection, note string) AIProviderStatus {
@@ -232,7 +255,7 @@ func aiProviderStatus(cfg AIConfig, connection, note string) AIProviderStatus {
 		status.Status = "ready"
 		return status
 	}
-	if cfg.Endpoint == "" || cfg.Model == "" || cfg.APIKey == "" || !validAIEndpoint(cfg.Endpoint) {
+	if cfg.Endpoint == "" || cfg.Model == "" || (cfg.APIKey == "" && cfg.Provider != "ollama") || !validAIEndpointFor(cfg) {
 		status.Status, status.Reason = "incomplete", "Provider endpoint, model, and API key are required"
 		return status
 	}
@@ -251,20 +274,91 @@ func aiProviderStatus(cfg AIConfig, connection, note string) AIProviderStatus {
 // Test runs a bounded provider probe and persists only its safe outcome. It
 // never stores or exposes transport errors, which may include credentials.
 func (s *AIConfigService) Test(ctx context.Context) (AIProviderStatus, error) {
-	if err := s.updateConnection("testing", "Connection test is in progress"); err != nil {
-		return AIProviderStatus{}, err
-	}
-	if err := s.Probe(ctx); err != nil {
-		status, updateErr := s.recordProbeFailure(err)
-		if updateErr != nil {
-			return AIProviderStatus{}, updateErr
+	snapshot, err := s.store.Read()
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			if err = s.updateConnection("testing", "Connection test is in progress"); err != nil {
+				return AIProviderStatus{}, err
+			}
+			if err = s.Probe(ctx); err != nil {
+				status, e := s.recordProbeFailure(err)
+				return status, firstError(e, err)
+			}
+			if err = s.updateConnection("ready", ""); err != nil {
+				return AIProviderStatus{}, err
+			}
+			return s.Status()
 		}
-		return status, err
-	}
-	if err := s.updateConnection("ready", ""); err != nil {
 		return AIProviderStatus{}, err
 	}
-	return s.Status()
+	cfg, err := s.configFromPersisted(snapshot)
+	if err != nil {
+		return AIProviderStatus{}, err
+	}
+	updated, err := s.updateConnectionFor(snapshot, "testing", "Connection test is in progress")
+	if err != nil {
+		return AIProviderStatus{}, err
+	}
+	if !updated {
+		return s.Status()
+	}
+	probeErr := s.probeConfig(ctx, cfg)
+	state, note := "ready", ""
+	if probeErr != nil {
+		state, note = safeProbeResult(probeErr)
+	}
+	updated, err = s.updateConnectionFor(snapshot, state, note)
+	if err != nil {
+		return AIProviderStatus{}, err
+	}
+	if !updated {
+		return s.Status()
+	}
+	status, err := s.Status()
+	if err != nil {
+		return AIProviderStatus{}, err
+	}
+	return status, probeErr
+}
+
+func firstError(a, b error) error {
+	if a != nil {
+		return a
+	}
+	return b
+}
+
+func sameAISettings(a, b persistedAIConfig) bool {
+	return a.Enabled == b.Enabled && a.Provider == b.Provider && a.Endpoint == b.Endpoint && a.Model == b.Model && a.APIKey == b.APIKey && a.AllowPrivateHTTP == b.AllowPrivateHTTP
+}
+
+func (s *AIConfigService) updateConnectionFor(expected persistedAIConfig, status, note string) (bool, error) {
+	matched := false
+	err := s.store.Update(func(current *persistedAIConfig) error {
+		if !sameAISettings(*current, expected) {
+			return nil
+		}
+		current.Connection = status
+		current.ConnectionNote = note
+		matched = true
+		return nil
+	})
+	return matched, err
+}
+
+func safeProbeResult(err error) (string, string) {
+	switch {
+	case errors.Is(err, ErrAIDisabled):
+		return "disabled", "AI provider is disabled"
+	case errors.Is(err, ErrAIConfigIncomplete), errors.Is(err, ErrAIKeyRequired), errors.Is(err, ErrAIInvalidEndpoint):
+		return "incomplete", "Provider endpoint, model, and credentials are required"
+	case errors.Is(err, ErrAIProbeTimeout):
+		return "unreachable", "The provider did not respond before the connection test timed out"
+	case errors.Is(err, ErrAIProviderAuth):
+		return "unreachable", ErrAIProviderAuth.Error()
+	default:
+		return "unreachable", "The provider could not be reached"
+	}
 }
 
 func (s *AIConfigService) recordProbeFailure(probeErr error) (AIProviderStatus, error) {
@@ -298,6 +392,10 @@ func (s *AIConfigService) Probe(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	return s.probeConfig(ctx, cfg)
+}
+
+func (s *AIConfigService) probeConfig(ctx context.Context, cfg AIConfig) error {
 	if !cfg.Enabled {
 		return ErrAIDisabled
 	}
@@ -307,10 +405,10 @@ func (s *AIConfigService) Probe(ctx context.Context) error {
 	if cfg.Endpoint == "" || cfg.Model == "" {
 		return ErrAIConfigIncomplete
 	}
-	if cfg.APIKey == "" {
+	if cfg.APIKey == "" && cfg.Provider != "ollama" {
 		return ErrAIKeyRequired
 	}
-	if !validAIEndpoint(cfg.Endpoint) {
+	if !validAIEndpointFor(cfg) {
 		return ErrAIInvalidEndpoint
 	}
 	probeCtx, cancel := context.WithTimeout(ctx, s.timeout)
@@ -325,7 +423,7 @@ func (s *AIConfigService) Probe(ctx context.Context) error {
 	if errors.Is(probeErr, context.DeadlineExceeded) {
 		return fmt.Errorf("%w: %w", ErrAIProbeTimeout, probeErr)
 	}
-	if errors.Is(probeErr, context.Canceled) {
+	if errors.Is(probeErr, context.Canceled) || errors.Is(probeErr, ErrAIProviderAuth) {
 		return probeErr
 	}
 	if probeErr != nil {
@@ -335,6 +433,9 @@ func (s *AIConfigService) Probe(ctx context.Context) error {
 }
 
 func normalizeAIConfig(cfg AIConfig) AIConfig {
+	if cfg.TimeoutSeconds == 0 {
+		cfg.TimeoutSeconds = 30
+	}
 	cfg.Provider = strings.ToLower(strings.TrimSpace(cfg.Provider))
 	cfg.Endpoint = strings.TrimSpace(cfg.Endpoint)
 	cfg.Model = strings.TrimSpace(cfg.Model)
@@ -342,35 +443,58 @@ func normalizeAIConfig(cfg AIConfig) AIConfig {
 }
 
 func isSupportedAIProvider(provider string) bool {
-	return provider == "offline" || provider == "openai"
+	return provider == "offline" || provider == "openai" || provider == "anthropic" || provider == "ollama"
 }
 
-func validAIEndpoint(endpoint string) bool {
-	u, err := url.ParseRequestURI(endpoint)
-	return err == nil && u.Scheme == "https" && u.Host != "" && u.User == nil && u.RawQuery == "" && u.Fragment == ""
+func endpointOrigin(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return ""
+	}
+	return strings.ToLower(u.Scheme + "://" + u.Host)
 }
 
 func defaultAIProviderProbe(ctx context.Context, cfg AIConfig) error {
-	body, err := json.Marshal(map[string]interface{}{
-		"model":      cfg.Model,
-		"messages":   []AIMessage{{Role: "user", Content: "Connection test"}},
-		"max_tokens": 1,
-	})
-	if err != nil {
-		return fmt.Errorf("encode provider connection probe: %w", err)
+	return probeAIProvider(ctx, cfg, &http.Client{Timeout: defaultAIProbeTimeout})
+}
+
+func cloneAIHTTPClient(client *http.Client) *http.Client {
+	if client == nil {
+		client = &http.Client{}
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, cfg.Endpoint, bytes.NewReader(body))
+	clone := *client
+	clone.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	return &clone
+}
+
+func probeAIProvider(ctx context.Context, cfg AIConfig, client *http.Client) error {
+	target, bodyValue, headers, err := buildProviderHTTP(cfg, []AIMessage{{Role: "user", Content: "Connection test"}})
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
-	resp, err := http.DefaultClient.Do(req)
+	body, err := json.Marshal(bodyValue)
+	if err != nil {
+		return fmt.Errorf("encode provider connection probe: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, target, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
+	client = cloneAIHTTPClient(client)
+	if req.URL.Scheme == "http" {
+		client.Transport = aiDirectTransport
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = resp.Body.Close() }()
-	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		return ErrAIProviderAuth
+	}
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		return fmt.Errorf("provider returned %s", resp.Status)
 	}

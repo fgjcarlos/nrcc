@@ -14,6 +14,7 @@ vi.mock('@/features/dashboard/components/DashboardView', () => ({ DashboardView:
 vi.mock('@/features/backups/components/BackupsView', () => ({ BackupsView: () => <div>Recovery page</div> }));
 vi.mock('@/features/updates/components/UpdatesView', () => ({ UpdatesView: () => <div>Updates page</div> }));
 vi.mock('@/features/libraries/components/LibrariesView', () => ({ LibrariesView: () => <div>Libraries page</div> }));
+vi.mock('@/features/flows/FlowsView', () => ({ FlowsView: () => <div>Flows page</div> }));
 vi.mock('@/shared/components', async () => ({
   ...(await vi.importActual<typeof import('@/shared/components')>('@/shared/components')),
   ThemeToggle: () => null,
@@ -86,7 +87,6 @@ describe('navigation redirects', () => {
 
   it.each([
     ['/dashboard', 'Overview page'],
-    ['/flows', 'Overview page'],
     ['/flows/versions', 'Recovery page'],
     ['/flows/flow-42', 'Overview page'],
     ['/files', 'Overview page'],
@@ -104,6 +104,19 @@ describe('navigation redirects', () => {
     renderWithProviders(<App />);
 
     expect(await screen.findByText(expectedPage)).toBeInTheDocument();
+  });
+
+  it('routes admins to flows and redirects viewers to overview', async () => {
+    window.history.pushState({}, '', '/flows');
+    mockAuth({ isAuthenticated: true, isInitialized: true, isLoading: false, user: { id: 'admin', username: 'admin', role: 'admin', createdAt: '2024-01-01T00:00:00Z' } });
+    const { unmount } = renderWithProviders(<App />);
+    expect(await screen.findByText('Flows page')).toBeInTheDocument();
+    unmount();
+
+    window.history.pushState({}, '', '/flows');
+    mockAuth({ isAuthenticated: true, isInitialized: true, isLoading: false, user: { id: 'viewer', username: 'viewer', role: 'viewer', createdAt: '2024-01-01T00:00:00Z' } });
+    renderWithProviders(<App />);
+    await waitFor(() => expect(screen.getByText('Overview page')).toBeInTheDocument());
   });
 
   it.each(['/maintenance/updates', '/maintenance/libraries'])('denies non-admin direct access to %s', async (path) => {
