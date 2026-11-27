@@ -16,7 +16,8 @@ func TestRedactSecretsRedactsCredentialsEnvAndPayloadSamples(t *testing.T) {
 		"credentials": map[string]interface{}{
 			"token": "abc123",
 		},
-		"env": "PUBLIC_VALUE=ok\nAPI_KEY=real-key\nNODE_RED_PASSWORD=real-password",
+		"env":         "PUBLIC_VALUE=ok\nAPI_KEY=real-key\nNODE_RED_PASSWORD=real-password",
+		"environment": []interface{}{map[string]interface{}{"name": "NODE_RED_PASSWORD", "value": "row-secret"}},
 		"payload": map[string]interface{}{
 			"customer": "Jane",
 		},
@@ -36,7 +37,7 @@ func TestRedactSecretsRedactsCredentialsEnvAndPayloadSamples(t *testing.T) {
 		t.Fatalf("marshal redacted flow: %v", err)
 	}
 	text := string(encoded)
-	for _, secret := range []string{"super-secret", "abc123", "real-key", "real-password", "Bearer shhh", "private sample", "Jane"} {
+	for _, secret := range []string{"super-secret", "abc123", "real-key", "real-password", "row-secret", "Bearer shhh", "private sample", "Jane"} {
 		if strings.Contains(text, secret) {
 			t.Fatalf("redacted output leaked %q: %s", secret, text)
 		}
@@ -76,7 +77,7 @@ func TestBuildProviderRequestUsesRedactedReviewOnlyMessages(t *testing.T) {
 			t.Fatalf("provider request leaked %q: %s", leaked, joined)
 		}
 	}
-	for _, want := range []string{"review-first", "candidate JSON", redactedValue, "keep-me", "add retry handling"} {
+	for _, want := range []string{"review-first", `"candidateFlow":{"nodes":[...]}`, redactedValue, "keep-me", "add retry handling"} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("provider request missing %q: %s", want, joined)
 		}
@@ -95,6 +96,17 @@ func TestAssistFlowOfflineNoKeyReturnsReviewOnlyCandidate(t *testing.T) {
 	encoded, _ := json.Marshal(resp.Request)
 	if strings.Contains(string(encoded), "secret") {
 		t.Fatalf("offline response leaked secret in request: %s", encoded)
+	}
+}
+
+func TestParseProviderResponseParsesOpenAIContent(t *testing.T) {
+	parsed, err := parseProviderResponse("openai", []byte(`{"choices":[{"message":{"content":"{\"summary\":\"parsed summary\",\"candidateFlow\":{\"nodes\":[{\"id\":\"n1\",\"type\":\"inject\"}]}}"}}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	flow, err := validateCandidate(parsed.CandidateFlow)
+	if err != nil || parsed.Summary != "parsed summary" || len(flow["nodes"].([]interface{})) != 1 {
+		t.Fatalf("parsed=%#v flow=%#v err=%v", parsed, flow, err)
 	}
 }
 
