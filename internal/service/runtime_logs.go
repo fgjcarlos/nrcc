@@ -28,18 +28,19 @@ func runtimeLogBytes() int {
 }
 
 type RuntimeLogEntry struct {
-	ID        string    `json:"id"`
-	Timestamp time.Time `json:"timestamp"`
-	Level     string    `json:"level"`
-	Source    string    `json:"source"`
-	Message   string    `json:"message"`
+	ID           string    `json:"id"`
+	Timestamp    time.Time `json:"timestamp"`
+	Level        string    `json:"level"`
+	Source       string    `json:"source"`
+	Message      string    `json:"message"`
+	RunStartedAt time.Time `json:"runStartedAt,omitzero"`
 }
 type RuntimeLogPage struct {
 	Entries       []RuntimeLogEntry `json:"entries"`
 	Generation    string            `json:"generation"`
 	HighWatermark string            `json:"highWatermark"`
 	NextCursor    string            `json:"nextCursor,omitempty"`
-	StartedAt     time.Time         `json:"startedAt,omitempty"`
+	StartedAt     time.Time         `json:"startedAt,omitzero"`
 }
 type runtimeLogBuffer struct {
 	mu                                      sync.Mutex
@@ -64,9 +65,14 @@ func newLogGeneration() string {
 	_, _ = rand.Read(id[:])
 	return hex.EncodeToString(id[:])
 }
-func (b *runtimeLogBuffer) reset()          { b.mu.Lock(); defer b.mu.Unlock(); b.startedAt = time.Now().UTC() }
-func (b *runtimeLogBuffer) add(line string) { b.addSource(line, "stdout") }
-func (b *runtimeLogBuffer) addSource(line, source string) {
+func (b *runtimeLogBuffer) reset() time.Time {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.startedAt = time.Now().UTC()
+	return b.startedAt
+}
+func (b *runtimeLogBuffer) add(line string) { b.addSource(line, "stdout", time.Time{}) }
+func (b *runtimeLogBuffer) addSource(line, source string, runStartedAt time.Time) {
 	line = strings.TrimSuffix(strings.TrimSuffix(line, "\n"), "\r")
 	if len(line) > maxRuntimeLogLine {
 		line = line[:maxRuntimeLogLine]
@@ -74,8 +80,11 @@ func (b *runtimeLogBuffer) addSource(line, source string) {
 	ts, level, msg := parseRuntimeLog(line)
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	if runStartedAt.IsZero() {
+		runStartedAt = b.startedAt
+	}
 	b.seq++
-	entry := RuntimeLogEntry{ID: fmt.Sprintf("%s:%d", b.generation, b.seq), Timestamp: ts, Level: level, Source: source, Message: msg}
+	entry := RuntimeLogEntry{ID: fmt.Sprintf("%s:%d", b.generation, b.seq), Timestamp: ts, Level: level, Source: source, Message: msg, RunStartedAt: runStartedAt}
 	for b.count > 0 && (b.count == b.capacity || b.bytes+entryBytes(entry) > b.maxBytes) {
 		b.bytes -= entryBytes(b.entries[b.start])
 		b.entries[b.start] = RuntimeLogEntry{}
@@ -144,7 +153,6 @@ func (b *runtimeLogBuffer) pageSince(before string, limit int, levels []string, 
 	if limit > 1000 {
 		limit = 1000
 	}
-	now := time.Now().UTC()
 	matches := func(e RuntimeLogEntry) bool {
 		if len(levels) > 0 {
 			ok := false
@@ -160,7 +168,7 @@ func (b *runtimeLogBuffer) pageSince(before string, limit int, levels []string, 
 		if text != "" && !strings.Contains(strings.ToLower(e.Message), strings.ToLower(text)) {
 			return false
 		}
-		if sinceRestart && !b.startedAt.IsZero() && e.Timestamp.Before(b.startedAt) {
+		if sinceRestart && (b.startedAt.IsZero() || !e.RunStartedAt.Equal(b.startedAt)) {
 			return false
 		}
 		return (from.IsZero() || !e.Timestamp.Before(from)) && (to.IsZero() || !e.Timestamp.After(to))
@@ -194,11 +202,7 @@ func (b *runtimeLogBuffer) pageSince(before string, limit int, levels []string, 
 	if olderMatch && len(entries) > 0 {
 		next = entries[0].ID
 	}
-	started := b.startedAt
-	if started.IsZero() {
-		started = now
-	}
-	return RuntimeLogPage{Entries: entries, Generation: b.generation, HighWatermark: high, NextCursor: next, StartedAt: started}
+	return RuntimeLogPage{Entries: entries, Generation: b.generation, HighWatermark: high, NextCursor: next, StartedAt: b.startedAt}
 }
 func (b *runtimeLogBuffer) after(cursor string) []RuntimeLogEntry {
 	b.mu.Lock()

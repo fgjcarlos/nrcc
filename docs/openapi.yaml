@@ -4178,6 +4178,7 @@ components:
         level: { type: string, enum: [info, warn, error, debug, trace, fatal, unknown] }
         source: { type: string, enum: [stdout, stderr] }
         message: { type: string, description: Truncated to 4096 bytes when a line exceeds the capture limit }
+        runStartedAt: { type: string, format: date-time, description: Managed launch that produced the entry, independent of its log timestamp }
 
     # ── Generic utility types ──────────────────────────────────────────────────────
 

@@ -2641,6 +2641,11 @@ export interface components {
             source: "stdout" | "stderr";
             /** @description Truncated to 4096 bytes when a line exceeds the capture limit */
             message: string;
+            /**
+             * Format: date-time
+             * @description Managed launch that produced the entry
+             */
+            runStartedAt?: string;
         };
         /** @description Arbitrary JSON object */
         AnyObject: {
