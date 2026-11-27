@@ -85,13 +85,26 @@ S7 — Apply path. No new pipeline: the block flows through the existing structu
 
 ## Tasks
 
-- T1 [pending] S1, S2, S3, S4, S7 — backend model, catalog, ownership, parse/render, validation, tests; worker; commit.
-- T2 [pending] S5, S6 — frontend types, form mapping, Security card, i18n, tests; worker; commit.
-- T3 [pending] S1 — `docs/openapi.yaml` NodeRedConfig property + regenerated `frontend/src/shared/api/schema.ts`; parent; commit.
-- T4 [pending] S1–S7 — verification: Go focused + suite, frontend unit + typecheck + i18n parity, independent verifier; parent.
+- T1 [done] S1, S2, S3, S4, S7 — backend model, catalog, ownership, parse/render, validation, tests; worker + parent; commit 1860115.
+- T2 [done] S5, S6 — frontend types, form mapping, Security card, i18n, live payload wiring; worker; commits 10eb19c, 1cbf125.
+- T3 [done] S1 — `docs/openapi.yaml` NodeRedConfig property + regenerated `frontend/src/shared/api/schema.ts`; parent; commit e2c1ba9.
+- T4 [done] S1–S7 — verification: Go focused + full suite, frontend unit + typecheck + i18n parity, independent verifier; parent + `gentle-ai-verify`; commit b16c113 (verifier advisory).
+
+## Delivery note
+
+The feature is five commits on `feat/1076-http-node-cors`, larger than one 400-line
+review slice because two of them are test-heavy: 1860115 (783 lines, 431 of them
+the new Go test files), 10eb19c (payload plumbing + its tests), 1cbf125 (card +
+i18n + its tests), e2c1ba9 (API docs + generated client), b16c113 (verifier
+advisory fix + this document). Publishing stays a human decision; if the reviewer
+prefers a smaller slice, split 1860115 into parse/render and validation.
 
 ## Log
 
 L1 — Resuelve la issue #1076
 L2 — Issue is `status:approved` (labels: enhancement, area: backend, area: frontend). Local worktree /tmp/nrcc-1076 on feat/1076-http-node-cors, branched from origin/main (c828db5).
 L3 — Prior session: two backend worker handoffs stopped before any edits on an Allowed-edit-surfaces mismatch. Worktree is clean apart from this document; nothing to recover. Handoffs now list explicit repository-relative file paths.
+L4 — Both workers delivered; each stopped once on a real scope gap and both gaps were resolved by the parent. Backend: the new catalog and managed-key entries made two existing mirror tests fail (`testdata/nodered-5.0.6-catalog.json`, `source_patch_test.go` want slice); the parent edited them, then `go test ./internal/model/ ./internal/service/` passed. Frontend: the delegated surfaces made the card inert and typecheck red because the live read/write mapper is `configTransformers.ts` and three exhaustive Records must list the new form fields; surfaces widened, `pnpm install --frozen-lockfile` run, mapping kept single-sourced in `shared/types` and delegated to, and the two empty-form fixtures synced with the 7 CORS defaults (duplicate fixture deliberately not refactored — separate chore).
+L5 — `internal/handler` `TestSaveConfig_WritesExplicitRuntimeSettingsAndRestarts` fails on this machine only because the local Docker Node-RED is 5.0.10 while the test stubs 5.0.6; it passes with Docker discovery isolated (`DOCKER_HOST=unix:///tmp/nonexistent-docker.sock`), and failed identically on the base commit before this change.
+L6 — Independent verifier: S1–S7 all pass, no blockers. It proved the risky invariants itself rather than trusting the tests: an unsupported hand-written block survives the real save path (`Get` → `Save` → `renderSettings` → `patchSettingsJS`) byte-for-byte, a rejected save leaves `config.json` and `settings.js` sha256-identical, `parse(render(x))` is stable across 8 field combinations, and a config without `httpNodeCors` never gains the key.
+L7 — Verifier advisory 1 applied in b16c113: a hand-written block with an empty or missing origin array used to parse as modelable with no origins, which made every later save of an unrelated setting fail validation; it now parses as unsupported and is preserved read-only, with two new table cases. Advisory 2 accepted as-is: `Raw` holds the whole block line (the spec said "block body") because display and round-trip are correct either way.
