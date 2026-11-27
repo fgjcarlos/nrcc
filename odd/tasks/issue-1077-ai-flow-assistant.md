@@ -28,6 +28,8 @@ S10. i18n en/es for the settings card and assistant.
 - Frontend: Vitest 98 files / 789 tests green; `npx tsc --noEmit` clean; Playwright suite green (60 passed, 3 skipped, 1 pre-existing flaky i18n case) plus `e2e/ai-flow-assistant.spec.ts` passing on chromium-dark.
 - Contract: `npx @redocly/cli lint docs/openapi.yaml` valid (7 pre-existing style warnings).
 - Independent verifier: met on S1–S10, no blocker; its three suggested probes (no redirect follow, preview body equality, malformed upstream) are covered in `internal/service/ai_provider_test.go` and `internal/service/ai_test.go`.
+- Lint fix: ac5b64f resolves the repo-wide golangci-lint findings (`errorlint` in provider tests, `ifElseChain` in the analysis mapping).
+- Published as PR #1094 (`type:feature`, `Closes #1077`).
 - Slice boundary: 4 commits, ~1995 authored lines; largest slices 632 and 451 lines. Publication shape (single PR vs chained) is the maintainer's decision.
 
 ## Log
