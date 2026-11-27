@@ -78,6 +78,7 @@ type ProcessManager struct {
 
 	// restart history (ring buffer, capacity 50)
 	tracker *restartTracker
+	logs    *runtimeLogBuffer
 
 	// cumulativeRestarts is the durable lifetime count of auto-restarts.
 	// It is SEPARATE from restartCount (the backoff/give-up counter).
@@ -111,6 +112,7 @@ func NewProcessManager(cmd, dataDir string) *ProcessManager {
 		//   - restartStore: persistent monotonic counter that survives
 		//     process restarts; exposed as CumulativeRestarts().
 		tracker:            newRestartTracker(50),
+		logs:               newRuntimeLogBuffer(runtimeLogCapacity(), runtimeLogBytes()),
 		restartStore:       store,
 		cumulativeRestarts: store.Load(),
 	}
@@ -355,6 +357,7 @@ func (pm *ProcessManager) startLocked(resetCounter bool) error {
 	pm.doneCh = doneCh
 	pm.running = true
 	pm.startedAt = time.Now()
+	pm.logs.reset()
 	pm.lastError = nil
 	if resetCounter {
 		pm.restartCount = 0
@@ -363,8 +366,8 @@ func (pm *ProcessManager) startLocked(resetCounter bool) error {
 	// Forward the child stdout/stderr to the NRCC output (the container log;
 	// Docker rotates it) so a failed start explains itself. The forwarders end
 	// at EOF when waitForExit closes the pipe writers.
-	go forwardOutput(pm.output, stdoutR, "node-red: ")
-	go forwardOutput(pm.output, stderrR, "node-red: ")
+	go forwardOutputCapture(pm.output, stdoutR, "node-red: ", pm.logs, "stdout")
+	go forwardOutputCapture(pm.output, stderrR, "node-red: ", pm.logs, "stderr")
 	// Pass local copies of the channels — waitForExit must not read pm.stopCh/doneCh
 	// after the lock is released, as a new Start() could replace them.
 	go pm.waitForExit(cmd, stopCh, doneCh)
@@ -382,8 +385,13 @@ const outputWaitDelay = 2 * time.Second
 // chunks. Write errors are ignored: src must keep draining or the child
 // blocks on a full pipe.
 func forwardOutput(dst io.Writer, src io.Reader, prefix string) {
+	forwardOutputCapture(dst, src, prefix, nil, "stdout")
+}
+
+func forwardOutputCapture(dst io.Writer, src io.Reader, prefix string, logs *runtimeLogBuffer, source string) {
 	r := bufio.NewReader(src)
 	lineStart := true
+	captured := make([]byte, 0, maxRuntimeLogLine)
 	for {
 		chunk, err := r.ReadSlice('\n')
 		if len(chunk) > 0 {
@@ -392,12 +400,28 @@ func forwardOutput(dst io.Writer, src io.Reader, prefix string) {
 				buf = append([]byte(prefix), chunk...)
 			}
 			_, _ = dst.Write(buf)
+			if logs != nil && len(captured) < maxRuntimeLogLine {
+				n := maxRuntimeLogLine - len(captured)
+				if n > len(chunk) {
+					n = len(chunk)
+				}
+				captured = append(captured, chunk[:n]...)
+			}
 			lineStart = chunk[len(chunk)-1] == '\n'
+			if lineStart {
+				if logs != nil {
+					logs.addSource(string(captured), source)
+				}
+				captured = captured[:0]
+			}
 		}
 		if errors.Is(err, bufio.ErrBufferFull) {
 			continue
 		}
 		if err != nil {
+			if len(captured) > 0 && logs != nil {
+				logs.addSource(string(captured), source)
+			}
 			if !lineStart {
 				_, _ = dst.Write([]byte("\n"))
 			}
