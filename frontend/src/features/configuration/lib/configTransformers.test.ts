@@ -1009,4 +1009,35 @@ describe('configTransformers', () => {
       expect(Object.keys(payload)).not.toContain('adminAuth');
     });
   });
+
+  // ============================================
+  // httpNodeCors (issue #1076)
+  // ============================================
+
+  describe('httpNodeCors', () => {
+    it('carries the block from the API response into the save payload', () => {
+      const cors = {
+        origin: ['https://app.example.com'],
+        methods: ['GET', 'POST'],
+        credentials: true,
+        allowedHeaders: ['Content-Type'],
+      };
+      const formData = configToFormData({ uiPort: 1880, projectsEnabled: false, httpNodeCors: cors });
+
+      expect(formData.httpNodeCorsEnabled).toBe(true);
+      expect(formDataToConfigPayload(formData).httpNodeCors).toEqual(cors);
+    });
+
+    it('omits the key when CORS is disabled and passes an unsupported block through', () => {
+      const disabled = configToFormData({ uiPort: 1880, projectsEnabled: false });
+      expect(disabled.httpNodeCorsEnabled).toBe(false);
+      expect(formDataToConfigPayload(disabled)).not.toHaveProperty('httpNodeCors');
+
+      const raw = '  httpNodeCors: {\n    origin: (req, cb) => cb(null, "*"),\n  },';
+      const unsupported = formDataToConfigPayload(
+        configToFormData({ uiPort: 1880, projectsEnabled: false, httpNodeCors: { origin: [], unsupported: true, raw } })
+      );
+      expect(unsupported.httpNodeCors).toEqual({ origin: [], unsupported: true, raw });
+    });
+  });
 });

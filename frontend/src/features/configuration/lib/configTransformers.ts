@@ -1,4 +1,12 @@
-import type { NodeRedConfigFormData, LoggingLevel, EditorTheme, RuntimeStateSettings } from '@/shared/types';
+import {
+  httpNodeCorsFromFormData,
+  httpNodeCorsToFormData,
+  type HTTPNodeCorsConfig,
+  type NodeRedConfigFormData,
+  type LoggingLevel,
+  type EditorTheme,
+  type RuntimeStateSettings,
+} from '@/shared/types';
 
 /**
  * Shape of the raw Node-RED config response consumed by configToFormData.
@@ -93,6 +101,8 @@ export interface NodeRedConfigResponse {
   credentialSecret?: string;
   requireHttps?: boolean;
   https?: HttpsResponse;
+  // CORS for http-in endpoints (issue #1076).
+  httpNodeCors?: HTTPNodeCorsConfig;
   [key: string]: unknown;
 }
 
@@ -139,6 +149,8 @@ export interface ConfigPayload {
     port?: number;
     passphrase?: string;
   };
+  // CORS for http-in endpoints (issue #1076). Absent key = disabled.
+  httpNodeCors?: HTTPNodeCorsConfig;
 }
 
 /**
@@ -306,6 +318,11 @@ export function formDataToConfigPayload(formData: NodeRedConfigFormData): Config
     };
   }
 
+  // CORS for http-in endpoints (issue #1076) — the mapping lives in
+  // `shared/types`; disabled omits the key so the backend drops it.
+  const httpNodeCors = httpNodeCorsFromFormData(formData);
+  if (httpNodeCors) config.httpNodeCors = httpNodeCors;
+
   // Language
   config.lang = formData.lang || 'en-US';
 
@@ -377,5 +394,9 @@ export function configToFormData(config: NodeRedConfigResponse): NodeRedConfigFo
     httpsCA: config.https?.ca || '',
     httpsPort: config.https?.port ?? 0,
     httpsPassphrase: config.https?.passphrase || '',
+
+    // CORS for http-in endpoints (issue #1076) — same shared mapping as
+    // the write path.
+    ...httpNodeCorsToFormData(config.httpNodeCors),
   };
 }

@@ -114,6 +114,14 @@ const FIELD_SOURCE: Record<keyof NodeRedConfigFormData, FieldSource> = {
   httpsCA: 'settings.js',
   httpsPort: 'settings.js',
   httpsPassphrase: 'form default',
+  // CORS slice (issue #1076) — every field is read back from settings.js.
+  httpNodeCorsEnabled: 'settings.js',
+  httpNodeCorsOrigins: 'settings.js',
+  httpNodeCorsMethods: 'settings.js',
+  httpNodeCorsCredentials: 'settings.js',
+  httpNodeCorsAllowedHeaders: 'settings.js',
+  httpNodeCorsUnsupported: 'settings.js',
+  httpNodeCorsRaw: 'settings.js',
 };
 
 /**
@@ -133,6 +141,12 @@ const HARD_RESTART_FIELDS: ReadonlySet<keyof NodeRedConfigFormData> = new Set([
   'runtimeStateEnabled',
   'runtimeStateFile',
   'lang',
+  // httpNodeCors is RestartRequired in the catalog (issue #1076).
+  'httpNodeCorsEnabled',
+  'httpNodeCorsOrigins',
+  'httpNodeCorsMethods',
+  'httpNodeCorsCredentials',
+  'httpNodeCorsAllowedHeaders',
 ]);
 
 /**

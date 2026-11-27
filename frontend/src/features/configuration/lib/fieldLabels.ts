@@ -67,6 +67,14 @@ export const FIELD_LABELS: Record<keyof NodeRedConfigFormData, string> = {
   httpsCA: 'CA Bundle Path',
   httpsPort: 'HTTPS Port',
   httpsPassphrase: 'Private Key Passphrase',
+  // CORS (issue #1076)
+  httpNodeCorsEnabled: 'CORS Enabled',
+  httpNodeCorsOrigins: 'CORS Origins',
+  httpNodeCorsMethods: 'CORS Methods',
+  httpNodeCorsCredentials: 'CORS Credentials',
+  httpNodeCorsAllowedHeaders: 'CORS Allowed Headers',
+  httpNodeCorsUnsupported: 'CORS Unsupported',
+  httpNodeCorsRaw: 'CORS Raw Source',
 };
 
 /**
@@ -120,4 +128,11 @@ export const SETTINGS_KEYS: Record<keyof NodeRedConfigFormData, string> = {
   httpsCA: 'https.ca',
   httpsPort: 'https.port',
   httpsPassphrase: 'https.passphrase',
+  httpNodeCorsEnabled: 'httpNodeCors',
+  httpNodeCorsOrigins: 'httpNodeCors.origin',
+  httpNodeCorsMethods: 'httpNodeCors.methods',
+  httpNodeCorsCredentials: 'httpNodeCors.credentials',
+  httpNodeCorsAllowedHeaders: 'httpNodeCors.allowedHeaders',
+  httpNodeCorsUnsupported: 'httpNodeCors',
+  httpNodeCorsRaw: 'httpNodeCors',
 };
