@@ -117,11 +117,21 @@ does not apply the change.
 | `NRCC_RESTIC_CACHE_DIR` | `$TMPDIR/nrcc-restic-cache` | Deferred (#432) — local restic cache directory | yes |
 | `NPM_BIN` | empty | Override the npm binary path the palette manager invokes | yes |
 | `NRCC_AI_ENABLED` | `false` | Enable the in-UI AI assistant | yes |
-| `NRCC_AI_PROVIDER` | `offline` | AI provider id (`openai`, `anthropic`, …) | yes |
+| `NRCC_AI_PROVIDER` | `offline` | AI provider id: `offline`, `openai`, `anthropic`, or `ollama` | yes |
 | `NRCC_AI_ENDPOINT` | OpenAI chat completions URL for `openai`, else empty | Custom AI endpoint URL | yes |
 | `NRCC_AI_MODEL` | `gpt-4o-mini` | Model id | yes |
-| `NRCC_AI_API_KEY` | none | AI provider API key (prefer secret file) | yes |
+| `NRCC_AI_API_KEY` | none | AI provider API key (not used by native Ollama) | yes |
 | `NRCC_METRICS_PUBLIC` | `false` | When `true`, Prometheus `/metrics` is served unauthenticated. Default `false` gates `/metrics` behind the same JWT as other routes (#671); opt out only on a private metrics network. | yes |
+
+The AI analysis timeout is configured through `timeoutSeconds` in the
+persisted `PUT /api/ai/config` settings (default `30`, valid range
+`1`–`300`). It affects flow analysis only; provider connection tests
+retain their fixed five-second timeout.
+
+AI endpoints must use `https`. A native `ollama` provider may use a literal
+private or loopback `http` address only when `allowPrivateHTTP` is enabled in
+the same settings; hostnames such as `localhost` are rejected because they can
+resolve outside the private ranges.
 
 ## Node-RED runtime variables
 
