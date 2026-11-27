@@ -1567,7 +1567,7 @@ export interface paths {
         };
         /**
          * Get runtime log history
-         * @description Admin-only. Entries are ordered ascending by sequence; without cursor the newest matching limit entries are returned. Filters are applied before pagination. Use nextCursor for older matching pages; highWatermark identifies the snapshot boundary for live tail. startedAt is the latest runtime start time; sinceRestart=true filters retained history to entries timestamped at or after it.
+         * @description Admin-only. Entries are ordered ascending by sequence; without cursor the newest matching limit entries are returned. Filters are applied before pagination. Use nextCursor for older matching pages; highWatermark identifies the snapshot boundary for live tail. startedAt is the latest managed runtime start time and is absent before any launch; sinceRestart=true only returns entries produced by that launch.
          */
         get: operations["getLogs"];
         put?: never;

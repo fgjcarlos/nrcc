@@ -103,7 +103,7 @@ func (h *RuntimeLogsHandler) Stream(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("X-Accel-Buffering", "no")
-	if !writeSSE(w, flusher, "event: connected\ndata: "+mustJSON(map[string]any{"generation": page.Generation, "highWatermark": page.HighWatermark, "startedAt": page.StartedAt})+"\n\n") {
+	if !writeSSE(w, flusher, logSnapshotEvent("connected", page)) {
 		return
 	}
 	ticker := time.NewTicker(500 * time.Millisecond)
@@ -121,7 +121,7 @@ func (h *RuntimeLogsHandler) Stream(w http.ResponseWriter, r *http.Request) {
 		case <-ticker.C:
 			current := h.pm.RuntimeLogs("", 1, nil, "", time.Time{}, time.Time{})
 			if !current.StartedAt.Equal(page.StartedAt) {
-				_ = writeSSE(w, flusher, "event: restart\ndata: "+mustJSON(map[string]any{"generation": current.Generation, "highWatermark": current.HighWatermark, "startedAt": current.StartedAt})+"\n\n")
+				_ = writeSSE(w, flusher, logSnapshotEvent("restart", current))
 				return
 			}
 			for _, entry := range h.pm.RuntimeLogsAfter(cursor) {
@@ -137,6 +137,15 @@ func (h *RuntimeLogsHandler) Stream(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 }
+func logSnapshotEvent(event string, page service.RuntimeLogPage) string {
+	meta := struct {
+		Generation    string    `json:"generation"`
+		HighWatermark string    `json:"highWatermark"`
+		StartedAt     time.Time `json:"startedAt,omitzero"`
+	}{page.Generation, page.HighWatermark, page.StartedAt}
+	return "event: " + event + "\ndata: " + mustJSON(meta) + "\n\n"
+}
+
 func writeSSE(w http.ResponseWriter, flusher http.Flusher, event string) bool {
 	_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(20 * time.Second))
 	// #nosec G705 -- the stream has a text/event-stream content type; all event payloads are JSON-encoded.

@@ -173,18 +173,13 @@ func (b *runtimeLogBuffer) pageSince(before string, limit int, levels []string, 
 		}
 		return (from.IsZero() || !e.Timestamp.Before(from)) && (to.IsZero() || !e.Timestamp.After(to))
 	}
-	bound := b.seq
-	if before != "" {
-		if n, ok := parseLogSequence(before, b.generation); ok {
-			bound = n - 1
-		}
-	}
+	bound, bounded := parseLogSequence(before, b.generation)
 	entries := make([]RuntimeLogEntry, 0, limit)
 	var olderMatch bool
 	for off := b.count - 1; off >= 0; off-- {
 		e := b.entries[(b.start+off)%b.capacity]
 		seq, _ := parseLogSequence(e.ID, b.generation)
-		if seq > bound || !matches(e) {
+		if (bounded && seq >= bound) || !matches(e) {
 			continue
 		}
 		if len(entries) < limit {
