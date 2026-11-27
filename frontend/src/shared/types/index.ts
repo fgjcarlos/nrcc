@@ -29,6 +29,12 @@ export interface LoggingSettings {
   internal?: LoggingHandler;
 }
 
+export interface RuntimeConsoleLoggingStatus {
+  configuredLevel?: string | null;
+  runningLevel?: string | null;
+  status: 'applied' | 'pending' | 'unknown';
+}
+
 // ============================================
 // EDITOR THEME - Page
 // ============================================
@@ -247,6 +253,7 @@ export interface NodeRedConfig {
   disableEditor?: boolean;
   projectsEnabled: boolean;
   logging?: LoggingSettings;
+  runtimeConsoleLogging?: RuntimeConsoleLoggingStatus;
   loggingLevel?: LoggingLevel;
   flowFile?: string;
   userDir?: string;

@@ -1956,6 +1956,7 @@ export interface components {
             httpNodeAuth?: components["schemas"]["HTTPBasicAuth"];
             httpStaticAuth?: components["schemas"]["HTTPBasicAuth"];
             projectsEnabled?: boolean;
+            runtimeConsoleLogging?: components["schemas"]["RuntimeConsoleLoggingStatus"];
             /** @example en-US */
             lang?: string;
             functionLibraries?: components["schemas"]["FunctionLibrary"][];
@@ -1963,6 +1964,18 @@ export interface components {
             /** @description Redirect HTTP requests to HTTPS */
             requireHttps?: boolean;
             https?: components["schemas"]["HttpsConfig"];
+        };
+        /** @description Server-observed console logging status for the managed Node-RED child. The values are read-only and never accepted from clients. */
+        RuntimeConsoleLoggingStatus: {
+            /** @description Literal console level read from the resolved settings.js path. */
+            configuredLevel?: string | null;
+            /** @description Literal console level captured for the current child, only when it is ready. */
+            runningLevel?: string;
+            /**
+             * @description Applied only when the ready child level matches the current configured literal.
+             * @enum {string}
+             */
+            status: "applied" | "pending" | "unknown";
         };
         /** @description Node-RED TLS listener block */
         HttpsConfig: {

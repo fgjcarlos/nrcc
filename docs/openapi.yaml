@@ -2904,6 +2904,8 @@ components:
           $ref: "#/components/schemas/HTTPBasicAuth"
         projectsEnabled:
           type: boolean
+        runtimeConsoleLogging:
+          $ref: "#/components/schemas/RuntimeConsoleLoggingStatus"
         lang:
           type: string
           example: en-US
@@ -2920,6 +2922,25 @@ components:
           description: Redirect HTTP requests to HTTPS
         https:
           $ref: "#/components/schemas/HttpsConfig"
+
+    RuntimeConsoleLoggingStatus:
+      type: object
+      readOnly: true
+      description: >-
+        Server-observed console logging status for the managed Node-RED child.
+        The values are read-only and never accepted from clients.
+      required: [status]
+      properties:
+        configuredLevel:
+          type: [string, "null"]
+          description: Literal console level read from the resolved settings.js path.
+        runningLevel:
+          type: string
+          description: Literal console level captured for the current child, only when it is ready.
+        status:
+          type: string
+          enum: [applied, pending, unknown]
+          description: Applied only when the ready child level matches the current configured literal.
 
     HttpsConfig:
       type: object

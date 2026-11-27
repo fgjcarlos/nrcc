@@ -66,6 +66,7 @@ const baseConfig = {
   // No adminAuth / nodeHttpAuth / staticAuth — start false
   projectsEnabled: false,
   logging: { console: { level: 'info', metrics: false }, internal: { level: 'info', metrics: false } },
+  runtimeConsoleLogging: { configuredLevel: 'info', runningLevel: null, status: 'unknown' },
   flowFile: 'flows.json',
   editorTheme: {
     page: { title: 'Node-RED' },
@@ -119,6 +120,56 @@ function findToggleButton(labelText: RegExp): HTMLButtonElement {
   if (!button) throw new Error(`No toggle button next to label matching ${labelText}`);
   return button as HTMLButtonElement;
 }
+
+describe('ConfigurationView (issue #1075 — logging status)', () => {
+  it('shows applied only when the managed runtime reports a matching level', async () => {
+    mocks.getConfig.mockResolvedValueOnce({
+      data: { data: { ...baseConfig, runtimeConsoleLogging: { configuredLevel: 'debug', runningLevel: 'debug', status: 'applied' } }, success: true, timestamp: '' },
+    });
+    const user = userEvent.setup();
+    renderConfiguration();
+    await switchToTab(user, 'Logging');
+
+    expect(await screen.findByText('Applied: debug')).toBeInTheDocument();
+    const level = screen.getByRole('combobox', { name: /Console Level/ });
+    await user.selectOptions(level, 'warn');
+    expect(screen.getByText('Applied: debug')).toBeInTheDocument();
+    expect(screen.queryByText('Applied: warn')).not.toBeInTheDocument();
+  });
+
+  it('shows pending restart with configured and observed running values', async () => {
+    mocks.getConfig.mockResolvedValueOnce({
+      data: { data: { ...baseConfig, logging: { ...baseConfig.logging, console: { level: 'warn', metrics: false } }, runtimeConsoleLogging: { configuredLevel: 'warn', runningLevel: 'debug', status: 'pending' } }, success: true, timestamp: '' },
+    });
+    const user = userEvent.setup();
+    renderConfiguration();
+    await switchToTab(user, 'Logging');
+
+    expect(await screen.findByText('Pending restart: configured warn, running debug')).toBeInTheDocument();
+  });
+
+  it('shows the configured console level and does not claim runtime application', async () => {
+    const user = userEvent.setup();
+    renderConfiguration();
+    await switchToTab(user, 'Logging');
+
+    expect(await screen.findByText('Configured console level: info')).toBeInTheDocument();
+    expect(screen.getByText(/Runtime level status is unknown/)).toBeInTheDocument();
+    expect(screen.getByText(/requires a Node-RED restart/i)).toBeInTheDocument();
+  });
+
+  it('shows not set when the configured console level is absent', async () => {
+    mocks.getConfig.mockResolvedValueOnce({
+      data: { data: { ...baseConfig, logging: { console: { metrics: false } } }, success: true, timestamp: '' },
+    });
+    const user = userEvent.setup();
+    renderConfiguration();
+    await switchToTab(user, 'Logging');
+
+    expect(await screen.findAllByText(/Not set \/ unreadable/)).not.toHaveLength(0);
+    expect(screen.getByText(/Runtime level status is unknown/)).toBeInTheDocument();
+  });
+});
 
 describe('ConfigurationView (issue #366 — toggles were reset on every render)', () => {
   it('keeps the Editor Theme palette toggle flipped off after a re-render', async () => {

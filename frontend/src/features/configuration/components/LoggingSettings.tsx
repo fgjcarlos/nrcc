@@ -6,9 +6,12 @@ interface LoggingSettingsProps {
   settings: NodeRedConfigFormData;
   onUpdate: (field: keyof NodeRedConfigFormData, value: string | number | boolean) => void;
   disabled?: boolean;
+  configuredConsoleLevel?: string;
+  runningConsoleLevel?: string;
+  runtimeConsoleLoggingStatus?: 'applied' | 'pending' | 'unknown';
 }
 
-export function LoggingSettings({ settings, onUpdate, disabled }: LoggingSettingsProps) {
+export function LoggingSettings({ settings, onUpdate, disabled, configuredConsoleLevel, runningConsoleLevel, runtimeConsoleLoggingStatus = 'unknown' }: LoggingSettingsProps) {
   const { t } = useT();
   return (
     <div className="space-y-4">
@@ -16,13 +19,14 @@ export function LoggingSettings({ settings, onUpdate, disabled }: LoggingSetting
         {/* Console Handler */}
         <div>
           <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ds-text-secondary">{t('configuration:consoleHandler')}</h4>
+          <p className="mb-2 text-xs text-ds-text-muted">{configuredConsoleLevel ? `${t('configuration:configuredLevel')}: ${configuredConsoleLevel}` : t('configuration:levelNotSet')}</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <SelectField
               label="Console Level"
               field="loggingConsoleLevel"
               value={settings.loggingConsoleLevel}
               onChange={(v) => onUpdate('loggingConsoleLevel', v)}
-              options={LOGGING_LEVELS}
+              options={[{ value: '', label: t('configuration:levelNotSet') }, ...LOGGING_LEVELS]}
               disabled={disabled}
             />
             <ToggleField
@@ -34,6 +38,14 @@ export function LoggingSettings({ settings, onUpdate, disabled }: LoggingSetting
               disabled={disabled}
             />
           </div>
+          <p className="mt-2 text-xs text-ds-text-muted">{t('configuration:restartRequired')}</p>
+          <p className="mt-1 text-xs text-ds-text-muted" role="status">
+            {runtimeConsoleLoggingStatus === 'applied' && runningConsoleLevel
+              ? t('configuration:runtimeLevelApplied', { level: runningConsoleLevel })
+              : runtimeConsoleLoggingStatus === 'pending' && runningConsoleLevel
+                ? t('configuration:runtimeLevelPending', { configured: configuredConsoleLevel ?? t('configuration:levelNotSet'), running: runningConsoleLevel })
+                : t('configuration:runtimeLevelUnknown')}
+          </p>
         </div>
 
         {/* Internal Handler */}
@@ -45,7 +57,7 @@ export function LoggingSettings({ settings, onUpdate, disabled }: LoggingSetting
               field="loggingInternalLevel"
               value={settings.loggingInternalLevel}
               onChange={(v) => onUpdate('loggingInternalLevel', v)}
-              options={LOGGING_LEVELS}
+              options={[{ value: '', label: t('configuration:levelNotSet') }, ...LOGGING_LEVELS]}
               disabled={disabled}
             />
             <ToggleField

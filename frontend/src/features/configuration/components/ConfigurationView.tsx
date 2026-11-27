@@ -44,6 +44,9 @@ interface Section {
     settings: NodeRedConfigFormData;
     onUpdate: (field: keyof NodeRedConfigFormData, value: string | number | boolean) => void;
     disabled?: boolean;
+    configuredConsoleLevel?: string;
+    runningConsoleLevel?: string;
+    runtimeConsoleLoggingStatus?: 'applied' | 'pending' | 'unknown';
   }>;
 }
 
@@ -439,7 +442,7 @@ export function ConfigurationView() {
           <div className="border-l-2 border-ds-warning py-1 pl-3 text-sm text-ds-on-tint-warning" role="status">
             {t('configuration:controlsUnavailable')}
           </div>
-        ) : activeTab === 'ai' ? <AIProviderSettings /> : <ActiveComponent settings={formData} onUpdate={handleUpdateField} disabled={isSaving} fieldErrors={fieldValidationMap(diff.fields)} />}
+        ) : activeTab === 'ai' ? <AIProviderSettings /> : <ActiveComponent settings={formData} onUpdate={handleUpdateField} disabled={isSaving} configuredConsoleLevel={data.config?.runtimeConsoleLogging ? data.config.runtimeConsoleLogging.configuredLevel ?? undefined : data.config?.logging?.console?.level} runningConsoleLevel={data.config?.runtimeConsoleLogging?.runningLevel ?? undefined} runtimeConsoleLoggingStatus={data.config?.runtimeConsoleLogging?.status ?? 'unknown'} fieldErrors={fieldValidationMap(diff.fields)} />}
       </TabPanel>
 
       {/* Curated preset catalogue — slice 3 of #764 */}
