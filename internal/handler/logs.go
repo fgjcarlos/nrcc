@@ -28,7 +28,7 @@ func (h *RuntimeLogsHandler) History(w http.ResponseWriter, r *http.Request) {
 	if v := q.Get("limit"); v != "" {
 		n, e := strconv.Atoi(v)
 		if e != nil || n < 1 || n > 1000 {
-			model.RespondError(w, 400, "INVALID_QUERY", "limit must be between 1 and 1000")
+			model.RespondError(w, http.StatusBadRequest, "INVALID_QUERY", "limit must be between 1 and 1000")
 			return
 		}
 		limit = n
@@ -38,14 +38,14 @@ func (h *RuntimeLogsHandler) History(w http.ResponseWriter, r *http.Request) {
 	if q.Get("from") != "" {
 		from, err = time.Parse(time.RFC3339, q.Get("from"))
 		if err != nil {
-			model.RespondError(w, 400, "INVALID_QUERY", "from must be RFC3339")
+			model.RespondError(w, http.StatusBadRequest, "INVALID_QUERY", "from must be RFC3339")
 			return
 		}
 	}
 	if q.Get("to") != "" {
 		to, err = time.Parse(time.RFC3339, q.Get("to"))
 		if err != nil {
-			model.RespondError(w, 400, "INVALID_QUERY", "to must be RFC3339")
+			model.RespondError(w, http.StatusBadRequest, "INVALID_QUERY", "to must be RFC3339")
 			return
 		}
 	}
@@ -54,17 +54,17 @@ func (h *RuntimeLogsHandler) History(w http.ResponseWriter, r *http.Request) {
 	if raw := q.Get("sinceRestart"); raw != "" {
 		parsed, e := strconv.ParseBool(raw)
 		if e != nil {
-			model.RespondError(w, 400, "INVALID_QUERY", "sinceRestart must be true or false")
+			model.RespondError(w, http.StatusBadRequest, "INVALID_QUERY", "sinceRestart must be true or false")
 			return
 		}
 		sinceRestart = parsed
 	}
 	if cursor != "" && !strings.HasPrefix(cursor, h.pm.RuntimeLogs("", 1, nil, "", time.Time{}, time.Time{}).Generation+":") {
-		model.RespondError(w, 409, "LOG_GENERATION_CHANGED", "Runtime log generation changed; restart pagination")
+		model.RespondError(w, http.StatusConflict, "LOG_GENERATION_CHANGED", "Runtime log generation changed; restart pagination")
 		return
 	}
 	if cursor != "" && !h.pm.RuntimeLogBuffer().ValidCursor(cursor) {
-		model.RespondError(w, 400, "INVALID_QUERY", "cursor is malformed or beyond the current high watermark")
+		model.RespondError(w, http.StatusBadRequest, "INVALID_QUERY", "cursor is malformed or beyond the current high watermark")
 		return
 	}
 	page := h.pm.RuntimeLogsSince(cursor, limit, q["level"], q.Get("q"), from, to, sinceRestart)
@@ -77,12 +77,12 @@ func (h *RuntimeLogsHandler) History(w http.ResponseWriter, r *http.Request) {
 func (h *RuntimeLogsHandler) Stream(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	if h.pm == nil {
-		http.Error(w, "Runtime logs unavailable", 503)
+		http.Error(w, "Runtime logs unavailable", http.StatusServiceUnavailable)
 		return
 	}
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		http.Error(w, "Streaming unsupported", 500)
+		http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
 		return
 	}
 	cursor := r.Header.Get("Last-Event-ID")
@@ -139,6 +139,7 @@ func (h *RuntimeLogsHandler) Stream(w http.ResponseWriter, r *http.Request) {
 }
 func writeSSE(w http.ResponseWriter, flusher http.Flusher, event string) bool {
 	_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(20 * time.Second))
+	// #nosec G705 -- the stream has a text/event-stream content type; all event payloads are JSON-encoded.
 	if _, err := w.Write([]byte(event)); err != nil {
 		return false
 	}

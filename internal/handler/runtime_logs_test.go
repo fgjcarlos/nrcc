@@ -37,7 +37,7 @@ func TestRuntimeLogsRejectsInvalidLimitAndGeneration(t *testing.T) {
 	generation := pm.RuntimeLogs("", 1, nil, "", time.Time{}, time.Time{}).Generation
 	for _, target := range []string{"/api/logs?limit=1001", "/api/logs?generation=stale", "/api/logs?cursor=" + generation + ":bogus"} {
 		rec := httptest.NewRecorder()
-		h.History(rec, httptest.NewRequest("GET", target, nil))
+		h.History(rec, httptest.NewRequest(http.MethodGet, target, nil))
 		want := 400
 		if strings.Contains(target, "generation=stale") {
 			want = 409
@@ -57,7 +57,7 @@ func TestRuntimeLogsHistoryAndStreamSnapshot(t *testing.T) {
 	// Buffer is exercised through the public process API's forwarding-independent capture seam.
 	pm.RuntimeLogBuffer().AddForTest("12 Jan 12:34:56 - [error] failure")
 	rec := httptest.NewRecorder()
-	h.History(rec, httptest.NewRequest("GET", "/api/logs?limit=1", nil))
+	h.History(rec, httptest.NewRequest(http.MethodGet, "/api/logs?limit=1", nil))
 	if rec.Code != 200 {
 		t.Fatalf("history status=%d body=%s", rec.Code, rec.Body.String())
 	}
@@ -77,7 +77,7 @@ func TestRuntimeLogsHistoryAndStreamSnapshot(t *testing.T) {
 		t.Fatalf("unexpected response: %#v", result)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	req := httptest.NewRequest("GET", "/api/logs/stream?since="+result.Data.HighWatermark, nil).WithContext(ctx)
+	req := httptest.NewRequest(http.MethodGet, "/api/logs/stream?since="+result.Data.HighWatermark, nil).WithContext(ctx)
 	stream := httptest.NewRecorder()
 	done := make(chan struct{})
 	go func() { h.Stream(stream, req); close(done) }()
