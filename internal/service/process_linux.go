@@ -435,7 +435,7 @@ func (pm *ProcessManager) startLocked(resetCounter bool) error {
 	pm.doneCh = doneCh
 	pm.running = true
 	pm.startedAt = time.Now()
-	pm.logs.reset()
+	runStartedAt := pm.logs.reset()
 	pm.lastError = nil
 	if resetCounter {
 		pm.restartCount = 0
@@ -444,8 +444,8 @@ func (pm *ProcessManager) startLocked(resetCounter bool) error {
 	// Forward the child stdout/stderr to the NRCC output (the container log;
 	// Docker rotates it) so a failed start explains itself. The forwarders end
 	// at EOF when waitForExit closes the pipe writers.
-	go forwardOutputCapture(pm.output, stdoutR, "node-red: ", pm.logs, "stdout")
-	go forwardOutputCapture(pm.output, stderrR, "node-red: ", pm.logs, "stderr")
+	go forwardOutputCapture(pm.output, stdoutR, "node-red: ", pm.logs, "stdout", runStartedAt)
+	go forwardOutputCapture(pm.output, stderrR, "node-red: ", pm.logs, "stderr", runStartedAt)
 	// Pass local copies of the channels — waitForExit must not read pm.stopCh/doneCh
 	// after the lock is released, as a new Start() could replace them.
 	go pm.waitForExit(cmd, stopCh, doneCh)
@@ -463,10 +463,10 @@ const outputWaitDelay = 2 * time.Second
 // chunks. Write errors are ignored: src must keep draining or the child
 // blocks on a full pipe.
 func forwardOutput(dst io.Writer, src io.Reader, prefix string) {
-	forwardOutputCapture(dst, src, prefix, nil, "stdout")
+	forwardOutputCapture(dst, src, prefix, nil, "stdout", time.Time{})
 }
 
-func forwardOutputCapture(dst io.Writer, src io.Reader, prefix string, logs *runtimeLogBuffer, source string) {
+func forwardOutputCapture(dst io.Writer, src io.Reader, prefix string, logs *runtimeLogBuffer, source string, runStartedAt time.Time) {
 	r := bufio.NewReader(src)
 	lineStart := true
 	captured := make([]byte, 0, maxRuntimeLogLine)
@@ -488,7 +488,7 @@ func forwardOutputCapture(dst io.Writer, src io.Reader, prefix string, logs *run
 			lineStart = chunk[len(chunk)-1] == '\n'
 			if lineStart {
 				if logs != nil {
-					logs.addSource(string(captured), source)
+					logs.addSource(string(captured), source, runStartedAt)
 				}
 				captured = captured[:0]
 			}
@@ -498,7 +498,7 @@ func forwardOutputCapture(dst io.Writer, src io.Reader, prefix string, logs *run
 		}
 		if err != nil {
 			if len(captured) > 0 && logs != nil {
-				logs.addSource(string(captured), source)
+				logs.addSource(string(captured), source, runStartedAt)
 			}
 			if !lineStart {
 				_, _ = dst.Write([]byte("\n"))

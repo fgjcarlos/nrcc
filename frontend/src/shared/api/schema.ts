@@ -1567,7 +1567,7 @@ export interface paths {
         };
         /**
          * Get runtime log history
-         * @description Admin-only. Entries are ordered ascending by sequence; without cursor the newest matching limit entries are returned. Filters are applied before pagination. Use nextCursor for older matching pages; highWatermark identifies the snapshot boundary for live tail. startedAt is the latest runtime start time; sinceRestart=true filters retained history to entries timestamped at or after it.
+         * @description Admin-only. Entries are ordered ascending by sequence; without cursor the newest matching limit entries are returned. Filters are applied before pagination. Use nextCursor for older matching pages; highWatermark identifies the snapshot boundary for live tail. startedAt is the latest managed runtime start time and is absent before any launch; sinceRestart=true only returns entries produced by that launch.
          */
         get: operations["getLogs"];
         put?: never;
@@ -2641,6 +2641,11 @@ export interface components {
             source: "stdout" | "stderr";
             /** @description Truncated to 4096 bytes when a line exceeds the capture limit */
             message: string;
+            /**
+             * Format: date-time
+             * @description Managed launch that produced the entry, independent of its log timestamp
+             */
+            runStartedAt?: string;
         };
         /** @description Arbitrary JSON object */
         AnyObject: {
