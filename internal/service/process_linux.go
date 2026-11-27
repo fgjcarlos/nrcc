@@ -62,12 +62,14 @@ type ProcessManager struct {
 	envSvc *EnvService
 
 	// process state — guarded by mu
-	mu           sync.Mutex
-	currentCmd   *exec.Cmd
-	running      bool
-	runtimePort  int // port resolved for the most recent successful Start; guarded by mu
-	startedAt    time.Time
-	restartCount int
+	mu                  sync.Mutex
+	currentCmd          *exec.Cmd
+	running             bool
+	runtimePort         int // port resolved for the most recent successful Start; guarded by mu
+	runtimeSettingsPath string
+	launchConsoleLevel  *string
+	startedAt           time.Time
+	restartCount        int
 	// restartsExhausted is set when automatic restarts give up and cleared
 	// by the next successful user-initiated Start; /healthz reports it.
 	restartsExhausted bool
@@ -137,6 +139,77 @@ func (pm *ProcessManager) EffectiveRuntimePort() int {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 	return pm.runtimePort
+}
+
+// RuntimeConsoleLoggingStatus compares the literal level in the current
+// launch settings file with the snapshot captured for the managed child.
+// A one-shot readiness probe is required before exposing a running value.
+func (pm *ProcessManager) RuntimeConsoleLoggingStatus() model.RuntimeConsoleLoggingStatus {
+	status := model.RuntimeConsoleLoggingStatus{Status: "unknown"}
+	pm.mu.Lock()
+	cmd, path, port, launchLevel := pm.currentCmd, pm.runtimeSettingsPath, pm.runtimePort, pm.launchConsoleLevel
+	managedRunning := pm.running && cmd != nil && cmd.Process != nil
+	envSvc, dataDir := pm.envSvc, pm.dataDir
+	pm.mu.Unlock()
+	if path == "" {
+		var stored map[string]string
+		if envSvc != nil {
+			stored, _ = envSvc.GetAll()
+		}
+		dotenv, _ := parseEnvFile(filepath.Join(dataDir, ".env"))
+		if runtime, err := resolveNodeRedRuntime(mergeEnvLayers(os.Environ(), stored, dotenv), dataDir); err == nil {
+			path = runtime.SettingsPath
+		}
+	}
+	if path == "" {
+		return status
+	}
+	configuredLevel := readConsoleLoggingLevel(path)
+	status.ConfiguredLevel = configuredLevel
+	if !managedRunning || configuredLevel == nil || launchLevel == nil || port == 0 {
+		return status
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	url := fmt.Sprintf("http://127.0.0.1:%d/settings", port)
+	client := defaultReadinessProbe{timeout: 500 * time.Millisecond}
+	if err := probeAttempt(ctx, client, "nrcc-runtime-status/1.0", url); err != nil {
+		return status
+	}
+
+	pm.mu.Lock()
+	stillCurrent := pm.running && pm.currentCmd == cmd && pm.runtimeSettingsPath == path
+	pm.mu.Unlock()
+	if !stillCurrent {
+		return status
+	}
+	status.RunningLevel = launchLevel
+	if *configuredLevel == *launchLevel {
+		status.Status = "applied"
+	} else {
+		status.Status = "pending"
+	}
+	return status
+}
+
+// readConsoleLoggingLevel reads only a literal string from the console
+// handler in settings.js. It never evaluates the JavaScript source.
+func readConsoleLoggingLevel(path string) *string {
+	// #nosec G304 -- path is the operator-configured settings path resolved for this managed launch.
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	console, ok := parseLoggingBlock(string(content))["console"]
+	if !ok {
+		return nil
+	}
+	level, ok := console["level"].(string)
+	if !ok || level == "" {
+		return nil
+	}
+	return &level
 }
 
 // closedChan returns an already-closed channel used as a sentinel.
@@ -291,6 +364,8 @@ func (pm *ProcessManager) startLocked(resetCounter bool) error {
 		pid := pm.currentCmd.Process.Pid
 		return fmt.Errorf("process already running (PID: %d)", pid)
 	}
+	pm.runtimeSettingsPath = ""
+	pm.launchConsoleLevel = nil
 
 	// Resolve explicit Node-RED runtime contract (NODE_RED_PORT/USER_DIR/SETTINGS).
 	// See resolveNodeRedRuntime for precedence and validation.
@@ -312,6 +387,7 @@ func (pm *ProcessManager) startLocked(resetCounter bool) error {
 	if err := ensureSettings(rt.SettingsPath); err != nil {
 		return fmt.Errorf("failed to create settings.js: %w", err)
 	}
+	launchConsoleLevel := readConsoleLoggingLevel(rt.SettingsPath)
 
 	// #nosec G204,G702 -- pm.nodeRedCmd is operator-supplied via configuration; rt fields are derived from operator-controlled dataDir.
 	cmd := exec.Command(pm.nodeRedCmd,
@@ -352,12 +428,14 @@ func (pm *ProcessManager) startLocked(resetCounter bool) error {
 
 	pm.currentCmd = cmd
 	pm.runtimePort = runtimePort
+	pm.runtimeSettingsPath = rt.SettingsPath
+	pm.launchConsoleLevel = launchConsoleLevel
 	pm.stopCh = stopCh
 	pm.stopOnce = &sync.Once{}
 	pm.doneCh = doneCh
 	pm.running = true
 	pm.startedAt = time.Now()
-	pm.logs.reset()
+	runStartedAt := pm.logs.reset()
 	pm.lastError = nil
 	if resetCounter {
 		pm.restartCount = 0
@@ -366,8 +444,8 @@ func (pm *ProcessManager) startLocked(resetCounter bool) error {
 	// Forward the child stdout/stderr to the NRCC output (the container log;
 	// Docker rotates it) so a failed start explains itself. The forwarders end
 	// at EOF when waitForExit closes the pipe writers.
-	go forwardOutputCapture(pm.output, stdoutR, "node-red: ", pm.logs, "stdout")
-	go forwardOutputCapture(pm.output, stderrR, "node-red: ", pm.logs, "stderr")
+	go forwardOutputCapture(pm.output, stdoutR, "node-red: ", pm.logs, "stdout", runStartedAt)
+	go forwardOutputCapture(pm.output, stderrR, "node-red: ", pm.logs, "stderr", runStartedAt)
 	// Pass local copies of the channels — waitForExit must not read pm.stopCh/doneCh
 	// after the lock is released, as a new Start() could replace them.
 	go pm.waitForExit(cmd, stopCh, doneCh)
@@ -385,10 +463,10 @@ const outputWaitDelay = 2 * time.Second
 // chunks. Write errors are ignored: src must keep draining or the child
 // blocks on a full pipe.
 func forwardOutput(dst io.Writer, src io.Reader, prefix string) {
-	forwardOutputCapture(dst, src, prefix, nil, "stdout")
+	forwardOutputCapture(dst, src, prefix, nil, "stdout", time.Time{})
 }
 
-func forwardOutputCapture(dst io.Writer, src io.Reader, prefix string, logs *runtimeLogBuffer, source string) {
+func forwardOutputCapture(dst io.Writer, src io.Reader, prefix string, logs *runtimeLogBuffer, source string, runStartedAt time.Time) {
 	r := bufio.NewReader(src)
 	lineStart := true
 	captured := make([]byte, 0, maxRuntimeLogLine)
@@ -410,7 +488,7 @@ func forwardOutputCapture(dst io.Writer, src io.Reader, prefix string, logs *run
 			lineStart = chunk[len(chunk)-1] == '\n'
 			if lineStart {
 				if logs != nil {
-					logs.addSource(string(captured), source)
+					logs.addSource(string(captured), source, runStartedAt)
 				}
 				captured = captured[:0]
 			}
@@ -420,7 +498,7 @@ func forwardOutputCapture(dst io.Writer, src io.Reader, prefix string, logs *run
 		}
 		if err != nil {
 			if len(captured) > 0 && logs != nil {
-				logs.addSource(string(captured), source)
+				logs.addSource(string(captured), source, runStartedAt)
 			}
 			if !lineStart {
 				_, _ = dst.Write([]byte("\n"))

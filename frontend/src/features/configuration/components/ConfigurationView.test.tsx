@@ -66,6 +66,7 @@ const baseConfig = {
   // No adminAuth / nodeHttpAuth / staticAuth — start false
   projectsEnabled: false,
   logging: { console: { level: 'info', metrics: false }, internal: { level: 'info', metrics: false } },
+  runtimeConsoleLogging: { configuredLevel: 'info', runningLevel: null, status: 'unknown' },
   flowFile: 'flows.json',
   editorTheme: {
     page: { title: 'Node-RED' },
@@ -119,6 +120,101 @@ function findToggleButton(labelText: RegExp): HTMLButtonElement {
   if (!button) throw new Error(`No toggle button next to label matching ${labelText}`);
   return button as HTMLButtonElement;
 }
+
+describe('ConfigurationView (issue #1075 — logging status)', () => {
+  it('shows applied only when the managed runtime reports a matching level', async () => {
+    mocks.getConfig.mockResolvedValueOnce({
+      data: { data: { ...baseConfig, runtimeConsoleLogging: { configuredLevel: 'debug', runningLevel: 'debug', status: 'applied' } }, success: true, timestamp: '' },
+    });
+    const user = userEvent.setup();
+    renderConfiguration();
+    await switchToTab(user, 'Logging');
+
+    expect(await screen.findByText('Applied: debug')).toBeInTheDocument();
+    const level = screen.getByRole('combobox', { name: /Console Level/ });
+    expect(level.querySelector('option[value=""]')).toBeNull();
+    await user.selectOptions(level, 'warn');
+    expect(screen.getByText('Applied: debug')).toBeInTheDocument();
+    expect(screen.queryByText('Applied: warn')).not.toBeInTheDocument();
+  });
+
+  it('shows pending restart with configured and observed running values', async () => {
+    mocks.getConfig.mockResolvedValueOnce({
+      data: { data: { ...baseConfig, logging: { ...baseConfig.logging, console: { level: 'warn', metrics: false } }, runtimeConsoleLogging: { configuredLevel: 'warn', runningLevel: 'debug', status: 'pending' } }, success: true, timestamp: '' },
+    });
+    const user = userEvent.setup();
+    renderConfiguration();
+    await switchToTab(user, 'Logging');
+
+    expect(await screen.findByText('Pending restart: configured warn, running debug')).toBeInTheDocument();
+  });
+
+  it('shows the configured console level and does not claim runtime application', async () => {
+    const user = userEvent.setup();
+    renderConfiguration();
+    await switchToTab(user, 'Logging');
+
+    expect(await screen.findByText('Configured console level: info')).toBeInTheDocument();
+    expect(screen.getByText(/Runtime level status is unknown/)).toBeInTheDocument();
+    expect(screen.getByText(/requires a Node-RED restart/i)).toBeInTheDocument();
+  });
+
+  it('keeps the missing-level placeholder disabled', async () => {
+    mocks.getConfig.mockResolvedValueOnce({
+      data: { data: { ...baseConfig, logging: { console: { metrics: false } } }, success: true, timestamp: '' },
+    });
+    const user = userEvent.setup();
+    renderConfiguration();
+    await switchToTab(user, 'Logging');
+
+    const consoleLevel = await screen.findByRole('combobox', { name: /Console Level/ });
+    const missingOption = consoleLevel.querySelector('option[value=""]');
+    expect(missingOption).toBeDisabled();
+    expect(screen.getByRole('combobox', { name: /Console Level/ })).toHaveValue('');
+  });
+
+  it('persists an explicitly disabled audit flag while preserving the other handler', async () => {
+    mocks.getConfig.mockResolvedValueOnce({
+      data: {
+        data: {
+          ...baseConfig,
+          logging: {
+            console: { level: 'info', metrics: false, audit: true },
+            internal: { level: 'warn', metrics: false, audit: true },
+          },
+        }, success: true, timestamp: '',
+      },
+    });
+    const updateSpy = vi.fn().mockResolvedValue({ data: { data: {}, success: true, timestamp: '' } });
+    const configModule = await import('@/features/configuration/services');
+    vi.spyOn(configModule.configService, 'updateConfig').mockImplementation(updateSpy);
+    const user = userEvent.setup();
+    renderConfiguration();
+    await switchToTab(user, 'Logging');
+
+    await user.click(screen.getByRole('button', { name: /Enable Audit.*logging\.console\.audit/ }));
+    await user.click(reviewAction());
+    const panel = await screen.findByTestId('review-changes-panel');
+    await user.click(within(panel).getByTestId('review-changes-panel-apply'));
+
+    await waitFor(() => expect(updateSpy).toHaveBeenCalled());
+    const payload = updateSpy.mock.calls[0][0] as { logging: { console: { audit: boolean }; internal: { audit: boolean } } };
+    expect(payload.logging.console.audit).toBe(false);
+    expect(payload.logging.internal.audit).toBe(true);
+  });
+
+  it('shows not set when the configured console level is absent', async () => {
+    mocks.getConfig.mockResolvedValueOnce({
+      data: { data: { ...baseConfig, logging: { console: { metrics: false } } }, success: true, timestamp: '' },
+    });
+    const user = userEvent.setup();
+    renderConfiguration();
+    await switchToTab(user, 'Logging');
+
+    expect(await screen.findAllByText(/Not set \/ unreadable/)).not.toHaveLength(0);
+    expect(screen.getByText(/Runtime level status is unknown/)).toBeInTheDocument();
+  });
+});
 
 describe('ConfigurationView (issue #366 — toggles were reset on every render)', () => {
   it('keeps the Editor Theme palette toggle flipped off after a re-render', async () => {

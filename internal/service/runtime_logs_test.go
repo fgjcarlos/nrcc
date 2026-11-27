@@ -61,10 +61,17 @@ func TestRuntimeLogsSinceRestartFiltersRetainedHistory(t *testing.T) {
 	b := newRuntimeLogBuffer(8, 1<<20)
 	b.add("old")
 	b.reset()
-	b.add("new")
+	b.add("2000-01-01T00:00:00Z - [info] new")
 	page := b.pageSince("", 8, nil, "", time.Time{}, time.Time{}, true)
 	if len(page.Entries) != 1 || page.Entries[0].Message != "new" {
 		t.Fatalf("since restart failed: %#v", page.Entries)
+	}
+}
+
+func TestRuntimeLogsReportNoStartUntilLaunch(t *testing.T) {
+	b := newRuntimeLogBuffer(8, 1<<20)
+	if page := b.page("", 1, nil, "", time.Time{}, time.Time{}); !page.StartedAt.IsZero() {
+		t.Fatalf("unstarted runtime reports a launch: %s", page.StartedAt)
 	}
 }
 
@@ -122,7 +129,7 @@ func TestForwardOutputCapturePreservesOverlongForwarding(t *testing.T) {
 	line := strings.Repeat("x", maxRuntimeLogLine+200) + "\n"
 	var dst bytes.Buffer
 	logs := newRuntimeLogBuffer(2, 1<<20)
-	forwardOutputCapture(&dst, strings.NewReader(line), "node-red: ", logs, "stderr")
+	forwardOutputCapture(&dst, strings.NewReader(line), "node-red: ", logs, "stderr", time.Time{})
 	if dst.String() != "node-red: "+line {
 		t.Fatal("capture altered container log forwarding")
 	}

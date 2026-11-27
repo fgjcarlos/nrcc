@@ -33,6 +33,11 @@ const (
 // chi.Walk produces. Adding a new route to server.go without an entry here
 // is a build failure.
 var routeAuthz = map[string]authzLevel{
+
+	// Raw Node-RED runtime logs are admin-only.
+	"GET /api/logs":        authzAdmin,
+	"GET /api/logs/stream": authzAdmin,
+
 	// ── public (no auth) ─────────────────────────────────────────────────
 	//
 	// /metrics is conditionally registered as public when
