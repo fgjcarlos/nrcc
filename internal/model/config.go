@@ -4,6 +4,14 @@ import (
 	"encoding/json"
 )
 
+// RuntimeConsoleLoggingStatus reports the settings.js console level and the
+// level observed from the currently ready managed child, when available.
+type RuntimeConsoleLoggingStatus struct {
+	ConfiguredLevel *string `json:"configuredLevel"`
+	RunningLevel    *string `json:"runningLevel,omitempty"`
+	Status          string  `json:"status"`
+}
+
 // NodeRedConfig represents the Node-RED configuration
 type NodeRedConfig struct {
 	// Basic settings
@@ -24,8 +32,9 @@ type NodeRedConfig struct {
 	HTTPStaticAuth *HTTPBasicAuth `json:"httpStaticAuth,omitempty"`
 
 	// Projects & Logging
-	ProjectsEnabled bool        `json:"projectsEnabled,omitempty"`
-	Logging         interface{} `json:"logging,omitempty"`
+	ProjectsEnabled       bool                         `json:"projectsEnabled,omitempty"`
+	Logging               interface{}                  `json:"logging,omitempty"`
+	RuntimeConsoleLogging *RuntimeConsoleLoggingStatus `json:"runtimeConsoleLogging,omitempty"`
 
 	// TLS (issue #762 slice 1). HTTPS enables a TLS listener; RequireHttps
 	// redirects plain-http traffic to https when set. Both require a Node-RED
@@ -171,6 +180,8 @@ func (c *NodeRedConfig) UnmarshalJSON(data []byte) error {
 	if c.UIPort > 0 && c.Port == 0 {
 		c.Port = c.UIPort
 	}
+	// Runtime logging status is response-only and never accepted from clients.
+	c.RuntimeConsoleLogging = nil
 
 	// Record which security surfaces this payload carried (issue #881).
 	// "absent" and "explicitly null" are different intents: absent means

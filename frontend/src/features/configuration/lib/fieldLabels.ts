@@ -26,8 +26,10 @@ export const FIELD_LABELS: Record<keyof NodeRedConfigFormData, string> = {
   // Logging
   loggingConsoleLevel: 'Console Log Level',
   loggingConsoleMetrics: 'Console Metrics',
+  loggingConsoleAudit: 'Console Audit',
   loggingInternalLevel: 'Internal Log Level',
   loggingInternalMetrics: 'Internal Metrics',
+  loggingInternalAudit: 'Internal Audit',
   // Files
   flowFile: 'Flow File',
   userDir: 'User Dir',
@@ -82,8 +84,10 @@ export const SETTINGS_KEYS: Record<keyof NodeRedConfigFormData, string> = {
   projectsEnabled: 'projectsEnabled',
   loggingConsoleLevel: 'logging.console.level',
   loggingConsoleMetrics: 'logging.console.metrics',
+  loggingConsoleAudit: 'logging.console.audit',
   loggingInternalLevel: 'logging.internal.level',
   loggingInternalMetrics: 'logging.internal.metrics',
+  loggingInternalAudit: 'logging.internal.audit',
   flowFile: 'flowFile',
   userDir: 'userDir',
   nodesDir: 'nodesDir',
