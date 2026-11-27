@@ -17,6 +17,7 @@ import enEnvVars from '@/locales/en/env-vars.json';
 import enLibraries from '@/locales/en/libraries.json';
 import enSecurity from '@/locales/en/security.json';
 import enUpdates from '@/locales/en/updates.json';
+import enLogs from '@/locales/en/logs.json';
 
 import esCommon from '@/locales/es/common.json';
 import esAuth from '@/locales/es/auth.json';
@@ -29,6 +30,7 @@ import esEnvVars from '@/locales/es/env-vars.json';
 import esLibraries from '@/locales/es/libraries.json';
 import esSecurity from '@/locales/es/security.json';
 import esUpdates from '@/locales/es/updates.json';
+import esLogs from '@/locales/es/logs.json';
 
 const resources = {
   en: {
@@ -43,6 +45,7 @@ const resources = {
     libraries: enLibraries,
     security: enSecurity,
     updates: enUpdates,
+    logs: enLogs,
   },
   es: {
     common: esCommon,
@@ -56,6 +59,7 @@ const resources = {
     libraries: esLibraries,
     security: esSecurity,
     updates: esUpdates,
+    logs: esLogs,
   },
 };
 
@@ -73,7 +77,7 @@ if (!w.__nrccI18nInitOnce) {
       defaultNS: 'common',
       ns: [
         'common', 'auth', 'setup', 'backups', 'bootstrap', 'configuration',
-        'dashboard', 'env-vars', 'libraries', 'security', 'updates',
+        'dashboard', 'env-vars', 'libraries', 'security', 'updates', 'logs',
       ],
       resources,
       detection: {
