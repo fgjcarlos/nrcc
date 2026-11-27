@@ -1,3 +1,4 @@
+import { DEFAULT_HTTP_NODE_CORS_METHODS } from '@/shared/types';
 import type { NodeRedConfigFormData } from '@/shared/types';
 
 /**
@@ -53,4 +54,14 @@ export const INITIAL_FORM_DATA: NodeRedConfigFormData = {
   runtimeStateFile: '',
 
   lang: 'en-US',
+
+  // CORS (issue #1076) — mirrors the defaults `configToFormData` produces
+  // for an absent `httpNodeCors` key.
+  httpNodeCorsEnabled: false,
+  httpNodeCorsOrigins: '',
+  httpNodeCorsMethods: DEFAULT_HTTP_NODE_CORS_METHODS.join(','),
+  httpNodeCorsCredentials: false,
+  httpNodeCorsAllowedHeaders: '',
+  httpNodeCorsUnsupported: false,
+  httpNodeCorsRaw: '',
 };

@@ -1,5 +1,7 @@
-import { InputField, ToggleField } from './FormFields';
+import { InputField, ToggleField, FieldLabel } from './FormFields';
 import { FieldStatusChip } from './FieldStatusChip';
+import { Textarea } from '@/shared/components/ui';
+import { DEFAULT_HTTP_NODE_CORS_METHODS, HTTP_NODE_CORS_METHODS } from '@/shared/types';
 import type { NodeRedConfigFormData } from '@/shared/types';
 import type { FieldDiff } from '../hooks/useConfigurationDiff';
 import { useT } from '@/i18n';
@@ -22,6 +24,17 @@ interface SecuritySettingsProps {
 // ConfigurationView (save time). Hidden when editable=false.
 export function SecuritySettings({ settings, onUpdate, disabled, fieldErrors }: SecuritySettingsProps) {
   const { t } = useT();
+  // The flat model keeps methods as a comma separated string; rewriting it
+  // from the current tokens preserves any method the UI does not offer.
+  const methods = (settings.httpNodeCorsMethods ?? DEFAULT_HTTP_NODE_CORS_METHODS.join(','))
+    .split(',')
+    .map((method) => method.trim())
+    .filter(Boolean);
+  const origins = (settings.httpNodeCorsOrigins ?? '').split('\n').map((origin) => origin.trim());
+  const toggleMethod = (method: string) => {
+    const next = methods.includes(method) ? methods.filter((entry) => entry !== method) : [...methods, method];
+    onUpdate('httpNodeCorsMethods', next.join(','));
+  };
   return (
     <div className="space-y-6">
       <div>
@@ -142,6 +155,97 @@ export function SecuritySettings({ settings, onUpdate, disabled, fieldErrors }: 
             />
           </div>
         </div>
+      </div>
+
+      {/* CORS for http-in endpoints (issue #1076). An unsupported
+          hand-written block is shown read-only: no controls, verbatim
+          source, and it round-trips unchanged. */}
+      <div>
+        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ds-text-secondary">{t('configuration:httpNodeCors.title')}</h4>
+        {settings.httpNodeCorsUnsupported ? (
+          <div className="space-y-2">
+            <p className="text-xs text-ds-text-muted">{t('configuration:httpNodeCors.unsupportedHelp')}</p>
+            <pre
+              aria-label={t('configuration:httpNodeCors.rawLabel')}
+              className="overflow-x-auto rounded-box border border-ds-border-subtle bg-ds-bg-base p-3 font-mono text-xs text-ds-text-primary"
+            >
+              {settings.httpNodeCorsRaw ?? ''}
+            </pre>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-xs text-ds-text-muted">{t('configuration:httpNodeCors.description')}</p>
+            <ToggleField
+              label={t('configuration:httpNodeCors.enable')}
+              field="httpNodeCorsEnabled"
+              value={settings.httpNodeCorsEnabled ?? false}
+              onChange={(v) => onUpdate('httpNodeCorsEnabled', v)}
+              help={t('configuration:httpNodeCors.enableHelp')}
+              disabled={disabled}
+            />
+            {settings.httpNodeCorsEnabled && (
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <FieldLabel label={t('configuration:httpNodeCors.origins')} settingKey="httpNodeCors.origin" htmlFor="cfg-httpNodeCorsOrigins" />
+                  <Textarea
+                    id="cfg-httpNodeCorsOrigins"
+                    value={settings.httpNodeCorsOrigins ?? ''}
+                    onChange={(e) => onUpdate('httpNodeCorsOrigins', e.target.value)}
+                    placeholder={t('configuration:httpNodeCors.originsPlaceholder')}
+                    disabled={disabled}
+                    rows={3}
+                  />
+                  <p className="text-xs text-ds-text-muted">{t('configuration:httpNodeCors.originsHelp')}</p>
+                </div>
+
+                <fieldset className="space-y-1">
+                  <legend className="text-xs text-ds-text-secondary">{t('configuration:httpNodeCors.methods')}</legend>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                    {HTTP_NODE_CORS_METHODS.map((method) => (
+                      <label key={method} className="flex items-center gap-1.5 text-xs text-ds-text-secondary">
+                        <input
+                          type="checkbox"
+                          checked={methods.includes(method)}
+                          onChange={() => toggleMethod(method)}
+                          disabled={disabled}
+                        />
+                        {method}
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-xs text-ds-text-muted">{t('configuration:httpNodeCors.methodsHelp')}</p>
+                </fieldset>
+
+                <ToggleField
+                  label={t('configuration:httpNodeCors.credentials')}
+                  field="httpNodeCorsCredentials"
+                  value={settings.httpNodeCorsCredentials ?? false}
+                  onChange={(v) => onUpdate('httpNodeCorsCredentials', v)}
+                  help={t('configuration:httpNodeCors.credentialsHelp')}
+                  disabled={disabled}
+                />
+
+                <InputField
+                  label={t('configuration:httpNodeCors.allowedHeaders')}
+                  field="httpNodeCorsAllowedHeaders"
+                  value={settings.httpNodeCorsAllowedHeaders ?? ''}
+                  onChange={(v) => onUpdate('httpNodeCorsAllowedHeaders', v as string)}
+                  placeholder={t('configuration:httpNodeCors.allowedHeadersPlaceholder')}
+                  help={t('configuration:httpNodeCors.allowedHeadersHelp')}
+                  disabled={disabled}
+                />
+
+                {origins.includes('*') && (
+                  <p role="alert" className="rounded-box border border-ds-warning/40 bg-ds-warning/10 px-3 py-2 text-sm text-ds-on-tint-warning">
+                    {settings.httpNodeCorsCredentials
+                      ? t('configuration:httpNodeCors.wildcardCredentialsWarning')
+                      : t('configuration:httpNodeCors.wildcardWarning')}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

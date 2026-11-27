@@ -44,6 +44,9 @@ type NodeRedConfig struct {
 	RequireHttps bool         `json:"requireHttps,omitempty"`
 	Https        *HttpsConfig `json:"https,omitempty"`
 
+	// CORS for http-in endpoints (issue #1076). Absent key = disabled.
+	HTTPNodeCors *HTTPNodeCorsConfig `json:"httpNodeCors,omitempty"`
+
 	// Editor Theme
 	EditorTheme interface{} `json:"editorTheme,omitempty"`
 
@@ -144,6 +147,21 @@ type HttpsConfig struct {
 	CA         string `json:"ca,omitempty"`
 	Port       int    `json:"port,omitempty"`
 	Passphrase string `json:"passphrase,omitempty"`
+}
+
+// HTTPNodeCorsConfig describes the Node-RED `httpNodeCors` block, rendered as
+// an object literal in settings.js. A nil *HTTPNodeCorsConfig means the key is
+// absent (CORS disabled for http-in endpoints).
+type HTTPNodeCorsConfig struct {
+	Origin         []string `json:"origin"`
+	Methods        []string `json:"methods,omitempty"`
+	Credentials    bool     `json:"credentials,omitempty"`
+	AllowedHeaders []string `json:"allowedHeaders,omitempty"`
+	// Unsupported marks a hand-written block whose shape NRCC cannot model
+	// (function origin, regexp, unknown keys). Raw keeps its verbatim source
+	// text so the block is shown read-only and never rewritten.
+	Unsupported bool   `json:"unsupported,omitempty"`
+	Raw         string `json:"raw,omitempty"`
 }
 
 // FunctionLibrary represents a Node-RED function library

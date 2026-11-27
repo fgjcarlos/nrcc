@@ -45,6 +45,7 @@ must include a sync update and (if shapes change) an ADR.
 | httpNodeRoot | string-or-false | / | path-or-false |   | ✓ | ✓ |
 | https | https-options | undefined | https-options | ✓ | ✓ | ✓ |
 | requireHttps | boolean | false | boolean |   | ✓ | ✓ |
+| httpNodeCors | http-node-cors | undefined | http-node-cors |   | ✓ | ✓ |
 | httpStatic | string-or-array |  | path-or-static-sources |   | ✓ |   |
 | lang | string | en-US | locale |   | ✓ | ✓ |
 | runtimeState | object | {enabled:false,ui:false} | runtime-state-options |   | ✓ | ✓ |
@@ -155,6 +156,20 @@ When `true` Node-RED redirects `http://` requests to `https://`.
 Restart required. **Verification**: an editor URL without `https`
 redirects to `https://<same path>`.
 
+### `httpNodeCors`
+
+CORS options for http-in endpoints (`origin`, `methods`,
+`credentials`, `allowedHeaders`). Absent by default, which disables
+CORS. Restart required. An `origin` is `"*"`, one origin, or an
+array of origins; each concrete origin must be an `http(s)` URL
+without a path. `"*"` cannot be combined with `credentials: true`.
+`methods` accepts a comma-separated string or an array of
+`GET, HEAD, PUT, PATCH, POST, DELETE`; empty means Node-RED's default.
+A hand-written block whose shape NRCC cannot model (function origin,
+regexp, unknown keys) is shown read-only and preserved verbatim on
+every save. **Verification**: a preflight `OPTIONS` request from a
+listed origin returns `Access-Control-Allow-Origin`.
+
 ### `httpStatic`
 
 Static file serving config (path or array of
@@ -218,7 +233,7 @@ The catalog is verified by
 `internal/service/catalog_doc_sync_test.go` (W2). The test parses
 the table above and asserts:
 
-- Exactly 21 rows.
+- Exactly 22 rows.
 - The `Key` column matches `ManagedSettingKeys()` exactly (set
   equality, not order).
 - For every catalog entry, the row's `Shape` / `Default` /

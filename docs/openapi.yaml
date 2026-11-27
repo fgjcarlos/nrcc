@@ -2922,6 +2922,8 @@ components:
           description: Redirect HTTP requests to HTTPS
         https:
           $ref: "#/components/schemas/HttpsConfig"
+        httpNodeCors:
+          $ref: "#/components/schemas/HTTPNodeCorsConfig"
 
     RuntimeConsoleLoggingStatus:
       type: object
@@ -2965,6 +2967,42 @@ components:
             Private-key passphrase. Write-only: the API never returns the
             stored value, for any role. An empty or redacted value on write
             keeps the stored passphrase; a new value rotates it.
+
+    HTTPNodeCorsConfig:
+      type: object
+      description: Node-RED CORS block for http-in endpoints
+      required: [origin]
+      properties:
+        origin:
+          type: array
+          items:
+            type: string
+          description: >-
+            "*" as a single entry, or an explicit list of http(s) origins
+            without a path.
+        methods:
+          type: array
+          items:
+            type: string
+            enum: [GET, HEAD, PUT, PATCH, POST, DELETE]
+          description: >-
+            Allowed methods. Absent means the Node-RED default
+            GET,PUT,POST,DELETE.
+        credentials:
+          type: boolean
+        allowedHeaders:
+          type: array
+          items:
+            type: string
+        unsupported:
+          type: boolean
+          description: >-
+            Set when the hand-written block uses a shape NRCC cannot model, for
+            example a function origin. The block is then read-only and left
+            verbatim in settings.js.
+        raw:
+          type: string
+          description: Verbatim source of an unsupported block, for read-only display.
 
     AdminAuth:
       type: object

@@ -21,6 +21,8 @@ func TestManagedSettingKeys_CatalogExposed(t *testing.T) {
 		"env",
 		// #764 slice 1: https became managed (was operator-owned under #758).
 		"https",
+		// #1076: CORS for http-in endpoints.
+		"httpNodeCors",
 	}
 	got := ManagedSettingKeys()
 	if len(got) != len(want) {
@@ -50,6 +52,8 @@ func TestIsManagedSettingKey(t *testing.T) {
 		{"externalModules", false},
 		// https became managed in #764 slice 1 (was operator-owned under #758).
 		{"https", true},
+		// CORS for http-in endpoints became managed in #1076.
+		{"httpNodeCors", true},
 		{"exportGlobalContextKeys", false},
 		{"nodesDirArray", false},
 		{"fooBar", false},

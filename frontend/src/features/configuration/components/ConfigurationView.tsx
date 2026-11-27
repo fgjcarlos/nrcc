@@ -2,6 +2,7 @@ import { useState, useEffect, useId, useMemo, useRef } from 'react';
 import { errorMessage } from '@/shared/lib/errorMessage';
 import { cn } from '@/shared/lib';
 import type { NodeRedConfigFormData } from '@/shared/types';
+import { DEFAULT_HTTP_NODE_CORS_METHODS } from '@/shared/types';
 import { settingsRawSchema } from '@/shared/validation/schemas';
 import {
   BasicSettings,
@@ -133,6 +134,16 @@ const INITIAL_FORM_DATA: NodeRedConfigFormData = {
 
   // Language
   lang: 'en-US',
+
+  // CORS (issue #1076) — mirrors the defaults `configToFormData` produces
+  // for an absent `httpNodeCors` key.
+  httpNodeCorsEnabled: false,
+  httpNodeCorsOrigins: '',
+  httpNodeCorsMethods: DEFAULT_HTTP_NODE_CORS_METHODS.join(','),
+  httpNodeCorsCredentials: false,
+  httpNodeCorsAllowedHeaders: '',
+  httpNodeCorsUnsupported: false,
+  httpNodeCorsRaw: '',
 };
 
 // ============================================

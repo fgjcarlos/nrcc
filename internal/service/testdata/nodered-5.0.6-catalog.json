@@ -13,6 +13,7 @@
   {"key":"httpNodeRoot","shape":"string-or-false"},
   {"key":"https","shape":"https-options"},
   {"key":"requireHttps","shape":"boolean"},
+  {"key":"httpNodeCors","shape":"http-node-cors"},
   {"key":"httpStatic","shape":"string-or-array"},
   {"key":"lang","shape":"string"},
   {"key":"runtimeState","shape":"object"},

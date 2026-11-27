@@ -208,6 +208,25 @@ export interface HttpsConfig {
   passphrase?: string;
 }
 
+// Issue #1076. Node-RED `httpNodeCors`, rendered as an object literal in
+// settings.js. An absent key means CORS is disabled for http-in nodes;
+// `unsupported` marks a hand-written block NRCC cannot model, whose
+// verbatim `raw` source is shown read-only and never rewritten.
+export interface HTTPNodeCorsConfig {
+  origin: string[];
+  methods?: string[];
+  credentials?: boolean;
+  allowedHeaders?: string[];
+  unsupported?: boolean;
+  raw?: string;
+}
+
+/** Methods Node-RED accepts in `httpNodeCors.methods` (backend S4 order). */
+export const HTTP_NODE_CORS_METHODS = ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'] as const;
+
+/** Node-RED's own default when `methods` is absent. */
+export const DEFAULT_HTTP_NODE_CORS_METHODS: readonly string[] = ['GET', 'PUT', 'POST', 'DELETE'];
+
 // ============================================
 // AUTHENTICATION
 // ============================================
@@ -270,6 +289,8 @@ export interface NodeRedConfig {
   credentialSecret?: string;
   requireHttps?: boolean;
   https?: HttpsConfig;
+  // CORS for http-in endpoints (issue #1076). Absent key = disabled.
+  httpNodeCors?: HTTPNodeCorsConfig;
   settingsPath?: string;
   settingsSource?: string;
 }
@@ -347,6 +368,71 @@ export interface NodeRedConfigFormData {
   httpsCA?: string;
   httpsPort?: number;
   httpsPassphrase?: string;
+  // CORS slice (issue #1076) — origins newline separated, methods and
+  // allowed headers comma separated, so one flat model keeps working.
+  httpNodeCorsEnabled?: boolean;
+  httpNodeCorsOrigins?: string;
+  httpNodeCorsMethods?: string;
+  httpNodeCorsCredentials?: boolean;
+  httpNodeCorsAllowedHeaders?: string;
+  httpNodeCorsUnsupported?: boolean;
+  httpNodeCorsRaw?: string;
+}
+
+export type HTTPNodeCorsFormFields = Required<Pick<
+  NodeRedConfigFormData,
+  | 'httpNodeCorsEnabled'
+  | 'httpNodeCorsOrigins'
+  | 'httpNodeCorsMethods'
+  | 'httpNodeCorsCredentials'
+  | 'httpNodeCorsAllowedHeaders'
+  | 'httpNodeCorsUnsupported'
+  | 'httpNodeCorsRaw'
+>>;
+
+function splitList(value: string | undefined, separator: string): string[] {
+  return (value ?? '')
+    .split(separator)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+/**
+ * The single mapping between the API's `httpNodeCors` block and the flat
+ * form fields (issue #1076). `configTransformers` delegates here so the
+ * read and write paths cannot drift from the form model.
+ */
+export function httpNodeCorsToFormData(cors: HTTPNodeCorsConfig | undefined): HTTPNodeCorsFormFields {
+  return {
+    httpNodeCorsEnabled: !!cors && !cors.unsupported,
+    // The backend omits `origin` on an unsupported block, so tolerate null.
+    httpNodeCorsOrigins: (cors?.origin ?? []).join('\n'),
+    httpNodeCorsMethods: cors?.methods?.join(',') || DEFAULT_HTTP_NODE_CORS_METHODS.join(','),
+    httpNodeCorsCredentials: cors?.credentials ?? false,
+    httpNodeCorsAllowedHeaders: cors?.allowedHeaders?.join(',') || '',
+    httpNodeCorsUnsupported: cors?.unsupported ?? false,
+    httpNodeCorsRaw: cors?.raw || '',
+  };
+}
+
+export function httpNodeCorsFromFormData(formData: NodeRedConfigFormData): HTTPNodeCorsConfig | undefined {
+  // An unsupported block is emitted back verbatim; settings.js leaves it
+  // byte-for-byte untouched on the backend either way.
+  if (formData.httpNodeCorsUnsupported) {
+    return { origin: [], unsupported: true, raw: formData.httpNodeCorsRaw ?? '' };
+  }
+  if (!formData.httpNodeCorsEnabled) return undefined;
+  const methods = splitList(formData.httpNodeCorsMethods ?? DEFAULT_HTTP_NODE_CORS_METHODS.join(','), ',');
+  const isDefaultMethods =
+    methods.length === DEFAULT_HTTP_NODE_CORS_METHODS.length &&
+    DEFAULT_HTTP_NODE_CORS_METHODS.every((method) => methods.includes(method));
+  const allowedHeaders = splitList(formData.httpNodeCorsAllowedHeaders, ',');
+  return {
+    origin: splitList(formData.httpNodeCorsOrigins, '\n'),
+    methods: isDefaultMethods ? undefined : methods,
+    credentials: formData.httpNodeCorsCredentials || undefined,
+    allowedHeaders: allowedHeaders.length ? allowedHeaders : undefined,
+  };
 }
 
 export function configToFormData(config: NodeRedConfig): NodeRedConfigFormData {
@@ -397,6 +483,8 @@ export function configToFormData(config: NodeRedConfig): NodeRedConfigFormData {
     httpsCA: config.https?.ca || '',
     httpsPort: config.https?.port ?? 0,
     httpsPassphrase: config.https?.passphrase || '',
+    // CORS for http-in endpoints — the shared helper is the only mapping.
+    ...httpNodeCorsToFormData(config.httpNodeCors),
   };
 }
 
@@ -479,6 +567,10 @@ export function formDataToConfig(formData: NodeRedConfigFormData): Partial<NodeR
       passphrase: formData.httpsPassphrase || undefined,
     } : undefined,
   };
+
+  // CORS for http-in endpoints — disabled omits the key entirely.
+  const httpNodeCors = httpNodeCorsFromFormData(formData);
+  if (httpNodeCors) config.httpNodeCors = httpNodeCors;
   
   if (config.editorTheme) {
     Object.keys(config.editorTheme).forEach(key => {
