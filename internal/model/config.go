@@ -4,6 +4,14 @@ import (
 	"encoding/json"
 )
 
+// RuntimeConsoleLoggingStatus reports the settings.js console level and the
+// level observed from the currently ready managed child, when available.
+type RuntimeConsoleLoggingStatus struct {
+	ConfiguredLevel *string `json:"configuredLevel"`
+	RunningLevel    *string `json:"runningLevel,omitempty"`
+	Status          string  `json:"status"`
+}
+
 // NodeRedConfig represents the Node-RED configuration
 type NodeRedConfig struct {
 	// Basic settings
