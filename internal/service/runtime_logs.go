@@ -165,7 +165,7 @@ func (b *runtimeLogBuffer) pageSince(before string, limit int, levels []string, 
 		}
 		return (from.IsZero() || !e.Timestamp.Before(from)) && (to.IsZero() || !e.Timestamp.After(to))
 	}
-	var bound uint64 = b.seq
+	bound := b.seq
 	if before != "" {
 		if n, ok := parseLogSequence(before, b.generation); ok {
 			bound = n - 1
