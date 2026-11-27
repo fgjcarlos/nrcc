@@ -202,6 +202,47 @@ func TestLoggingRoundTrip_RenderParseRender(t *testing.T) {
 	}
 }
 
+// TestLoggingRoundTrip_PersistsExplicitFalseFlags verifies false values are
+// retained in settings.js and read back as explicit false values.
+func TestLoggingRoundTrip_PersistsExplicitFalseFlags(t *testing.T) {
+	dir := t.TempDir()
+	svc := NewIsolatedConfigService(dir)
+	settingsPath := filepath.Join(dir, "settings.js")
+	seed := strings.Replace(loggingFixture,
+		"console: { level: 'info', metrics: false, audit: false }",
+		"console: { level: 'info', metrics: true, audit: true }", 1)
+	if err := os.WriteFile(settingsPath, []byte(seed), 0o600); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	cfg, err := svc.Get()
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	cfg.Logging = map[string]any{
+		"console": map[string]any{"level": "warn", "metrics": false, "audit": false},
+	}
+	if err := svc.Save(cfg); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	reloaded, err := svc.Get()
+	if err != nil {
+		t.Fatalf("Get after Save: %v", err)
+	}
+	console := newLoggingModel(reloaded.Logging)["console"]
+	if console["metrics"] != false || console["audit"] != false {
+		t.Fatalf("explicit false flags did not round-trip: %+v", console)
+	}
+	written, err := os.ReadFile(settingsPath) // #nosec G304 -- settingsPath is derived from t.TempDir().
+	if err != nil {
+		t.Fatalf("read settings.js: %v", err)
+	}
+	if !strings.Contains(string(written), "metrics: false, audit: false") {
+		t.Fatalf("settings.js did not persist explicit false flags:\n%s", written)
+	}
+}
+
 // TestLoggingRoundTrip_AppliesSubmittedValuesToExistingFile asserts the
 // values the operator submits through the API reach the file and are read
 // back by the structured model.

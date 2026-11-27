@@ -47,6 +47,7 @@ type Server struct {
 	metricsBuffer      *service.MetricsBuffer
 	metricsSampler     *service.MetricsSampler
 	flowVersionSvc     *service.FlowVersionService
+	runtimeLogsHandler *handler.RuntimeLogsHandler
 	httpLogger         *slog.Logger
 	ctx                context.Context
 	cancel             context.CancelFunc
@@ -169,6 +170,7 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 	flowVersionSvc := service.NewFlowVersionService(dataDir)
 	flowVersionSvc.StartPolling()
 	flowHandler := handler.NewFlowHandler(flowSvc)
+	runtimeLogsHandler := handler.NewRuntimeLogsHandler(nil)
 	flowHandler.SetVersionService(flowVersionSvc)
 	dashboardHandler := handler.NewDashboardHandler(service.NewDashboardService(dataDir))
 	librarySvc := service.NewLibraryService(dataDir)
@@ -367,6 +369,10 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 			r.Get("/status", bootstrapHandler.GetStatus)
 		})
 
+		// Raw Node-RED runtime logs contain untrusted application data and are admin-only.
+		r.With(middleware.RequireAdmin).Get("/api/logs", runtimeLogsHandler.History)
+		r.With(middleware.RequireAdmin).Get("/api/logs/stream", runtimeLogsHandler.Stream)
+
 		// System routes
 		r.Get("/api/system/info", systemHandler.GetSystemInfo)
 		r.Get("/api/system/history", systemHandler.GetSystemHistory)
@@ -518,6 +524,7 @@ func NewServerWithConfig(authSvc *service.AuthService, cfg Config) *Server {
 		metricsBuffer:      metricsBuffer,
 		metricsSampler:     metricsSampler,
 		flowVersionSvc:     flowVersionSvc,
+		runtimeLogsHandler: runtimeLogsHandler,
 		httpLogger:         cfg.HTTPLogger,
 	}
 
@@ -570,6 +577,9 @@ func (s *Server) SetProcessManager(pm *service.ProcessManager) {
 	}
 	// Wire env vars into the process so they're injected on every node-red start
 	pm.SetEnvService(s.envSvc)
+	if s.runtimeLogsHandler != nil {
+		s.runtimeLogsHandler.SetProcessManager(pm)
+	}
 	// Wire process manager into env handler so it restarts node-red on env changes
 	s.envHandler.SetProcessManager(pm)
 	// Wire process manager into config handler so a successful SaveConfig

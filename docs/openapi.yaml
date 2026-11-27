@@ -2222,77 +2222,50 @@ paths:
     get:
       tags: [Logs]
       operationId: getLogs
-      summary: Get recent log entries
-      description: Returns recent Node-RED runtime log entries from the in-memory buffer.
+      summary: Get runtime log history
+      description: Admin-only. Entries are ordered ascending by sequence; without cursor the newest matching limit entries are returned. Filters are applied before pagination. Use nextCursor for older matching pages; highWatermark identifies the snapshot boundary for live tail. startedAt is the latest managed runtime start time and is absent before any launch; sinceRestart=true only returns entries produced by that launch.
       security:
         - bearerAuth: []
       parameters:
-        - name: tail
-          in: query
-          description: Number of recent entries to return (max 1000)
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 1000
-            default: 100
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 1000, default: 100 } }
+        - { name: cursor, in: query, description: Exclusive before cursor returned as nextCursor; fetches the preceding older page, schema: { type: string } }
+        - { name: generation, in: query, description: Expected restart generation; mismatch returns 409, schema: { type: string } }
+        - { name: level, in: query, description: Repeat for multiple levels, style: form, explode: true, schema: { type: array, items: { type: string, enum: [info, warn, error, debug, trace, fatal, unknown] } } }
+        - { name: q, in: query, description: Case-insensitive message substring, schema: { type: string } }
+        - { name: from, in: query, description: Inclusive RFC3339 timestamp, schema: { type: string, format: date-time } }
+        - { name: to, in: query, description: Inclusive RFC3339 timestamp, schema: { type: string, format: date-time } }
+        - { name: sinceRestart, in: query, description: Return entries since the runtime's last start, schema: { type: boolean, default: false } }
       responses:
         "200":
-          description: Log entries
+          description: Log page
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessEnvelope_LogEntryList"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-    delete:
-      tags: [Logs]
-      operationId: deleteLogs
-      summary: Clear log buffer
-      description: Clears all entries from the in-memory log buffer.
-      security:
-        - bearerAuth: []
-      responses:
-        "204":
-          description: Log buffer cleared
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "400": { description: Invalid query parameters }
+        "409": { description: Cursor or generation is stale }
   /api/logs/stream:
     get:
       tags: [Logs]
       operationId: streamLogs
-      summary: Stream logs via SSE
-      description: |
-        Opens a Server-Sent Events stream for live log tailing.
-
-        **Event types:**
-        - `connected` — sent once on connection; payload `{"bufferedCount": N}`
-        - `log` — one per log entry; payload is a `LogEntry` object
-        - `: ping` — keepalive comment every 15 seconds
-
-        The `replay` parameter controls how many buffered entries are replayed
-        on connect before live streaming begins.
+      summary: Stream runtime logs via SSE
+      description: Admin-only. Connect with `since=<generation:sequence>` set to history highWatermark to avoid gaps. Events are connected (generation/highWatermark/startedAt), log (entry with SSE id), restart (same cursor generation, updated highWatermark/startedAt; obtain a new snapshot), and ping comments. Automatic reconnect sends Last-Event-ID, honored when since is absent. Streams end after five minutes to re-evaluate bearer authorization. Authentication requires the existing bearer Authorization header; native browser EventSource cannot set it, so browser clients must use an authenticated fetch streaming reader or an approved EventSource implementation that supports headers.
       security:
         - bearerAuth: []
       parameters:
-        - name: replay
-          in: query
-          description: Number of buffered entries to replay on connect (max 1000)
-          schema:
-            type: integer
-            minimum: 0
-            maximum: 1000
-            default: 100
+        - { name: since, in: query, description: Generation:sequence cursor, schema: { type: string } }
       responses:
         "200":
           description: SSE stream
           content:
             text/event-stream:
-              schema:
-                type: string
-                description: Newline-delimited SSE events
-        "401":
-          $ref: "#/components/responses/Unauthorized"
+              schema: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { description: Restart generation changed; fetch a fresh history snapshot }
+        "400": { description: Malformed cursor }
 
   # ─── AI ───────────────────────────────────────────────────────────────────────
 
@@ -2931,6 +2904,8 @@ components:
           $ref: "#/components/schemas/HTTPBasicAuth"
         projectsEnabled:
           type: boolean
+        runtimeConsoleLogging:
+          $ref: "#/components/schemas/RuntimeConsoleLoggingStatus"
         lang:
           type: string
           example: en-US
@@ -2947,6 +2922,25 @@ components:
           description: Redirect HTTP requests to HTTPS
         https:
           $ref: "#/components/schemas/HttpsConfig"
+
+    RuntimeConsoleLoggingStatus:
+      type: object
+      readOnly: true
+      description: >-
+        Server-observed console logging status for the managed Node-RED child.
+        The values are read-only and never accepted from clients.
+      required: [status]
+      properties:
+        configuredLevel:
+          type: [string, "null"]
+          description: Literal console level read from the resolved settings.js path.
+        runningLevel:
+          type: string
+          description: Literal console level captured for the current child, only when it is ready.
+        status:
+          type: string
+          enum: [applied, pending, unknown]
+          description: Applied only when the ready child level matches the current configured literal.
 
     HttpsConfig:
       type: object
@@ -4179,20 +4173,12 @@ components:
       type: object
       required: [id, timestamp, level, source, message]
       properties:
-        id:
-          type: string
-        timestamp:
-          type: string
-          format: date-time
-          description: ISO-8601 timestamp
-        level:
-          type: string
-          enum: [info, warn, error, debug]
-        source:
-          type: string
-          enum: [stdout, stderr]
-        message:
-          type: string
+        id: { type: string, description: Opaque generation:sequence identifier }
+        timestamp: { type: string, format: date-time }
+        level: { type: string, enum: [info, warn, error, debug, trace, fatal, unknown] }
+        source: { type: string, enum: [stdout, stderr] }
+        message: { type: string, description: Truncated to 4096 bytes when a line exceeds the capture limit }
+        runStartedAt: { type: string, format: date-time, description: "Managed launch that produced the entry, independent of its log timestamp" }
 
     # ── Generic utility types ──────────────────────────────────────────────────────
 
@@ -5014,18 +5000,21 @@ components:
         - type: object
           required: [success, data, timestamp]
           properties:
-            success:
-              type: boolean
-              enum: [true]
-            timestamp:
-              type: string
-              format: date-time
+            success: { type: boolean, enum: [true] }
+            timestamp: { type: string, format: date-time }
         - type: object
           properties:
             data:
-              type: array
-              items:
-                $ref: "#/components/schemas/LogEntry"
+              type: object
+              required: [entries, generation, highWatermark]
+              properties:
+                entries:
+                  type: array
+                  items: { $ref: "#/components/schemas/LogEntry" }
+                generation: { type: string }
+                highWatermark: { type: string }
+                nextCursor: { type: string }
+                startedAt: { type: string, format: date-time, description: Latest runtime start time }
 
     SuccessEnvelope_AnyObject:
       allOf:

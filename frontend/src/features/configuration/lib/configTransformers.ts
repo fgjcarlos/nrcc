@@ -42,6 +42,7 @@ interface BasicAuthResponse {
 interface LoggingHandlerResponse {
   level?: string;
   metrics?: boolean;
+  audit?: boolean;
 }
 
 interface EditorThemeResponse {
@@ -76,6 +77,11 @@ export interface NodeRedConfigResponse {
   httpNodeAuth?: BasicAuthResponse;
   httpStaticAuth?: BasicAuthResponse;
   logging?: { console?: LoggingHandlerResponse; internal?: LoggingHandlerResponse };
+  runtimeConsoleLogging?: {
+    configuredLevel?: string | null;
+    runningLevel?: string | null;
+    status?: 'applied' | 'pending' | 'unknown';
+  };
   flowFile?: string;
   userDir?: string;
   nodesDir?: string;
@@ -112,8 +118,8 @@ export interface ConfigPayload {
   disableEditor?: boolean;
   projectsEnabled: boolean;
   logging?: {
-    console?: { level: LoggingLevel; metrics?: boolean };
-    internal?: { level: LoggingLevel; metrics?: boolean };
+    console?: { level?: LoggingLevel; metrics: boolean; audit?: boolean };
+    internal?: { level?: LoggingLevel; metrics: boolean; audit?: boolean };
   };
   flowFile: string;
   userDir?: string;
@@ -170,12 +176,14 @@ export function formDataToConfigPayload(formData: NodeRedConfigFormData): Config
   // Logging - Multiple handlers
   config.logging = {
     console: {
-      level: formData.loggingConsoleLevel,
-      metrics: formData.loggingConsoleMetrics || undefined,
+      ...(formData.loggingConsoleLevel ? { level: formData.loggingConsoleLevel } : {}),
+      metrics: formData.loggingConsoleMetrics,
+      ...(formData.loggingConsoleAudit !== undefined ? { audit: formData.loggingConsoleAudit } : {}),
     },
     internal: {
-      level: formData.loggingInternalLevel,
-      metrics: formData.loggingInternalMetrics || undefined,
+      ...(formData.loggingInternalLevel ? { level: formData.loggingInternalLevel } : {}),
+      metrics: formData.loggingInternalMetrics,
+      ...(formData.loggingInternalAudit !== undefined ? { audit: formData.loggingInternalAudit } : {}),
     },
   };
 
@@ -323,10 +331,12 @@ export function configToFormData(config: NodeRedConfigResponse): NodeRedConfigFo
 
     projectsEnabled: config.projectsEnabled || false,
 
-    loggingConsoleLevel: (config.logging?.console?.level as LoggingLevel) || 'info',
+    loggingConsoleLevel: (config.logging?.console?.level ?? '') as LoggingLevel,
     loggingConsoleMetrics: config.logging?.console?.metrics || false,
-    loggingInternalLevel: (config.logging?.internal?.level as LoggingLevel) || 'info',
+    loggingConsoleAudit: config.logging?.console?.audit,
+    loggingInternalLevel: (config.logging?.internal?.level ?? '') as LoggingLevel,
     loggingInternalMetrics: config.logging?.internal?.metrics || false,
+    loggingInternalAudit: config.logging?.internal?.audit,
 
     flowFile: config.flowFile || 'flows.json',
     userDir: config.userDir || '',
