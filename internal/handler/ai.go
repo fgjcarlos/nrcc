@@ -99,6 +99,8 @@ func (h *AIHandler) respondConfigError(w http.ResponseWriter, err error) {
 		status, code = http.StatusBadRequest, "AI_INVALID_PROVIDER"
 	case errors.Is(err, service.ErrAIInvalidEndpoint):
 		status, code = http.StatusBadRequest, "AI_INVALID_ENDPOINT"
+	case errors.Is(err, service.ErrAIInvalidTimeout):
+		status, code = http.StatusBadRequest, "AI_INVALID_TIMEOUT"
 	case errors.Is(err, service.ErrAIEncryptionKeyRequired):
 		status, code = http.StatusServiceUnavailable, "AI_ENCRYPTION_KEY_REQUIRED"
 	case errors.Is(err, service.ErrAIConfigIncomplete), errors.Is(err, service.ErrAIKeyRequired):
@@ -107,17 +109,28 @@ func (h *AIHandler) respondConfigError(w http.ResponseWriter, err error) {
 		status, code = http.StatusServiceUnavailable, "AI_DISABLED"
 	case errors.Is(err, service.ErrAIProbeTimeout):
 		status, code = http.StatusGatewayTimeout, "AI_PROBE_TIMEOUT"
+	case errors.Is(err, service.ErrAIProviderAuth):
+		status, code = http.StatusBadGateway, "AI_PROVIDER_AUTH_FAILED"
 	case errors.Is(err, service.ErrAIProbeUnreachable):
 		status, code = http.StatusBadGateway, "AI_PROBE_UNREACHABLE"
 	}
-	model.RespondError(w, status, code, err.Error())
+	message := err.Error()
+	if errors.Is(err, service.ErrAIProbeTimeout) {
+		message = "AI provider connection test timed out"
+	} else if errors.Is(err, service.ErrAIProbeUnreachable) {
+		message = "AI provider could not be reached"
+	}
+	model.RespondError(w, status, code, message)
 }
 
 // PostAnalyzeFlow analyzes a flow with explicit, review-first AI assistance.
 // POST /api/ai/analyze/flow
 func (h *AIHandler) PostAnalyzeFlow(w http.ResponseWriter, r *http.Request) {
+	var cfg service.AIConfig
 	if h.configSvc != nil {
-		providerStatus, err := h.configSvc.Status()
+		var providerStatus service.AIProviderStatus
+		var err error
+		cfg, providerStatus, err = h.configSvc.LoadWithStatus()
 		if err != nil {
 			h.respondConfigError(w, err)
 			return
@@ -138,19 +151,24 @@ func (h *AIHandler) PostAnalyzeFlow(w http.ResponseWriter, r *http.Request) {
 
 	aiSvc := h.svc
 	if h.configSvc != nil {
-		cfg, err := h.configSvc.Load()
-		if err != nil {
-			h.respondConfigError(w, err)
-			return
-		}
 		aiSvc = service.NewAIService(cfg)
 	}
 	resp, err := aiSvc.AssistFlow(r.Context(), req)
 	if err != nil {
 		status := http.StatusBadRequest
 		code := "AI_REQUEST_ERROR"
-		if errors.Is(err, http.ErrHandlerTimeout) {
+		if errors.Is(err, http.ErrHandlerTimeout) || errors.Is(err, service.ErrAITimeout) {
 			status = http.StatusGatewayTimeout
+			code = "AI_PROVIDER_TIMEOUT"
+		} else if errors.Is(err, service.ErrAIProviderServer) {
+			status = http.StatusBadGateway
+			code = "AI_PROVIDER_ERROR"
+		} else if errors.Is(err, service.ErrAIProviderAuth) {
+			status = http.StatusBadGateway
+			code = "AI_PROVIDER_AUTH_FAILED"
+		} else if errors.Is(err, service.ErrAIPreviewChanged) {
+			status = http.StatusConflict
+			code = "AI_PREVIEW_CHANGED"
 		}
 		if errors.Is(err, service.ErrAIDisabled) {
 			status = http.StatusServiceUnavailable

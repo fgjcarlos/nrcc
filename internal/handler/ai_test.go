@@ -5,9 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/fgjcarlos/nrcc/internal/middleware"
 	"github.com/fgjcarlos/nrcc/internal/model"
@@ -54,6 +56,31 @@ func TestAIHandlerConfigAndStatus(t *testing.T) {
 				t.Fatalf("unexpected response: %s", w.Body.String())
 			}
 		})
+	}
+}
+
+func TestAIHandlerPersistsAnalysisTimeoutAndRejectsInvalidValues(t *testing.T) {
+	h, _ := newAIConfigHandler(t, nil)
+	for _, tc := range []struct {
+		timeout    int
+		wantStatus int
+		wantBody   string
+	}{
+		{42, http.StatusOK, `"timeoutSeconds":42`},
+		{0, http.StatusOK, `"timeoutSeconds":30`},
+		{301, http.StatusBadRequest, `"code":"AI_INVALID_TIMEOUT"`},
+	} {
+		body := `{"enabled":true,"provider":"offline","timeoutSeconds":` + fmt.Sprint(tc.timeout) + `}`
+		w := httptest.NewRecorder()
+		h.PutConfig(w, aiRequest(http.MethodPut, "/api/ai/config", body))
+		if w.Code != tc.wantStatus || !bytes.Contains(w.Body.Bytes(), []byte(tc.wantBody)) {
+			t.Errorf("timeout=%d status=%d body=%s", tc.timeout, w.Code, w.Body.String())
+		}
+	}
+	w := httptest.NewRecorder()
+	h.GetConfig(w, aiRequest(http.MethodGet, "/api/ai/config", ""))
+	if !bytes.Contains(w.Body.Bytes(), []byte(`"timeoutSeconds":30`)) {
+		t.Fatalf("GET config omitted effective timeout: %s", w.Body.String())
 	}
 }
 
@@ -127,6 +154,59 @@ func TestAIHandlerMapsConfigErrors(t *testing.T) {
 				t.Fatalf("error response leaked secret: %s", w.Body.String())
 			}
 		})
+	}
+}
+
+func TestAIHandlerMapsAnalysisProviderErrorsWithoutEchoingUpstream(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("synthetic upstream secret"))
+	}))
+	defer server.Close()
+	svc := service.NewAIService(service.AIConfig{Enabled: true, Provider: "ollama", Endpoint: server.URL, Model: "m", AllowPrivateHTTP: true})
+	h := NewAIHandler(svc, nil)
+	w := httptest.NewRecorder()
+	h.PostAnalyzeFlow(w, aiRequest(http.MethodPost, "/api/ai/analyze/flow", `{"action":"explain","flow":{}}`))
+	if w.Code != http.StatusBadGateway || bytes.Contains(w.Body.Bytes(), []byte("synthetic upstream secret")) || !bytes.Contains(w.Body.Bytes(), []byte("AI_PROVIDER_ERROR")) {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestAIHandlerMapsAnalysisTimeoutTo504(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		timer := time.NewTimer(1500 * time.Millisecond)
+		defer timer.Stop()
+		<-timer.C
+		_, _ = w.Write([]byte(`{"message":{"content":"late"}}`))
+	}))
+	defer server.Close()
+	configSvc := service.NewAIConfigService(t.TempDir(), "encryption-key", service.WithAIProviderProbe(func(context.Context, service.AIConfig) error { return nil }))
+	if err := configSvc.Save(service.AIConfig{Enabled: true, Provider: "ollama", Endpoint: server.URL, Model: "m", AllowPrivateHTTP: true, TimeoutSeconds: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := configSvc.Test(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	h := NewAIHandler(nil, configSvc)
+	w := httptest.NewRecorder()
+	h.PostAnalyzeFlow(w, aiRequest(http.MethodPost, "/api/ai/analyze/flow", `{"action":"explain","flow":{}}`))
+	if w.Code != http.StatusGatewayTimeout || !bytes.Contains(w.Body.Bytes(), []byte(`"code":"AI_PROVIDER_TIMEOUT"`)) {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestAIHandlerMapsRejectedProviderCredentialsSafely(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte("synthetic upstream credential detail"))
+	}))
+	defer server.Close()
+	svc := service.NewAIService(service.AIConfig{Enabled: true, Provider: "ollama", Endpoint: server.URL, Model: "m", AllowPrivateHTTP: true})
+	h := NewAIHandler(svc, nil)
+	w := httptest.NewRecorder()
+	h.PostAnalyzeFlow(w, aiRequest(http.MethodPost, "/api/ai/analyze/flow", `{"action":"explain","flow":{}}`))
+	if w.Code != http.StatusBadGateway || !bytes.Contains(w.Body.Bytes(), []byte("AI_PROVIDER_AUTH_FAILED")) || !bytes.Contains(w.Body.Bytes(), []byte("AI provider rejected credentials")) || bytes.Contains(w.Body.Bytes(), []byte("synthetic upstream credential detail")) {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
 	}
 }
 
