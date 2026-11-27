@@ -1,4 +1,5 @@
 import { useState, useEffect, useId, useMemo, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { errorMessage } from '@/shared/lib/errorMessage';
 import { cn } from '@/shared/lib';
 import type { NodeRedConfigFormData } from '@/shared/types';
@@ -152,7 +153,12 @@ const INITIAL_FORM_DATA: NodeRedConfigFormData = {
 
 export function ConfigurationView() {
   // UI state
-  const [activeTab, setActiveTab] = useState('basic');
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState(location.hash === '#ai' ? 'ai' : 'basic');
+
+  useEffect(() => {
+    if (location.hash === '#ai') setActiveTab('ai');
+  }, [location.hash]);
   const [formData, setFormData] = useState<NodeRedConfigFormData>(INITIAL_FORM_DATA);
   const [rawSettingsContent, setRawSettingsContent] = useState('');
   // Raw-settings editor gate (issue #364): the textarea is read-only by

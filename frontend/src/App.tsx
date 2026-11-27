@@ -74,6 +74,7 @@ const SecurityView = lazyNamed(
   () => import('@/features/security/components/SecurityView'),
   'SecurityView',
 );
+const FlowsView = lazyNamed(() => import('@/features/flows/FlowsView'), 'FlowsView');
 const LogsView = lazyNamed(
   () => import('@/features/logs/components/LogsView'),
   'LogsView',
@@ -197,7 +198,7 @@ function AppRoutes() {
         <Route path="maintenance/libraries" element={routeElement('maintenance libraries', <LibrariesView />, 'admin')} />
         <Route path="updates" element={<Navigate to="/maintenance/updates" replace />} />
         <Route path="libraries" element={<Navigate to="/maintenance/libraries" replace />} />
-        <Route path="flows" element={<Navigate to="/overview" replace />} />
+        <Route path="flows" element={routeElement('flows', <FlowsView />, 'admin')} />
         <Route path="flows/versions" element={<Navigate to="/backups" replace />} />
         <Route path="flows/:id" element={<Navigate to="/overview" replace />} />
         <Route path="bootstrap" element={routeElement('bootstrap', <BootstrapView />)} />

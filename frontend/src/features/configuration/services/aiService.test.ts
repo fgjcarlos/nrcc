@@ -21,6 +21,23 @@ describe('aiService', () => {
     expect(mockApi.get).toHaveBeenNthCalledWith(2, '/ai/status');
   });
 
+  it('sends preview and reviewed requests with the exact flow contract', async () => {
+    const input = { action: 'audit' as const, flow: [{ id: 'n1', type: 'inject' }], previewOnly: true };
+    const response = { summary: 'Review', previewToken: 'p1', request: { endpoint: 'https://api.test', body: { messages: [] } } };
+    mockApi.post.mockResolvedValueOnce(ok(response)).mockResolvedValueOnce(ok({ summary: 'Done' }));
+    await expect(aiService.analyzeFlow(input)).resolves.toEqual(response);
+    await aiService.analyzeFlow({ action: 'audit', flow: input.flow, previewToken: 'p1' });
+    expect(mockApi.post).toHaveBeenNthCalledWith(1, '/ai/analyze/flow', input);
+    expect(mockApi.post).toHaveBeenNthCalledWith(2, '/ai/analyze/flow', { action: 'audit', flow: input.flow, previewToken: 'p1' });
+  });
+
+  it('persists the configured timeout in seconds', async () => {
+    const config = { enabled: false, provider: 'offline' as const, timeoutSeconds: 30 };
+    mockApi.put.mockResolvedValueOnce(ok({ ...config, apiKeyConfigured: false }));
+    await aiService.saveConfig(config);
+    expect(mockApi.put).toHaveBeenCalledWith('/ai/config', config);
+  });
+
   it('saves write-only API keys and starts a connection test', async () => {
     const config = { enabled: true, provider: 'openai' as const, endpoint: 'https://api.example.test', model: 'model', apiKey: 'secret' };
     mockApi.put.mockResolvedValueOnce(ok({ ...config, apiKeyConfigured: true }));

@@ -4,6 +4,7 @@ import {
   ChevronLeft,
   ChevronRight,
   DatabaseBackup,
+  GitBranch,
   Gauge,
   HardDrive,
   Library,
@@ -34,6 +35,7 @@ const navItems: NavItemDef[] = [
 ];
 
 const adminItems: NavItemDef[] = [
+  { to: '/flows', labelKey: 'configuration:flows.title', icon: GitBranch },
   { to: '/settings/users', labelKey: 'auth:userManagement', icon: UsersRound },
   { to: '/maintenance/updates', labelKey: 'updates:title', icon: RotateCw },
   { to: '/maintenance/libraries', labelKey: 'libraries:title', icon: Library },
