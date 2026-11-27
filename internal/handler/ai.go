@@ -92,6 +92,27 @@ func (h *AIHandler) TestConfig(w http.ResponseWriter, r *http.Request) {
 	model.RespondJSON(w, http.StatusOK, status)
 }
 
+// analysisError maps an analysis failure to its HTTP status. Upstream
+// outages must never look like a client mistake (issue #1077).
+func analysisError(err error) (int, string) {
+	switch {
+	case errors.Is(err, http.ErrHandlerTimeout), errors.Is(err, service.ErrAITimeout):
+		return http.StatusGatewayTimeout, "AI_PROVIDER_TIMEOUT"
+	case errors.Is(err, service.ErrAIProviderServer):
+		return http.StatusBadGateway, "AI_PROVIDER_ERROR"
+	case errors.Is(err, service.ErrAIProviderAuth):
+		return http.StatusBadGateway, "AI_PROVIDER_AUTH_FAILED"
+	case errors.Is(err, service.ErrAIPreviewChanged):
+		return http.StatusConflict, "AI_PREVIEW_CHANGED"
+	case errors.Is(err, service.ErrAIDisabled):
+		return http.StatusServiceUnavailable, "AI_DISABLED"
+	case errors.Is(err, service.ErrAIKeyRequired), errors.Is(err, service.ErrAIEndpointReqd):
+		return http.StatusServiceUnavailable, "AI_NOT_CONFIGURED"
+	default:
+		return http.StatusBadRequest, "AI_REQUEST_ERROR"
+	}
+}
+
 func (h *AIHandler) respondConfigError(w http.ResponseWriter, err error) {
 	status, code := http.StatusInternalServerError, "AI_CONFIG_ERROR"
 	switch {
@@ -155,28 +176,7 @@ func (h *AIHandler) PostAnalyzeFlow(w http.ResponseWriter, r *http.Request) {
 	}
 	resp, err := aiSvc.AssistFlow(r.Context(), req)
 	if err != nil {
-		status := http.StatusBadRequest
-		code := "AI_REQUEST_ERROR"
-		if errors.Is(err, http.ErrHandlerTimeout) || errors.Is(err, service.ErrAITimeout) {
-			status = http.StatusGatewayTimeout
-			code = "AI_PROVIDER_TIMEOUT"
-		} else if errors.Is(err, service.ErrAIProviderServer) {
-			status = http.StatusBadGateway
-			code = "AI_PROVIDER_ERROR"
-		} else if errors.Is(err, service.ErrAIProviderAuth) {
-			status = http.StatusBadGateway
-			code = "AI_PROVIDER_AUTH_FAILED"
-		} else if errors.Is(err, service.ErrAIPreviewChanged) {
-			status = http.StatusConflict
-			code = "AI_PREVIEW_CHANGED"
-		}
-		if errors.Is(err, service.ErrAIDisabled) {
-			status = http.StatusServiceUnavailable
-			code = "AI_DISABLED"
-		} else if errors.Is(err, service.ErrAIKeyRequired) || errors.Is(err, service.ErrAIEndpointReqd) {
-			status = http.StatusServiceUnavailable
-			code = "AI_NOT_CONFIGURED"
-		}
+		status, code := analysisError(err)
 		model.RespondError(w, status, code, err.Error())
 		return
 	}

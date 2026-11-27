@@ -241,7 +241,7 @@ func (s *AIService) AssistFlow(ctx context.Context, req AIFlowRequest) (AIFlowRe
 	resp.Summary, resp.Suggestions, resp.AuditFindings = parsed.Summary, parsed.Suggestions, parsed.AuditFindings
 	resp.CandidateFlow, err = validateCandidate(parsed.CandidateFlow)
 	if err != nil {
-		return AIFlowResponse{}, fmt.Errorf("%w: %v", ErrAIProviderServer, err)
+		return AIFlowResponse{}, fmt.Errorf("%w: candidate flow rejected", ErrAIProviderServer)
 	}
 	return resp, nil
 }

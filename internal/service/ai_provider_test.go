@@ -128,7 +128,7 @@ func TestAssistFlowHandlesUpstreamBodyFailures(t *testing.T) {
 			defer server.Close()
 			svc := NewAIService(AIConfig{Enabled: true, Provider: "ollama", Endpoint: server.URL, Model: "m", AllowPrivateHTTP: true, TimeoutSeconds: 1})
 			got, err := svc.AssistFlow(context.Background(), AIFlowRequest{Action: AIActionExplain})
-			if err != tc.want || got.Summary != "" || got.CandidateFlow != nil {
+			if !errors.Is(err, tc.want) || got.Summary != "" || got.CandidateFlow != nil {
 				t.Fatalf("response=%+v error=%v; want empty response and %v", got, err, tc.want)
 			}
 		})
@@ -149,7 +149,7 @@ func TestAssistFlowMapsProviderFailuresWithoutEchoingBody(t *testing.T) {
 			svc := NewAIService(AIConfig{Enabled: true, Provider: "openai", Endpoint: server.URL, Model: "m", APIKey: "synthetic-key"})
 			svc.client.Transport = server.Client().Transport
 			_, err := svc.AssistFlow(context.Background(), AIFlowRequest{Action: AIActionExplain, Flow: map[string]interface{}{}})
-			if err != tc.want {
+			if !errors.Is(err, tc.want) {
 				t.Fatalf("error=%v want %v", err, tc.want)
 			}
 			if strings.Contains(err.Error(), "synthetic") {
@@ -171,7 +171,7 @@ func TestAssistFlowDoesNotFollowProviderRedirect(t *testing.T) {
 	}))
 	defer provider.Close()
 	svc := NewAIService(AIConfig{Enabled: true, Provider: "ollama", Endpoint: provider.URL, Model: "m", AllowPrivateHTTP: true})
-	if _, err := svc.AssistFlow(context.Background(), AIFlowRequest{Action: AIActionExplain}); err != ErrAIProviderServer {
+	if _, err := svc.AssistFlow(context.Background(), AIFlowRequest{Action: AIActionExplain}); !errors.Is(err, ErrAIProviderServer) {
 		t.Fatalf("error=%v, want %v", err, ErrAIProviderServer)
 	}
 	select {
