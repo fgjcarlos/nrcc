@@ -59,6 +59,7 @@ func TestGetConfigReportsManagedConsoleLoggingStatus(t *testing.T) {
 			_ = portListener.Close()
 			t.Setenv("NODE_RED_PORT", strconv.Itoa(port))
 			launcher := filepath.Join(t.TempDir(), "node-red-fixture")
+			// #nosec G306 -- this launcher is an executable fixture in the test temporary directory.
 			if err := os.WriteFile(launcher, []byte("#!/bin/sh\nexec /bin/sleep 60\n"), 0o700); err != nil {
 				t.Fatal(err)
 			}
@@ -71,7 +72,7 @@ func TestGetConfigReportsManagedConsoleLoggingStatus(t *testing.T) {
 			if err != nil {
 				t.Fatalf("bind readiness fixture: %v", err)
 			}
-			server := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			server := &http.Server{ReadHeaderTimeout: time.Second, Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.URL.Path != "/settings" {
 					http.NotFound(w, r)
 					return
