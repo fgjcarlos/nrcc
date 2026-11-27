@@ -66,7 +66,7 @@ export function LogsView() {
   const scroller = useRef<HTMLDivElement>(null);
   const loaded = useRef<LogEntry[]>([]);
   const highWatermark = useRef('');
-  const startedAt = useRef<string | undefined>(undefined);
+  const [startedAt, setStartedAt] = useState<string>();
 
   useEffect(() => {
     const timer = setTimeout(() => setQuery(queryInput.trim()), 250);
@@ -86,27 +86,29 @@ export function LogsView() {
   useEffect(() => {
     const controller = new AbortController();
     let streamStarted = false;
+    let launch: string | undefined;
     setLoading(true);
     setError(false);
     setHistoryFailed(false);
     setEntries([]);
     loaded.current = [];
     highWatermark.current = '';
-    startedAt.current = undefined;
+    setStartedAt(undefined);
     setScrollTop(0);
     if (scroller.current) scroller.current.scrollTop = 0;
 
     const onEntry = (entry: LogEntry) => {
       if (controller.signal.aborted) return;
       highWatermark.current = entry.id;
-      if (!matches(entry, filters, startedAt.current)) return;
+      if (!matches(entry, filters, launch)) return;
       loaded.current = mergeEntries(loaded.current, [entry]);
       setEntries(loaded.current);
     };
     const onSnapshot = (page: LogsPage) => {
       if (controller.signal.aborted) return;
       highWatermark.current = page.highWatermark;
-      startedAt.current = page.startedAt;
+      launch = page.startedAt;
+      setStartedAt(launch);
       loaded.current = mergeEntries(page.entries);
       setEntries(loaded.current);
       if (!paused && !streamStarted) {
@@ -122,7 +124,7 @@ export function LogsView() {
               controller.abort();
               restartSnapshot();
             }
-          }, startedAt.current);
+          }, launch);
         } catch {
           if (!controller.signal.aborted) setError(true);
         }
@@ -134,7 +136,8 @@ export function LogsView() {
       if (controller.signal.aborted) return;
       // Keep stream arrivals received while cursor pages were loading.
       if (!highWatermark.current) highWatermark.current = page.highWatermark;
-      if (!startedAt.current) startedAt.current = page.startedAt;
+      launch ??= page.startedAt;
+      setStartedAt(launch);
       loaded.current = mergeEntries(page.entries, loaded.current);
       setEntries(loaded.current);
       setLoading(false);
@@ -155,11 +158,11 @@ export function LogsView() {
   }, [filters, paused, restartVersion, restartSnapshot]);
 
   const filtered = useMemo(() => entries.filter((entry) => {
-    if (!matches(entry, filters, startedAt.current)) return false;
+    if (!matches(entry, filters, startedAt)) return false;
     if (!selection) return true;
     const time = timestamp(entry.timestamp);
     return time >= selection.from && time <= selection.to;
-  }), [entries, filters, selection]);
+  }), [entries, filters, selection, startedAt]);
 
   useEffect(() => {
     setScrollTop(0);
@@ -177,7 +180,7 @@ export function LogsView() {
   const buckets = useMemo(() => {
     const grouped = new Map<number, Record<string, number>>();
     for (const entry of entries) {
-      if (!matches(entry, filters, startedAt.current)) continue;
+      if (!matches(entry, filters, startedAt)) continue;
       const time = timestamp(entry.timestamp);
       const bucket = Math.floor(time / 60000) * 60000;
       const counts = grouped.get(bucket) ?? {};
@@ -186,7 +189,7 @@ export function LogsView() {
       grouped.set(bucket, counts);
     }
     return [...grouped.entries()].sort(([a], [b]) => a - b).slice(-24);
-  }, [entries, filters]);
+  }, [entries, filters, startedAt]);
 
   const start = Math.min(Math.floor(scrollTop / ROW_HEIGHT), Math.max(0, filtered.length - VISIBLE_ROWS));
   const visible = filtered.slice(start, start + VISIBLE_ROWS);
@@ -230,7 +233,7 @@ export function LogsView() {
         {buckets.map(([time, counts]) => <button key={time} type="button" className="flex h-full min-w-10 flex-col justify-end" aria-label={t('bucket', { time: new Date(time).toLocaleTimeString(), count: Object.values(counts).reduce((a, b) => a + b, 0) })} aria-pressed={selection?.from === time} onClick={() => selectBucket(time)}>
           <span className="flex flex-col-reverse" style={{ height: `${Math.max(8, Math.min(100, Object.values(counts).reduce((a, b) => a + b, 0) * 8))}%` }} aria-hidden="true">{Object.entries(counts).map(([level, count]) => <span key={level} className={`block ${levelColor(level)}`} style={{ height: `${count * 8}px` }} />)}</span><small>{new Date(time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</small>
         </button>)}
-      </div><ul className="mt-2 flex flex-wrap gap-3" aria-label={t('legend')}>{LEVELS.map((level) => <li key={level} className="flex items-center gap-1"><span aria-hidden="true" className={`inline-block h-3 w-3 ${levelColor(level)}`} />{t(`level.${level}`)}</li>)}</ul><h3 className="mt-3 text-sm font-medium">{t('topErrors')}</h3>{[...entries.reduce((counts, entry) => { if (matches(entry, filters, startedAt.current) && (entry.level === 'error' || entry.level === 'fatal')) counts.set(entry.message, (counts.get(entry.message) ?? 0) + 1); return counts; }, new Map<string, number>())].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([message, count]) => <button key={message} type="button" className="mr-2 underline" onClick={() => { setQueryInput(message); setSelection(null); }}>{message} ({count})</button>)}
+      </div><ul className="mt-2 flex flex-wrap gap-3" aria-label={t('legend')}>{LEVELS.map((level) => <li key={level} className="flex items-center gap-1"><span aria-hidden="true" className={`inline-block h-3 w-3 ${levelColor(level)}`} />{t(`level.${level}`)}</li>)}</ul><h3 className="mt-3 text-sm font-medium">{t('topErrors')}</h3>{[...entries.reduce((counts, entry) => { if (matches(entry, filters, startedAt) && (entry.level === 'error' || entry.level === 'fatal')) counts.set(entry.message, (counts.get(entry.message) ?? 0) + 1); return counts; }, new Map<string, number>())].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([message, count]) => <button key={message} type="button" className="mr-2 underline" onClick={() => { setQueryInput(message); setSelection(null); }}>{message} ({count})</button>)}
     </section>
     {loading ? <p role="status">{t('loading')}</p> : filtered.length === 0 ? (historyFailed ? null : <p role="status">{t('empty')}</p>) : <section aria-label={t('tableTitle')}>
       <div ref={scroller} className="overflow-auto" style={{ maxHeight: ROW_HEIGHT * VISIBLE_ROWS }} onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}>
