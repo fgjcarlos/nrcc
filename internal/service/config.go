@@ -1882,6 +1882,12 @@ func parseHTTPNodeCorsBlockFromJS(content string) *model.HTTPNodeCorsConfig {
 			return unsupported
 		}
 	}
+	// A block without a usable origin cannot be modelled: CORS with no origin
+	// is meaningless, and treating it as modelable would make every later save
+	// fail validation on an unrelated edit (issue #1076).
+	if len(cors.Origin) == 0 {
+		return unsupported
+	}
 	return cors
 }
 

@@ -113,6 +113,8 @@ func TestParseHTTPNodeCorsBlockFromJS_Unsupported(t *testing.T) {
 		{"unknown key", `  httpNodeCors: { origin: "*", maxAge: 5 },`},
 		{"non-literal value", `  httpNodeCors: { origin: allowedOrigin },`},
 		{"empty object", `  httpNodeCors: { },`},
+		{"empty origin array", `  httpNodeCors: { origin: [], methods: "GET" },`},
+		{"missing origin", `  httpNodeCors: { methods: "GET" },`},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
