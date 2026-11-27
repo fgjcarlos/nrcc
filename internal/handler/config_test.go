@@ -29,6 +29,120 @@ func mustConfigPasswordHash(t *testing.T) string {
 	return string(hash)
 }
 
+func TestGetConfigReportsManagedConsoleLoggingStatus(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		diskLevel   string
+		launchLevel string
+		wantStatus  string
+		wantRunning string
+	}{
+		{name: "applied", diskLevel: "debug", launchLevel: "debug", wantStatus: "applied", wantRunning: "debug"},
+		{name: "pending restart", diskLevel: "warn", launchLevel: "debug", wantStatus: "pending", wantRunning: "debug"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			settingsPath := filepath.Join(dir, "settings.js")
+			writeSettings := func(level string) {
+				t.Helper()
+				source := "module.exports = {\n  logging: {\n    console: { level: '" + level + "' },\n  },\n};\n"
+				if err := os.WriteFile(settingsPath, []byte(source), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			writeSettings(tc.launchLevel)
+			portListener, err := net.Listen("tcp", "127.0.0.1:0")
+			if err != nil {
+				t.Fatal(err)
+			}
+			port := portListener.Addr().(*net.TCPAddr).Port
+			_ = portListener.Close()
+			t.Setenv("NODE_RED_PORT", strconv.Itoa(port))
+			launcher := filepath.Join(t.TempDir(), "node-red-fixture")
+			// #nosec G306 -- this launcher is an executable fixture in the test temporary directory.
+			if err := os.WriteFile(launcher, []byte("#!/bin/sh\nexec /bin/sleep 60\n"), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			pm := service.NewProcessManager(launcher, dir)
+			if err := pm.Start(); err != nil {
+				t.Fatalf("start managed child: %v", err)
+			}
+			t.Cleanup(func() { _ = pm.Stop(context.Background()) })
+			ready, err := net.Listen("tcp", "127.0.0.1:"+strconv.Itoa(port))
+			if err != nil {
+				t.Fatalf("bind readiness fixture: %v", err)
+			}
+			server := &http.Server{ReadHeaderTimeout: time.Second, Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != "/settings" {
+					http.NotFound(w, r)
+					return
+				}
+				w.WriteHeader(http.StatusUnauthorized)
+			})}
+			go func() { _ = server.Serve(ready) }()
+			t.Cleanup(func() { _ = server.Close() })
+			if tc.diskLevel != tc.launchLevel {
+				writeSettings(tc.diskLevel)
+			}
+
+			svc := service.NewIsolatedConfigService(dir)
+			h := NewConfigHandler(svc)
+			h.SetProcessManager(pm)
+			req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+			req = req.WithContext(context.WithValue(req.Context(), middleware.CtxKeyUser, &model.Claims{Username: "admin", Role: model.RoleAdmin}))
+			w := httptest.NewRecorder()
+			h.GetConfig(w, req)
+			if w.Code != http.StatusOK {
+				t.Fatalf("GET /api/config status=%d body=%s", w.Code, w.Body.String())
+			}
+			var response struct {
+				Data struct {
+					RuntimeConsoleLogging *model.RuntimeConsoleLoggingStatus `json:"runtimeConsoleLogging"`
+				} `json:"data"`
+			}
+			if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+			status := response.Data.RuntimeConsoleLogging
+			if status == nil || status.Status != tc.wantStatus {
+				t.Fatalf("runtimeConsoleLogging=%+v want status %q", status, tc.wantStatus)
+			}
+			if status.RunningLevel == nil || *status.RunningLevel != tc.wantRunning {
+				t.Fatalf("running level=%v want %q", status.RunningLevel, tc.wantRunning)
+			}
+			if status.ConfiguredLevel == nil || *status.ConfiguredLevel != tc.diskLevel {
+				t.Fatalf("configured level=%v want %q", status.ConfiguredLevel, tc.diskLevel)
+			}
+		})
+	}
+}
+
+func TestGetConfigWithoutManagedProcessReportsUnknownConsoleLevel(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "settings.js"), []byte("module.exports = { logging: { console: { level: 'info' } } };"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	h := NewConfigHandler(service.NewIsolatedConfigService(dir))
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	req = req.WithContext(context.WithValue(req.Context(), middleware.CtxKeyUser, &model.Claims{Username: "admin", Role: model.RoleAdmin}))
+	w := httptest.NewRecorder()
+	h.GetConfig(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("GET /api/config status=%d", w.Code)
+	}
+	var response struct {
+		Data struct {
+			RuntimeConsoleLogging *model.RuntimeConsoleLoggingStatus `json:"runtimeConsoleLogging"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if got := response.Data.RuntimeConsoleLogging; got == nil || got.Status != "unknown" || got.RunningLevel != nil {
+		t.Fatalf("runtimeConsoleLogging=%+v, want unknown with no running level", got)
+	}
+}
+
 func TestSaveConfigWithFrontendPayload(t *testing.T) {
 	// Create a temporary config service
 	configSvc := service.NewIsolatedConfigService(t.TempDir())
@@ -36,15 +150,16 @@ func TestSaveConfigWithFrontendPayload(t *testing.T) {
 
 	// Frontend payload from Configuration.tsx
 	frontendPayload := map[string]interface{}{
-		"uiPort":          1880,
-		"uiHost":          "0.0.0.0",
-		"httpAdminRoot":   "/",
-		"httpNodeRoot":    "/",
-		"disableEditor":   false,
-		"flowFile":        "flows.json",
-		"userDir":         "",
-		"nodesDir":        "",
-		"projectsEnabled": false,
+		"uiPort":                1880,
+		"uiHost":                "0.0.0.0",
+		"httpAdminRoot":         "/",
+		"httpNodeRoot":          "/",
+		"disableEditor":         false,
+		"flowFile":              "flows.json",
+		"userDir":               "",
+		"nodesDir":              "",
+		"projectsEnabled":       false,
+		"runtimeConsoleLogging": map[string]interface{}{"configuredLevel": "fatal", "runningLevel": "fatal", "status": "applied"},
 		"logging": map[string]interface{}{
 			"console": map[string]interface{}{
 				"level":   "info",
@@ -86,6 +201,9 @@ func TestSaveConfigWithFrontendPayload(t *testing.T) {
 
 	if savedCfg.UIPort != 1880 {
 		t.Errorf("Expected UIPort 1880, got %d", savedCfg.UIPort)
+	}
+	if savedCfg.RuntimeConsoleLogging != nil {
+		t.Fatalf("client-sent runtime status was trusted: %+v", savedCfg.RuntimeConsoleLogging)
 	}
 }
 

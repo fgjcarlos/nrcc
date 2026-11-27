@@ -78,6 +78,16 @@ func (h *ConfigHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Runtime logging status is server-observed metadata, never client supplied.
+	if h.processManager != nil {
+		status := h.processManager.RuntimeConsoleLoggingStatus()
+		cfg.RuntimeConsoleLogging = &status
+	} else {
+		status := model.RuntimeConsoleLoggingStatus{Status: "unknown"}
+		status.ConfiguredLevel = configuredConsoleLoggingLevel(cfg.Logging)
+		cfg.RuntimeConsoleLogging = &status
+	}
+
 	// MEDIUM-015: redact secrets for non-admin viewers. Password hashes and
 	// cleartext env values are not safe to expose to a logged-in viewer.
 	// Encrypted env blobs are cipher bytes, not cleartext, so they pass
@@ -343,6 +353,22 @@ func writeApplyError(w http.ResponseWriter, err error, fallback string) {
 // _ ensures context import stays in the package surface even
 // when saveConfigViaApply stops touching r.Context() directly.
 var _ = context.TODO
+
+func configuredConsoleLoggingLevel(logging any) *string {
+	handlers, ok := logging.(map[string]any)
+	if !ok {
+		return nil
+	}
+	console, ok := handlers["console"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	level, ok := console["level"].(string)
+	if !ok || level == "" {
+		return nil
+	}
+	return &level
+}
 
 func compatibilityAuditMeta(capabilities model.ConfigurationCapabilities) map[string]string {
 	return map[string]string{

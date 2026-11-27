@@ -25,10 +25,12 @@ describe('configTransformers', () => {
           console: {
             level: 'debug',
             metrics: true,
+            audit: true,
           },
           internal: {
             level: 'info',
             metrics: true, // true so it's not turned into undefined
+            audit: true,
           },
         },
         flowFile: '/data/flows.json',
@@ -99,8 +101,10 @@ describe('configTransformers', () => {
       expect(result.projectsEnabled).toBe(true);
       expect(result.loggingConsoleLevel).toBe('debug');
       expect(result.loggingConsoleMetrics).toBe(true);
+      expect(result.loggingConsoleAudit).toBe(true);
       expect(result.loggingInternalLevel).toBe('info');
       expect(result.loggingInternalMetrics).toBe(true);
+      expect(result.loggingInternalAudit).toBe(true);
       expect(result.flowFile).toBe('/data/flows.json');
       expect(result.userDir).toBe('/data/node-red-home');
       expect(result.nodesDir).toBe('/data/nodes');
@@ -143,9 +147,9 @@ describe('configTransformers', () => {
       expect(result.httpNodeRoot).toBe('/');
       expect(result.disableEditor).toBe(false);
       expect(result.projectsEnabled).toBe(false);
-      expect(result.loggingConsoleLevel).toBe('info');
+      expect(result.loggingConsoleLevel).toBe('');
       expect(result.loggingConsoleMetrics).toBe(false);
-      expect(result.loggingInternalLevel).toBe('info');
+      expect(result.loggingInternalLevel).toBe('');
       expect(result.loggingInternalMetrics).toBe(false);
       expect(result.flowFile).toBe('flows.json');
       expect(result.userDir).toBe('');
@@ -365,8 +369,10 @@ describe('configTransformers', () => {
       expect(result.projectsEnabled).toBe(true);
       expect(result.logging?.console?.level).toBe('debug');
       expect(result.logging?.console?.metrics).toBe(true);
+      expect(result.logging?.console).not.toHaveProperty('audit');
       expect(result.logging?.internal?.level).toBe('info');
       expect(result.logging?.internal?.metrics).toBe(true);
+      expect(result.logging?.internal).not.toHaveProperty('audit');
       expect(result.flowFile).toBe('/data/flows.json');
       expect(result.userDir).toBe('/data/node-red-home');
       expect(result.nodesDir).toBe('/data/nodes');
@@ -377,6 +383,27 @@ describe('configTransformers', () => {
     // The authentication surfaces belong to the /security boundary cards,
     // which edit every account, the per-account permission and the session
     // expiry. A payload that omits a surface leaves it untouched.
+    it('preserves an absent audit flag instead of inventing false', () => {
+      const payload = formDataToConfigPayload(configToFormData({
+        uiPort: 1880,
+        projectsEnabled: false,
+        logging: { console: { level: 'warn' }, internal: { level: 'info' } },
+      }));
+
+      expect(payload.logging?.console).not.toHaveProperty('audit');
+      expect(payload.logging?.internal).not.toHaveProperty('audit');
+    });
+
+    it('round-trips explicit false metrics and audit flags without inventing a level', () => {
+      const formData = configToFormData({ uiPort: 1880, projectsEnabled: false });
+      formData.loggingConsoleAudit = false;
+      formData.loggingInternalAudit = false;
+      const payload = formDataToConfigPayload(formData);
+
+      expect(payload.logging?.console).toEqual({ metrics: false, audit: false });
+      expect(payload.logging?.internal).toEqual({ metrics: false, audit: false });
+    });
+
     it('never emits an adminAuth surface, even when the loaded config has accounts', () => {
       const formData = configToFormData({
         uiPort: 1880,

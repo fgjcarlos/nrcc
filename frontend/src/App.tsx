@@ -74,6 +74,10 @@ const SecurityView = lazyNamed(
   () => import('@/features/security/components/SecurityView'),
   'SecurityView',
 );
+const LogsView = lazyNamed(
+  () => import('@/features/logs/components/LogsView'),
+  'LogsView',
+);
 
 function RouteLoadingFallback({ label }: { label: string }) {
   const { t } = useT();
@@ -188,6 +192,7 @@ function AppRoutes() {
         <Route path="security" element={routeElement('security', <SecurityView />)} />
         <Route path="profile" element={routeElement('profile', <ProfileView />)} />
         <Route path="settings/users" element={routeElement('users', <UsersView />, 'admin')} />
+        <Route path="maintenance/logs" element={routeElement('logs', <LogsView />, 'admin')} />
         <Route path="maintenance/updates" element={routeElement('maintenance updates', <UpdatesView />, 'admin')} />
         <Route path="maintenance/libraries" element={routeElement('maintenance libraries', <LibrariesView />, 'admin')} />
         <Route path="updates" element={<Navigate to="/maintenance/updates" replace />} />

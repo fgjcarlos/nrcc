@@ -1567,7 +1567,7 @@ export interface paths {
         };
         /**
          * Get runtime log history
-         * @description Admin-only. Entries are ordered ascending by sequence; without cursor the newest matching limit entries are returned. Filters are applied before pagination. Use nextCursor for older matching pages; highWatermark identifies the snapshot boundary for live tail. startedAt is the latest runtime start time; sinceRestart=true filters retained history to entries timestamped at or after it.
+         * @description Admin-only. Entries are ordered ascending by sequence; without cursor the newest matching limit entries are returned. Filters are applied before pagination. Use nextCursor for older matching pages; highWatermark identifies the snapshot boundary for live tail. startedAt is the latest managed runtime start time and is absent before any launch; sinceRestart=true only returns entries produced by that launch.
          */
         get: operations["getLogs"];
         put?: never;
@@ -1956,6 +1956,7 @@ export interface components {
             httpNodeAuth?: components["schemas"]["HTTPBasicAuth"];
             httpStaticAuth?: components["schemas"]["HTTPBasicAuth"];
             projectsEnabled?: boolean;
+            runtimeConsoleLogging?: components["schemas"]["RuntimeConsoleLoggingStatus"];
             /** @example en-US */
             lang?: string;
             functionLibraries?: components["schemas"]["FunctionLibrary"][];
@@ -1963,6 +1964,18 @@ export interface components {
             /** @description Redirect HTTP requests to HTTPS */
             requireHttps?: boolean;
             https?: components["schemas"]["HttpsConfig"];
+        };
+        /** @description Server-observed console logging status for the managed Node-RED child. The values are read-only and never accepted from clients. */
+        RuntimeConsoleLoggingStatus: {
+            /** @description Literal console level read from the resolved settings.js path. */
+            configuredLevel?: string | null;
+            /** @description Literal console level captured for the current child, only when it is ready. */
+            runningLevel?: string;
+            /**
+             * @description Applied only when the ready child level matches the current configured literal.
+             * @enum {string}
+             */
+            status: "applied" | "pending" | "unknown";
         };
         /** @description Node-RED TLS listener block */
         HttpsConfig: {
@@ -2628,6 +2641,11 @@ export interface components {
             source: "stdout" | "stderr";
             /** @description Truncated to 4096 bytes when a line exceeds the capture limit */
             message: string;
+            /**
+             * Format: date-time
+             * @description Managed launch that produced the entry, independent of its log timestamp
+             */
+            runStartedAt?: string;
         };
         /** @description Arbitrary JSON object */
         AnyObject: {

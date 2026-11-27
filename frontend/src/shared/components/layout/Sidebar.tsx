@@ -7,6 +7,7 @@ import {
   Gauge,
   HardDrive,
   Library,
+  ScrollText,
   RotateCw,
   Settings,
   Shield,
@@ -36,6 +37,7 @@ const adminItems: NavItemDef[] = [
   { to: '/settings/users', labelKey: 'auth:userManagement', icon: UsersRound },
   { to: '/maintenance/updates', labelKey: 'updates:title', icon: RotateCw },
   { to: '/maintenance/libraries', labelKey: 'libraries:title', icon: Library },
+  { to: '/maintenance/logs', labelKey: 'logs:title', icon: ScrollText },
 ];
 
 const STORAGE_KEY = 'sidebar-collapsed';
