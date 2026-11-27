@@ -208,7 +208,10 @@ func TestLoggingRoundTrip_PersistsExplicitFalseFlags(t *testing.T) {
 	dir := t.TempDir()
 	svc := NewIsolatedConfigService(dir)
 	settingsPath := filepath.Join(dir, "settings.js")
-	if err := os.WriteFile(settingsPath, []byte(loggingFixture), 0o600); err != nil {
+	seed := strings.Replace(loggingFixture,
+		"console: { level: 'info', metrics: false, audit: false }",
+		"console: { level: 'info', metrics: true, audit: true }", 1)
+	if err := os.WriteFile(settingsPath, []byte(seed), 0o600); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
 

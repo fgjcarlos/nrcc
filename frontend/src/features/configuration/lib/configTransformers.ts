@@ -118,8 +118,8 @@ export interface ConfigPayload {
   disableEditor?: boolean;
   projectsEnabled: boolean;
   logging?: {
-    console?: { level?: LoggingLevel; metrics: boolean; audit: boolean };
-    internal?: { level?: LoggingLevel; metrics: boolean; audit: boolean };
+    console?: { level?: LoggingLevel; metrics: boolean; audit?: boolean };
+    internal?: { level?: LoggingLevel; metrics: boolean; audit?: boolean };
   };
   flowFile: string;
   userDir?: string;
@@ -178,12 +178,12 @@ export function formDataToConfigPayload(formData: NodeRedConfigFormData): Config
     console: {
       ...(formData.loggingConsoleLevel ? { level: formData.loggingConsoleLevel } : {}),
       metrics: formData.loggingConsoleMetrics,
-      audit: false,
+      ...(formData.loggingConsoleAudit !== undefined ? { audit: formData.loggingConsoleAudit } : {}),
     },
     internal: {
       ...(formData.loggingInternalLevel ? { level: formData.loggingInternalLevel } : {}),
       metrics: formData.loggingInternalMetrics,
-      audit: false,
+      ...(formData.loggingInternalAudit !== undefined ? { audit: formData.loggingInternalAudit } : {}),
     },
   };
 
@@ -333,8 +333,10 @@ export function configToFormData(config: NodeRedConfigResponse): NodeRedConfigFo
 
     loggingConsoleLevel: (config.logging?.console?.level ?? '') as LoggingLevel,
     loggingConsoleMetrics: config.logging?.console?.metrics || false,
+    loggingConsoleAudit: config.logging?.console?.audit,
     loggingInternalLevel: (config.logging?.internal?.level ?? '') as LoggingLevel,
     loggingInternalMetrics: config.logging?.internal?.metrics || false,
+    loggingInternalAudit: config.logging?.internal?.audit,
 
     flowFile: config.flowFile || 'flows.json',
     userDir: config.userDir || '',

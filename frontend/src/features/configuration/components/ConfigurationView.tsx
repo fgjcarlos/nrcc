@@ -80,8 +80,10 @@ const INITIAL_FORM_DATA: NodeRedConfigFormData = {
   // Logging - Multiple handlers
   loggingConsoleLevel: 'info',
   loggingConsoleMetrics: false,
+  loggingConsoleAudit: undefined,
   loggingInternalLevel: 'info',
   loggingInternalMetrics: false,
+  loggingInternalAudit: undefined,
 
   // Files
   flowFile: 'flows.json',

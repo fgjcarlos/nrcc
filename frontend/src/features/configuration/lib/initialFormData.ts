@@ -20,8 +20,10 @@ export const INITIAL_FORM_DATA: NodeRedConfigFormData = {
 
   loggingConsoleLevel: 'info',
   loggingConsoleMetrics: false,
+  loggingConsoleAudit: undefined,
   loggingInternalLevel: 'info',
   loggingInternalMetrics: false,
+  loggingInternalAudit: undefined,
 
   flowFile: 'flows.json',
   userDir: '',

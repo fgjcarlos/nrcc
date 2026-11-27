@@ -21,6 +21,7 @@ export type LoggingLevel = 'off' | 'trace' | 'debug' | 'info' | 'warn' | 'error'
 export interface LoggingHandler {
   level?: LoggingLevel;
   metrics?: boolean;
+  audit?: boolean;
 }
 
 export interface LoggingSettings {
@@ -304,8 +305,10 @@ export interface NodeRedConfigFormData {
   projectsEnabled: boolean;
   loggingConsoleLevel: LoggingLevel;
   loggingConsoleMetrics: boolean;
+  loggingConsoleAudit?: boolean;
   loggingInternalLevel: LoggingLevel;
   loggingInternalMetrics: boolean;
+  loggingInternalAudit?: boolean;
   flowFile: string;
   userDir: string;
   nodesDir: string;

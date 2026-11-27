@@ -26,7 +26,7 @@ export function LoggingSettings({ settings, onUpdate, disabled, configuredConsol
               field="loggingConsoleLevel"
               value={settings.loggingConsoleLevel}
               onChange={(v) => onUpdate('loggingConsoleLevel', v)}
-              options={[{ value: '', label: t('configuration:levelNotSet') }, ...LOGGING_LEVELS]}
+              options={[...(!settings.loggingConsoleLevel ? [{ value: '', label: t('configuration:levelNotSet'), disabled: true }] : []), ...LOGGING_LEVELS]}
               disabled={disabled}
             />
             <ToggleField
@@ -35,6 +35,14 @@ export function LoggingSettings({ settings, onUpdate, disabled, configuredConsol
               value={settings.loggingConsoleMetrics}
               onChange={(v) => onUpdate('loggingConsoleMetrics', v)}
               help="Log flow execution metrics"
+              disabled={disabled}
+            />
+            <ToggleField
+              label={t('configuration:enableAudit')}
+              field="loggingConsoleAudit"
+              value={settings.loggingConsoleAudit ?? false}
+              onChange={(v) => onUpdate('loggingConsoleAudit', v)}
+              help={t('configuration:consoleAuditHelp')}
               disabled={disabled}
             />
           </div>
@@ -57,7 +65,7 @@ export function LoggingSettings({ settings, onUpdate, disabled, configuredConsol
               field="loggingInternalLevel"
               value={settings.loggingInternalLevel}
               onChange={(v) => onUpdate('loggingInternalLevel', v)}
-              options={[{ value: '', label: t('configuration:levelNotSet') }, ...LOGGING_LEVELS]}
+              options={[...(!settings.loggingInternalLevel ? [{ value: '', label: t('configuration:levelNotSet'), disabled: true }] : []), ...LOGGING_LEVELS]}
               disabled={disabled}
             />
             <ToggleField
@@ -66,6 +74,14 @@ export function LoggingSettings({ settings, onUpdate, disabled, configuredConsol
               value={settings.loggingInternalMetrics}
               onChange={(v) => onUpdate('loggingInternalMetrics', v)}
               help="Log runtime metrics"
+              disabled={disabled}
+            />
+            <ToggleField
+              label={t('configuration:enableAudit')}
+              field="loggingInternalAudit"
+              value={settings.loggingInternalAudit ?? false}
+              onChange={(v) => onUpdate('loggingInternalAudit', v)}
+              help={t('configuration:internalAuditHelp')}
               disabled={disabled}
             />
           </div>
