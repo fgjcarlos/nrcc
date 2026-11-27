@@ -1566,17 +1566,13 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get recent log entries
-         * @description Returns recent Node-RED runtime log entries from the in-memory buffer.
+         * Get runtime log history
+         * @description Admin-only. Entries are ordered ascending by sequence; without cursor the newest matching limit entries are returned. Filters are applied before pagination. Use nextCursor for older matching pages; highWatermark identifies the snapshot boundary for live tail. startedAt is the latest runtime start time; sinceRestart=true filters retained history to entries timestamped at or after it.
          */
         get: operations["getLogs"];
         put?: never;
         post?: never;
-        /**
-         * Clear log buffer
-         * @description Clears all entries from the in-memory log buffer.
-         */
-        delete: operations["deleteLogs"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1590,16 +1586,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Stream logs via SSE
-         * @description Opens a Server-Sent Events stream for live log tailing.
-         *
-         *     **Event types:**
-         *     - `connected` — sent once on connection; payload `{"bufferedCount": N}`
-         *     - `log` — one per log entry; payload is a `LogEntry` object
-         *     - `: ping` — keepalive comment every 15 seconds
-         *
-         *     The `replay` parameter controls how many buffered entries are replayed
-         *     on connect before live streaming begins.
+         * Stream runtime logs via SSE
+         * @description Admin-only. Connect with `since=<generation:sequence>` set to history highWatermark to avoid gaps. Events are connected (generation/highWatermark/startedAt), log (entry with SSE id), restart (same cursor generation, updated highWatermark/startedAt; obtain a new snapshot), and ping comments. Automatic reconnect sends Last-Event-ID, honored when since is absent. Streams end after five minutes to re-evaluate bearer authorization. Authentication requires the existing bearer Authorization header; native browser EventSource cannot set it, so browser clients must use an authenticated fetch streaming reader or an approved EventSource implementation that supports headers.
          */
         get: operations["streamLogs"];
         put?: never;
@@ -2630,16 +2618,15 @@ export interface components {
             message: string;
         };
         LogEntry: {
+            /** @description Opaque generation:sequence identifier */
             id: string;
-            /**
-             * Format: date-time
-             * @description ISO-8601 timestamp
-             */
+            /** Format: date-time */
             timestamp: string;
             /** @enum {string} */
-            level: "info" | "warn" | "error" | "debug";
+            level: "info" | "warn" | "error" | "debug" | "trace" | "fatal" | "unknown";
             /** @enum {string} */
             source: "stdout" | "stderr";
+            /** @description Truncated to 4096 bytes when a line exceeds the capture limit */
             message: string;
         };
         /** @description Arbitrary JSON object */
@@ -3048,7 +3035,17 @@ export interface components {
             /** Format: date-time */
             timestamp: string;
         } & {
-            data?: components["schemas"]["LogEntry"][];
+            data?: {
+                entries: components["schemas"]["LogEntry"][];
+                generation: string;
+                highWatermark: string;
+                nextCursor?: string;
+                /**
+                 * Format: date-time
+                 * @description Latest runtime start time
+                 */
+                startedAt?: string;
+            };
         };
         SuccessEnvelope_AnyObject: {
             /** @enum {boolean} */
@@ -5338,8 +5335,21 @@ export interface operations {
     getLogs: {
         parameters: {
             query?: {
-                /** @description Number of recent entries to return (max 1000) */
-                tail?: number;
+                limit?: number;
+                /** @description Exclusive before cursor returned as nextCursor; fetches the preceding older page */
+                cursor?: string;
+                /** @description Expected restart generation; mismatch returns 409 */
+                generation?: string;
+                /** @description Repeat for multiple levels */
+                level?: ("info" | "warn" | "error" | "debug" | "trace" | "fatal" | "unknown")[];
+                /** @description Case-insensitive message substring */
+                q?: string;
+                /** @description Inclusive RFC3339 timestamp */
+                from?: string;
+                /** @description Inclusive RFC3339 timestamp */
+                to?: string;
+                /** @description Return entries since the runtime's last start */
+                sinceRestart?: boolean;
             };
             header?: never;
             path?: never;
@@ -5347,7 +5357,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Log entries */
+            /** @description Log page */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -5356,33 +5366,29 @@ export interface operations {
                     "application/json": components["schemas"]["SuccessEnvelope_LogEntryList"];
                 };
             };
-            401: components["responses"]["Unauthorized"];
-        };
-    };
-    deleteLogs: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Log buffer cleared */
-            204: {
+            /** @description Invalid query parameters */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            /** @description Cursor or generation is stale */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     streamLogs: {
         parameters: {
             query?: {
-                /** @description Number of buffered entries to replay on connect (max 1000) */
-                replay?: number;
+                /** @description Generation:sequence cursor */
+                since?: string;
             };
             header?: never;
             path?: never;
@@ -5399,7 +5405,22 @@ export interface operations {
                     "text/event-stream": string;
                 };
             };
+            /** @description Malformed cursor */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            /** @description Restart generation changed; fetch a fresh history snapshot */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     aiAnalyzeFlow: {
