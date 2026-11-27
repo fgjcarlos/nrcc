@@ -73,8 +73,10 @@ const FIELD_SOURCE: Record<keyof NodeRedConfigFormData, FieldSource> = {
   // Logging
   loggingConsoleLevel: 'settings.js',
   loggingConsoleMetrics: 'settings.js',
+  loggingConsoleAudit: 'settings.js',
   loggingInternalLevel: 'settings.js',
   loggingInternalMetrics: 'settings.js',
+  loggingInternalAudit: 'settings.js',
   // Files
   flowFile: 'settings.js',
   userDir: 'settings.js',
@@ -140,8 +142,10 @@ const HARD_RESTART_FIELDS: ReadonlySet<keyof NodeRedConfigFormData> = new Set([
 const SOFT_RESTART_FIELDS: ReadonlySet<keyof NodeRedConfigFormData> = new Set([
   'loggingConsoleLevel',
   'loggingConsoleMetrics',
+  'loggingConsoleAudit',
   'loggingInternalLevel',
   'loggingInternalMetrics',
+  'loggingInternalAudit',
   'editorPageTitle',
   'editorPageFavicon',
   'editorPageCss',

@@ -76,6 +76,11 @@ func TestRuntimeLogsHistoryAndStreamSnapshot(t *testing.T) {
 	if len(result.Data.Entries) != 1 || result.Data.Entries[0].Source != "stdout" {
 		t.Fatalf("unexpected response: %#v", result)
 	}
+	beforeFirst := httptest.NewRecorder()
+	h.History(beforeFirst, httptest.NewRequest(http.MethodGet, "/api/logs?cursor="+strings.Replace(result.Data.HighWatermark, ":1", ":0", 1), nil))
+	if beforeFirst.Code != http.StatusOK || !strings.Contains(beforeFirst.Body.String(), `"entries":[]`) {
+		t.Fatalf("paging before sequence zero returned %d: %s", beforeFirst.Code, beforeFirst.Body.String())
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	req := httptest.NewRequest(http.MethodGet, "/api/logs/stream?since="+result.Data.HighWatermark, nil).WithContext(ctx)
 	stream := httptest.NewRecorder()
@@ -84,7 +89,7 @@ func TestRuntimeLogsHistoryAndStreamSnapshot(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 	cancel()
 	<-done
-	if !strings.Contains(stream.Body.String(), "event: connected") {
-		t.Fatalf("missing initial event: %s", stream.Body.String())
+	if !strings.Contains(stream.Body.String(), "event: connected") || strings.Contains(stream.Body.String(), `"startedAt"`) {
+		t.Fatalf("invalid initial event before startup: %s", stream.Body.String())
 	}
 }
