@@ -77,7 +77,7 @@ func TestRuntimeLogsHistoryAndStreamSnapshot(t *testing.T) {
 		t.Fatalf("unexpected response: %#v", result)
 	}
 	beforeFirst := httptest.NewRecorder()
-	h.History(beforeFirst, httptest.NewRequest("GET", "/api/logs?cursor="+strings.Replace(result.Data.HighWatermark, ":1", ":0", 1), nil))
+	h.History(beforeFirst, httptest.NewRequest(http.MethodGet, "/api/logs?cursor="+strings.Replace(result.Data.HighWatermark, ":1", ":0", 1), nil))
 	if beforeFirst.Code != http.StatusOK || !strings.Contains(beforeFirst.Body.String(), `"entries":[]`) {
 		t.Fatalf("paging before sequence zero returned %d: %s", beforeFirst.Code, beforeFirst.Body.String())
 	}
