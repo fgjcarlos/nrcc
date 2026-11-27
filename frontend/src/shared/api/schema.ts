@@ -1964,6 +1964,7 @@ export interface components {
             /** @description Redirect HTTP requests to HTTPS */
             requireHttps?: boolean;
             https?: components["schemas"]["HttpsConfig"];
+            httpNodeCors?: components["schemas"]["HTTPNodeCorsConfig"];
         };
         /** @description Server-observed console logging status for the managed Node-RED child. The values are read-only and never accepted from clients. */
         RuntimeConsoleLoggingStatus: {
@@ -1989,6 +1990,19 @@ export interface components {
             port?: number;
             /** @description Private-key passphrase. Write-only: the API never returns the stored value, for any role. An empty or redacted value on write keeps the stored passphrase; a new value rotates it. */
             passphrase?: string;
+        };
+        /** @description Node-RED CORS block for http-in endpoints */
+        HTTPNodeCorsConfig: {
+            /** @description "*" as a single entry, or an explicit list of http(s) origins without a path. */
+            origin: string[];
+            /** @description Allowed methods. Absent means the Node-RED default GET,PUT,POST,DELETE. */
+            methods?: ("GET" | "HEAD" | "PUT" | "PATCH" | "POST" | "DELETE")[];
+            credentials?: boolean;
+            allowedHeaders?: string[];
+            /** @description Set when the hand-written block uses a shape NRCC cannot model, for example a function origin. The block is then read-only and left verbatim in settings.js. */
+            unsupported?: boolean;
+            /** @description Verbatim source of an unsupported block, for read-only display. */
+            raw?: string;
         };
         AdminAuth: {
             /** @example credentials */
