@@ -2643,7 +2643,7 @@ export interface components {
             message: string;
             /**
              * Format: date-time
-             * @description Managed launch that produced the entry
+             * @description Managed launch that produced the entry, independent of its log timestamp
              */
             runStartedAt?: string;
         };
