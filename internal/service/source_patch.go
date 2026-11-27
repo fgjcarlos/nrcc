@@ -82,6 +82,10 @@ var managedSettingKeys = []string{
 	// to managed lets the https-tls-preset route through SourcePatch
 	// while keeping the existing preservation guarantees.
 	"https",
+	// httpNodeCors — issue #1076. CORS for http-in endpoints, rendered
+	// from the structured model so the block round-trips through the
+	// source-preserving patch.
+	"httpNodeCors",
 }
 
 // IsManagedSettingKey reports whether key is one NRCC edits through its

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -851,6 +852,9 @@ func (s *ConfigService) Validate(cfg model.NodeRedConfig) error {
 	if err := validateHTTPBasicAuth("httpStaticAuth", cfg.HTTPStaticAuth); err != nil {
 		return err
 	}
+	if err := validateHTTPNodeCors(cfg.HTTPNodeCors); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -903,6 +907,58 @@ func validateHTTPBasicAuth(name string, auth *model.HTTPBasicAuth) error {
 		return fmt.Errorf("%s pass must be a bcrypt hash", name)
 	}
 	return nil
+}
+
+// validateHTTPNodeCors enforces the httpNodeCors rules (issue #1076). A nil
+// config is "CORS disabled" and an unsupported block is read-only: neither is
+// rejected, because NRCC cannot edit it.
+func validateHTTPNodeCors(cors *model.HTTPNodeCorsConfig) error {
+	if cors == nil || cors.Unsupported {
+		return nil
+	}
+	if len(cors.Origin) == 0 {
+		return fmt.Errorf("httpNodeCors origin must not be empty")
+	}
+	wildcard := false
+	for _, origin := range cors.Origin {
+		if origin == "*" {
+			wildcard = true
+			continue
+		}
+		if !isValidCorsOrigin(origin) {
+			return fmt.Errorf("httpNodeCors origin %q must be \"*\" or an http(s) URL without a path", origin)
+		}
+	}
+	if wildcard && cors.Credentials {
+		return fmt.Errorf("httpNodeCors origin \"*\" cannot be combined with credentials")
+	}
+	for _, method := range cors.Methods {
+		if !corsMethodAllowed[method] {
+			return fmt.Errorf("httpNodeCors method %q is not one of GET, HEAD, PUT, PATCH, POST, DELETE", method)
+		}
+	}
+	for _, header := range cors.AllowedHeaders {
+		if header == "" {
+			return fmt.Errorf("httpNodeCors allowedHeaders must not contain an empty header name")
+		}
+	}
+	return nil
+}
+
+// corsMethodAllowed is the closed set Node-RED's CORS middleware accepts.
+var corsMethodAllowed = map[string]bool{
+	"GET": true, "HEAD": true, "PUT": true, "PATCH": true, "POST": true, "DELETE": true,
+}
+
+// isValidCorsOrigin accepts exactly what the UI can express: the wildcard
+// (handled by the caller) or an http(s) origin with no path, query or fragment.
+func isValidCorsOrigin(origin string) bool {
+	parsed, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	return (parsed.Scheme == "http" || parsed.Scheme == "https") &&
+		parsed.Host != "" && parsed.Path == "" && parsed.RawQuery == "" && parsed.Fragment == ""
 }
 
 func (s *ConfigService) decorateConfig(cfg *model.NodeRedConfig) {
@@ -1087,6 +1143,14 @@ func patchSettingsJS(existingContent string, cfg model.NodeRedConfig) string {
 		content = replaceBlockKey(content, "https", block)
 	} else {
 		content = removeObjectKey(content, "https")
+	}
+	// httpNodeCors (issue #1076): a nil config clears the key, a modelable
+	// config replaces it, and an unsupported hand-written block is left
+	// byte-for-byte untouched (render returns "" for it).
+	if block := renderHTTPNodeCorsBlock(cfg); block != "" {
+		content = replaceBlockKey(content, "httpNodeCors", block)
+	} else if cfg.HTTPNodeCors == nil {
+		content = removeObjectKey(content, "httpNodeCors")
 	}
 
 	// Block keys: use brace-aware replacement
@@ -1316,6 +1380,51 @@ func renderHttpsBlock(cfg model.NodeRedConfig) string {
 		return ""
 	}
 	return "  https: {\n" + strings.Join(parts, "\n") + "\n  },"
+}
+
+// renderHTTPNodeCorsBlock produces a settings.js-compatible
+// `httpNodeCors: { ... }` entry. Returns the empty string for a nil config
+// (key absent) and for an unsupported hand-written block, which callers must
+// leave untouched in settings.js instead of rewriting it.
+func renderHTTPNodeCorsBlock(cfg model.NodeRedConfig) string {
+	cors := cfg.HTTPNodeCors
+	if cors == nil || cors.Unsupported {
+		return ""
+	}
+	parts := []string{fmt.Sprintf("    origin: %s,", renderCorsStringArray(cors.Origin))}
+	if len(cors.Methods) > 0 {
+		parts = append(parts, fmt.Sprintf("    methods: %s,", renderCorsStringArray(dedupeStrings(cors.Methods))))
+	}
+	if cors.Credentials {
+		parts = append(parts, "    credentials: true,")
+	}
+	if len(cors.AllowedHeaders) > 0 {
+		parts = append(parts, fmt.Sprintf("    allowedHeaders: %s,", renderCorsStringArray(cors.AllowedHeaders)))
+	}
+	return "  httpNodeCors: {\n" + strings.Join(parts, "\n") + "\n  },"
+}
+
+// renderCorsStringArray renders a JavaScript array of quoted strings.
+func renderCorsStringArray(values []string) string {
+	quoted := make([]string, len(values))
+	for i, value := range values {
+		quoted[i] = fmt.Sprintf("%q", value)
+	}
+	return "[" + strings.Join(quoted, ", ") + "]"
+}
+
+// dedupeStrings returns values without repeats, keeping the first occurrence.
+func dedupeStrings(values []string) []string {
+	seen := make(map[string]struct{}, len(values))
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		if _, dup := seen[value]; dup {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	return out
 }
 
 func nodeRedEnvType(typ string) string {
@@ -1629,6 +1738,7 @@ func (s *ConfigService) parseConfigFromContent(content string) (model.NodeRedCon
 	cfg.CredentialSecret = parseCredentialSecretFromJS(content)
 	cfg.RequireHttps = parseBoolFromJS(content, "requireHttps", false)
 	cfg.Https = parseHttpsBlockFromJS(content)
+	cfg.HTTPNodeCors = parseHTTPNodeCorsBlockFromJS(content)
 	if logging := parseLoggingBlock(content); len(logging) > 0 {
 		// The logging block is read back from the source so the mirror
 		// reports the values Node-RED actually runs with (issue #882).
@@ -1707,6 +1817,199 @@ func parseHttpsBlockFromJS(content string) *model.HttpsConfig {
 		return nil
 	}
 	return https
+}
+
+// parseHTTPNodeCorsBlockFromJS reads the top-level `httpNodeCors: { ... }`
+// block. Returns nil when the key is absent (CORS disabled). A block whose
+// shape NRCC cannot model (function origin, regexp, unknown key, non-literal
+// value) is reported as Unsupported with its verbatim source text so the UI
+// can show it read-only and the patcher leaves it untouched (issue #1076).
+func parseHTTPNodeCorsBlockFromJS(content string) *model.HTTPNodeCorsConfig {
+	start, end, ok := findTopLevelBlock(content, "httpNodeCors")
+	if !ok {
+		return nil
+	}
+	block := content[start:end]
+	unsupported := &model.HTTPNodeCorsConfig{Unsupported: true, Raw: block}
+
+	open := strings.Index(block, "{")
+	closeIdx := strings.LastIndex(block, "}")
+	if open < 0 || closeIdx <= open+1 {
+		return unsupported
+	}
+	body := block[open+1 : closeIdx]
+	if strings.TrimSpace(body) == "" {
+		return unsupported
+	}
+
+	cors := &model.HTTPNodeCorsConfig{}
+	for _, entry := range splitCorsObjectBody(body) {
+		if strings.TrimSpace(entry) == "" {
+			continue // trailing comma or the indentation before the closing brace
+		}
+		key, value, entryOK := parseCorsEntry(entry)
+		if !entryOK {
+			return unsupported
+		}
+		switch key {
+		case "origin":
+			list, listOK := parseCorsStringList(value)
+			if !listOK {
+				return unsupported
+			}
+			cors.Origin = list
+		case "methods", "allowedHeaders":
+			list, listOK := parseCorsStringList(value)
+			if !listOK {
+				return unsupported
+			}
+			list = splitCorsCommas(list)
+			if key == "methods" {
+				cors.Methods = list
+			} else {
+				cors.AllowedHeaders = list
+			}
+		case "credentials":
+			switch value {
+			case "true":
+				cors.Credentials = true
+			case "false":
+				cors.Credentials = false
+			default:
+				return unsupported
+			}
+		default:
+			return unsupported
+		}
+	}
+	return cors
+}
+
+// splitCorsObjectBody splits an object-literal body into its top-level
+// `key: value` entries. Depth tracking keeps commas inside nested brackets,
+// parentheses and string literals from splitting an entry.
+func splitCorsObjectBody(body string) []string {
+	var entries []string
+	depth := 0
+	inString := byte(0)
+	start := 0
+	for i := 0; i < len(body); i++ {
+		c := body[i]
+		if inString != 0 {
+			if c == '\\' {
+				i++
+				continue
+			}
+			if c == inString {
+				inString = 0
+			}
+			continue
+		}
+		switch c {
+		case '\'', '"', '`':
+			inString = c
+		case '{', '[', '(':
+			depth++
+		case '}', ']', ')':
+			depth--
+		case ',':
+			if depth == 0 {
+				entries = append(entries, body[start:i])
+				start = i + 1
+			}
+		}
+	}
+	return append(entries, body[start:])
+}
+
+// parseCorsEntry splits one `key: value` entry. A missing colon or an empty
+// key/value is reported as not-ok so callers treat it as unmodelable.
+func parseCorsEntry(entry string) (key, value string, ok bool) {
+	colon := strings.IndexByte(entry, ':')
+	if colon < 0 {
+		return "", "", false
+	}
+	key = strings.TrimSpace(entry[:colon])
+	value = strings.TrimSpace(entry[colon+1:])
+	return key, value, key != "" && value != ""
+}
+
+// parseCorsString parses a single- or double-quoted JavaScript string
+// literal. Anything else (identifier, call, regex, template) is not a literal
+// NRCC can render back, so it reports not-ok.
+func parseCorsString(value string) (string, bool) {
+	if len(value) < 2 {
+		return "", false
+	}
+	quote := value[0]
+	if (quote != '\'' && quote != '"') || value[len(value)-1] != quote {
+		return "", false
+	}
+	var out strings.Builder
+	for i := 1; i < len(value)-1; i++ {
+		c := value[i]
+		if c == '\\' && i+1 < len(value)-1 {
+			i++
+			switch value[i] {
+			case 'n':
+				out.WriteByte('\n')
+			case 't':
+				out.WriteByte('\t')
+			case 'r':
+				out.WriteByte('\r')
+			default:
+				out.WriteByte(value[i])
+			}
+			continue
+		}
+		out.WriteByte(c)
+	}
+	return out.String(), true
+}
+
+// parseCorsStringList parses a string literal or an array of string literals.
+func parseCorsStringList(value string) ([]string, bool) {
+	if !strings.HasPrefix(value, "[") {
+		single, ok := parseCorsString(value)
+		if !ok {
+			return nil, false
+		}
+		return []string{single}, true
+	}
+	if !strings.HasSuffix(value, "]") {
+		return nil, false
+	}
+	inner := strings.TrimSpace(value[1 : len(value)-1])
+	if inner == "" {
+		return []string{}, true
+	}
+	list := make([]string, 0, 4)
+	for _, element := range splitCorsObjectBody(inner) {
+		element = strings.TrimSpace(element)
+		if element == "" {
+			continue // tolerate a trailing comma
+		}
+		single, ok := parseCorsString(element)
+		if !ok {
+			return nil, false
+		}
+		list = append(list, single)
+	}
+	return list, true
+}
+
+// splitCorsCommas expands the comma-separated string form Node-RED accepts for
+// methods and allowedHeaders into one element per value.
+func splitCorsCommas(values []string) []string {
+	var out []string
+	for _, value := range values {
+		for _, part := range strings.Split(value, ",") {
+			if part = strings.TrimSpace(part); part != "" {
+				out = append(out, part)
+			}
+		}
+	}
+	return out
 }
 
 func parseStringFromJS(content, key, fallback string) string {

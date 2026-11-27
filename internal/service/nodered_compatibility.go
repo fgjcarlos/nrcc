@@ -37,6 +37,7 @@ var nodeRED5Catalog = []SettingCatalogEntry{
 	{Key: "httpNodeRoot", Shape: "string-or-false", Default: "/", Validation: "path-or-false", RestartRequired: true, UIEditable: true},
 	{Key: "https", Shape: "https-options", Default: "undefined", Validation: "https-options", Secret: true, RestartRequired: true, UIEditable: true},
 	{Key: "requireHttps", Shape: "boolean", Default: "false", Validation: "boolean", RestartRequired: true, UIEditable: true},
+	{Key: "httpNodeCors", Shape: "http-node-cors", Default: "undefined", Validation: "http-node-cors", RestartRequired: true, UIEditable: true},
 	{Key: "httpStatic", Shape: "string-or-array", Validation: "path-or-static-sources", RestartRequired: true, UIEditable: false},
 	{Key: "lang", Shape: "string", Default: "en-US", Validation: "locale", RestartRequired: true, UIEditable: true},
 	{Key: "runtimeState", Shape: "object", Default: "{enabled:false,ui:false}", Validation: "runtime-state-options", RestartRequired: true, UIEditable: true},
@@ -66,6 +67,10 @@ var nodeRED5Catalog = []SettingCatalogEntry{
 //   - requireHttps: when true Node-RED redirects http:// requests to https://.
 //     Restart required. Verification: editor URL without https redirects to
 //     https://<same path>.
+//   - httpNodeCors: CORS options for http-in endpoints (origin, methods,
+//     credentials, allowedHeaders). Absent by default, which disables CORS.
+//     Restart required. Verification: a preflight OPTIONS request from a
+//     listed origin returns Access-Control-Allow-Origin.
 func NodeRED5Catalog() []SettingCatalogEntry {
 	return append([]SettingCatalogEntry(nil), nodeRED5Catalog...)
 }
